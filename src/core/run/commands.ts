@@ -34,7 +34,7 @@ export function chooseRunNode(save: SaveGame, commandId: string, nodeId: string)
 
   const next = markCommand(save, commandId);
   const updatedRun = next.run!;
-  updatedRun.pendingNextCombat ??= { skipOrdinary: false, forceElite: false, extraItemRoll: false, forceBounty: false, bountyCreditsBonus: 0, bountyEnemyId: null, extraRareItemRoll: false };
+  updatedRun.pendingNextCombat ??= { skipOrdinary: false, forceElite: false, extraItemRoll: false, forceBounty: false, bountyCreditsBonus: 0, bountyEnemyId: null, extraRareItemRoll: false, alliedTurret: false };
   const selectedNode = updatedRun.graph.layers.flat().find((candidate) => candidate.id === nodeId)!;
   if (selectedNode.type === 'COMBAT' && updatedRun.pendingNextCombat.forceBounty && selectedNode.enemies.length > 0) {
     const original = selectedNode.enemies[0]!;
