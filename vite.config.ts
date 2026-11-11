@@ -1,10 +1,13 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   plugins: [react()],
-  resolve: { alias: { '@': path.resolve(__dirname, 'src') } },
+  resolve: { alias: { '@': path.resolve(projectRoot, 'src') } },
   server: { host: '0.0.0.0', port: 5173, strictPort: false, allowedHosts: true },
   preview: { host: '0.0.0.0', port: 4173, allowedHosts: true },
   build: { target: 'es2022', sourcemap: false, chunkSizeWarningLimit: 1500 },

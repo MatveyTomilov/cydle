@@ -27,18 +27,6 @@ export interface ItemInstance {
   label?: string;
 }
 
-let itemCounter = 0;
-export function nextItemId(prefix = 'it'): string {
-  itemCounter++;
-  return `${prefix}_${itemCounter.toString(36)}_${Math.floor(performanceNow())}`;
-}
-function performanceNow(): number {
-  return typeof performance !== 'undefined' ? performance.now() : Date.now();
-}
-export function resetItemCounter(v = 0): void {
-  itemCounter = v;
-}
-
 export function templateOf(item: ItemInstance): ItemTemplate {
   return UNIQUE_TEMPLATE_BY_ID[item.templateId] ?? ITEM_BY_ID[item.templateId]!;
 }
@@ -103,7 +91,8 @@ export function createItem(rng: Rng, opts: CreateItemOptions): ItemInstance {
   const [trMin, trMax] = TR_RANGES[rarity]!;
   const tr = trMin === trMax ? trMin : rng.int(trMin, trMax);
   return {
-    itemId: nextItemId(),
+    // Reward grants are idempotent; deriving identity from the grant keeps replays stable.
+    itemId: `it:${encodeURIComponent(opts.originGrantId)}:${encodeURIComponent(opts.templateId)}`,
     templateId: opts.templateId,
     techLevel: T,
     rarity,

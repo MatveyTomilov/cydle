@@ -117,33 +117,38 @@ export function partitionDamage(
   bypassShieldRatio: number,
   incomingShieldMultiplier = 1,
 ): PoolPartition {
-  const bypass = incoming * clamp(bypassShieldRatio, 0, 1);
-  let remaining = incoming - bypass;
+  const amount = Math.max(0, Number.isFinite(incoming) ? incoming : 0);
+  const bypass = amount * clamp(bypassShieldRatio, 0, 1);
+  let remaining = amount - bypass;
+  const shieldMultiplier = Math.max(0, Number.isFinite(incomingShieldMultiplier) ? incomingShieldMultiplier : 1);
   const tempConsumed: { sourceId: string; amount: number }[] = [];
   let shieldConsumed = 0;
+
+  const absorb = (available: number): number => {
+    if (remaining <= 0 || shieldMultiplier <= 0) return 0;
+    const absorbed = Math.min(Math.max(0, available), remaining * shieldMultiplier);
+    remaining -= absorbed / shieldMultiplier;
+    shieldConsumed += absorbed;
+    return absorbed;
+  };
 
   const sorted = [...pools.temp].sort((a, b) => a.expiresAt - b.expiresAt || a.sourceId.localeCompare(b.sourceId));
   for (const p of sorted) {
     if (remaining <= 0) break;
-    const take = Math.min(p.amount, remaining);
+    const take = absorb(p.amount);
     if (take > 0) {
-      tempConsumed.push({ sourceId: p.sourceId, amount: take * incomingShieldMultiplier > 0 ? take : take });
-      remaining -= take;
-      shieldConsumed += take;
+      tempConsumed.push({ sourceId: p.sourceId, amount: take });
     }
   }
-  if (remaining > 0) {
-    const take = Math.min(pools.shield, remaining);
-    shieldConsumed += take;
-    remaining -= take;
-  }
+  absorb(pools.shield);
   const hpDamage = bypass + remaining;
-  const hpLost = Math.min(pools.hp, hpDamage);
-  const overkill = Math.max(0, hpDamage - pools.hp);
-  const trace = node('SUM', 'щиты/HP', incoming, {
+  const hp = Math.max(0, Number.isFinite(pools.hp) ? pools.hp : 0);
+  const hpLost = Math.min(hp, hpDamage);
+  const overkill = Math.max(0, hpDamage - hp);
+  const trace = node('SUM', 'щиты/HP', amount, {
     sourceId: 'partition', sourceName: 'Распределение урона', unit: 'ед.',
-    inputs: [incoming, bypass, shieldConsumed, hpLost, overkill],
-    localizedExplanation: `Обход щита ${bypass}, поглощено щитом ${shieldConsumed}, потеря HP ${hpLost}${overkill > 0 ? `, overkill ${overkill}` : ''}`,
+    inputs: [amount, bypass, shieldMultiplier, shieldConsumed, hpLost, overkill],
+    localizedExplanation: `Обход щита ${bypass}, множитель урона по щиту ×${shieldMultiplier}, поглощено щитом ${shieldConsumed}, потеря HP ${hpLost}${overkill > 0 ? `, overkill ${overkill}` : ''}`,
   });
   return { shieldConsumed, tempConsumed, hpLost, bypassed: bypass, overkill, trace };
 }

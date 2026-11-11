@@ -214,6 +214,8 @@ export interface Wallet {
 export const EMPTY_WALLET: Wallet = { CREDITS: 0, SCRAP: 0, DATA: 0 };
 
 export type TargetMode =
+  | 'target'
+  | 'otherEnemy'
   | 'nearest'
   | 'lowestHPPercent'
   | 'marked'

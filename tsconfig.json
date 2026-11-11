@@ -17,7 +17,7 @@
     "esModuleInterop": true,
     "allowImportingTsExtensions": false,
     "noEmit": true,
-    "types": ["vitest/globals"],
+    "types": ["vitest/globals", "node"],
     "baseUrl": ".",
     "paths": { "@/*": ["src/*"] }
   },

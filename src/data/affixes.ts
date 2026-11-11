@@ -1,4 +1,5 @@
-import type { ItemCategory, StatId } from '../core/types';
+import type { ItemCategory } from '../core/types';
+import type { StatId } from '../core/math/stats';
 import type { StatEffect } from './types';
 
 export type AffixGroup = 'offensive' | 'defensive' | 'resource' | 'utility';
