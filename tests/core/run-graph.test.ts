@@ -1,0 +1,44 @@
+import { describe, expect, it } from 'vitest';
+import { enumerateSectorPaths, generateSectorGraph } from '../../src/core/run/graph';
+
+describe('deterministic sector graph', () => {
+  it('keeps the authored first-sector tutorial sequence on every route', () => {
+    const graph = generateSectorGraph({ seed: 'tutorial-pinned', depth: 1, biome: 'B01', tutorial: true });
+    expect(graph.layers.map((layer) => layer.length)).toEqual([1, 2, 3, 3, 2, 1]);
+    expect(graph.layers[0]![0]).toMatchObject({ type: 'COMBAT', enemies: [{ templateId: 'E01' }] });
+    expect(graph.layers[1]!.every((node) => node.type === 'CACHE' && node.prototypeChoices?.length === 3)).toBe(true);
+    expect(graph.layers[2]!.every((node) => node.type === 'COMBAT' && node.enemies.map((enemy) => enemy.templateId).join(',') === 'E01,E02')).toBe(true);
+    expect(graph.layers[5]![0]?.type).toBe('CHECKPOINT');
+    for (const path of enumerateSectorPaths(graph)) {
+      expect(path.map((node) => node.type).slice(0, 3)).toEqual(['COMBAT', 'CACHE', 'COMBAT']);
+    }
+  });
+
+  it('is reproducible for a seed and produces a reachable acyclic graph', () => {
+    const input = { seed: 'same-seed', depth: 2, biome: 'B03' as const, tutorial: false };
+    const graph = generateSectorGraph(input);
+    expect(generateSectorGraph(input)).toEqual(graph);
+    expect(generateSectorGraph({ ...input, seed: 'other-seed' })).not.toEqual(graph);
+    expect(graph.layers.map((layer) => layer.length).slice(0, 3)).toEqual([1, 2, 3]);
+    expect(graph.edges.every((edge) => edge.from === graph.startNodeId || edge.toLayer === edge.fromLayer + 1)).toBe(true);
+    expect(graph.edges.filter((edge) => edge.from === graph.startNodeId).length).toBe(1);
+    expect(graph.layers.flat().every((node) => graph.edges.some((edge) => edge.to === node.id))).toBe(true);
+    expect(graph.layers.slice(0, -1).flat().every((node) => graph.edges.some((edge) => edge.from === node.id))).toBe(true);
+    expect(graph.edges.reduce((max, edge) => Math.max(max, graph.edges.filter((out) => out.from === edge.from).length), 0)).toBeLessThanOrEqual(3);
+  });
+
+  it('guarantees combat and a resource opportunity on every reachable path', () => {
+    for (const input of [
+      { seed: 'a', depth: 1, biome: 'B01' as const, tutorial: true },
+      { seed: 'b', depth: 2, biome: 'B03' as const, tutorial: false },
+      { seed: 'c', depth: 4, biome: 'B01' as const, tutorial: false },
+    ]) {
+      const graph = generateSectorGraph(input);
+      for (const path of enumerateSectorPaths(graph)) {
+        expect(path.filter((node) => ['COMBAT', 'ELITE', 'BOUNTY', 'BOSS'].includes(node.type)).length).toBeGreaterThanOrEqual(2);
+        expect(path.some((node) => ['REPAIR', 'FUEL', 'SHOP', 'CACHE'].includes(node.type))).toBe(true);
+        expect(path.at(-1)?.type).toBe(input.depth % 4 === 0 ? 'BOSS' : 'CHECKPOINT');
+      }
+    }
+  });
+});

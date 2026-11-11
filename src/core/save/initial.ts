@@ -38,6 +38,7 @@ export function createInitialSave(options: { saveId?: string; now?: number } = {
     revision: 1,
     meta: {
       operator: { level: 1, xp: 0, attributes: { POW: 5, REF: 5, INT: 5, ENG: 5, SYN: 5 }, attributePoints: 0, treePoints: 0 },
+      tutorial: { firstSectorCompleted: false, starterPrototypeSecured: false },
       transport: { fuel: 24, fuelMax: 24, hull: 100, hullMax: 100, cargoCapacity: 20 },
       protectedBank: { CREDITS: 120, SCRAP: 30, DATA: 20 },
       unsecuredWallet: { CREDITS: 0, SCRAP: 0, DATA: 0 },
@@ -45,6 +46,7 @@ export function createInitialSave(options: { saveId?: string; now?: number } = {
       equipment,
       garage: { WORKSHOP: 1, NEUROLAB: 1, SERVER: 1, HANGAR: 1, MARKET: 1, INTEL: 1, GARAGE_MED: 1, CALIBRATOR: 1 },
       unlockedForpost: 0,
+      maxSectorCleared: 0,
       unlockedBiomes: ['B01'],
       skillIds: ['SK_BURST', 'SK_SHIELD', 'SK_EMP'],
       passiveIds: ['PP_ACCURACY', 'PP_SHIELD'],

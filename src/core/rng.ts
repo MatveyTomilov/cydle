@@ -70,6 +70,11 @@ export class Rng {
     return (t >>> 0) / 4294967296;
   }
 
+  /** unsigned output for deterministic IDs that must not lose RNG entropy */
+  nextUint32(): number {
+    return Math.floor(this.next() * 4294967296) >>> 0;
+  }
+
   /** целое в [min,max] включительно */
   int(min: number, max: number): number {
     if (max < min) return min;

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { resolveBuild } from '../build/build';
+import { createRunStateSchema } from '../run/schema';
 
 export const SAVE_SCHEMA_VERSION = 1 as const;
 export const BALANCE_VERSION = '1.0.0';
@@ -19,6 +20,7 @@ const itemInstance = z.object({
   secured: z.boolean(), originGrantId: z.string().min(1), rollSeed: z.string(), tr: z.number().finite(),
   coreGroup: z.number().int().optional(), acquiredAt: z.number().finite().nonnegative(), origin: z.string(), label: z.string().optional(),
 }).strict();
+const runState = createRunStateSchema(itemInstance);
 
 const tacticCondition: z.ZodTypeAny = z.lazy(() => z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('always') }).strict(),
@@ -51,16 +53,17 @@ export const SaveGameSchema = z.object({
   saveId: z.string().min(1), createdAt: z.number().finite().nonnegative(), updatedAt: z.number().finite().nonnegative(), revision: z.number().int().min(1),
   meta: z.object({
     operator: z.object({ level: z.number().int().min(1).max(999), xp: z.number().int().nonnegative(), attributes: attributeMap, attributePoints: z.number().int().nonnegative(), treePoints: z.number().int().nonnegative() }).strict(),
+    tutorial: z.object({ firstSectorCompleted: z.boolean(), starterPrototypeSecured: z.boolean() }).strict(),
     transport: z.object({ fuel: z.number().finite().min(0), fuelMax: z.number().finite().min(0), hull: z.number().finite().min(0), hullMax: z.number().finite().min(0), cargoCapacity: z.number().finite().min(0) }).strict(),
     protectedBank: wallet, unsecuredWallet: wallet,
     inventory: z.array(itemInstance), equipment: z.record(z.enum(['MAIN', 'OFFHAND', 'ARMOR', 'IMP_1', 'IMP_2', 'IMP_3', 'IMP_4', 'IMP_5', 'IMP_6', 'DRONE_1', 'DRONE_2', 'ENGINE', 'CHASSIS', 'SCANNER', 'SERVICE', 'CARGO', 'SUPPORT']), z.string().min(1)),
-    garage: garageLevels, unlockedForpost: z.number().int().min(0).max(12), unlockedBiomes: z.array(z.enum(['B01', 'B02', 'B03', 'B04', 'B05', 'B06'])),
+    garage: garageLevels, unlockedForpost: z.number().int().min(0).max(12), maxSectorCleared: z.number().int().min(0).max(999).optional(), unlockedBiomes: z.array(z.enum(['B01', 'B02', 'B03', 'B04', 'B05', 'B06'])),
     skillIds: z.array(z.string().min(1)).max(3), passiveIds: z.array(z.string().min(1)).max(3), treeNodeIds: z.array(z.string().min(1)),
     unlockedImplantSlots: z.number().int().min(4).max(6), unlockedDroneSlots: z.number().int().min(1).max(2),
     tactics: z.array(tacticalProfile).min(1), activeTacticId: z.string().min(1),
     autopilotProfiles: z.array(z.object({ id: z.string().min(1), name: z.string().min(1), startDepth: z.number().int().min(1).max(13), enabled: z.boolean() }).strict()).min(1),
   }).strict(),
-  run: z.null(),
+  run: runState.nullable(),
 }).strict();
 
 export type SaveGame = z.infer<typeof SaveGameSchema>;

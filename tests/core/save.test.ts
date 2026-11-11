@@ -5,6 +5,7 @@ import { resolveBuild } from '../../src/core/build/build';
 import { createInitialSave } from '../../src/core/save/initial';
 import { commitSave, exportSaveText, importSaveText, loadSave } from '../../src/core/save/storage';
 import { parseSave, parseSaveExport, saveChecksum } from '../../src/core/save/schema';
+import { createInitialRun } from '../../src/core/run/run';
 
 describe('save boundary', () => {
   it('creates the canonical equipped level-one operator without random variation', () => {
@@ -39,6 +40,11 @@ describe('save boundary', () => {
   it('validates imported data and rejects incompatible schema versions', () => {
     const save = createInitialSave({ saveId: 'save-test', now: 1234 });
     expect(parseSave(save).success).toBe(true);
+    const legacyV1 = structuredClone(save) as typeof save & { meta: { maxSectorCleared?: number } };
+    delete legacyV1.meta.maxSectorCleared;
+    const legacyParsed = parseSave(legacyV1);
+    expect(legacyParsed.success).toBe(true);
+    if (legacyParsed.success) expect(saveChecksum(legacyParsed.data)).toBe(saveChecksum(legacyV1));
     expect(parseSave({ ...save, schemaVersion: 2 }).success).toBe(false);
     expect(parseSave({ ...save, meta: { ...save.meta, protectedBank: { ...save.meta.protectedBank, CREDITS: -1 } } }).success).toBe(false);
     expect(parseSave({ ...save, meta: { ...save.meta, equipment: { ...save.meta.equipment, MAIN: 'missing-item' } } }).success).toBe(false);
@@ -52,6 +58,17 @@ describe('save boundary', () => {
     const save = createInitialSave({ saveId: 'save-test', now: 1234 });
     expect(saveChecksum(save)).toBe(saveChecksum(structuredClone(save)));
     expect(saveChecksum(save)).not.toBe(saveChecksum({ ...save, revision: save.revision + 1 }));
+  });
+
+  it('persists and reloads a deterministic active run without rerolling its graph', async () => {
+    const base = createInitialSave({ saveId: `active-run-${globalThis.crypto.randomUUID()}`, now: 100 });
+    const active = { ...base, run: createInitialRun(base, 'persisted-run-seed') };
+    const committed = await commitSave(active, 100);
+    const loaded = await loadSave();
+    expect(loaded).toMatchObject({ kind: 'loaded', recovered: false });
+    if (loaded.kind !== 'loaded') throw new Error('Expected active run to reload');
+    expect(loaded.save.run).toEqual(committed.run);
+    expect(loaded.save.run?.graph).toEqual(active.run.graph);
   });
 
   it('commits atomically, keeps a valid fallback, and imports only verified exports', async () => {
