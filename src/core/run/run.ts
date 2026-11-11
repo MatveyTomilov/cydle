@@ -48,7 +48,7 @@ export function createInitialRun(save: SaveGame, seed: string): RunState {
     revealLevel: 1,
     pendingTravelDeltaMs: 0,
     pendingCombatEffects: { initialTempShield: 0, extraHeat: 0 },
-    pendingNextCombat: { skipOrdinary: false, forceElite: false, extraItemRoll: false, forceBounty: false, bountyCreditsBonus: 0, bountyEnemyId: null, extraRareItemRoll: false },
+    pendingNextCombat: { skipOrdinary: false, forceElite: false, extraItemRoll: false, forceBounty: false, bountyCreditsBonus: 0, bountyEnemyId: null, extraRareItemRoll: false, alliedTurret: false },
     resources: {
       fuel: save.meta.transport.fuel,
       maxFuel: save.meta.transport.fuelMax,

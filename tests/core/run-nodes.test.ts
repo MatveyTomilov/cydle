@@ -289,12 +289,12 @@ describe('run road nodes', () => {
     expect(skipped.ok).toBe(true);
     if (!skipped.ok) return;
     expect(skipped.save.run!.runWallet.CREDITS).toBe(0);
-    expect(skipped.save.run!.pendingNextCombat).toEqual({ skipOrdinary: true, forceElite: false, extraItemRoll: false, forceBounty: false, bountyCreditsBonus: 0, bountyEnemyId: null, extraRareItemRoll: false });
+    expect(skipped.save.run!.pendingNextCombat).toEqual({ skipOrdinary: true, forceElite: false, extraItemRoll: false, forceBounty: false, bountyCreditsBonus: 0, bountyEnemyId: null, extraRareItemRoll: false, alliedTurret: false });
 
     const elite = resolveRunEvent({ ...base, run: prepareEventRun('event-force-elite') }, { id: 'event-force-elite', choiceId: 'B' });
     expect(elite.ok).toBe(true);
     if (!elite.ok) return;
-    expect(elite.save.run!.pendingNextCombat).toEqual({ skipOrdinary: false, forceElite: true, extraItemRoll: true, forceBounty: false, bountyCreditsBonus: 0, bountyEnemyId: null, extraRareItemRoll: false });
+    expect(elite.save.run!.pendingNextCombat).toEqual({ skipOrdinary: false, forceElite: true, extraItemRoll: true, forceBounty: false, bountyCreditsBonus: 0, bountyEnemyId: null, extraRareItemRoll: false, alliedTurret: false });
   });
 
   it('stores EV14 and EV21 as forced bounty choices with their authored modifiers', () => {
@@ -319,6 +319,21 @@ describe('run road nodes', () => {
     expect(ev21.ok).toBe(true);
     if (!ev21.ok) return;
     expect(ev21.save.run!.pendingNextCombat).toMatchObject({ forceBounty: true, bountyEnemyId: 'E21', extraRareItemRoll: true });
+  });
+
+  it('stores EV18 A as a one-combat allied turret effect', () => {
+    const base = createInitialSave({ saveId: 'event-allied-turret', now: 100 });
+    const run = createInitialRun(base, 'event-allied-turret-seed');
+    const eventNode = run.graph.layers[1]![0]!;
+    eventNode.type = 'EVENT';
+    eventNode.eventId = 'EV18';
+    run.currentNodeId = eventNode.id;
+    run.visitedNodeIds = [eventNode.id];
+    run.phase = 'NODE';
+    const result = resolveRunEvent({ ...base, run }, { id: 'event-allied-turret-choice', choiceId: 'A' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.save.run!.pendingNextCombat.alliedTurret).toBe(true);
   });
 
   it('rejects an unaffordable event choice without mutating the save', () => {

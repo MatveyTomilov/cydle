@@ -263,7 +263,7 @@ export function createCombatState(config: CombatConfig): CombatState {
   }
   const started = emit(state, 'COMBAT_START', 'operator', {
     text: `Бой начался: ${enemies.map((e) => e.name).join(', ')}.`,
-    data: { initialTempShield: config.initialTempShield ?? 0, initialExtraHeat: config.initialExtraHeat ?? 0 },
+    data: { initialTempShield: config.initialTempShield ?? 0, initialExtraHeat: config.initialExtraHeat ?? 0, alliedCount: allies.length },
   });
   dispatchTriggerEvent(state, rng, { event: 'ON_COMBAT_START', actor: operator, actionId: 'combat-start', originActionId: 'combat-start', causeId: started.eventId, chainDepth: 0, direct: false, procWeight: 1 });
   state.rng = rng.serialize();

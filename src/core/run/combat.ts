@@ -120,13 +120,13 @@ export function resolveCurrentCombat(save: SaveGame, commandId: string): RunComm
   const node = run.graph.layers.flat().find((candidate) => candidate.id === run.currentNodeId);
   if (!node || !['COMBAT', 'ELITE', 'BOUNTY', 'BOSS'].includes(node.type)) return fail(save, 'NODE_NOT_COMBAT', 'Текущий узел не является боевым.');
   if (run.clearedNodeIds.includes(node.id)) return fail(save, 'NODE_ALREADY_CLEARED', 'Этот боевой узел уже пройден.');
-  const pendingNextCombat = run.pendingNextCombat ?? { skipOrdinary: false, forceElite: false, extraItemRoll: false, forceBounty: false, bountyCreditsBonus: 0, bountyEnemyId: null, extraRareItemRoll: false };
+  const pendingNextCombat = run.pendingNextCombat ?? { skipOrdinary: false, forceElite: false, extraItemRoll: false, forceBounty: false, bountyCreditsBonus: 0, bountyEnemyId: null, extraRareItemRoll: false, alliedTurret: false };
   if (pendingNextCombat.skipOrdinary && node.type === 'COMBAT') {
     const next = structuredClone(save);
     const nextRun = next.run!;
     nextRun.commandIds = [...nextRun.commandIds, commandId].slice(-128);
     nextRun.lastCommandId = commandId;
-    nextRun.pendingNextCombat = { skipOrdinary: false, forceElite: false, extraItemRoll: false, forceBounty: false, bountyCreditsBonus: 0, bountyEnemyId: null, extraRareItemRoll: false };
+    nextRun.pendingNextCombat = { skipOrdinary: false, forceElite: false, extraItemRoll: false, forceBounty: false, bountyCreditsBonus: 0, bountyEnemyId: null, extraRareItemRoll: false, alliedTurret: false };
     nextRun.clearedNodeIds = [...nextRun.clearedNodeIds, node.id];
     nextRun.combatResult = null;
     nextRun.phase = node.layer === 5 ? 'CHECKPOINT' : 'ROUTE';
@@ -154,6 +154,7 @@ export function resolveCurrentCombat(save: SaveGame, commandId: string): RunComm
     startHeat: run.resources.heat,
     initialTempShield: pendingCombatEffects.initialTempShield,
     initialExtraHeat: pendingCombatEffects.extraHeat,
+    allies: pendingNextCombat.alliedTurret ? [{ templateId: 'E08', hpMult: 0.5, damageMult: 0.5 }] : [],
     wanted: run.wanted,
     extraEnemyDigitalBonus: BIOME_BY_ID[run.biome]?.enemyDigitalBonus ?? 0,
     coolingPenalty: BIOME_BY_ID[run.biome]?.coolingPenalty ?? 0,
@@ -162,7 +163,7 @@ export function resolveCurrentCombat(save: SaveGame, commandId: string): RunComm
   const next = structuredClone(save);
   const nextRun = next.run!;
   nextRun.pendingCombatEffects = { initialTempShield: 0, extraHeat: 0 };
-  nextRun.pendingNextCombat = { skipOrdinary: false, forceElite: false, extraItemRoll: false, forceBounty: false, bountyCreditsBonus: 0, bountyEnemyId: null, extraRareItemRoll: false };
+  nextRun.pendingNextCombat = { skipOrdinary: false, forceElite: false, extraItemRoll: false, forceBounty: false, bountyCreditsBonus: 0, bountyEnemyId: null, extraRareItemRoll: false, alliedTurret: false };
   nextRun.commandIds = [...nextRun.commandIds, commandId].slice(-128);
   nextRun.lastCommandId = commandId;
   nextRun.combatResult = result;

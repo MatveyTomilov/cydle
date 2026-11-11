@@ -179,10 +179,11 @@ export function resolveRunEvent(save: SaveGame, command: { id: string; choiceId:
   nextRun.pendingCombatEffects ??= { initialTempShield: 0, extraHeat: 0 };
   if (choice.nextCombat?.shieldBonus) nextRun.pendingCombatEffects.initialTempShield += choice.nextCombat.shieldBonus;
   if (choice.nextCombat?.extraHeat) nextRun.pendingCombatEffects.extraHeat += choice.nextCombat.extraHeat;
-  nextRun.pendingNextCombat ??= { skipOrdinary: false, forceElite: false, extraItemRoll: false, forceBounty: false, bountyCreditsBonus: 0, bountyEnemyId: null, extraRareItemRoll: false };
+  nextRun.pendingNextCombat ??= { skipOrdinary: false, forceElite: false, extraItemRoll: false, forceBounty: false, bountyCreditsBonus: 0, bountyEnemyId: null, extraRareItemRoll: false, alliedTurret: false };
   if (choice.nextCombat?.skip) nextRun.pendingNextCombat.skipOrdinary = true;
   if (choice.nextCombat?.forceElite) nextRun.pendingNextCombat.forceElite = true;
   if (choice.nextCombat?.forceBounty) nextRun.pendingNextCombat.forceBounty = true;
+  if (choice.nextCombat?.alliedTurret) nextRun.pendingNextCombat.alliedTurret = true;
   if (choice.nextCombat?.bountyCredits) nextRun.pendingNextCombat.bountyCreditsBonus += choice.nextCombat.bountyCredits;
   if (choice.nextCombat?.extraRareRoll && event.id === 'EV16') nextRun.pendingNextCombat.extraItemRoll = true;
   if (choice.flag === 'bountyE21') {

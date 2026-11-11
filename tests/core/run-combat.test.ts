@@ -184,6 +184,29 @@ describe('run combat integration', () => {
     expect(result.save.meta.operator.xp).toBe(0);
   });
 
+  it('joins one half-strength E08 ally for the next combat after EV18 A', () => {
+    const base = combatSave('event-allied-turret');
+    const run = base.run!;
+    const eventNode = run.graph.layers[1]![0]!;
+    eventNode.type = 'EVENT';
+    eventNode.eventId = 'EV18';
+    run.currentNodeId = eventNode.id;
+    run.visitedNodeIds = [eventNode.id];
+    run.phase = 'NODE';
+    const choice = resolveRunEvent({ ...base, run }, { id: 'event-allied-turret-choice', choiceId: 'A' });
+    expect(choice.ok).toBe(true);
+    if (!choice.ok) return;
+    const nextCombat = choice.save.run!.graph.layers[2]![0]!;
+    const entered = chooseRunNode(choice.save, 'event-allied-turret-enter', nextCombat.id);
+    expect(entered.ok).toBe(true);
+    if (!entered.ok) return;
+    const result = resolveCurrentCombat(entered.save, 'event-allied-turret-fight');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.save.run!.combatResult!.log.find((event) => event.kind === 'COMBAT_START')?.data?.alliedCount).toBe(1);
+    expect(result.save.run!.pendingNextCombat.alliedTurret).toBe(false);
+  });
+
   it('applies elite rewards, corporate wanted, and biome wallet bonuses through the shared combat result', () => {
     const save = combatSave('elite-reward');
     const run = save.run!;
