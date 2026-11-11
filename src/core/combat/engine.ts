@@ -8,7 +8,7 @@ import { ENEMY_BY_ID, BOSS_BY_ID, enemyTemplate } from '../../data/enemies';
 import { ITEM_BY_ID } from '../../data/items';
 import { SKILL_BY_ID } from '../../data/skills';
 import { UNIQUE_TEMPLATE_BY_ID } from '../../data/uniques';
-import type { BossTemplate, EnemyTemplate, SkillDef } from '../../data/types';
+import type { BossTemplate, EnemyAbility, EnemyTemplate, SkillDef } from '../../data/types';
 import type { ResolvedBuild } from '../build/build';
 import { D, H, TICK_MS, attackIntervalMs, clamp, cooldownMs, finite } from '../math/formula';
 import {
@@ -139,7 +139,7 @@ function createEnemyActor(spec: { templateId: string; hpMult?: number; damageMul
     summoned: spec.summoned, noLoot: spec.noLoot, eliteMod: spec.elite,
   });
   actor.flags.lastDamagedAt = -100000;
-  for (const ability of t.abilities) actor.abilityNext[ability.id] = ability.firstAtMs;
+  for (const ability of [...t.abilities, ...('rotating' in t ? t.rotating ?? [] : [])]) actor.abilityNext[ability.id] = ability.firstAtMs;
   return actor;
 }
 
@@ -630,6 +630,7 @@ interface HitOptions {
   skillId?: string;
   penOverride?: PenetrationSnapshot;
   bypassShieldRatio?: number;
+  abilityId?: string;
 }
 
 /**
@@ -666,7 +667,7 @@ function applyHit(state: CombatState, rng: Rng, actor: CombatActor, target: Comb
     delete target.statuses.MARK;
     target.markBy = undefined;
   }
-  const partition = partitionDamage(incoming, { hp: target.hp, shield: target.shield, temp: target.tempShields }, 0, ds.incomingShield);
+  const partition = partitionDamage(incoming, { hp: target.hp, shield: target.shield, temp: target.tempShields }, opts.bypassShieldRatio ?? 0, ds.incomingShield);
   applyPartition(target, partition);
   target.flags.lastDamagedAt = state.timeMs;
   state.metrics.hits++;
@@ -688,7 +689,7 @@ function applyHit(state: CombatState, rng: Rng, actor: CombatActor, target: Comb
     amountBeforeDefense: raw, amountAfterDefense: incoming,
     shieldConsumed: partition.shieldConsumed, hpLost: partition.hpLost, bypassed: partition.bypassed,
     text: `${actor.name} → ${target.name}: ${incoming.toFixed(1)} ${type}${crit ? ' (крит)' : ''}, щит −${partition.shieldConsumed.toFixed(1)}, HP −${partition.hpLost.toFixed(1)}.`,
-    data: { overkill: partition.overkill },
+    data: { overkill: partition.overkill, ...(opts.abilityId ? { abilityId: opts.abilityId } : {}) },
   });
   return raw;
 }
@@ -956,6 +957,131 @@ function castTarget(state: CombatState, actor: CombatActor, cast: CastState): Co
   return livingEnemies(state).sort((a, b) => byId(a.id, b.id))[0];
 }
 
+function actorAbilities(actor: CombatActor): EnemyAbility[] {
+  const template = enemyTemplate(actor.templateId);
+  return [...template.abilities, ...('rotating' in template ? template.rotating ?? [] : [])];
+}
+
+function isScheduledAbility(ability: EnemyAbility): boolean {
+  if (['heavyAttack', 'heal', 'heat', 'shieldRestore', 'mark', 'shieldBypass'].includes(ability.kind)) return true;
+  // Zero-time applyStatus entries encode event-driven effects (on hit/death), not timed casts.
+  return ability.kind === 'applyStatus' && (ability.firstAtMs > 0 || ability.everyMs > 0);
+}
+
+function readyEnemyAbility(state: CombatState, actor: CombatActor): EnemyAbility | undefined {
+  return actorAbilities(actor)
+    .filter((ability) => isScheduledAbility(ability) && (actor.abilityNext[ability.id] ?? Number.MAX_SAFE_INTEGER) <= state.timeMs)
+    .sort((a, b) => (actor.abilityNext[a.id] ?? 0) - (actor.abilityNext[b.id] ?? 0) || byId(a.id, b.id))[0];
+}
+
+function startEnemyAbility(state: CombatState, actor: CombatActor, ability: EnemyAbility): void {
+  const windup = Math.max(0, ability.windupMs * state.enemyWindupMult);
+  actor.counters.abilities = (actor.counters.abilities ?? 0) + 1;
+  const actionId = `${actor.id}:ability:${ability.id}:${actor.counters.abilities}`;
+  const cast: CastState = {
+    actionId, skillId: null, startedAt: state.timeMs,
+    resolveAt: state.timeMs + windup, endAt: state.timeMs + windup,
+    targetId: state.operator.alive ? state.operator.id : null,
+    interruptible: ability.interruptible, telegraph: ability.telegraphMs > 0,
+    dangerTag: ability.kind, channel: 'main', abilityId: ability.id,
+  };
+  actor.cast = cast;
+  actor.abilityNext[ability.id] = ability.everyMs > 0 ? state.timeMs + ability.everyMs : Number.MAX_SAFE_INTEGER;
+  actor.nextAttackAt = Math.max(actor.nextAttackAt, cast.endAt);
+  emit(state, 'CAST_START', actor.id, {
+    targetId: cast.targetId ?? undefined, actionId,
+    text: `${actor.name} готовит: ${ability.desc}`,
+    data: { abilityId: ability.id, windupMs: windup, interruptible: ability.interruptible },
+  });
+  if (cast.telegraph) emit(state, 'TELEGRAPH', actor.id, {
+    targetId: cast.targetId ?? undefined, actionId,
+    text: `${actor.name}: ${ability.desc}`,
+    data: { abilityId: ability.id, dangerTag: ability.kind, windupMs: windup },
+  });
+}
+
+function resolveEnemyAbility(state: CombatState, rng: Rng, actor: CombatActor, cast: CastState): void {
+  const ability = actorAbilities(actor).find((a) => a.id === cast.abilityId);
+  if (!ability) {
+    emit(state, 'CAST_FIZZLE', actor.id, { actionId: cast.actionId, reason: 'unknown_ability', text: `${actor.name}: неизвестное действие.` });
+    return;
+  }
+  const abilityEvent = (text: string, target?: CombatActor) => emit(state, 'TRIGGER', actor.id, {
+    targetId: target?.id, actionId: cast.actionId, text,
+    data: { abilityId: ability.id, abilityKind: ability.kind },
+  });
+  const playerTarget = (preferredId?: string): CombatActor | undefined => {
+    const party = livingPlayerSide(state).sort((a, b) => byId(a.id, b.id));
+    return (preferredId ? party.find((a) => a.id === preferredId) : undefined) ?? party[0];
+  };
+
+  switch (ability.kind) {
+    case 'heavyAttack':
+    case 'shieldBypass': {
+      const target = playerTarget(cast.targetId ?? undefined);
+      if (!target) {
+        emit(state, 'CAST_FIZZLE', actor.id, { actionId: cast.actionId, reason: 'no_target', text: `${actor.name}: цель недоступна.` });
+        return;
+      }
+      const type = ability.damageType ?? actor.attackType;
+      const base = ability.damage ?? actor.attackDamage;
+      const raw = applyHit(state, rng, actor, target, base, type, {
+        actionId: cast.actionId, isMain: false, procWeight: 0,
+        bypassShieldRatio: ability.bypassShieldRatio ?? (ability.kind === 'shieldBypass' ? ability.amount ?? 0 : 0),
+        abilityId: ability.id,
+      });
+      if (raw >= 0 && ability.status) applyStatus(state, actor, target, ability.status, { stacks: 1, durationMs: ability.statusDurationMs, snapshot: raw, actionId: cast.actionId });
+      break;
+    }
+    case 'applyStatus': {
+      const targets = ability.status === 'DRONE_JAM'
+        ? state.drones.filter((drone) => drone.alive).sort((a, b) => byId(a.id, b.id))
+        : [playerTarget(cast.targetId ?? undefined)].filter((target): target is CombatActor => !!target);
+      if (!targets.length) {
+        emit(state, 'CAST_FIZZLE', actor.id, { actionId: cast.actionId, reason: 'no_target', text: `${actor.name}: цель недоступна.` });
+        return;
+      }
+      for (const target of targets) applyStatus(state, actor, target, ability.status!, { stacks: 1, durationMs: ability.statusDurationMs, actionId: cast.actionId });
+      abilityEvent(`${actor.name}: ${ability.desc}`, targets[0]);
+      break;
+    }
+    case 'heat': {
+      const target = playerTarget();
+      if (!target) return;
+      const amount = ability.amount ?? 0;
+      gainHeat(state, target, amount);
+      emit(state, 'HEAT', actor.id, { targetId: target.id, actionId: cast.actionId, text: `${target.name}: нагрев +${amount}.`, data: { abilityId: ability.id, amount } });
+      abilityEvent(`${actor.name}: ${ability.desc}`, target);
+      break;
+    }
+    case 'mark': {
+      const target = playerTarget();
+      if (!target || !ability.status) return;
+      applyStatus(state, actor, target, ability.status, { stacks: 1, durationMs: ability.statusDurationMs, actionId: cast.actionId });
+      abilityEvent(`${actor.name}: ${ability.desc}`, target);
+      break;
+    }
+    case 'heal': {
+      const ally = [actor, ...state.enemies].filter((candidate) => candidate.alive)
+        .sort((a, b) => a.hp / Math.max(1, eff(state, a).maxHP) - b.hp / Math.max(1, eff(state, b).maxHP) || byId(a.id, b.id))[0];
+      if (!ally) return;
+      const before = ally.hp;
+      ally.hp = clamp(ally.hp + (ability.amount ?? 0), 0, eff(state, ally).maxHP);
+      const healed = ally.hp - before;
+      emit(state, 'HEAL', actor.id, { targetId: ally.id, actionId: cast.actionId, text: `${actor.name} восстанавливает ${healed.toFixed(1)} HP: ${ally.name}.`, data: { abilityId: ability.id, amount: healed } });
+      break;
+    }
+    case 'shieldRestore': {
+      const before = actor.shield;
+      actor.shield = clamp(actor.shield + (ability.amount ?? 0), 0, eff(state, actor).maxShield);
+      emit(state, 'SHIELD_GAIN', actor.id, { actionId: cast.actionId, text: `${actor.name}: щит +${(actor.shield - before).toFixed(1)}.`, data: { abilityId: ability.id, amount: actor.shield - before } });
+      break;
+    }
+    default:
+      abilityEvent(`${actor.name}: ${ability.desc}`);
+  }
+}
+
 /** Продвижение активных кастов: STUN приостанавливает, resolveAt разрешает эффект, endAt освобождает канал. */
 function advanceCasts(state: CombatState, rng: Rng): void {
   for (const actor of allActors(state)) {
@@ -969,7 +1095,8 @@ function advanceCasts(state: CombatState, rng: Rng): void {
     }
     if (!cast.resolved && state.timeMs >= cast.resolveAt) {
       cast.resolved = true;
-      if (cast.skillId) resolveSkillCast(state, rng, actor, cast);
+      if (cast.abilityId) resolveEnemyAbility(state, rng, actor, cast);
+      else if (cast.skillId) resolveSkillCast(state, rng, actor, cast);
     }
     if (state.timeMs >= cast.endAt) actor.cast = null;
   }
@@ -1296,8 +1423,10 @@ export function stepCombat(state: CombatState): CombatState {
     if (actor.kind === 'operator') {
       if (!actor.reactionCast) chooseReaction(next, actor);
       if (!actor.cast && actor.nextAttackAt <= next.timeMs) chooseOperatorAction(next, rng, actor);
-    } else if (!actor.cast && actor.nextAttackAt <= next.timeMs) {
-      startAutoAttack(next, rng, actor);
+    } else if (!actor.cast) {
+      const ability = actor.side === 'enemy' ? readyEnemyAbility(next, actor) : undefined;
+      if (ability) startEnemyAbility(next, actor, ability);
+      else if (actor.nextAttackAt <= next.timeMs) startAutoAttack(next, rng, actor);
     }
   }
 
