@@ -4,7 +4,7 @@ Last updated: 2026-11-11
 
 ## Current status
 
-This is a recovery branch containing the preserved Qwen snapshot and two completed recovery stages, plus an explicitly unfinished combat-kernel test/design scaffold. Development is paused at the user's request. No combat engine implementation exists yet. The current branch is expected to fail typecheck and tests because the WIP test imports that not-yet-created engine.
+This is a recovery branch containing the preserved Qwen snapshot, two completed recovery stages, and a newly implemented **combat kernel**. `src/core/combat/engine.ts` now exists and satisfies the previously-red WIP combat tests. Typecheck passes and all 33 unit tests pass. The kernel resolves deterministic auto-attacks and continuous resources only; active skills, tactical rules, statuses/DoT, reactions, drone/enemy abilities, and boss AI are **not yet implemented** (see expansion notes below). The Vite production build still stops at the missing real app entrypoint `src/main.tsx`, which is a UI-stage task — no placeholder was added to silence it.
 
 ## Repository and checkpoint
 
@@ -30,36 +30,41 @@ The presence of catalogs and interfaces does not mean those systems are playable
 1. Preserved the recovered snapshot in commit `4a59add7afa50670165c0b2266c80bca545cb15b` (`recovery: preserve Qwen CYDLE snapshot`).
 2. Repaired the mathematical foundation in `12ce16b37e61f90fc1a39efe3fe4bd79f3c3fc7f` (`fix: restore deterministic CYDLE math core`): shield-only incoming multiplier behavior, stable item IDs, type/configuration fixes, and regression tests.
 3. Added the build resolver in `a06dbbab98581a95ae9b7af72f8a7be29fc659a2` (`feat: resolve validated CYDLE builds`). `resolveBuild()` validates equipment and allocation and gathers catalog effects through one existing stat resolver, including attribute formulas, item scaling, CalcTrace, and neural capacity checks.
-4. Began—but did not implement—the combat kernel. Current WIP files are `docs/superpowers/specs/2026-11-11-combat-kernel-design.md`, `docs/superpowers/plans/2026-11-11-combat-kernel.md`, and `tests/core/combat.test.ts`. The design calls for a single fixed 100 ms transition and a headless runner using existing damage and RNG modules. There is no `src/core/combat/engine.ts` yet.
+4. Combat-kernel TDD scaffolding: `docs/superpowers/specs/2026-11-11-combat-kernel-design.md`, `docs/superpowers/plans/2026-11-11-combat-kernel.md`, and `tests/core/combat.test.ts`. The design calls for a single fixed 100 ms transition and a headless runner using existing damage and RNG modules.
+5. Implemented the combat kernel in `src/core/combat/engine.ts` (this checkpoint). Exports `createCombatState`, `stepCombat` (exactly one 100 ms tick, pure — returns a new state, never mutates its input), `simulateCombat` (headless runner), `resultFromState`, `allActors`, plus `COMBAT_RULES_VERSION` and `MAX_LOG_EVENTS`. It builds operator/drone/enemy/ally actors from a validated `ResolvedBuild`, rolls hit/crit via the deterministic `Rng`, routes every packet through `math/damage.ts` (`mitigatePacket` → incoming multiplier → `partitionDamage`) exactly once, applies continuous resources once per tick (energy regen, heat cooling/ambient/lockout at 100→release ≤80, shield regen after 4 s), resolves deaths and terminal outcome (VICTORY/DEFEAT/TIMEOUT), accumulates `CombatMetrics`, and emits an immutable event log capped at 5000. No `Math.random`, wall-clock, or process-global counters touch combat state; `nextTraceId`/CalcTrace nodes are deliberately kept out of events so `stateHash` stays reproducible. The three WIP combat tests pass unmodified.
 
 ## Systems that currently work
 
 - Catalog modules load and the catalog consistency test passes.
 - Deterministic RNG, scalar formulas, stat aggregation/conditions/CalcTrace, damage mitigation, shield/HP partitioning, and stable item-instance creation are implemented and covered by unit tests.
 - Validated build resolution is implemented and covered: canonical starter stats, attribute formulas, item scaling and durability thresholds, equipment/skill/passive/tree/mutation limits and validation, conditions, and neural capacity.
-- These are foundations and developer-facing core logic, not a complete game loop.
+- The combat kernel runs deterministically: a validated build fights a depth-scaled encounter to VICTORY/DEFEAT/TIMEOUT through one pure 100 ms transition, with reproducible `stateHash` across identical seeds, hit/crit rolls, per-packet mitigation and shield/HP partitioning, continuous energy/heat/shield resources, heat lockout, metrics, and a capped event log. Covered by the three combat tests (tick purity + energy regen, deterministic victory, invalid-build rejection).
+- These are foundations and developer-facing core logic, not a complete game loop. Combat currently models **auto-attacks only**.
 
 ## Partial or absent against `CYDLE_MASTER_SPEC.md` v2.0
 
-- **Partial:** typed data/effects catalogs; some item instance creation; build/stat preview boundary; damage and status primitives; combat state/result interfaces.
-- **Absent:** executable combat transition/simulator, tactical rule evaluation, active skill execution, trigger chains, status lifecycle/DoT, drones, enemy/boss AI and phases, encounter orchestration, campaign map/run/autopilot, economy/rewards/loot/crafting loop, persistence/migrations/atomic save transactions, meta progression/unlocks, garage, player-facing Build Lab, Simulation Lab and balance batches, React app entrypoint and UI/rendering/animation/assets, integrated and end-to-end test setup.
+- **Partial:** typed data/effects catalogs; some item instance creation; build/stat preview boundary; damage and status primitives; combat state/result interfaces; **executable combat transition + headless simulator for auto-attacks, continuous resources, deaths and terminal outcome** (`src/core/combat/engine.ts`).
+- **Absent (combat expansion, stage 2):** tactical rule evaluation and targeting, active skill execution (windup/recovery/cooldown/cost), trigger chains with budget, status lifecycle/DoT (BLEED/BURN/VIRUS/SHOCK/etc.), reaction channel, drone active abilities, enemy ability scheduler and boss phases/rotating casts, encounter orchestration hooks (wanted/reveal deltas, escape, death burst).
+- **Absent (other systems):** campaign map/run/autopilot, economy/rewards/loot/crafting loop, persistence/migrations/atomic save transactions, meta progression/unlocks, garage, player-facing Build Lab, Simulation Lab and balance batches, React app entrypoint and UI/rendering/animation/assets, integrated and end-to-end test setup.
 - `index.html` references `/src/main.tsx`, which is missing. `npm run dev` and production build cannot provide a playable app until the actual application is implemented.
 - Package scripts `validate`, `sim`, and `balance` refer to missing scripts. `e2e` refers to Playwright, which is not installed in this project.
 
-## Checks at the paused WIP commit
+## Checks at this checkpoint (combat kernel implemented)
 
-- `npm run typecheck`: **fails** because `tests/core/combat.test.ts` imports missing `src/core/combat/engine.ts`; the unresolved import also makes the test callback parameter implicitly `any`.
-- `npm test`: **30 existing tests pass; combat suite fails to load** for the same missing module.
-- `npm run build`: **fails during TypeScript check** for the same WIP errors. At the previous clean checkpoint it passed TypeScript and then Vite failed because `/src/main.tsx` is absent.
+- `npm run typecheck`: **passes** (no errors).
+- `npm test`: **33 tests pass** across 5 files — math (11), build (14), combat (3), rng (4), catalog (1). The combat suite now loads and passes; the WIP tests were not modified or deleted.
+- `npm run build`: **passes the TypeScript check, then Vite fails to resolve `/src/main.tsx`** from `index.html`. This is the same pre-existing UI-stage blocker documented at `a06dbba`, not a regression. It clears only when a real app entrypoint is implemented; no placeholder was added.
 - `npm run e2e`: **fails** because the `playwright` executable/dependency is absent.
-- No integration tests exist. No verification is claimed for the absent combat kernel or app.
+- No integration tests exist yet. No verification is claimed for the absent combat-expansion features or the app/UI.
 - `npm ci` succeeded during recovery. An earlier `npm audit` reported 7 advisories (3 moderate, 2 high, 2 critical); dependencies were not upgraded during recovery.
 
-## Exact stop point and first task
+## Exact stop point and next task
 
-Stop point: combat-kernel TDD scaffolding only. The expected first red test cannot collect because the engine module has not been written. The worktree is saved in the recovery branch; the previous known-good core checkpoint is `a06dbba`.
+Stop point: combat kernel implemented and verified (typecheck + 33 tests green). The engine resolves auto-attacks and continuous resources deterministically. The worktree is on `recovery/qwen-snapshot`; the previous known-good core checkpoint is `a06dbba`.
 
-First task for the next agent: read `CYDLE_MASTER_SPEC.md` sections 2, 4, 6–8, and 23.2, then `docs/superpowers/specs/2026-11-11-combat-kernel-design.md` and its plan. Implement `src/core/combat/engine.ts` to satisfy the existing tests using `ResolvedBuild`, `src/core/math/damage.ts`, and the existing deterministic RNG. Keep the master spec as the balance authority. Expand combat in later small stages; do not duplicate math or rewrite the working resolver.
+Next task (stage 2 — combat expansion): extend the **same** `stepCombat` transition, in small verified sub-stages, with active skills (windup/recovery/cooldown/energy/heat), tactical rule evaluation and targeting, status lifecycle/DoT, the reaction channel, drone abilities, the enemy ability scheduler and boss phases/rotating casts, and bounded trigger chains. Reuse `ResolvedBuild`, `math/damage.ts`, `math/stats.ts`, the status definitions, and the deterministic `Rng`; do not duplicate math or rewrite the working resolver. Add tests for each sub-stage and keep `stateHash` reproducible (never embed CalcTrace/`nextTraceId` in combat events).
+
+Then bring forward the real React app entrypoint (`src/main.tsx`) and UI so `npm run build` and `npm run dev` produce a playable app, followed by road/economy/progression, autopilot/offline sim, Build Lab/Simulation Lab, and the 12-sector campaign acceptance. Keep the master spec as the balance authority.
 
 ## Important implementation decisions
 
@@ -80,8 +85,8 @@ npm test
 npm run build
 ```
 
-To run the unit suite, use `npm test`. After the combat WIP import is implemented, the app build will still stop later at the missing `/src/main.tsx`; implement a real app entrypoint when the UI stage is authorized. Do not add a placeholder solely to silence Vite.
+To run the unit suite, use `npm test` (33 tests). The combat kernel is implemented; the app build still stops at the missing `/src/main.tsx`. Implement a real app entrypoint at the UI stage — do not add a placeholder solely to silence Vite.
 
 ## Short continuation prompt
 
-Open `https://github.com/MatveyTomilov/cydle/tree/recovery/qwen-snapshot` and the local working directory `E:\cydle\project`. Read `CYDLE_MASTER_SPEC.md` and `HANDOFF.md`, inspect `git status` and the latest commits, then inspect the combat-kernel spec, plan, and red tests. Continue from `src/core/combat/engine.ts` without redoing the math core or build resolver. Keep changes on the recovery branch, test each stage, and commit at verified checkpoints.
+Open `https://github.com/MatveyTomilov/cydle/tree/recovery/qwen-snapshot` and the local working directory `E:\cydle\project`. Read `CYDLE_MASTER_SPEC.md` and `HANDOFF.md`, inspect `git status` and the latest commits. The combat kernel (`src/core/combat/engine.ts`) is implemented and verified (typecheck + 33 tests). Continue with stage-2 combat expansion through the same `stepCombat`, then the real app entrypoint/UI, without redoing the math core or build resolver. Keep changes on the recovery branch, test each stage, and commit at verified checkpoints.
