@@ -1,4 +1,5 @@
 import type { EquipSlotId } from '../types';
+import { dismantleValue, templateOf } from '../items/items';
 import { parseSave, type SaveGame } from '../save/schema';
 import { resolveRunBuild } from '../run/build';
 import type { RunCommandResult } from '../run/types';
@@ -47,4 +48,25 @@ export function unequipGarageSlot(save: SaveGame, slot: EquipSlotId): RunCommand
   const equipment = { ...save.meta.equipment };
   delete equipment[slot];
   return commitGarageEquipment(save, equipment, `${itemId} снят в гараже и оставлен на защищённом складе.`);
+}
+
+export function dismantleGarageItem(save: SaveGame, itemId: string): RunCommandResult {
+  const parsed = parseSave(save);
+  if (!parsed.success) return fail(save, 'INVALID_SAVE', parsed.error);
+  const locked = canEditGarage(save);
+  if (locked) return locked;
+  const item = save.meta.inventory.find((candidate) => candidate.itemId === itemId && candidate.secured);
+  if (!item) return fail(save, 'ITEM_NOT_OWNED', 'Разобрать можно только предмет из защищённого склада.');
+  if (templateOf(item).category === 'MATERIAL') return fail(save, 'ITEM_NOT_DISMANTLABLE', 'Материалы нельзя разбирать на ресурсы.');
+  const slot = Object.entries(save.meta.equipment).find(([, equippedId]) => equippedId === itemId)?.[0];
+  if (slot) return fail(save, 'ITEM_EQUIPPED', `Сначала снимите предмет со слота ${slot}.`);
+  const value = dismantleValue(item);
+  const next = structuredClone(save);
+  next.meta.inventory = next.meta.inventory.filter((candidate) => candidate.itemId !== itemId);
+  next.meta.protectedBank.SCRAP += value.scrap;
+  next.meta.protectedBank.DATA += value.data;
+  const checked = parseSave(next);
+  if (!checked.success) return fail(save, 'INVALID_RESULT', checked.error);
+  const resources = [`${value.scrap} металлолома`, ...(value.data ? [`${value.data} данных`] : [])].join(' и ');
+  return { ok: true, save: checked.data, events: [{ type: 'ITEM_DISMANTLED', text: `${templateOf(item).name} разобран. Получено: ${resources}.` }] };
 }

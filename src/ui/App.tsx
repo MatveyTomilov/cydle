@@ -11,12 +11,12 @@ import { resolveCurrentCombat } from '../core/run/combat';
 import { resolveRunCache, resolveRunService } from '../core/run/nodes';
 import { resolveRunCheckpoint } from '../core/run/checkpoint';
 import { equipRunItem, unequipRunSlot } from '../core/run/inventory';
-import { equipGarageItem, unequipGarageSlot } from '../core/inventory/garage';
-import { templateOf } from '../core/items/items';
+import { dismantleGarageItem, equipGarageItem, unequipGarageSlot } from '../core/inventory/garage';
+import { dismantleValue, templateOf } from '../core/items/items';
 import type { RunCommandResult, RunState } from '../core/run/types';
 import { IMPLANT_SLOT_TYPES, NODE_TYPE_RU, type EquipSlotId, type ItemCategory } from '../core/types';
 
-type Screen = 'garage' | 'build' | 'road';
+type Screen = 'garage' | 'build' | 'inventory' | 'road';
 type BootState = { kind: 'loading' } | LoadSaveResult | { kind: 'error'; message: string };
 
 function itemName(templateId: string): string {
@@ -148,6 +148,7 @@ export function App() {
         <nav className="nav-list" aria-label="Разделы">
           <button className={screen === 'garage' ? 'nav-item active' : 'nav-item'} onClick={() => setScreen('garage')}><span className="nav-icon">⌂</span><span>Гараж</span><b>01</b></button>
           <button className={screen === 'build' ? 'nav-item active' : 'nav-item'} onClick={() => setScreen('build')}><span className="nav-icon">◇</span><span>Сборка</span><b>02</b></button>
+          <button className={screen === 'inventory' ? 'nav-item active' : 'nav-item'} onClick={() => setScreen('inventory')}><span className="nav-icon">▤</span><span>Склад</span><b>{String(save?.meta.inventory.length ?? 0).padStart(2, '0')}</b></button>
           {save?.run && <button className={screen === 'road' ? 'nav-item active' : 'nav-item'} onClick={() => setScreen('road')}><span className="nav-icon">⌁</span><span>Дорога</span><b>{String(save.run.depth).padStart(2, '0')}</b></button>}
         </nav>
         <div className="rail-bottom"><span className="signal-dot" /> АРХИВ СИНХРОНИЗИРОВАН <small>ЛОКАЛЬНЫЙ ПРОФИЛЬ · V1</small></div>
@@ -166,8 +167,9 @@ export function App() {
         {!save ? <WelcomeState boot={boot} busy={busy} onCreate={() => void createGame()} onImport={() => fileRef.current?.click()} /> : (
           screen === 'garage' ? <GarageScreen save={save} buildValid={!!build?.valid} busy={busy} onStartRun={() => void startRun()} onOpenRoad={() => setScreen('road')} />
             : screen === 'build' ? <BuildScreen save={save} buildValid={!!build?.valid} busy={busy} onResult={(result) => void applyRunResult(result)} />
-              : save.run ? <RoadScreen save={save} busy={busy} onResult={(result) => void applyRunResult(result)} onReturn={() => setScreen('garage')} onNewRun={() => void startRun()} commandId={commandId} />
-                : <GarageScreen save={save} buildValid={!!build?.valid} busy={busy} onStartRun={() => void startRun()} onOpenRoad={() => setScreen('road')} />
+              : screen === 'inventory' ? <InventoryScreen save={save} busy={busy} onResult={(result) => void applyRunResult(result)} />
+                : save.run ? <RoadScreen save={save} busy={busy} onResult={(result) => void applyRunResult(result)} onReturn={() => setScreen('garage')} onNewRun={() => void startRun()} commandId={commandId} />
+                  : <GarageScreen save={save} buildValid={!!build?.valid} busy={busy} onStartRun={() => void startRun()} onOpenRoad={() => setScreen('road')} />
         )}
         <footer className="footer"><span>CYDLE 1.0 <i>·</i> ПРОТОКОЛ ЗАПУЩЕН</span><span>СХЕМА СОХРАНЕНИЯ {save?.schemaVersion ?? '—'} <i>·</i> BALANCE {save?.balanceVersion ?? '—'}</span></footer>
       </main>
@@ -318,6 +320,29 @@ function BuildScreen({ save, buildValid, busy, onResult }: { save: SaveGame; bui
           onResult(itemId ? equipGarageItem(save, itemId, id) : unequipGarageSlot(save, id));
         }}><option value="" disabled={id === 'MAIN'}>{id === 'MAIN' ? 'Обязательный слот' : 'Пусто'}</option>{candidates.map((item) => <option key={item.itemId} value={item.itemId}>{itemName(item.templateId)} · СКЛАД</option>)}</select></label>;
       })}</div></div></section>
+  </div>;
+}
+
+function InventoryScreen({ save, busy, onResult }: { save: SaveGame; busy: boolean; onResult: (result: RunCommandResult) => void }) {
+  const equipped = new Map(Object.entries(save.meta.equipment).map(([slot, itemId]) => [itemId, slot]));
+  const activeRun = !!save.run && !['EXTRACTED', 'DEFEATED'].includes(save.run.phase);
+  function confirmDismantle(item: SaveGame['meta']['inventory'][number]) {
+    const template = templateOf(item);
+    const value = dismantleValue(item);
+    const yieldText = [`${value.scrap} металлолома`, ...(value.data ? [`${value.data} данных`] : [])].join(' и ');
+    if (globalThis.confirm(`Разобрать ${template.name} · T${item.techLevel}?\nБудет уничтожен этот экземпляр.\nПолучите: ${yieldText}.`)) onResult(dismantleGarageItem(save, item.itemId));
+  }
+  return <div className="screen-content inventory-screen"><section className="hero-row"><div><span className="eyebrow">ИНВЕНТАРЬ <i>·</i> ЗАЩИЩЁННАЯ СОБСТВЕННОСТЬ</span><h1>Склад оператора</h1><p>Предметы на складе сохраняются между выездами. Разбор уничтожает выбранный экземпляр и выдаёт указанные ресурсы.</p></div><span className="count-chip">{save.meta.inventory.length} ПРЕДМЕТОВ</span></section>
+    {activeRun && <div className="inventory-risk-note">В выезде нельзя разбирать или менять постоянный склад. Незакреплённый груз: {save.run!.unsecuredCargo.length} предметов под риском.</div>}
+    <section className="panel inventory-panel"><div className="panel-head"><div><span className="eyebrow">ЗАЩИЩЁННЫЙ СКЛАД</span><h2>Предметы и разбор</h2></div><span className="count-chip">ЗАКРЕПЛЕНО</span></div><div className="inventory-grid">{save.meta.inventory.map((item) => {
+      const template = templateOf(item);
+      const slot = equipped.get(item.itemId);
+      const value = dismantleValue(item);
+      const material = template.category === 'MATERIAL';
+      const yieldText = [`${value.scrap} металлолома`, ...(value.data ? [`${value.data} данных`] : [])].join(' · ');
+      return <article className="inventory-item" key={item.itemId}><div className="inventory-item-head"><span className={`rarity-line rarity-${item.rarity.toLowerCase()}`} /><div><span className="eyebrow">{item.rarity} · T{item.techLevel}</span><h3>{template.name}</h3></div><span className="inventory-category">{template.category}</span></div><p>{template.desc}</p><div className="inventory-item-meta"><span>{template.id}</span><span>ПРОЧНОСТЬ {item.durability}%</span>{slot && <span>СЛОТ {slot}</span>}</div><div className="inventory-item-action"><small>РАЗБОР · {yieldText}</small><button className="secondary-button" disabled={busy || activeRun || !!slot || material} title={slot ? 'Сначала снимите предмет в разделе «Сборка».' : material ? 'Материалы нельзя разбирать.' : undefined} onClick={() => confirmDismantle(item)}>{material ? 'МАТЕРИАЛ' : slot ? 'ЭКИПИРОВАНО' : 'РАЗОБРАТЬ'}</button></div></article>;
+    })}</div></section>
+    {!!save.run?.unsecuredCargo.length && <section className="panel inventory-panel risk-panel"><div className="panel-head"><div><span className="eyebrow">ГРУЗ ВЫЕЗДА</span><h2>Незакреплённые предметы</h2></div><span className="count-chip">РИСК</span></div><div className="inventory-grid">{save.run.unsecuredCargo.map((item) => <article className="inventory-item" key={item.itemId}><div className="inventory-item-head"><span className={`rarity-line rarity-${item.rarity.toLowerCase()}`} /><div><span className="eyebrow">{item.rarity} · T{item.techLevel}</span><h3>{itemName(item.templateId)}</h3></div><span className="inventory-category">РИСК</span></div><p>{templateOf(item).desc}</p><div className="inventory-item-meta"><span>{item.templateId}</span><span>ПРОЧНОСТЬ {item.durability}%</span></div><div className="inventory-item-action"><small>Закрепите отправкой на checkpoint или эвакуацией.</small></div></article>)}</div></section>}
   </div>;
 }
 
