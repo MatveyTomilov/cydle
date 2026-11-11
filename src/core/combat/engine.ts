@@ -629,6 +629,7 @@ interface HitOptions {
   procWeight: number;
   skillId?: string;
   penOverride?: PenetrationSnapshot;
+  bypassShieldRatio?: number;
 }
 
 /**
