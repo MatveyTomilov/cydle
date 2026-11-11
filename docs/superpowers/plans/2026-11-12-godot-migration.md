@@ -71,9 +71,9 @@
 - Create: `game/tests/golden/rng_golden_test.gd`
 - Reference: `src/core/rng.ts`, `tests/core/rng.test.ts`
 
-- [ ] Port the existing PRNG and stream serialization exactly with explicit 32-bit masks.
-- [ ] Pin known next-value sequences, serialized states, and replay hash outputs from TypeScript.
-- [ ] Compare all fixtures headlessly before porting formulas.
+- [x] Port the existing PRNG and stream serialization exactly with explicit 32-bit masks.
+- [x] Pin known next-value sequences, serialized states, and replay hash outputs from TypeScript.
+- [x] Compare all fixtures headlessly before porting formulas.
 
 ### Task 3: local save repository
 
