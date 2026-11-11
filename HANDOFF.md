@@ -20,6 +20,12 @@ Last updated: 2026-11-12
 - Scope boundary: this is the storage envelope and transaction layer. The nested `payload` is currently generic JSON; typed META/RUN/COMBAT validation and application autosave integration are still required as those domain models are ported. This does not yet implement playable save/progression behavior.
 - Next implementation task: port typed scalar/stat formulas and damage rules from the legacy math modules with golden fixtures; later connect their domain state to this repository's payload schema.
 
+### Godot Task 4 in progress — scalar math and damage
+
+- Ported legacy scalar formulas, formatting/trace node foundation, hit/crit probabilities, defense penetration, kinetic/resistance mitigation, temporary/ordinary shield partition, and simple EHP to `game/scripts/core/math/`.
+- TypeScript-derived golden fixtures currently pass for H/D/R, XP, TechPower, intervals, cooldown, Wilson interval, sample statistics, hit/crit, resistance penetration, and multi-pool shield ordering. Current Godot suite: **4 tests, 79 assertions, 0 failures**.
+- Remaining in Task 4: complete the stat registry, condition evaluator, modifier aggregation, conversion order, clamps, and CalcTrace output parity. Do not treat the math port as finished yet.
+
 The user's latest instruction supersedes the prior web-game continuation. CYDLE 1.0 is now a native 2D Windows game built in Godot 4.x with strictly typed GDScript. Do not implement more React/Vite/PixiJS product features. Preserve the entire existing TypeScript tree and its tests as legacy/reference and as a source for golden outputs.
 
 - Working directory: `E:\cydle\project`.
