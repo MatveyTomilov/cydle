@@ -9,6 +9,8 @@
 - Added graph and combat integration coverage for elite/bounty generation and reward behavior.
 - Added persistent one-step EVENT nodes from the supported subset of the event catalog. Choices apply run resource/currency/item effects and permanent bounded faction reputation; choices resolve once and event IDs do not repeat during one run.
 - Added save defaults for faction reputation and campaign flags so existing version-1 saves remain readable. Advanced event hooks for reveals, next-combat modifiers, mutations, and quest progression remain unimplemented and are excluded from generated event choices.
+- Added fuel emergency tow and abandon actions when all outgoing roads exceed available fuel. Tow applies its specified fee, 30% currency loss and one deterministic cargo loss before securing the remainder; abandon loses all unsecured rewards and wears secured equipped items by 10 durability.
+- Added regression coverage for tow/abandon settlement, explicit protected-bank permission, retained cargo, durability loss, and blocking emergency actions when travel is affordable.
 - Added run-specific equipment ownership and loadouts. Secured inventory and unsecured cargo feed the same canonical build resolver; equip/unequip is validated at safe points, combat uses the selected field loadout, extraction secures it, and defeat loses unsecured gear while restoring protected gear with durability loss.
 - Connected the run loadout editor to the road screen with compatible-slot filtering, implant/drone unlock states, and warehouse/risk labels.
 - Kept active run saves created before loadouts readable: they inherit the previous garage equipment on load, and their original snapshot/export checksums remain verifiable.
