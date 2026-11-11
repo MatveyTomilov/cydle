@@ -1,26 +1,26 @@
 # CYDLE — handoff checkpoint
 
-Last updated: 2026-11-11
+Last updated: 2026-11-12
 
 ## Resumed development — current checkpoint
 
 The user explicitly resumed autonomous implementation after the earlier audit handoff. Work is now on `development/luna`, created from user-specified base `2e5a59798695aaf7666a8fa13cb709fcdaad9fc7`. The recovery branch remains the untouched source of the handoff.
 
-- Current work: combat expansion 2d–2e remains verified in the single `stepCombat` engine. Stage 3 is active: a real React shell, versioned save boundary, IndexedDB snapshots, and startup catalog checks are implemented.
-- Checks: typecheck, 124 unit tests, catalog validation, production build, and local dev-server HTTP response pass. Browser UI automation was blocked before page navigation because the computer-use tool could not establish the browser URL. Playwright is not installed, so E2E is unavailable.
-- Next task: implement the first persisted playable sector/run loop with validated commands, deterministic six-layer road graph, combat encounters, unsecured rewards, checkpoints, evacuation/death, and reload. Then continue campaign, garage, economy, and Simulation Lab.
+- Current work: first persisted sector/run loop is implemented on the existing deterministic combat simulator. Browser smoke created a profile, started a run, chose the first route, and showed an E01 victory with reward and combat report; it did not complete a whole sector.
+- Checks at the feature checkpoint: typecheck, all 144 tests, data validation, and production build pass. Playwright is not installed, so automated E2E is unavailable.
+- Next task: implement persistent inventory/equipment changes and the garage ownership loop. Then add further node types with real handlers, campaign outcomes, autopilot/offline, Simulation Lab, and final visuals.
 - The user requests continued implementation through a playable CYDLE 1.0; the old emergency stop is superseded.
 
 ## Current status
 
-This is `development/luna`, based on the preserved Qwen snapshot. Combat expansions **2a–2e task 2** are implemented in the existing deterministic engine. Stage 3 has begun: the app starts into a responsive Garage/Build shell; new operator creation uses the exact level-one equipment, skills, passives, resources, transport, and tactical preset from section 22.1; save imports use a strict Zod schema, legal build validation and checksum; Dexie commits snapshots transactionally and can fall back to the previous valid snapshot; catalog references are checked on startup and through `npm run validate`. This is not yet a playable run: `SaveGame.run` is still `null`, screens are read-only, and no route/campaign state is wired.
+This is `development/luna`, based on the preserved Qwen snapshot. Combat expansions **2a–2e task 2** remain in the existing deterministic engine. Stage 3 boot/save now supports a first sector: the exact starter save, strict validation, checksummed Dexie snapshots, import/export, and catalog validation. Stage 4 is active: deterministic run/map state, route selection, combat/rewards, cache and repair/fuel nodes, checkpoint shipment/evacuation/continuation, defeat settlement, and a connected road screen are implemented. This remains a partial game, not a CYDLE 1.0 release.
 
 ## Repository and checkpoint
 
 - Working directory: `E:\cydle\project`
 - Remote: `https://github.com/MatveyTomilov/cydle.git`
 - Branch: `development/luna`
-- Latest feature checkpoint: `d9a88e77a330d36f023ff292306b1a2535a15f66` (`feat: execute catalog combat triggers`)
+- Latest code checkpoint: `38a5787ae5a0c11fb7d877ca2ff868fa42ad5882` (`feat: add persisted first-sector run loop`)
 - Base: `2e5a59798695aaf7666a8fa13cb709fcdaad9fc7` from `recovery/qwen-snapshot`. Current commit: check `git rev-parse HEAD`.
 - Last fully-verified feature checkpoint before Luna work: `f14bdbc8fda39bc75e277219002194dab61d9061` (stage 2c). Earlier clean core checkpoint: `a06dbbab98581a95ae9b7af72f8a7be29fc659a2` (`feat: resolve validated CYDLE builds`).
 - Preserved original archive: `E:\cydle\workspace.tar.gz` (SHA-256 `5E82E5BDA30D38A0FB551F242E1B14E44E8B75B1D51A874B208AD45E96D24630`). Extracted read-only comparison snapshot: `E:\cydle\recovered-snapshot\cydle`.
@@ -53,6 +53,8 @@ The presence of catalogs and interfaces does not mean those systems are playable
 
 13. Combat expansion **2e task 2 — bounded catalog trigger engine** (Luna). `resolveBuild()` preserves each trigger's source identity; the single combat engine dispatches catalog events/actions, including ON_BEFORE_HIT packet/flag spends, periodic effects, heat transitions, dodge, cast/interrupt/telegraph, status expiry, HP threshold, shield spend/absorb, drone/ally death, combat start/end, and hit/crit/kill. Secondary and status-tick ON_HIT/ON_KILL remain opt-in; DoT can still drive incoming-damage/shield/HP-threshold events. Shared `applyHit()` handles proc damage. Chains cap at depth 8 and 32 triggered children per origin, suppress duplicate source/effect/cause combinations, report `CHAIN_LIMIT`, and prune stale budgets. Target-dependent stat conditions now resolve against the actual attacker/target pair; timed phase stacks, cold streak, scan accuracy, emergency/extra reactions, and U01/U04/U09 effects have runtime behavior. Full unit suite is 119/119.
 
+14. **Persisted sector run loop** (Luna, commit `38a5787`). Added serializable/Zod-validated `RunState`, deterministic six-layer sector graph, tutorial path E01 → prototype cache → E01+E02, route fuel/time, cache choice, repair/fuel service, seeded combat through the existing `simulateCombat`, unsecured reward wallet/cargo, one-time grants/XP, defeat settlement, and checkpoint EXIT/SHIP/CONTINUE. Active runs survive save/reload without graph rerolls. The React road screen wires commands to IndexedDB commits and displays route, combat metrics/log, cargo, and checkpoint decisions. Save v1 remains compatible with pre-run saves (`run:null`; optional `maxSectorCleared`). Tutorial graph keeps the spec's 12 base nodes. Browser smoke verified profile creation, run start, route choice, and first E01 victory; no full-sector browser/E2E claim.
+
 ## Systems that currently work
 
 - Catalog modules load and the catalog consistency test passes.
@@ -60,30 +62,30 @@ The presence of catalogs and interfaces does not mean those systems are playable
 - Validated build resolution is implemented and covered: canonical starter stats, attribute formulas, item scaling and durability thresholds, equipment/skill/passive/tree/mutation limits and validation, conditions, and neural capacity.
 - The combat kernel runs deterministically: a validated build fights a depth-scaled encounter to VICTORY/DEFEAT/TIMEOUT through one pure 100 ms transition, with reproducible `stateHash` across identical seeds, hit/crit rolls, per-packet mitigation and shield/HP partitioning, continuous energy/heat/shield resources, heat lockout, metrics, and a capped event log. Covered by the three combat tests (tick purity + energy regen, deterministic victory, invalid-build rejection).
 - These are foundations and developer-facing core logic, not a complete game loop. Combat models **auto-attacks, status effects/DoT, main-channel active skills driven by tactical rules** (cast lifecycle, costs, cooldowns, targeting, rule-failure diagnostics), an **independent reaction channel** (shield/EMP/guard/vent/heal/drone-mark), scheduled enemy abilities, boss phases/CORE rotation, all six elite modifiers, all drone roles, enemy event behaviors, and bounded catalog-driven trigger/proc chains inside the single deterministic transition.
+- A first-sector loop is now playable through the UI: begin a run, traverse its persisted graph, resolve combat/cache/service nodes, earn unsecured rewards and XP, and settle at a checkpoint or death. Only COMBAT/CACHE/REPAIR/FUEL/CHECKPOINT/BOSS are wired end to end; the generated ordinary pool excludes node kinds whose handlers are not ready.
 
 ## Partial or absent against `CYDLE_MASTER_SPEC.md` v2.0
 
 - **Partial:** typed data/effects catalogs; some item instance creation; build/stat preview boundary; damage and status primitives; combat state/result interfaces; **executable combat transition + headless simulator for auto-attacks, continuous resources, deaths and terminal outcome**; **effective-stat recomputation, status lifecycle/stacking and DoT (BLEED/BURN/VIRUS), expiry, and status-derived combat modifiers** (stage 2a); **main-channel active skill casts (windup/resolve/recovery/cooldown/energy/heat), tactical rule evaluation, targeting selectors, AUTO fallback and rule-failure diagnostics** (stage 2b); **independent reaction channel (shield/EMP/guard/vent/heal/drone-mark), cast interrupts and telegraph event infrastructure** (stage 2c) — all in `src/core/combat/engine.ts`.
-- **Partial (combat expansion 2d–2e):** combat AI, elite/drone behavior, and catalogued combat triggers are executable and unit tested. Combat only exposes wanted/reveal deltas; the run/campaign consumer, encounter rewards, escapes, and persistent death/economy consequences are absent.
-- **Partial (stage 3 boot/save):** `src/main.tsx`, responsive React Garage/Build screens, strict schema v1 import/export, legal build validation, catalog startup validation, and Dexie snapshot persistence/recovery are implemented. The current save intentionally accepts only `run: null`; no migrations from an older application format exist. UI currently reads the starter profile and does not edit it.
-- **Absent:** playable run/map/encounter loop, reward/economy/garage commands, campaign and autopilot, meta progression/unlocks, Simulation Lab/balance batches, visual combat scene/animation/assets, CI and E2E setup. There is no Playwright dependency.
+- **Partial:** sector one can be traversed and resolved, but persistent inventory rearrangement/equipment editing, build editing, full node variety (SHOP/ANOMALY/EVENT/QUEST/ELITE/BOUNTY), tow/abandon, and complete cargo-capacity/ownership rules are absent. Checkpoint/death settlement is core-tested but not browser-smoke-tested end to end.
+- **Absent:** campaign sectors 2–12 through finale/endgame; faction/quest/contract outcomes; full garage/crafting/TechLevel/tree/Build Lab editing; autopilot and exact offline worker; Simulation Lab/balance batches; original game-scene art/animation/assets/audio; CI and E2E setup. Playwright is not installed. The road screen is a styled map/report UI, not the final animated combat presentation.
 - Package script `validate` is now implemented. `sim` and `balance` still refer to missing scripts. `e2e` refers to Playwright, which is not installed in this project.
 
-## Checks at this checkpoint (combat + boot/save boundary)
+## Checks at feature checkpoint `38a5787`
 
 - `npm run typecheck`: **passes**.
-- `npm test -- --run`: **124 tests pass** across 10 files. Includes 50 combat-AI cases and four save tests; the save suite uses `fake-indexeddb` to check commit/load, checksum/schema rejection, corrupt latest-snapshot fallback, continued writes, and export/import validation.
+- `npm test -- --run`: **144 tests pass** across 16 files. Includes 50 combat-AI cases, run graph/state/command/node/combat/checkpoint tests, active-run save/reload, legacy v1 shape/checksum compatibility, and existing Dexie recovery/export tests.
 - `npm run validate`: **passes** current catalog cross-reference and starter-content checks.
 - `npm run build`: **passes**; Vite generates a production bundle.
-- Dev server responds HTTP 200 at `http://127.0.0.1:5173/`. Browser visual/interaction smoke did not complete: the computer-use tool stopped before navigation because it could not verify the current browser URL.
-- E2E was not run in this checkpoint; Playwright and an E2E harness are absent. UI interactions are therefore not browser-verified.
+- Local Vite server responded at `http://127.0.0.1:5173/`. Browser smoke created a temporary profile in the in-app browser, started a run, chose the first combat node, and observed the saved E01 victory with reward/report. No complete sector, mobile viewport, or automated E2E was verified.
+- E2E is unavailable: Playwright and an E2E harness are absent. `npm run e2e` was not rerun for this checkpoint.
 - `npm ci` succeeded during recovery. An earlier `npm audit` reported 7 advisories (3 moderate, 2 high, 2 critical); dependencies were not upgraded during recovery.
 
 ## Exact stop point and next task
 
-Current code checkpoint: branch `development/luna`; run `git rev-parse HEAD` for the latest saved commit. Combat expansions 2a–2e task 2 remain in `src/core/combat/engine.ts`. The new app/save stage adds `src/main.tsx`, `src/ui/App.tsx`, `src/core/save/`, and `src/data/validate.ts`; its run field is still null. Current checks: typecheck, 124 tests, `npm run validate`, build, and local HTTP 200 pass. UI automation and E2E remain unverified.
+Current code checkpoint: branch `development/luna`, feature commit `38a5787ae5a0c11fb7d877ca2ff868fa42ad5882`. Run commands live in `src/core/run/`, use `simulateCombat()` from `src/core/combat/engine.ts`, and are wired in `src/ui/App.tsx`; storage remains in `src/core/save/storage.ts`. Current checks: typecheck, 144 tests, `npm run validate`, and production build pass. Browser smoke only verified the opening combat; there is no E2E.
 
-Next task: add the persisted RunState and validated run commands, then implement one complete playable sector using the existing deterministic world/combat engines. Include seeded six-layer DAG generation, route choice, encounter composition and combat start, reward grant IDs and unsecured cargo, checkpoint/evacuation/death, and save/reload. Keep rendering and storage outside the combat engine; do not redo verified math/build/combat rules.
+Next task: implement persistent inventory/equipment operations for secured and unsecured items. Define transfer and death behavior so unsecured equipped loot is lost while protected gear returns damaged. Then add other road nodes only with actual gameplay handlers. Keep rendering/storage outside the combat engine; do not redo verified math/build/combat rules.
 
 ## Important implementation decisions
 
@@ -106,7 +108,7 @@ npm run build
 npm run dev
 ```
 
-The unit suite currently has 124 tests. `npm run sim` and `npm run balance` are not implemented; `npm run e2e` needs Playwright setup. The application entrypoint exists now, but no playable run loop is wired.
+The unit suite has 144 tests at feature commit `38a5787`. `npm run sim` and `npm run balance` are not implemented; `npm run e2e` needs Playwright and a harness. The first-sector run loop is wired, while campaign progression and most content systems remain absent.
 
 ## Short continuation prompt
 
