@@ -11,8 +11,7 @@ This is a recovery branch containing the preserved Qwen snapshot and two complet
 - Working directory: `E:\cydle\project`
 - Remote: `https://github.com/MatveyTomilov/cydle.git`
 - Branch: `recovery/qwen-snapshot`
-- Current handoff commit: use `git rev-parse HEAD` on this branch. Previous clean, verified checkpoint: `a06dbbab98581a95ae9b7af72f8a7be29fc659a2` (`feat: resolve validated CYDLE builds`).
-- Previous clean, verified checkpoint: `a06dbbab98581a95ae9b7af72f8a7be29fc659a2` (`feat: resolve validated CYDLE builds`). At that commit typecheck passed and all 30 unit tests passed; the Vite build remained blocked by missing `src/main.tsx`.
+- Current handoff commit: use `git rev-parse HEAD` on this branch. Previous clean, verified checkpoint: `a06dbbab98581a95ae9b7af72f8a7be29fc659a2` (`feat: resolve validated CYDLE builds`); at that commit typecheck and all 30 unit tests passed, while Vite remained blocked by missing `src/main.tsx`.
 - Preserved original archive: `E:\cydle\workspace.tar.gz` (SHA-256 `5E82E5BDA30D38A0FB551F242E1B14E44E8B75B1D51A874B208AD45E96D24630`). Extracted read-only comparison snapshot: `E:\cydle\recovered-snapshot\cydle`.
 - The Qwen snapshot and follow-up fixes are committed locally; see the recovery commits in `git log`. The master spec matches GitHub `main` at the recovery point.
 
