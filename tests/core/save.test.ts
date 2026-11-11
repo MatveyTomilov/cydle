@@ -71,6 +71,30 @@ describe('save boundary', () => {
     expect(loaded.save.run?.graph).toEqual(active.run.graph);
   });
 
+  it('normalizes legacy active-run loadouts without invalidating their stored checksum', async () => {
+    const saveId = `legacy-active-run-${globalThis.crypto.randomUUID()}`;
+    const base = createInitialSave({ saveId, now: 100 });
+    const legacy = { ...base, run: createInitialRun(base, 'legacy-active-run-seed') } as typeof base & { run: NonNullable<typeof base.run> };
+    delete (legacy.run as unknown as Record<string, unknown>).equipment;
+    const checksum = saveChecksum(legacy);
+    const legacyRun = legacy.run;
+    const raw = new Dexie('cydle-save');
+    raw.version(1).stores({ snapshots: '&key, saveId, revision, createdAt', control: '&id' });
+    await raw.open();
+    const snapshotKey = `${saveId}:legacy`;
+    await raw.table('snapshots').put({ key: snapshotKey, saveId, revision: legacy.revision, createdAt: legacy.updatedAt, checksum, save: legacy });
+    await raw.table('control').put({ id: 'active', saveId, revision: legacy.revision, snapshotKey });
+    raw.close();
+
+    const loaded = await loadSave();
+    expect(loaded).toMatchObject({ kind: 'loaded', recovered: false });
+    if (loaded.kind !== 'loaded') throw new Error('Expected pre-loadout active run to load');
+    expect(loaded.save.run?.equipment).toEqual(loaded.save.meta.equipment);
+    const legacyExport = { format: 'CYDLE_SAVE_EXPORT_V1', checksum, save: legacy };
+    expect(parseSaveExport(legacyExport).success).toBe(true);
+    expect(legacyRun.equipment).toBeUndefined();
+  });
+
   it('commits atomically, keeps a valid fallback, and imports only verified exports', async () => {
     const saveId = `storage-${globalThis.crypto.randomUUID()}`;
     const first = await commitSave(createInitialSave({ saveId, now: 100 }), 100);

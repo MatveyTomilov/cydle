@@ -38,6 +38,7 @@ export function createInitialRun(save: SaveGame, seed: string): RunState {
     depth,
     biome,
     graph,
+    equipment: { ...save.meta.equipment },
     currentNodeId: graph.startNodeId,
     visitedNodeIds: [],
     clearedNodeIds: [],

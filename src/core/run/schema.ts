@@ -75,7 +75,7 @@ export function createRunStateSchema(itemSchema: z.ZodTypeAny) {
   const wallet = z.object({ CREDITS: z.number().finite().nonnegative(), SCRAP: z.number().finite().nonnegative(), DATA: z.number().finite().nonnegative() }).strict();
   const run = z.object({
     seed: z.string().min(1), depth: z.number().int().min(1), biome: z.enum(['B01', 'B02', 'B03', 'B04', 'B05', 'B06']),
-    graph: roadGraph, currentNodeId: z.string().min(1), visitedNodeIds: z.array(z.string()), clearedNodeIds: z.array(z.string()),
+    graph: roadGraph, equipment: z.record(z.enum(['MAIN', 'OFFHAND', 'ARMOR', 'IMP_1', 'IMP_2', 'IMP_3', 'IMP_4', 'IMP_5', 'IMP_6', 'DRONE_1', 'DRONE_2', 'ENGINE', 'CHASSIS', 'SCANNER', 'SERVICE', 'CARGO', 'SUPPORT']), z.string().min(1)), currentNodeId: z.string().min(1), visitedNodeIds: z.array(z.string()), clearedNodeIds: z.array(z.string()),
     phase: z.enum(['ROUTE', 'NODE', 'CHECKPOINT', 'EXTRACTED', 'DEFEATED', 'SAFE_ERROR_STOP']),
     wanted: z.number().finite().min(0).max(100), revealLevel: z.number().int().min(0).max(2),
     resources: z.object({ fuel: z.number().finite().nonnegative(), maxFuel: z.number().finite().nonnegative(), hull: z.number().finite().nonnegative(), maxHull: z.number().finite().nonnegative(), hp: z.number().finite().nonnegative(), maxHP: z.number().finite().nonnegative(), shield: z.number().finite().nonnegative(), maxShield: z.number().finite().nonnegative(), energy: z.number().finite().nonnegative(), heat: z.number().finite().nonnegative(), gameTimeMs: z.number().finite().nonnegative() }).strict(),

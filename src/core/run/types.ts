@@ -1,4 +1,4 @@
-import type { BiomeId, NodeType, Wallet } from '../types';
+import type { BiomeId, EquipSlotId, NodeType, Wallet } from '../types';
 import type { NodeThreatBand } from '../../data/types';
 import type { EncounterEnemySpec, CombatResult } from '../combat/types';
 
@@ -51,6 +51,7 @@ export interface RunState {
   depth: number;
   biome: BiomeId;
   graph: RoadGraph;
+  equipment: Partial<Record<EquipSlotId, string>>;
   currentNodeId: string;
   visitedNodeIds: string[];
   clearedNodeIds: string[];
@@ -75,6 +76,8 @@ export type RunCommand =
   | { id: string; type: 'CHOOSE_NODE'; nodeId: string }
   | { id: string; type: 'RESOLVE_COMBAT' }
   | { id: string; type: 'CHOOSE_PROTOTYPE'; templateId: string }
+  | { id: string; type: 'EQUIP_ITEM'; itemId: string; slot: EquipSlotId }
+  | { id: string; type: 'UNEQUIP_ITEM'; slot: EquipSlotId }
   | { id: string; type: 'RESOLVE_SERVICE'; choice: 'REPAIR_HULL' | 'REPAIR_HP' | 'BUY_FUEL'; currency?: 'CREDITS' | 'SCRAP'; spendProtected?: boolean }
   | { id: string; type: 'CHECKPOINT'; choice: 'EXIT' | 'SHIP' | 'CONTINUE'; cargoItemIds?: string[]; currencyShare?: number; spendProtected?: boolean };
 

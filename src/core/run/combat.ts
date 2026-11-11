@@ -1,33 +1,17 @@
 import { BIOME_BY_ID } from '../../data/biomes';
 import { createCore, rollItem, type ItemInstance } from '../items/items';
 import { simulateCombat } from '../combat/engine';
-import { resolveBuild } from '../build/build';
 import { R, xpRequired } from '../math/formula';
 import { Rng } from '../rng';
 import { parseSave, type SaveGame } from '../save/schema';
 import type { CombatResult } from '../combat/types';
 import type { RunCommandResult, RunState } from './types';
+import { resolveRunBuild } from './build';
 
 const zeroWallet = () => ({ CREDITS: 0, SCRAP: 0, DATA: 0 });
 
 function fail(save: SaveGame, failureCode: string, reason: string): RunCommandResult {
   return { ok: false, save, failureCode, reason };
-}
-
-function makeBuild(save: SaveGame) {
-  const items = new Map(save.meta.inventory.map((item) => [item.itemId, item]));
-  const equipment = Object.fromEntries(Object.entries(save.meta.equipment).map(([slot, id]) => [slot, items.get(id)]));
-  return resolveBuild({
-    attributes: save.meta.operator.attributes,
-    equipment,
-    skillIds: save.meta.skillIds,
-    passiveIds: save.meta.passiveIds,
-    treeNodeIds: save.meta.treeNodeIds,
-    attributePointsEarned: save.meta.operator.attributePoints,
-    treePointsEarned: save.meta.operator.treePoints,
-    unlockedImplantSlots: save.meta.unlockedImplantSlots,
-    unlockedDroneSlots: save.meta.unlockedDroneSlots,
-  });
 }
 
 function grantExperience(save: SaveGame, run: RunState, amount: number, grantId: string): void {
@@ -77,7 +61,7 @@ function makeBattleReward(run: RunState, nodeId: string, nodeType: string): { wa
 }
 
 function finishDefeat(save: SaveGame, run: RunState, result: CombatResult): void {
-  const build = makeBuild(save);
+  const build = resolveRunBuild(save, null);
   const maxHP = build.valid ? build.stats.maxHP : 1;
   const maxShield = build.valid ? build.stats.maxShield : 0;
   const paid = save.meta.protectedBank.CREDITS >= 10;
@@ -103,6 +87,7 @@ function finishDefeat(save: SaveGame, run: RunState, result: CombatResult): void
   run.runWallet = zeroWallet();
   run.unsecuredCargo = [];
   run.shippedCargo = [];
+  run.equipment = { ...save.meta.equipment };
 }
 
 /** Resolves one saved encounter with the canonical combat engine and applies one-time run rewards. */
@@ -117,7 +102,7 @@ export function resolveCurrentCombat(save: SaveGame, commandId: string): RunComm
   const node = run.graph.layers.flat().find((candidate) => candidate.id === run.currentNodeId);
   if (!node || !['COMBAT', 'ELITE', 'BOUNTY', 'BOSS'].includes(node.type)) return fail(save, 'NODE_NOT_COMBAT', 'Текущий узел не является боевым.');
   if (run.clearedNodeIds.includes(node.id)) return fail(save, 'NODE_ALREADY_CLEARED', 'Этот боевой узел уже пройден.');
-  const build = makeBuild(save);
+  const build = resolveRunBuild(save);
   if (!build.valid) return fail(save, 'INVALID_BUILD', build.issues.map((issue) => issue.message).join(' '));
   const tactic = save.meta.tactics.find((profile) => profile.id === save.meta.activeTacticId);
   if (!tactic) return fail(save, 'NO_TACTIC_PROFILE', 'Активный профиль тактики отсутствует.');

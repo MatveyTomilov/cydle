@@ -1,6 +1,6 @@
 import { NODE_TYPE_RU } from '../types';
-import { resolveBuild } from '../build/build';
 import { parseSave, type SaveGame } from '../save/schema';
+import { resolveRunBuild } from './build';
 import type { RunCommandResult } from './types';
 
 function fail(save: SaveGame, failureCode: string, reason: string): RunCommandResult {
@@ -13,22 +13,6 @@ function markCommand(save: SaveGame, commandId: string): SaveGame {
   run.commandIds = [...run.commandIds, commandId].slice(-128);
   run.lastCommandId = commandId;
   return next;
-}
-
-function buildFor(save: SaveGame) {
-  const items = new Map(save.meta.inventory.map((item) => [item.itemId, item]));
-  const equipment = Object.fromEntries(Object.entries(save.meta.equipment).map(([slot, id]) => [slot, items.get(id)]));
-  return resolveBuild({
-    attributes: save.meta.operator.attributes,
-    equipment,
-    skillIds: save.meta.skillIds,
-    passiveIds: save.meta.passiveIds,
-    treeNodeIds: save.meta.treeNodeIds,
-    attributePointsEarned: save.meta.operator.attributePoints,
-    treePointsEarned: save.meta.operator.treePoints,
-    unlockedImplantSlots: save.meta.unlockedImplantSlots,
-    unlockedDroneSlots: save.meta.unlockedDroneSlots,
-  });
 }
 
 /** Pure, idempotent route transition. Persistence is performed by the application after success. */
@@ -45,7 +29,7 @@ export function chooseRunNode(save: SaveGame, commandId: string, nodeId: string)
   if (run.resources.fuel < edge.fuelCost) return fail(save, 'INSUFFICIENT_FUEL', `Для перехода требуется ${edge.fuelCost} ед. топлива; доступно ${run.resources.fuel}.`);
   const node = run.graph.layers.flat().find((candidate) => candidate.id === nodeId);
   if (!node || run.visitedNodeIds.includes(nodeId)) return fail(save, 'INVALID_NODE', 'Узел неизвестен или уже посещён.');
-  const build = buildFor(save);
+  const build = resolveRunBuild(save);
   if (!build.valid) return fail(save, 'INVALID_BUILD', build.issues.map((issue) => issue.message).join(' '));
 
   const next = markCommand(save, commandId);

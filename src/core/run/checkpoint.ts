@@ -60,6 +60,7 @@ function finishRun(save: SaveGame, run: RunState): void {
   mergeRunWallet(save, run);
   save.meta.transport.fuel = run.resources.fuel;
   save.meta.transport.hull = run.resources.hull;
+  save.meta.equipment = { ...run.equipment };
   run.phase = 'EXTRACTED';
 }
 

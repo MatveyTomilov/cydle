@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { resolveBuild } from '../build/build';
 import { createRunStateSchema } from '../run/schema';
+import { resolveRunBuild } from '../run/build';
 
 export const SAVE_SCHEMA_VERSION = 1 as const;
 export const BALANCE_VERSION = '1.0.0';
@@ -76,7 +77,19 @@ export function parseSave(value: unknown): SaveValidation {
       return { success: false, error: `Сохранение использует будущую схему ${version}; поддерживается версия ${SAVE_SCHEMA_VERSION}. Исходные данные не изменены.` };
     }
   }
-  const parsed = SaveGameSchema.safeParse(value);
+  // Active runs saved before loadouts were added inherit the garage equipment once on read.
+  // The stored legacy payload is left untouched so its original checksum can still be verified.
+  let compatibleValue = value;
+  if (typeof value === 'object' && value !== null) {
+    const raw = value as Record<string, unknown>;
+    const rawRun = raw.run;
+    const rawMeta = raw.meta;
+    if (typeof rawRun === 'object' && rawRun !== null && !('equipment' in rawRun)
+      && typeof rawMeta === 'object' && rawMeta !== null && 'equipment' in rawMeta) {
+      compatibleValue = { ...raw, run: { ...rawRun, equipment: (rawMeta as Record<string, unknown>).equipment } };
+    }
+  }
+  const parsed = SaveGameSchema.safeParse(compatibleValue);
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues.map((issue) => `${issue.path.join('.') || 'save'}: ${issue.message}`).join('; ') };
   }
@@ -104,6 +117,18 @@ export function parseSave(value: unknown): SaveValidation {
     unlockedDroneSlots: save.meta.unlockedDroneSlots,
   });
   if (!build.valid) return { success: false, error: `build: ${build.issues.map((issue) => issue.message).join(' ')}` };
+  if (save.run) {
+    const runItems = [...save.meta.inventory, ...save.run.unsecuredCargo];
+    const runItemIds = new Set(runItems.map((item) => item.itemId));
+    if (runItemIds.size !== runItems.length) return { success: false, error: 'run: повторяется ID предмета в инвентаре и незакреплённом грузе.' };
+    const equippedIds = Object.values(save.run.equipment);
+    if (new Set(equippedIds).size !== equippedIds.length) return { success: false, error: 'run.equipment: один предмет установлен в несколько слотов.' };
+    for (const [slot, itemId] of Object.entries(save.run.equipment)) {
+      if (!runItemIds.has(itemId)) return { success: false, error: `run.equipment.${slot}: предмет ${itemId} отсутствует в доступной собственности.` };
+    }
+    const runBuild = resolveRunBuild(save);
+    if (!runBuild.valid) return { success: false, error: `run.build: ${runBuild.issues.map((issue) => issue.message).join(' ')}` };
+  }
   return { success: true, data: save };
 }
 
@@ -126,6 +151,6 @@ export function parseSaveExport(value: unknown): SaveValidation {
   }
   const result = parseSave(envelope.save);
   if (!result.success) return result;
-  if (saveChecksum(result.data) !== envelope.checksum) return { success: false, error: 'Контрольная сумма не совпадает: файл повреждён.' };
+  if (saveChecksum(result.data) !== envelope.checksum && saveChecksum(envelope.save as SaveGame) !== envelope.checksum) return { success: false, error: 'Контрольная сумма не совпадает: файл повреждён.' };
   return result;
 }

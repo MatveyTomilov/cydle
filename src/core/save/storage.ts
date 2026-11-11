@@ -31,7 +31,8 @@ export type LoadSaveResult =
 function checkedSnapshot(row: SaveSnapshot): SaveGame | null {
   const parsed = parseSave(row.save);
   if (!parsed.success || parsed.data.saveId !== row.saveId || parsed.data.revision !== row.revision) return null;
-  if (saveChecksum(parsed.data) !== row.checksum) return null;
+  // Verify the exact stored payload before returning a normalized legacy save.
+  if (saveChecksum(row.save as SaveGame) !== row.checksum) return null;
   return parsed.data;
 }
 

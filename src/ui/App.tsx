@@ -10,8 +10,10 @@ import { chooseRunNode } from '../core/run/commands';
 import { resolveCurrentCombat } from '../core/run/combat';
 import { resolveRunCache, resolveRunService } from '../core/run/nodes';
 import { resolveRunCheckpoint } from '../core/run/checkpoint';
+import { equipRunItem, unequipRunSlot } from '../core/run/inventory';
+import { templateOf } from '../core/items/items';
 import type { RunCommandResult, RunState } from '../core/run/types';
-import { NODE_TYPE_RU } from '../core/types';
+import { IMPLANT_SLOT_TYPES, NODE_TYPE_RU, type EquipSlotId, type ItemCategory } from '../core/types';
 
 type Screen = 'garage' | 'build' | 'road';
 type BootState = { kind: 'loading' } | LoadSaveResult | { kind: 'error'; message: string };
@@ -205,6 +207,26 @@ function runPhaseName(phase: RunState['phase']): string {
   return ({ ROUTE: 'выбор маршрута', NODE: 'узел дороги', CHECKPOINT: 'контрольная точка', EXTRACTED: 'выезд завершён', DEFEATED: 'оператор потерян', SAFE_ERROR_STOP: 'безопасная остановка' })[phase];
 }
 
+const RUN_LOADOUT_SLOTS: { id: EquipSlotId; label: string; category: ItemCategory }[] = [
+  { id: 'MAIN', label: 'ОСНОВНОЕ', category: 'MAIN' },
+  { id: 'OFFHAND', label: 'ВТОРАЯ РУКА', category: 'OFFHAND' },
+  { id: 'ARMOR', label: 'БРОНЯ', category: 'ARMOR' },
+  ...(['IMP_1', 'IMP_2', 'IMP_3', 'IMP_4', 'IMP_5', 'IMP_6'] as const).map((id, index) => ({ id, label: `ИМПЛАНТ ${index + 1} · ${IMPLANT_SLOT_TYPES[id]}`, category: 'IMPLANT' as const })),
+  { id: 'DRONE_1', label: 'ДРОН 1', category: 'DRONE' },
+  { id: 'DRONE_2', label: 'ДРОН 2', category: 'DRONE' },
+  { id: 'ENGINE', label: 'ДВИГАТЕЛЬ', category: 'ENGINE' },
+  { id: 'CHASSIS', label: 'ШАССИ', category: 'CHASSIS' },
+  { id: 'SCANNER', label: 'СКАНЕР', category: 'SCANNER' },
+  { id: 'SERVICE', label: 'СЕРВИС', category: 'SERVICE' },
+  { id: 'CARGO', label: 'ГРУЗОВОЙ МОДУЛЬ', category: 'CARGO' },
+  { id: 'SUPPORT', label: 'ПОДДЕРЖКА', category: 'SUPPORT' },
+];
+
+function itemFitsRunSlot(item: ReturnType<typeof templateOf>, slot: EquipSlotId): boolean {
+  if (slot.startsWith('IMP_')) return item.category === 'IMPLANT' && (!item.implantSlot || item.implantSlot === 'UNIVERSAL' || item.implantSlot === IMPLANT_SLOT_TYPES[slot]);
+  return item.category === RUN_LOADOUT_SLOTS.find((candidate) => candidate.id === slot)?.category;
+}
+
 function RoadScreen({ save, busy, onResult, onReturn, onNewRun, commandId }: {
   save: SaveGame;
   busy: boolean;
@@ -222,6 +244,7 @@ function RoadScreen({ save, busy, onResult, onReturn, onNewRun, commandId }: {
   const choices = run.graph.edges.filter((edge) => edge.from === run.currentNodeId).map((edge) => ({ edge, node: nodes.find((node) => node.id === edge.to)! })).filter(({ node }) => !!node);
   const terminal = run.phase === 'EXTRACTED' || run.phase === 'DEFEATED';
   const combat = run.combatResult;
+  const availableItems = [...save.meta.inventory, ...run.unsecuredCargo];
 
   function dispatch(result: RunCommandResult) {
     onResult(result);
@@ -258,7 +281,20 @@ function RoadScreen({ save, busy, onResult, onReturn, onNewRun, commandId }: {
       {run.phase === 'SAFE_ERROR_STOP' && <div className="checkpoint-panel"><h3>Симуляция остановлена безопасно</h3><p>Награды не выданы. Текущее состояние и журнал боя сохранены.</p>{actionButton('В ГАРАЖ', onReturn, true)}</div>}
     </div>
 
-    <aside className="road-side"><div className="panel road-wallet"><span className="eyebrow">НЕЗАКРЕПЛЁННОЕ</span><div className="run-currencies"><span>₡ <b>{Math.floor(run.runWallet.CREDITS)}</b></span><span>▧ <b>{Math.floor(run.runWallet.SCRAP)}</b></span><span>⌘ <b>{Math.floor(run.runWallet.DATA)}</b></span></div><div className="run-cargo-count">ГРУЗ · {run.unsecuredCargo.length} предметов <small>+ {run.shippedCargo.length} уже отправлено</small></div></div><div className="panel road-wallet"><span className="eyebrow">СОХРАНЕНИЕ</span><p>Каждое принятое действие записывается атомарным снимком. Seed: <code>{run.seed.slice(0, 14)}</code></p><p>Игровое время: {Math.floor(run.resources.gameTimeMs / 1000)} с · корпус: {Math.ceil(run.resources.hull)}%</p></div></aside></section>
+    <aside className="road-side"><div className="panel road-wallet"><span className="eyebrow">НЕЗАКРЕПЛЁННОЕ</span><div className="run-currencies"><span>₡ <b>{Math.floor(run.runWallet.CREDITS)}</b></span><span>▧ <b>{Math.floor(run.runWallet.SCRAP)}</b></span><span>⌘ <b>{Math.floor(run.runWallet.DATA)}</b></span></div><div className="run-cargo-count">ГРУЗ · {run.unsecuredCargo.length} предметов <small>+ {run.shippedCargo.length} уже отправлено</small></div></div>
+      <div className="panel road-loadout"><div className="panel-head"><div><span className="eyebrow">КОМПЛЕКТ ВЫЕЗДА</span><h2>Экипировка</h2></div><span className="count-chip">{Object.keys(run.equipment).length} СЛОТОВ</span></div><p className="loadout-note">Предметы из груза работают в бою и остаются под риском до эвакуации.</p><div className="run-loadout-list">{RUN_LOADOUT_SLOTS.map(({ id, label }) => {
+        const selectedId = run.equipment[id];
+        const candidates = availableItems.filter((instance) => {
+          const occupiedElsewhere = Object.entries(run.equipment).some(([otherSlot, itemId]) => otherSlot !== id && itemId === instance.itemId);
+          return (!occupiedElsewhere || instance.itemId === selectedId) && itemFitsRunSlot(templateOf(instance), id);
+        });
+        const locked = id.startsWith('IMP_') && Number(id.slice(4)) > save.meta.unlockedImplantSlots || id.startsWith('DRONE_') && Number(id.slice(6)) > save.meta.unlockedDroneSlots;
+        return <label className="run-loadout-row" key={id}><span>{label}{locked && <small> · ЗАКРЫТ</small>}</span><select aria-label={label} value={selectedId ?? ''} disabled={busy || terminal || locked} onChange={(event) => {
+          const itemId = event.target.value;
+          dispatch(itemId ? equipRunItem(save, { id: commandId(), itemId, slot: id }) : unequipRunSlot(save, { id: commandId(), slot: id }));
+        }}><option value="" disabled={id === 'MAIN'}>{id === 'MAIN' ? 'Обязательный слот' : 'Пусто'}</option>{candidates.map((instance) => <option key={instance.itemId} value={instance.itemId}>{itemName(instance.templateId)} · {instance.secured ? 'СКЛАД' : 'РИСК'}</option>)}</select></label>;
+      })}</div></div>
+      <div className="panel road-wallet"><span className="eyebrow">СОХРАНЕНИЕ</span><p>Каждое принятое действие записывается атомарным снимком. Seed: <code>{run.seed.slice(0, 14)}</code></p><p>Игровое время: {Math.floor(run.resources.gameTimeMs / 1000)} с · корпус: {Math.ceil(run.resources.hull)}%</p></div></aside></section>
   </div>;
 }
 
