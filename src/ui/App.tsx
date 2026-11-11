@@ -11,8 +11,9 @@ import { resolveCurrentCombat } from '../core/run/combat';
 import { resolveRunCache, resolveRunService } from '../core/run/nodes';
 import { resolveRunCheckpoint } from '../core/run/checkpoint';
 import { equipRunItem, unequipRunSlot } from '../core/run/inventory';
-import { dismantleGarageItem, equipGarageItem, garageRepairCost, repairGarageItem, unequipGarageSlot } from '../core/inventory/garage';
-import { dismantleValue, templateOf } from '../core/items/items';
+import { craftGarageAffix, dismantleGarageItem, equipGarageItem, garageRepairCost, repairGarageItem, unequipGarageSlot } from '../core/inventory/garage';
+import { affixName, craftOperationCost, dismantleValue, templateOf } from '../core/items/items';
+import { AFFIX_BY_ID, tierForTech } from '../data/affixes';
 import type { RunCommandResult, RunState } from '../core/run/types';
 import { IMPLANT_SLOT_TYPES, NODE_TYPE_RU, type EquipSlotId, type ItemCategory } from '../core/types';
 
@@ -339,10 +340,26 @@ function InventoryScreen({ save, busy, onResult }: { save: SaveGame; busy: boole
       const slot = equipped.get(item.itemId);
       const value = dismantleValue(item);
       const repairCost = garageRepairCost(item);
+      const rerollCost = craftOperationCost('REROLL', item.techLevel);
+      const tierCost = craftOperationCost('TIER_UP', item.techLevel);
       const material = template.category === 'MATERIAL';
       const yieldText = [`${value.scrap} металлолома`, ...(value.data ? [`${value.data} данных`] : [])].join(' · ');
       const cannotRepair = busy || activeRun || item.durability >= 100 || save.meta.protectedBank.SCRAP < repairCost;
-      return <article className="inventory-item" key={item.itemId}><div className="inventory-item-head"><span className={`rarity-line rarity-${item.rarity.toLowerCase()}`} /><div><span className="eyebrow">{item.rarity} · T{item.techLevel}</span><h3>{template.name}</h3></div><span className="inventory-category">{template.category}</span></div><p>{template.desc}</p><div className="inventory-item-meta"><span>{template.id}</span><span>ПРОЧНОСТЬ {item.durability}%</span>{slot && <span>СЛОТ {slot}</span>}</div><div className="inventory-item-action"><small>РЕМОНТ · {repairCost} SCRAP<br/>РАЗБОР · {yieldText}</small><button className="secondary-button" disabled={cannotRepair} title={item.durability >= 100 ? 'Прочность уже полная.' : save.meta.protectedBank.SCRAP < repairCost ? `Нужно ${repairCost} металлолома.` : undefined} onClick={() => onResult(repairGarageItem(save, item.itemId))}>{item.durability >= 100 ? 'ИСПРАВНО' : 'РЕМОНТ'}</button><button className="secondary-button" disabled={busy || activeRun || !!slot || material} title={slot ? 'Сначала снимите предмет в разделе «Сборка».' : material ? 'Материалы нельзя разбирать.' : undefined} onClick={() => confirmDismantle(item)}>{material ? 'МАТЕРИАЛ' : slot ? 'ЭКИПИРОВАНО' : 'РАЗОБРАТЬ'}</button></div></article>;
+      return <article className="inventory-item" key={item.itemId}>
+        <div className="inventory-item-head"><span className={`rarity-line rarity-${item.rarity.toLowerCase()}`} /><div><span className="eyebrow">{item.rarity} · T{item.techLevel}</span><h3>{template.name}</h3></div><span className="inventory-category">{template.category}</span></div>
+        <p>{template.desc}</p><div className="inventory-item-meta"><span>{template.id}</span><span>T{item.techLevel} · TR {item.tr}</span><span>ПРОЧНОСТЬ {item.durability}%</span>{slot && <span>СЛОТ {slot}</span>}</div>
+        {item.affixes.length > 0 && <div className="inventory-affixes">{item.affixes.map((affix, affixIndex) => {
+          const fixed = !!AFFIX_BY_ID[affix.affixId]?.fixed;
+          const atTierCap = affix.tier >= tierForTech(item.techLevel);
+          const rerollDisabled = busy || activeRun || item.tr < rerollCost.tr || save.meta.protectedBank.SCRAP < rerollCost.scrap || save.meta.protectedBank.DATA < rerollCost.data || fixed;
+          const tierDisabled = busy || activeRun || item.tr < tierCost.tr || save.meta.protectedBank.SCRAP < tierCost.scrap || save.meta.protectedBank.DATA < tierCost.data || atTierCap;
+          return <div className="inventory-affix" key={`${affix.affixId}-${affixIndex}`}><span>{affixName(affix)} <small>{affix.value} · T{affix.tier}{fixed ? ' · ФИКС' : ''}</small></span>
+            <button className="craft-mini" disabled={rerollDisabled} title={fixed ? 'Фиксированный аффикс нельзя перекатывать.' : item.tr < rerollCost.tr ? `Нужно ${rerollCost.tr} TR.` : `Цена: ${rerollCost.tr} TR · ${rerollCost.scrap} металлолома.`} onClick={() => onResult(craftGarageAffix(save, { itemId: item.itemId, operation: 'REROLL', affixIndex, seed: globalThis.crypto.randomUUID() }))}>ROLL · {rerollCost.tr} TR / {rerollCost.scrap}▧</button>
+            <button className="craft-mini" disabled={tierDisabled} title={atTierCap ? 'Достигнут предел для TechLevel.' : item.tr < tierCost.tr ? `Нужно ${tierCost.tr} TR.` : `Цена: ${tierCost.tr} TR · ${tierCost.scrap} металлолома · ${tierCost.data} данных.`} onClick={() => onResult(craftGarageAffix(save, { itemId: item.itemId, operation: 'TIER_UP', affixIndex, seed: globalThis.crypto.randomUUID() }))}>TIER+ · {tierCost.tr} TR / {tierCost.scrap}▧ / {tierCost.data}⌘</button>
+          </div>;
+        })}</div>}
+        <div className="inventory-item-action"><small>РЕМОНТ · {repairCost} SCRAP<br/>РАЗБОР · {yieldText}</small><button className="secondary-button" disabled={cannotRepair} title={item.durability >= 100 ? 'Прочность уже полная.' : save.meta.protectedBank.SCRAP < repairCost ? `Нужно ${repairCost} металлолома.` : undefined} onClick={() => onResult(repairGarageItem(save, item.itemId))}>{item.durability >= 100 ? 'ИСПРАВНО' : 'РЕМОНТ'}</button><button className="secondary-button" disabled={busy || activeRun || !!slot || material} title={slot ? 'Сначала снимите предмет в разделе «Сборка».' : material ? 'Материалы нельзя разбирать.' : undefined} onClick={() => confirmDismantle(item)}>{material ? 'МАТЕРИАЛ' : slot ? 'ЭКИПИРОВАНО' : 'РАЗОБРАТЬ'}</button></div>
+      </article>;
     })}</div></section>
     {!!save.run?.unsecuredCargo.length && <section className="panel inventory-panel risk-panel"><div className="panel-head"><div><span className="eyebrow">ГРУЗ ВЫЕЗДА</span><h2>Незакреплённые предметы</h2></div><span className="count-chip">РИСК</span></div><div className="inventory-grid">{save.run.unsecuredCargo.map((item) => <article className="inventory-item" key={item.itemId}><div className="inventory-item-head"><span className={`rarity-line rarity-${item.rarity.toLowerCase()}`} /><div><span className="eyebrow">{item.rarity} · T{item.techLevel}</span><h3>{itemName(item.templateId)}</h3></div><span className="inventory-category">РИСК</span></div><p>{templateOf(item).desc}</p><div className="inventory-item-meta"><span>{item.templateId}</span><span>ПРОЧНОСТЬ {item.durability}%</span></div><div className="inventory-item-action"><small>Закрепите отправкой на checkpoint или эвакуацией.</small></div></article>)}</div></section>}
   </div>;

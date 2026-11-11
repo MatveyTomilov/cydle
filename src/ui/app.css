@@ -24,3 +24,6 @@
 @media(max-width:1000px){.inventory-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:760px){.inventory-panel{padding:15px}.inventory-grid{gap:7px}.inventory-item{padding:10px}.inventory-item>p{font-size:8px}}
 @media(max-width:480px){.inventory-grid{grid-template-columns:1fr}}
+.inventory-affixes{display:grid;gap:5px;margin:10px 0;padding:8px 0;border-top:1px solid rgba(154,181,206,.08);border-bottom:1px solid rgba(154,181,206,.08)}.inventory-affix{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:5px}.inventory-affix>span{min-width:0;color:#b7c7cf;font-size:8px}.inventory-affix>span small{display:block;margin-top:2px;color:#728696;font:7px var(--mono)}.craft-mini{min-height:25px;padding:0 5px;border:1px solid rgba(154,181,206,.13);border-radius:4px;background:#101a25;color:#a9c0c8;font:7px var(--mono);white-space:nowrap}.craft-mini:hover:not(:disabled){border-color:rgba(132,228,192,.4);color:#bff1dc}.craft-mini:disabled{opacity:.45;cursor:not-allowed}
+@media(max-width:760px){.inventory-affix{grid-template-columns:minmax(0,1fr) auto auto;gap:3px}.craft-mini{font-size:6px;padding:0 4px}}
+@media(max-width:360px){.inventory-affix{grid-template-columns:1fr 1fr}.inventory-affix>span{grid-column:1/-1}}
