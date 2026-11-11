@@ -6,9 +6,9 @@ Last updated: 2026-11-12
 
 The user explicitly resumed autonomous implementation after the earlier audit handoff. Work is now on `development/luna`, created from user-specified base `2e5a59798695aaf7666a8fa13cb709fcdaad9fc7`. The recovery branch remains the untouched source of the handoff.
 
-- Current work: the first persisted sector loop and the run-specific equipment stage are committed on the existing deterministic simulator. The road screen has ownership-aware equip/unequip controls. Browser smoke created a profile, started a run, chose the first route, and showed an E01 victory with reward/report; it did not complete a sector.
-- Checks after the current stage: typecheck, all 149 tests, data validation, and production build pass. Playwright is not installed, so automated E2E is unavailable.
-- Next task: finish garage-side equipment editing and broader inventory ownership actions. Then add further node types with real handlers, campaign outcomes, autopilot/offline, Simulation Lab, and final visuals.
+- Current work: the first persisted sector loop, run-specific loadout, and protected garage equipment editor are committed on the existing deterministic simulator. The road screen exposes risk-aware loadouts; the Build screen edits protected garage equipment. Browser smoke created a profile, started a run, chose the first route, and showed an E01 victory with reward/report; it did not complete a sector.
+- Checks after the current stage: typecheck, all 153 tests, data validation, and production build pass. Playwright is not installed, so automated E2E is unavailable.
+- Next task: implement broader inventory ownership actions (move/ship/salvage/repair/craft as defined by the master spec), then add further road nodes with real handlers, campaign outcomes, autopilot/offline, Simulation Lab, and final visuals.
 - The user requests continued implementation through a playable CYDLE 1.0; the old emergency stop is superseded.
 
 ## Current status
@@ -20,7 +20,7 @@ This is `development/luna`, based on the preserved Qwen snapshot. Combat expansi
 - Working directory: `E:\cydle\project`
 - Remote: `https://github.com/MatveyTomilov/cydle.git`
 - Branch: `development/luna`
-- Latest feature commit: `9598e1195c82197081e7ddfa147c1885f9617e64` (`feat: add risk-aware run equipment loadouts`)
+- Latest feature commit: `5fa32c3df9b1e9b72f237a30c6035b848580e429` (`feat: manage protected garage equipment`)
 - Base: `2e5a59798695aaf7666a8fa13cb709fcdaad9fc7` from `recovery/qwen-snapshot`. Current commit: check `git rev-parse HEAD`.
 - Last fully-verified feature checkpoint before Luna work: `f14bdbc8fda39bc75e277219002194dab61d9061` (stage 2c). Earlier clean core checkpoint: `a06dbbab98581a95ae9b7af72f8a7be29fc659a2` (`feat: resolve validated CYDLE builds`).
 - Preserved original archive: `E:\cydle\workspace.tar.gz` (SHA-256 `5E82E5BDA30D38A0FB551F242E1B14E44E8B75B1D51A874B208AD45E96D24630`). Extracted read-only comparison snapshot: `E:\cydle\recovered-snapshot\cydle`.
@@ -55,6 +55,7 @@ The presence of catalogs and interfaces does not mean those systems are playable
 
 14. **Persisted sector run loop** (Luna, commit `38a5787`). Added serializable/Zod-validated `RunState`, deterministic six-layer sector graph, tutorial path E01 → prototype cache → E01+E02, route fuel/time, cache choice, repair/fuel service, seeded combat through the existing `simulateCombat`, unsecured reward wallet/cargo, one-time grants/XP, defeat settlement, and checkpoint EXIT/SHIP/CONTINUE. Active runs survive save/reload without graph rerolls. The React road screen wires commands to IndexedDB commits and displays route, combat metrics/log, cargo, and checkpoint decisions. Save v1 remains compatible with pre-run saves (`run:null`; optional `maxSectorCleared`). Tutorial graph keeps the spec's 12 base nodes. Browser smoke verified profile creation, run start, route choice, and first E01 victory; no full-sector browser/E2E claim.
 15. **Run equipment ownership and loadout** (commit `9598e1195c82197081e7ddfa147c1885f9617e64`). `RunState.equipment` tracks the field loadout separately from permanent garage equipment. `resolveRunBuild()` combines secured inventory with unsecured run cargo and passes it to canonical `resolveBuild()`. Equip/unequip commands validate ownership, slot compatibility, duplicate use, phase, and build legality; combat uses this same resolved loadout. EXIT secures cargo and writes the field loadout to permanent equipment; DEFEAT discards unsecured cargo, restores protected gear, and applies durability loss. The road UI exposes slots and labels items `СКЛАД` or `РИСК`. Four tests cover cargo equipment, invalid loadouts, extraction, and defeat settlement. Old active-run snapshots and exports without `run.equipment` inherit `meta.equipment`; legacy raw checksums are verified before the normalized save is returned. This reuses the existing combat simulator.
+16. **Protected garage equipment** (commit `5fa32c3df9b1e9b72f237a30c6035b848580e429`). Garage equip/unequip operations use the canonical `resolveBuild()` through `resolveRunBuild(save, null)`, retain protected items in inventory, reject invalid slot/build changes, and refuse edits during active runs. Terminal runs are synchronized when the garage loadout changes so stored state remains valid. The Build screen now presents the compatible secured inventory for every slot. Four tests cover valid equip, incompatible slot, active-run lock, and mandatory main weapon.
 
 ## Systems that currently work
 
@@ -65,29 +66,30 @@ The presence of catalogs and interfaces does not mean those systems are playable
 - These are foundations and developer-facing core logic, not a complete game loop. Combat models **auto-attacks, status effects/DoT, main-channel active skills driven by tactical rules** (cast lifecycle, costs, cooldowns, targeting, rule-failure diagnostics), an **independent reaction channel** (shield/EMP/guard/vent/heal/drone-mark), scheduled enemy abilities, boss phases/CORE rotation, all six elite modifiers, all drone roles, enemy event behaviors, and bounded catalog-driven trigger/proc chains inside the single deterministic transition.
 - A first-sector loop is now playable through the UI: begin a run, traverse its persisted graph, resolve combat/cache/service nodes, earn unsecured rewards and XP, and settle at a checkpoint or death. Only COMBAT/CACHE/REPAIR/FUEL/CHECKPOINT/BOSS are wired end to end; the generated ordinary pool excludes node kinds whose handlers are not ready.
 - Run equipment can be changed at safe points through the road UI. It uses the canonical build resolver and the same combat simulator; unsecured items remain at risk until extraction.
+- Permanent garage equipment can be edited from secured inventory in the Build screen, with canonical slot/build checks and active-run protection.
 
 ## Partial or absent against `CYDLE_MASTER_SPEC.md` v2.0
 
 - **Partial:** typed data/effects catalogs; some item instance creation; build/stat preview boundary; damage and status primitives; combat state/result interfaces; **executable combat transition + headless simulator for auto-attacks, continuous resources, deaths and terminal outcome**; **effective-stat recomputation, status lifecycle/stacking and DoT (BLEED/BURN/VIRUS), expiry, and status-derived combat modifiers** (stage 2a); **main-channel active skill casts (windup/resolve/recovery/cooldown/energy/heat), tactical rule evaluation, targeting selectors, AUTO fallback and rule-failure diagnostics** (stage 2b); **independent reaction channel (shield/EMP/guard/vent/heal/drone-mark), cast interrupts and telegraph event infrastructure** (stage 2c) — all in `src/core/combat/engine.ts`.
-- **Partial:** sector one can be traversed and resolved. Run-specific equipment editing is implemented; garage loadout editing, inventory transfer/salvage/crafting, full node variety (SHOP/ANOMALY/EVENT/QUEST/ELITE/BOUNTY), tow/abandon, and complete cargo-capacity/ownership rules remain incomplete. Checkpoint/death settlement is core-tested but not browser-smoke-tested end to end.
+- **Partial:** sector one can be traversed and resolved. Run-specific and garage loadout editing are implemented; inventory transfer/shipping outside checkpoint, salvage/crafting/repair, full node variety (SHOP/ANOMALY/EVENT/QUEST/ELITE/BOUNTY), tow/abandon, and complete cargo-capacity/ownership rules remain incomplete. Checkpoint/death settlement is core-tested but not browser-smoke-tested end to end.
 - **Absent:** campaign sectors 2–12 through finale/endgame; faction/quest/contract outcomes; full garage/crafting/TechLevel/tree/Build Lab editing; autopilot and exact offline worker; Simulation Lab/balance batches; original game-scene art/animation/assets/audio; CI and E2E setup. Playwright is not installed. The road screen is a styled map/report UI, not the final animated combat presentation.
 - Package script `validate` is now implemented. `sim` and `balance` still refer to missing scripts. `e2e` refers to Playwright, which is not installed in this project.
 
-## Checks after run-loadout stage (current working tree)
+## Checks after garage equipment stage (current committed code)
 
 - `npm run typecheck`: **passes**.
-- `npm test -- --run`: **149 tests pass** across 17 files. Includes 50 combat-AI cases, run graph/state/command/node/combat/checkpoint/loadout tests, active-run save/reload, legacy v1 shape/checksum compatibility (including a pre-loadout active run), and existing Dexie recovery/export tests.
+- `npm test -- --run`: **153 tests pass** across 18 files. Includes 50 combat-AI cases, run graph/state/command/node/combat/checkpoint/loadout/garage-equipment tests, active-run save/reload, legacy v1 shape/checksum compatibility (including a pre-loadout active run), and existing Dexie recovery/export tests.
 - `npm run validate`: **passes** current catalog cross-reference and starter-content checks.
-- `npm run build`: **passes**; Vite generates a production bundle (JS 574.79 kB, gzip 181.56 kB).
+- `npm run build`: **passes**; Vite generates a production bundle (JS 577.64 kB, gzip 182.17 kB).
 - Local Vite server responded at `http://127.0.0.1:5173/`. Browser smoke created a temporary profile in the in-app browser, started a run, chose the first combat node, and observed the saved E01 victory with reward/report. No complete sector, mobile viewport, or automated E2E was verified.
 - E2E is unavailable: Playwright and an E2E harness are absent. `npm run e2e` was not rerun for this checkpoint.
 - `npm ci` succeeded during recovery. An earlier `npm audit` reported 7 advisories (3 moderate, 2 high, 2 critical); dependencies were not upgraded during recovery.
 
 ## Exact stop point and next task
 
-Current code checkpoint: branch `development/luna`, feature commit `9598e1195c82197081e7ddfa147c1885f9617e64`. Run commands live in `src/core/run/`, use `simulateCombat()` from `src/core/combat/engine.ts`, and are wired in `src/ui/App.tsx`; storage remains in `src/core/save/storage.ts`. Current checks: typecheck, 149 tests, `npm run validate`, and production build pass. Browser smoke only verified the opening combat; there is no E2E.
+Current code checkpoint: branch `development/luna`, feature commit `5fa32c3df9b1e9b72f237a30c6035b848580e429`. Run commands live in `src/core/run/`, garage ownership commands in `src/core/inventory/garage.ts`, both use the canonical build resolver, and combat uses `simulateCombat()` from `src/core/combat/engine.ts`; UI persistence remains in `src/core/save/storage.ts`. Current checks: typecheck, 153 tests, `npm run validate`, and production build pass. Browser smoke only verified the opening combat; there is no E2E.
 
-Next task: add garage-side equipment editing using permanent inventory and `meta.equipment`, keeping it isolated from the run loadout. Then implement further road nodes with real gameplay handlers. Keep rendering/storage outside the combat engine; do not duplicate verified math/build/combat rules.
+Next task: implement inventory ownership actions beyond equipping: checkpoint shipment outside the current picker, salvage, item repair, and crafting according to `CYDLE_MASTER_SPEC.md` §25.4 and §24. Then add road nodes with real gameplay handlers. Keep UI/storage outside the combat engine; do not duplicate verified math/build/combat rules.
 
 ## Important implementation decisions
 
