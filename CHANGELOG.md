@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Enabled EV18's allied turret choice: one E08 joins the next combat with 50% HP and damage through the existing ally simulator path. The log records ally count and the saved effect is consumed once.
+- Added tests for EV18 event state, generated map eligibility, ally delivery, and consumption after combat.
 - Enabled EV14 and EV21 forced bounty events. EV14 applies +25% credits; EV21 targets E21 and guarantees one RARE reward roll. Both convert the next selected ordinary COMBAT to BOUNTY and use the existing BOUNTY reward/XP rules.
 - Added tests for event eligibility, pending target/effect persistence, map node promotion, credit scaling, and guaranteed rare reward identity.
 - Enabled EV16's two encounter choices. Paying skips the next ordinary COMBAT without XP or loot; fighting transforms the next selected ordinary COMBAT into an ELITE and grants one extra item roll. The pending effect persists across service/checkpoint nodes and clears after the next combat encounter.
