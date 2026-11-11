@@ -8,6 +8,7 @@ import { QUESTS } from '../../src/data/quests';
 import { SKILLS, PASSIVES } from '../../src/data/skills';
 import { TREE_NODES } from '../../src/data/tree';
 import { UNIQUES } from '../../src/data/uniques';
+import { validateCatalog } from '../../src/data/validate';
 
 const assertUniqueIds = (ids: string[]) => expect(new Set(ids).size).toBe(ids.length);
 
@@ -27,5 +28,9 @@ describe('master-spec content catalog', () => {
     for (const defs of [ITEM_TEMPLATES, SKILLS, PASSIVES, TREE_NODES, UNIQUES, ENEMIES, BOSSES, EVENTS, QUESTS, BIOMES, AFFIXES]) {
       assertUniqueIds(defs.map((x) => x.id));
     }
+  });
+
+  it('has valid cross references for campaign, biomes, enemies, event rewards, and starter content', () => {
+    expect(validateCatalog()).toEqual([]);
   });
 });

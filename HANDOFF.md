@@ -6,14 +6,14 @@ Last updated: 2026-11-11
 
 The user explicitly resumed autonomous implementation after the earlier audit handoff. Work is now on `development/luna`, created from user-specified base `2e5a59798695aaf7666a8fa13cb709fcdaad9fc7`. The recovery branch remains the untouched source of the handoff.
 
-- Current work: combat expansion 2d and stage 2e (drone roles and catalog-driven trigger engine) are committed and verified inside the single `stepCombat` engine.
-- Tests: TypeScript typecheck and all 119 unit tests pass. Production build reaches Vite then fails because `src/main.tsx` is absent; E2E cannot run because Playwright is absent.
-- Next task: start the actual application/save boundary, then complete run, campaign, garage, economy, and Simulation Lab systems. Combat now covers catalog events/actions and bounded trigger chains.
+- Current work: combat expansion 2d–2e remains verified in the single `stepCombat` engine. Stage 3 is active: a real React shell, versioned save boundary, IndexedDB snapshots, and startup catalog checks are implemented.
+- Checks: typecheck, 124 unit tests, catalog validation, production build, and local dev-server HTTP response pass. Browser UI automation was blocked before page navigation because the computer-use tool could not establish the browser URL. Playwright is not installed, so E2E is unavailable.
+- Next task: implement the first persisted playable sector/run loop with validated commands, deterministic six-layer road graph, combat encounters, unsecured rewards, checkpoints, evacuation/death, and reload. Then continue campaign, garage, economy, and Simulation Lab.
 - The user requests continued implementation through a playable CYDLE 1.0; the old emergency stop is superseded.
 
 ## Current status
 
-This is `development/luna`, based on the preserved Qwen snapshot and implemented combat expansions **2a: effective stats + status lifecycle + DoT**, **2b: active main-channel skills + tactical rules + targeting**, **2c: independent reaction channel + interrupt/telegraph**, **2d: timed enemy abilities, boss phases/rotation, elite modifiers, and cataloged enemy events**, **2e task 1: all drone roles and droneA skills**, and **2e task 2: bounded catalog-driven trigger/proc execution**. Typecheck and all 119 unit tests pass. The Vite production build still stops at the missing real app entrypoint `src/main.tsx` — no placeholder was added.
+This is `development/luna`, based on the preserved Qwen snapshot. Combat expansions **2a–2e task 2** are implemented in the existing deterministic engine. Stage 3 has begun: the app starts into a responsive Garage/Build shell; new operator creation uses the exact level-one equipment, skills, passives, resources, transport, and tactical preset from section 22.1; save imports use a strict Zod schema, legal build validation and checksum; Dexie commits snapshots transactionally and can fall back to the previous valid snapshot; catalog references are checked on startup and through `npm run validate`. This is not yet a playable run: `SaveGame.run` is still `null`, screens are read-only, and no route/campaign state is wired.
 
 ## Repository and checkpoint
 
@@ -65,24 +65,25 @@ The presence of catalogs and interfaces does not mean those systems are playable
 
 - **Partial:** typed data/effects catalogs; some item instance creation; build/stat preview boundary; damage and status primitives; combat state/result interfaces; **executable combat transition + headless simulator for auto-attacks, continuous resources, deaths and terminal outcome**; **effective-stat recomputation, status lifecycle/stacking and DoT (BLEED/BURN/VIRUS), expiry, and status-derived combat modifiers** (stage 2a); **main-channel active skill casts (windup/resolve/recovery/cooldown/energy/heat), tactical rule evaluation, targeting selectors, AUTO fallback and rule-failure diagnostics** (stage 2b); **independent reaction channel (shield/EMP/guard/vent/heal/drone-mark), cast interrupts and telegraph event infrastructure** (stage 2c) — all in `src/core/combat/engine.ts`.
 - **Partial (combat expansion 2d–2e):** combat AI, elite/drone behavior, and catalogued combat triggers are executable and unit tested. Combat only exposes wanted/reveal deltas; the run/campaign consumer, encounter rewards, escapes, and persistent death/economy consequences are absent.
-- **Absent (other systems):** campaign map/run/autopilot, economy/rewards/loot/crafting loop, persistence/migrations/atomic save transactions, meta progression/unlocks, garage, player-facing Build Lab, Simulation Lab and balance batches, React app entrypoint and UI/rendering/animation/assets, integrated and end-to-end test setup.
-- `index.html` references `/src/main.tsx`, which is missing. `npm run dev` and production build cannot provide a playable app until the actual application is implemented.
-- Package scripts `validate`, `sim`, and `balance` refer to missing scripts. `e2e` refers to Playwright, which is not installed in this project.
+- **Partial (stage 3 boot/save):** `src/main.tsx`, responsive React Garage/Build screens, strict schema v1 import/export, legal build validation, catalog startup validation, and Dexie snapshot persistence/recovery are implemented. The current save intentionally accepts only `run: null`; no migrations from an older application format exist. UI currently reads the starter profile and does not edit it.
+- **Absent:** playable run/map/encounter loop, reward/economy/garage commands, campaign and autopilot, meta progression/unlocks, Simulation Lab/balance batches, visual combat scene/animation/assets, CI and E2E setup. There is no Playwright dependency.
+- Package script `validate` is now implemented. `sim` and `balance` still refer to missing scripts. `e2e` refers to Playwright, which is not installed in this project.
 
-## Checks at this checkpoint (combat kernel + stages 2a–2c + 2d + 2e tasks 1–2)
+## Checks at this checkpoint (combat + boot/save boundary)
 
-- `npm run typecheck`: **passes** (no errors).
-- `npm test`: **119 tests pass** across 9 files — math (11), build (15), combat (3), combat-AI (50), combat-status (7), combat-skills (16), combat-reactions (12), rng (4), catalog (1).
-- `npm run build`: **passes the TypeScript check, then Vite fails to resolve `/src/main.tsx`** from `index.html`. This is the same pre-existing UI-stage blocker documented at `a06dbba`, not a regression. It clears only when a real app entrypoint is implemented; no placeholder was added.
-- `npm run e2e`: **fails** because the `playwright` executable/dependency is absent.
-- No integration tests exist yet. Unit tests cover exact-tick interrupt order, boss target reacquisition, phase summon-cap saturation, E19 death→telegraph→damage ordering, deterministic transitions without input mutation, drone role/skill behavior, trigger source identity/bounds, packet modifiers, heat/interrupt/telegraph/HP-threshold events, and target-dependent stat conditions. App/UI and end-to-end behavior remain unverified.
+- `npm run typecheck`: **passes**.
+- `npm test -- --run`: **124 tests pass** across 10 files. Includes 50 combat-AI cases and four save tests; the save suite uses `fake-indexeddb` to check commit/load, checksum/schema rejection, corrupt latest-snapshot fallback, continued writes, and export/import validation.
+- `npm run validate`: **passes** current catalog cross-reference and starter-content checks.
+- `npm run build`: **passes**; Vite generates a production bundle.
+- Dev server responds HTTP 200 at `http://127.0.0.1:5173/`. Browser visual/interaction smoke did not complete: the computer-use tool stopped before navigation because it could not verify the current browser URL.
+- E2E was not run in this checkpoint; Playwright and an E2E harness are absent. UI interactions are therefore not browser-verified.
 - `npm ci` succeeded during recovery. An earlier `npm audit` reported 7 advisories (3 moderate, 2 high, 2 critical); dependencies were not upgraded during recovery.
 
 ## Exact stop point and next task
 
-Current code checkpoint: branch `development/luna`, feature commit `d9a88e77a330d36f023ff292306b1a2535a15f66`, combat expansion 2e task 2. Timed enemy abilities, boss thresholds/rotation, elite modifiers, drone roles/skills, and catalog event/action triggers execute in `src/core/combat/engine.ts`. Typecheck and the full unit suite (119/119) pass; production build still stops at missing `src/main.tsx`. The current HEAD is available through `git rev-parse HEAD`.
+Current code checkpoint: branch `development/luna`; run `git rev-parse HEAD` for the latest saved commit. Combat expansions 2a–2e task 2 remain in `src/core/combat/engine.ts`. The new app/save stage adds `src/main.tsx`, `src/ui/App.tsx`, `src/core/save/`, and `src/data/validate.ts`; its run field is still null. Current checks: typecheck, 124 tests, `npm run validate`, build, and local HTTP 200 pass. UI automation and E2E remain unverified.
 
-Next task: implement the real React application entrypoint and a versioned, validated save boundary, keeping combat independent from rendering/storage. Then connect one complete sector/run loop with persisted state, loot, reward grant IDs, checkpoint/evacuation/death, and save/reload. Do not replace the combat engine or redo verified math/build/combat rules.
+Next task: add the persisted RunState and validated run commands, then implement one complete playable sector using the existing deterministic world/combat engines. Include seeded six-layer DAG generation, route choice, encounter composition and combat start, reward grant IDs and unsecured cargo, checkpoint/evacuation/death, and save/reload. Keep rendering and storage outside the combat engine; do not redo verified math/build/combat rules.
 
 ## Important implementation decisions
 
@@ -100,11 +101,13 @@ git switch development/luna
 npm ci
 npm run typecheck
 npm test
+npm run validate
 npm run build
+npm run dev
 ```
 
-The unit suite currently has 119 tests. Implement a real app entrypoint at the UI stage; do not add a placeholder solely to silence Vite.
+The unit suite currently has 124 tests. `npm run sim` and `npm run balance` are not implemented; `npm run e2e` needs Playwright setup. The application entrypoint exists now, but no playable run loop is wired.
 
 ## Short continuation prompt
 
-Open `https://github.com/MatveyTomilov/cydle/tree/development/luna` and `E:\cydle\project`. Read `CYDLE_MASTER_SPEC.md`, `HANDOFF.md`, and `docs/ROADMAP.md`; inspect `git status` and recent commits. Combat 2a–2e, including bounded catalog-driven triggers, is implemented and verified. Begin the real application/save boundary, then one complete saved sector loop. Reuse the existing math/build/combat cores and commit each verified stage.
+Open `https://github.com/MatveyTomilov/cydle/tree/development/luna` and `E:\cydle\project`. Read `CYDLE_MASTER_SPEC.md`, `HANDOFF.md`, and `docs/ROADMAP.md`; inspect `git status` and recent commits. Combat 2a–2e and a partial boot/save boundary are implemented and verified. Begin the persisted playable sector/run loop. Reuse the existing math/build/combat cores and commit each verified stage.
