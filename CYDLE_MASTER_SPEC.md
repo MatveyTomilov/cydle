@@ -138,7 +138,7 @@
 - energyResistanceAfterPen=max(-0.5,min(0.75,energyResistance - max(0,energyResistance)×percentResPen - flatResPen)).
 - digital аналогично. Базовый resistance clamp [-0.5,0.75] по итогам.
 - damageAfterDefense=kineticRaw×(1-kineticReduction) или energy/digitalRaw×(1-resistanceAfterPen). После apply other incoming MORE/LESS; LESS = ×(1−decimal) с явно задаными пределами.
-- щит поглощает остаток первым; bypassShieldRatio (0..1) прямиком в HP и логируется; оставшееся проходит обычную шкалу.
+- щит поглощает остаток первым; bypassShieldRatio (0..1) прямиком в HP и логируется; оставшееся проходит обычную шкалу. Временный щит хранится отдельно по sourceId и expiry; SK_SHIELD имеет собственный max temporaryShieldCap=90, S4C имеет cap=80×D(T брони), другие эффекты — явные собственные caps. Общий temporaryShieldCap равен сумме действующих source caps, без двойного накопления от одного sourceId. Снятие эффекта удаляет только ещё оставшиеся временные щиты его источника.
 - HP clamp [0,maxHP], shields clamp [0,maxShield+temporaryShieldCap]. Overkill и excess healing логируются.
 
 **Время:** attackInterval=max(150ms, baseInterval/(1+attackSpeedIncrease)÷ΠattackSpeedMore); cooldownInterval=max(250ms,baseCooldown/(1+cooldownRecoveryRate)). Числовые multipliers строго положительны. Каналы не допускают двух одновременных main-кастов. Buff duration — милисекунды, status tickSchedule не зависит от display speed.
@@ -765,7 +765,7 @@ Reputation каждой ∈[−100,100], старт 0. Изменения сра
 3. На B03 после доставки выбрать очистку данных (−8 data, +чертёж OFF_TARGET) или продать (credits+35, F_ECHO−5).
 **Q03 «Долг механика» (B03 / F_RUST):**
 1. Дать 10 scrap мастеру (+6 F_RUST) либо выкупить tool (+10 credits, Quest ends).
-2. Победить E09 technician ELITE (открывает гарантированный тематический RARE drone-module контракт, F_RUST+6) либо купить запасной двигатель за 20×R(d) credits.
+2. Победить E09 technician ELITE (даёт один гарантированный RARE предмет типа DR_GUN/DR_ARC/DR_MED текущего T как unsecured reward и F_RUST+6) либо купить запасной двигатель за 20×R(d) credits.
 3. Выбрать доступ к SERVICE upgrade (открывает +15% hull repair at checkpoints) либо +1 calibration core of current group.
 **Q04 «Чужая броня» (B02 / F_VANTA):**
 1. Захватить код доступа (wanted+10, data+10) либо передать VANTA (F_VANTA+8, Quest ends).
