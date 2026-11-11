@@ -8,7 +8,7 @@ import { ENEMY_BY_ID, BOSS_BY_ID, enemyTemplate } from '../../data/enemies';
 import { ITEM_BY_ID } from '../../data/items';
 import { SKILL_BY_ID } from '../../data/skills';
 import { UNIQUE_TEMPLATE_BY_ID } from '../../data/uniques';
-import type { BossTemplate, EnemyAbility, EnemyTemplate, SkillDef } from '../../data/types';
+import type { BossPhaseTrigger, BossTemplate, EnemyAbility, EnemyTemplate, SkillDef } from '../../data/types';
 import type { ResolvedBuild } from '../build/build';
 import { D, H, TICK_MS, attackIntervalMs, clamp, cooldownMs, finite } from '../math/formula';
 import {
@@ -415,6 +415,7 @@ function incomingMultiplier(state: CombatState, target: CombatActor, type: Damag
 /** Скорость действий: SHOCK −30%, DRONE_JAM у дрона −50%. */
 function actionSpeedMult(actor: CombatActor): number {
   let m = 1;
+  m *= 1 + Math.max(0, actor.flags.bossAttackSpeedBonus ?? 0);
   if (hasStatus(actor, 'SHOCK')) m *= 0.7;
   if (actor.kind === 'drone' && hasStatus(actor, 'DRONE_JAM')) m *= 0.5;
   return m;
@@ -561,7 +562,9 @@ function applyContinuous(state: CombatState, dtSec: number): void {
     const s = eff(state, op);
     op.energy = clamp(op.energy + s.energyRegen * dtSec, 0, s.maxEnergy);
     const cooling = Math.max(0, s.heatCooling - state.coolingPenalty);
-    const ambient = state.ambientHeatPerSec;
+    const bossAmbient = state.enemies.filter((enemy) => enemy.alive && enemy.isBoss)
+      .reduce((total, enemy) => total + ((enemyTemplate(enemy.templateId) as BossTemplate).ambientHeatPerSec ?? 0), 0);
+    const ambient = state.ambientHeatPerSec + bossAmbient;
     const before = op.heat;
     op.heat = clamp(op.heat + (ambient - cooling) * dtSec, 0, s.maxHeat);
     if (!op.heatLockout && before < s.maxHeat && op.heat >= s.maxHeat) {
@@ -975,7 +978,8 @@ function readyEnemyAbility(state: CombatState, actor: CombatActor): EnemyAbility
 }
 
 function startEnemyAbility(state: CombatState, actor: CombatActor, ability: EnemyAbility): void {
-  const windup = Math.max(0, ability.windupMs * state.enemyWindupMult);
+  const castSpeed = Math.max(0, actor.flags.bossCastSpeedIncrease ?? 0);
+  const windup = Math.max(0, ability.windupMs * state.enemyWindupMult / (1 + castSpeed));
   actor.counters.abilities = (actor.counters.abilities ?? 0) + 1;
   const actionId = `${actor.id}:ability:${ability.id}:${actor.counters.abilities}`;
   const cast: CastState = {
@@ -986,7 +990,8 @@ function startEnemyAbility(state: CombatState, actor: CombatActor, ability: Enem
     dangerTag: ability.kind, channel: 'main', abilityId: ability.id,
   };
   actor.cast = cast;
-  actor.abilityNext[ability.id] = ability.everyMs > 0 ? state.timeMs + ability.everyMs : Number.MAX_SAFE_INTEGER;
+  const intervalMult = Math.max(0.01, actor.flags.bossAbilityIntervalMultiplier ?? 1);
+  actor.abilityNext[ability.id] = ability.everyMs > 0 ? state.timeMs + ability.everyMs * intervalMult : Number.MAX_SAFE_INTEGER;
   actor.nextAttackAt = Math.max(actor.nextAttackAt, cast.endAt);
   emit(state, 'CAST_START', actor.id, {
     targetId: cast.targetId ?? undefined, actionId,
@@ -998,6 +1003,110 @@ function startEnemyAbility(state: CombatState, actor: CombatActor, ability: Enem
     text: `${actor.name}: ${ability.desc}`,
     data: { abilityId: ability.id, dangerTag: ability.kind, windupMs: windup },
   });
+}
+
+const MAX_SUMMONED_ENEMIES = 2;
+
+function spawnSummonedEnemy(state: CombatState, owner: CombatActor, templateId: string): CombatActor | undefined {
+  const livingSummons = state.enemies.filter((enemy) => enemy.alive && enemy.summoned).length;
+  if (livingSummons >= MAX_SUMMONED_ENEMIES) {
+    emit(state, 'CAST_FIZZLE', owner.id, { reason: 'summon_cap', text: `${owner.name}: лимит призывов достигнут.`, data: { templateId, summonCap: MAX_SUMMONED_ENEMIES } });
+    return undefined;
+  }
+  if (!enemyTemplate(templateId)) {
+    emit(state, 'CAST_FIZZLE', owner.id, { reason: 'unknown_summon', text: `${owner.name}: неизвестный призыв ${templateId}.` });
+    return undefined;
+  }
+  const summon = createEnemyActor({ templateId, summoned: true, noLoot: true }, state.enemies.length, state.depth, state.extraEnemyDigitalBonus);
+  summon.id = `enemy:${state.enemies.length}`;
+  summon.ownerId = owner.id;
+  summon.nextAttackAt = state.timeMs + summon.attackIntervalMs;
+  state.enemies.push(summon);
+  emit(state, 'SUMMON', owner.id, {
+    targetId: summon.id, text: `${owner.name} вызывает ${summon.name}.`,
+    data: { templateId, hp: summon.hp, noLoot: true },
+  });
+  return summon;
+}
+
+function addBossAttackSpeed(state: CombatState, actor: CombatActor, amount: number): void {
+  actor.flags ??= {};
+  const previous = actor.flags.bossAttackSpeedBonus ?? 0;
+  const current = previous + amount;
+  actor.flags.bossAttackSpeedBonus = current;
+  if (actor.nextAttackAt > state.timeMs) {
+    actor.nextAttackAt = state.timeMs + (actor.nextAttackAt - state.timeMs) * (1 + previous) / (1 + current);
+  }
+}
+
+function applyBossPhase(state: CombatState, actor: CombatActor, phase: BossPhaseTrigger, phaseIndex: number): void {
+  actor.flags ??= {};
+  emit(state, 'PHASE', actor.id, {
+    text: `${actor.name}: ${phase.desc}`,
+    data: { phaseIndex, hpFraction: phase.hpFraction, phaseKind: phase.kind },
+  });
+  const amount = phase.amount ?? 0;
+  switch (phase.kind) {
+    case 'summon':
+      if (phase.summonId) spawnSummonedEnemy(state, actor, phase.summonId);
+      break;
+    case 'attackSpeed':
+      addBossAttackSpeed(state, actor, amount);
+      break;
+    case 'intervalReduce':
+      if (phase.target === 'abilities') {
+        const previous = Math.max(0.01, actor.flags.bossAbilityIntervalMultiplier ?? 1);
+        const current = Math.max(0.01, previous * (1 - clamp(amount, 0, 0.95)));
+        actor.flags.bossAbilityIntervalMultiplier = current;
+        for (const [abilityId, nextAt] of Object.entries(actor.abilityNext)) {
+          if (nextAt > state.timeMs && nextAt < Number.MAX_SAFE_INTEGER) {
+            actor.abilityNext[abilityId] = state.timeMs + (nextAt - state.timeMs) * current / previous;
+          }
+        }
+      } else {
+        addBossAttackSpeed(state, actor, amount);
+      }
+      break;
+    case 'castSpeed': {
+      const previous = Math.max(0, actor.flags.bossCastSpeedIncrease ?? 0);
+      const current = previous + amount;
+      actor.flags.bossCastSpeedIncrease = current;
+      if (actor.cast && !actor.cast.resolved && actor.cast.resolveAt > state.timeMs) {
+        const factor = (1 + previous) / (1 + current);
+        actor.cast.resolveAt = state.timeMs + (actor.cast.resolveAt - state.timeMs) * factor;
+        actor.cast.endAt = state.timeMs + (actor.cast.endAt - state.timeMs) * factor;
+      }
+      break;
+    }
+    case 'bypassUpgrade':
+      actor.flags.digitalShieldBypassBonus = (actor.flags.digitalShieldBypassBonus ?? 0) + amount;
+      break;
+    case 'cleanse':
+      for (const statusId of Object.keys(actor.statuses) as StatusId[]) {
+        if (!STATUS_DEFS[statusId]?.harmful) continue;
+        delete actor.statuses[statusId];
+        emit(state, 'STATUS_EXPIRE', actor.id, { statusId, text: `${actor.name}: ${STATUS_DEFS[statusId].name} очищен фазой.` });
+      }
+      break;
+  }
+}
+
+function resolveBossPhases(state: CombatState): void {
+  const bosses = state.enemies.filter((enemy) => enemy.alive && enemy.isBoss).sort((a, b) => byId(a.id, b.id));
+  for (const actor of bosses) {
+    if (actor.hp <= 0) continue;
+    const template = enemyTemplate(actor.templateId);
+    if (!('phases' in template)) continue;
+    const hpFraction = actor.hp / Math.max(1, actor.baseSheet.maxHP);
+    const phases = template.phases.map((phase, phaseIndex) => ({ phase, phaseIndex }))
+      .sort((a, b) => b.phase.hpFraction - a.phase.hpFraction || a.phaseIndex - b.phaseIndex);
+    for (const { phase, phaseIndex } of phases) {
+      const flag = `bossPhase:${phaseIndex}`;
+      if (actor.flags[flag] || hpFraction > phase.hpFraction) continue;
+      actor.flags[flag] = 1;
+      applyBossPhase(state, actor, phase, phaseIndex);
+    }
+  }
 }
 
 function resolveEnemyAbility(state: CombatState, rng: Rng, actor: CombatActor, cast: CastState): void {
@@ -1025,9 +1134,10 @@ function resolveEnemyAbility(state: CombatState, rng: Rng, actor: CombatActor, c
       }
       const type = ability.damageType ?? actor.attackType;
       const base = ability.damage ?? actor.attackDamage;
+      const phaseBypass = type === 'DIGITAL' ? actor.flags.digitalShieldBypassBonus ?? 0 : 0;
       const raw = applyHit(state, rng, actor, target, base, type, {
         actionId: cast.actionId, isMain: false, procWeight: 0,
-        bypassShieldRatio: ability.bypassShieldRatio ?? (ability.kind === 'shieldBypass' ? ability.amount ?? 0 : 0),
+        bypassShieldRatio: (ability.bypassShieldRatio ?? (ability.kind === 'shieldBypass' ? ability.amount ?? 0 : 0)) + phaseBypass,
         abilityId: ability.id,
       });
       if (raw >= 0 && ability.status) applyStatus(state, actor, target, ability.status, { stacks: 1, durationMs: ability.statusDurationMs, snapshot: raw, actionId: cast.actionId });
@@ -1430,6 +1540,7 @@ export function stepCombat(state: CombatState): CombatState {
     }
   }
 
+  resolveBossPhases(next);
   resolveDeaths(next);
   checkTerminal(next);
   next.rng = rng.serialize();

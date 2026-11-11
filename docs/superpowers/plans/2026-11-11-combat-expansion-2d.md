@@ -44,15 +44,15 @@
 ### Task 2: Boss thresholds and rotating abilities
 
 **Files:**
-- Modify: `src/core/combat/engine.ts`, `src/core/combat/types.ts`
+- Modify: `src/core/combat/engine.ts`, `src/data/types.ts`, `src/data/enemies.ts`
 - Test: `tests/core/combat-ai.test.ts`
 
 **Interfaces:** consume each `BossTemplate.phases` and optional `rotating` list; retain state-local phase/rotation counters.
 
-- [ ] Test one-shot phase activation, multi-threshold crossings, phase summon/cure/attack interval/cast speed/bypass upgrades.
-- [ ] Test BOSS_CORE rotating cast order and its phase-upgraded digital bypass.
-- [ ] Implement phase transitions, rotating schedule, boss ambient rules, and deterministic event output.
-- [ ] Test interrupt and target loss across boss casts; run full suite; commit `feat: execute boss phases and rotations`.
+- [x] Test one-shot phase activation, multi-threshold crossings, phase summon/cleanse/attack interval/cast speed/bypass upgrades.
+- [x] Test BOSS_CORE rotating cast order and its phase-upgraded digital bypass.
+- [x] Implement phase transitions, rotating schedule, boss ambient rules, and deterministic event output.
+- [x] Run focused/full tests and typecheck; commit `feat: execute boss phases and rotations`.
 
 ### Task 3: Elite modifier behaviors
 

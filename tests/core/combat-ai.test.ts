@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createCombatState, hasStatus, stepCombat, type CombatState } from '../../src/core/combat/engine';
+import { applyStatus, createCombatState, hasStatus, stepCombat, type CombatState } from '../../src/core/combat/engine';
 import type { CombatConfig, TacticalProfile } from '../../src/core/combat/types';
 import { resolveBuild } from '../../src/core/build/build';
 import { createItem } from '../../src/core/items/items';
@@ -15,12 +15,12 @@ const makeBuild = (skillIds: string[] = [], includeDrone = false) => resolveBuil
   skillIds, attributePointsEarned: 0, unlockedImplantSlots: 4, unlockedDroneSlots: 1,
 });
 
-const config = (seed: string, templates: string | string[], skillIds: string[] = [], rules: TacticalProfile['rules'] = []): CombatConfig => {
+const config = (seed: string, templates: string | string[], skillIds: string[] = [], rules: TacticalProfile['rules'] = [], maxDurationMs = 30000): CombatConfig => {
   const enemyIds = Array.isArray(templates) ? templates : [templates];
   return {
   seed, depth: enemyIds.some((id) => id.startsWith('BOSS_')) ? 8 : 2, biome: 'B01', nodeType: 'COMBAT',
   build: makeBuild(skillIds), enemies: enemyIds.map((templateId) => ({ templateId })),
-  tactics: { id: 'test', name: 'test', rules }, maxDurationMs: 30000,
+  tactics: { id: 'test', name: 'test', rules }, maxDurationMs,
   };
 };
 
@@ -127,5 +127,91 @@ describe('enemy ability scheduler', () => {
     expect(hasStatus(state.drones[0]!, 'DRONE_JAM')).toBe(true);
     const applied = state.log.find((event) => event.kind === 'STATUS_APPLY' && event.statusId === 'DRONE_JAM')!;
     expect(applied.targetId).toBe('drone:0');
+  });
+
+  it('fires crossed BOSS_A phase thresholds once and applies its attack-speed phase', () => {
+    let state = createCombatState(config('boss-phases-a', 'BOSS_A'));
+    state.operator.nextAttackAt = 30000;
+    state.enemies[0]!.nextAttackAt = 30000;
+    state.enemies[0]!.hp = state.enemies[0]!.baseSheet.maxHP * 0.34;
+    state = stepCombat(state);
+    state = stepCombat(state);
+
+    const phases = state.log.filter((event) => event.kind === 'PHASE' && event.actorId === 'enemy:0');
+    expect(phases.map((event) => event.data?.phaseIndex)).toEqual([0, 1]);
+    expect(state.enemies.filter((enemy) => enemy.summoned && enemy.alive).map((enemy) => enemy.templateId)).toEqual(['E09']);
+    expect(state.enemies[0]!.flags.bossAttackSpeedBonus).toBe(0.2);
+  });
+
+  it('cleanses BOSS_B once when its 30% threshold is crossed', () => {
+    let state = createCombatState(config('boss-cleanse', 'BOSS_B'));
+    const boss = state.enemies[0]!;
+    applyStatus(state, boss, boss, 'JAM', { durationMs: 10000 });
+    state.operator.nextAttackAt = 30000;
+    boss.nextAttackAt = 30000;
+    boss.hp = boss.baseSheet.maxHP * 0.29;
+    state = stepCombat(state);
+
+    expect(hasStatus(state.enemies[0]!, 'JAM')).toBe(false);
+    expect(state.log.filter((event) => event.kind === 'PHASE' && event.data?.phaseIndex === 1)).toHaveLength(1);
+  });
+
+  it('reduces BOSS_D burst ability interval after its 25% phase', () => {
+    let state = createCombatState(config('boss-d-interval', 'BOSS_D'));
+    const boss = state.enemies[0]!;
+    boss.hp = boss.baseSheet.maxHP * 0.24;
+    boss.flags['bossPhase:0'] = 1;
+    boss.nextAttackAt = 30000;
+    state.operator.hp = 10000;
+    boss.baseSheet.accuracy = 1e9;
+
+    state = until(state, (x) => x.log.some((event) => event.kind === 'TELEGRAPH' && event.data?.abilityId === 'BOSS_D_burst'));
+    const telegraph = state.log.find((event) => event.kind === 'TELEGRAPH' && event.data?.abilityId === 'BOSS_D_burst')!;
+    expect(telegraph.timestamp).toBe(10000);
+  });
+
+  it('rotates BOSS_CORE telegraphs in stable 12/24/36 second order', () => {
+    let state = createCombatState(config('core-rotation', 'BOSS_CORE', [], [], 60000));
+    state.operator.nextAttackAt = 60000;
+    state.enemies[0]!.nextAttackAt = 60000;
+    state = until(state, (x) => x.log.filter((event) => event.kind === 'TELEGRAPH' && event.actorId === 'enemy:0').length >= 3, 40000);
+    const waves = state.log.filter((event) => event.kind === 'TELEGRAPH' && event.actorId === 'enemy:0');
+
+    expect(waves.slice(0, 3).map((event) => [event.data?.abilityId, event.timestamp])).toEqual([
+      ['CORE_rail', 12000], ['CORE_jam', 24000], ['CORE_suppress', 36000],
+    ]);
+  });
+
+  it('upgrades BOSS_CORE digital wave to 25% shield bypass after the 40% phase', () => {
+    let state = createCombatState(config('core-phase-bypass', 'BOSS_CORE', [], [], 30000));
+    state.operator.nextAttackAt = 30000;
+    state.enemies[0]!.nextAttackAt = 30000;
+    state.enemies[0]!.hp = state.enemies[0]!.baseSheet.maxHP * 0.39;
+    state.enemies[0]!.flags['bossPhase:0'] = 1;
+    state.enemies[0]!.baseSheet.accuracy = 1e9;
+    state.operator.hp = 10000;
+    state.operator.shield = 100;
+    state = until(state, (x) => x.log.some((event) => event.kind === 'DAMAGE' && event.data?.abilityId === 'CORE_jam'), 30000);
+    const hit = state.log.find((event) => event.kind === 'DAMAGE' && event.data?.abilityId === 'CORE_jam')!;
+
+    expect(hit.bypassed).toBeCloseTo(20, 6);
+    expect(hit.shieldConsumed).toBe(0);
+    expect(hit.hpLost).toBeCloseTo(80, 6);
+  });
+
+  it('shortens BOSS_CORE cast windup by its 15% phase', () => {
+    let state = createCombatState(config('core-cast-speed', 'BOSS_CORE', [], [], 20000));
+    const boss = state.enemies[0]!;
+    boss.hp = boss.baseSheet.maxHP * 0.1;
+    boss.flags['bossPhase:0'] = 1;
+    boss.flags['bossPhase:1'] = 1;
+    boss.nextAttackAt = 30000;
+    boss.baseSheet.accuracy = 1e9;
+    state.operator.hp = 10000;
+
+    state = until(state, (x) => x.log.some((event) => event.kind === 'DAMAGE' && event.data?.abilityId === 'CORE_rail'), 16000);
+    const hit = state.log.find((event) => event.kind === 'DAMAGE' && event.data?.abilityId === 'CORE_rail')!;
+    expect(hit.timestamp).toBe(13300);
+    expect(state.enemies[0]!.flags.bossCastSpeedIncrease).toBe(0.2);
   });
 });

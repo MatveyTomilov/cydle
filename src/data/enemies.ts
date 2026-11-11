@@ -87,7 +87,7 @@ export const BOSSES: BossTemplate[] = [
     unlockDepth: 8, biomes: ['B04'], isBoss: true, accuracy: 110,
     desc: 'Перехватчик подсети. Цифровой скальпель обходит щит и вызывает утечку.',
     phases: [
-      { hpFraction: 0.6, kind: 'intervalReduce', amount: 0.15, desc: 'На 60% ускоряет атаки' },
+      { hpFraction: 0.6, kind: 'intervalReduce', target: 'attacks', amount: 0.15, desc: 'На 60% ускоряет атаки' },
       { hpFraction: 0.3, kind: 'cleanse', desc: 'На 30% один раз снимает свои статусы' },
     ],
     abilities: [ab({ id: 'BOSS_B_scalpel', kind: 'heavyAttack', firstAtMs: 11000, everyMs: 11000, windupMs: 1500, telegraphMs: 1500, interruptible: true, damage: 95, damageType: 'DIGITAL', bypassShieldRatio: 0.25, status: 'SHIELD_LEAK', statusDurationMs: 4000, desc: 'Скальпель 95 D, обход щита 25%, SHIELD_LEAK' })],
@@ -110,7 +110,7 @@ export const BOSSES: BossTemplate[] = [
     desc: 'Реактор термического пояса. Постоянный нагрев и тепловые взрывы.',
     phases: [
       { hpFraction: 0.6, kind: 'attackSpeed', amount: 0.1, desc: 'На 60% +10% скорости атаки' },
-      { hpFraction: 0.25, kind: 'intervalReduce', amount: 0.29, desc: 'На 25% интервал взрыва 10 с' },
+      { hpFraction: 0.25, kind: 'intervalReduce', target: 'abilities', amount: 0.29, desc: 'На 25% интервал взрыва 10 с' },
     ],
     abilities: [ab({ id: 'BOSS_D_burst', kind: 'heavyAttack', firstAtMs: 14000, everyMs: 14000, windupMs: 1500, telegraphMs: 1500, interruptible: true, damage: 85, damageType: 'ENERGY', desc: 'Тепловой взрыв 85 E' })],
   },

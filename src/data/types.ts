@@ -236,6 +236,8 @@ export interface EnemyTemplate {
 export interface BossPhaseTrigger {
   hpFraction: number;
   kind: 'summon' | 'attackSpeed' | 'castSpeed' | 'bypassUpgrade' | 'intervalReduce' | 'cleanse';
+  /** `intervalReduce` targets the boss's basic attacks or its timed abilities. */
+  target?: 'attacks' | 'abilities';
   summonId?: string;
   amount?: number;
   desc: string;
