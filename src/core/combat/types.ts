@@ -107,6 +107,8 @@ export interface CombatActor {
   shieldSpentWindow: number[];
   energyGainWindow: number[];
   markBy?: string;
+  droneRole?: 'mark' | 'shock' | 'medic' | 'emp' | 'bulwark' | 'swarm';
+  dronePellets?: number;
 }
 
 export type CombatEventKind =

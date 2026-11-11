@@ -194,11 +194,15 @@ function createDroneActor(build: ResolvedBuild, index: number, config: CombatCon
     attackIntervalMs: attackIntervalMs(drone.intervalMs, owner.droneAttackSpeed, 1),
     attackType: drone.type,
     accuracyBase: sheet.accuracy,
-    nextAttackAt: drone.intervalMs,
+    nextAttackAt: attackIntervalMs(drone.intervalMs, owner.droneAttackSpeed, 1),
     ownerId: 'operator',
   });
   actor.flags.lastDamagedAt = -100000;
   actor.flags.droneIndex = index;
+  actor.droneRole = drone.role;
+  actor.dronePellets = drone.pellets ?? 1;
+  if (drone.role === 'medic') actor.abilityNext.droneShield = 10000;
+  if (drone.role === 'emp') actor.abilityNext.droneEMP = 14000;
   return actor;
 }
 
@@ -630,6 +634,20 @@ function applyContinuous(state: CombatState, dtSec: number): void {
       actor.shield = clamp(actor.shield + regen * dtSec, 0, s.maxShield);
     }
   }
+  for (const drone of state.drones) {
+    if (!drone.alive || drone.droneRole !== 'medic' || state.timeMs < (drone.abilityNext.droneShield ?? Number.MAX_SAFE_INTEGER)) continue;
+    drone.abilityNext.droneShield += 10000;
+    const operator = state.operator;
+    if (!operator.alive) continue;
+    const maxShield = eff(state, operator).maxShield;
+    const restored = Math.min(18, Math.max(0, maxShield - operator.shield));
+    if (restored <= 0) continue;
+    operator.shield += restored;
+    emit(state, 'SHIELD_GAIN', drone.id, {
+      targetId: operator.id, text: `${drone.name}: оператору +${restored.toFixed(1)} щита.`,
+      data: { amount: restored, source: 'DR_MED_periodic' },
+    });
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -652,6 +670,9 @@ function attackPackets(state: CombatState, actor: CombatActor): AttackPacket[] {
     const weight = w.pelletProcWeight ?? w.procWeight ?? 1;
     return Array.from({ length: count }, () => ({ type: w.type, amount: w.damage, procWeight: weight }));
   }
+  if (actor.kind === 'drone' && actor.droneRole === 'swarm') {
+    return Array.from({ length: actor.dronePellets ?? 3 }, () => ({ type: actor.attackType, amount: actor.attackDamage, procWeight: 0.25 }));
+  }
   return [{ type: actor.attackType, amount: actor.attackDamage, procWeight: 1 }];
 }
 
@@ -659,7 +680,11 @@ function pickAutoTarget(state: CombatState, actor: CombatActor): CombatActor | u
   if (actor.side === 'enemy') {
     return state.operator.alive ? state.operator : livingPlayerSide(state)[0];
   }
-  return livingEnemies(state)[0];
+  const enemies = livingEnemies(state).sort((a, b) => byId(a.id, b.id));
+  if (actor.kind === 'drone' && actor.droneRole === 'mark') {
+    return enemies.find((enemy) => hasStatus(enemy, 'DRONE_MARK')) ?? enemies[0];
+  }
+  return enemies[0];
 }
 
 interface HitOptions {
@@ -699,6 +724,34 @@ function applyHit(state: CombatState, rng: Rng, actor: CombatActor, target: Comb
     state.metrics.crits++;
   }
   raw = finite(raw, 0);
+  if (actor.side === 'enemy' && target.kind === 'operator') {
+    const bulwark = state.drones.filter((drone) => drone.alive && drone.droneRole === 'bulwark').sort((a, b) => byId(a.id, b.id))[0];
+    if (bulwark) {
+      const redirected = Math.min(raw * 0.1, 20);
+      const operatorRaw = raw - redirected;
+      applyMitigatedHit(state, actor, target, operatorRaw, type, opts, crit, true);
+      if (redirected > 0) applyMitigatedHit(state, actor, bulwark, redirected, type, opts, crit, false);
+      resolveDirectHitTriggers(state, actor, target, opts.actionId, operatorRaw);
+      return operatorRaw;
+    }
+  }
+  applyMitigatedHit(state, actor, target, raw, type, opts, crit, true);
+  resolveDirectHitTriggers(state, actor, target, opts.actionId, raw);
+  return raw;
+}
+
+function applyMitigatedHit(
+  state: CombatState,
+  actor: CombatActor,
+  target: CombatActor,
+  raw: number,
+  type: DamageType,
+  opts: HitOptions,
+  crit: boolean,
+  countHit: boolean,
+): void {
+  const ds = eff(state, target);
+  const skillTag = opts.skillId ? { skillId: opts.skillId } : {};
   const mitigated = mitigatePacket(raw, type, defenseOf(state, target), opts.penOverride ?? penOf(state, actor));
   let incoming = mitigated.afterDefense * incomingMultiplier(state, target, type);
   if (hasStatus(target, 'MARK')) {
@@ -709,7 +762,7 @@ function applyHit(state: CombatState, rng: Rng, actor: CombatActor, target: Comb
   const partition = partitionDamage(incoming, { hp: target.hp, shield: target.shield, temp: target.tempShields }, opts.bypassShieldRatio ?? 0, ds.incomingShield);
   applyPartition(target, partition);
   target.flags.lastDamagedAt = state.timeMs;
-  state.metrics.hits++;
+  if (countHit) state.metrics.hits++;
   const dealt = partition.shieldConsumed + partition.hpLost;
   actor.damageDealt += dealt;
   target.damageTaken += dealt;
@@ -730,8 +783,6 @@ function applyHit(state: CombatState, rng: Rng, actor: CombatActor, target: Comb
     text: `${actor.name} → ${target.name}: ${incoming.toFixed(1)} ${type}${crit ? ' (крит)' : ''}, щит −${partition.shieldConsumed.toFixed(1)}, HP −${partition.hpLost.toFixed(1)}.`,
     data: { overkill: partition.overkill, ...(opts.abilityId ? { abilityId: opts.abilityId } : {}) },
   });
-  resolveDirectHitTriggers(state, actor, target, opts.actionId ?? '', raw);
-  return raw;
 }
 
 function resolveAttack(state: CombatState, rng: Rng, actor: CombatActor, preparedActionId?: string): void {
@@ -762,10 +813,17 @@ function resolveAttack(state: CombatState, rng: Rng, actor: CombatActor, prepare
 
   const packets = attackPackets(state, actor);
   const isMain = actor.kind === 'operator';
+  actor.lastTargetId = target.id;
+  let landed = false;
   for (const packet of packets) {
     const current = pickAutoTarget(state, actor);
     if (!current) return;
-    applyHit(state, rng, actor, current, packet.amount, packet.type, { actionId, isMain, procWeight: packet.procWeight });
+    if (applyHit(state, rng, actor, current, packet.amount, packet.type, { actionId, isMain, procWeight: packet.procWeight }) >= 0) landed = true;
+  }
+  if (landed && actor.kind === 'drone' && actor.droneRole === 'shock' && (actor.counters.attacks ?? 0) % 5 === 0) {
+    const previousTarget = actor.lastTargetId ? actorById(state, actor.lastTargetId) : undefined;
+    const current = previousTarget?.alive ? previousTarget : pickAutoTarget(state, actor);
+    if (current) applyStatus(state, actor, current, 'SHOCK', { stacks: 1, actionId });
   }
 }
 
@@ -987,7 +1045,7 @@ function startSkillCast(state: CombatState, actor: CombatActor, skill: SkillDef,
     resolveAt: state.timeMs + skill.windupMs, endAt: state.timeMs + skill.windupMs + skill.recoveryMs,
     targetId: target?.id ?? null, interruptible: skill.interruptible, telegraph: false, channel: skill.channel,
   };
-  if (skill.channel === 'reaction') actor.reactionCast = cast;
+  if (skill.channel === 'reaction' || skill.channel === 'droneA' || skill.channel === 'droneB') actor.reactionCast = cast;
   else actor.cast = cast;
   actor.lastSkillId = skill.id;
   if (actor.kind === 'operator') recordJudgeProgram(state, skill.id, actionId);
@@ -1450,6 +1508,30 @@ function resolveSkillCast(state: CombatState, rng: Rng, actor: CombatActor, cast
 
   if (isReaction) { resolveReaction(state, rng, actor, skill, cast); return; }
 
+  if (skill.special === 'DRONE_REPAIR' && actor.kind === 'drone') {
+    const maxHP = eff(state, actor).maxHP;
+    const healed = Math.min(25, Math.max(0, maxHP - actor.hp));
+    actor.hp += healed;
+    state.metrics.healingDone += healed;
+    if (healed > 0) emit(state, 'HEAL', actor.id, { targetId: actor.id, actionId: cast.actionId, text: `${actor.name}: восстановлено ${healed.toFixed(1)} HP.`, data: { amount: healed, source: skill.id } });
+    const operator = state.operator;
+    if (operator.alive) {
+      const maxShield = eff(state, operator).maxShield;
+      const restored = Math.min(20, Math.max(0, maxShield - operator.shield));
+      operator.shield += restored;
+      if (restored > 0) emit(state, 'SHIELD_GAIN', actor.id, { targetId: operator.id, actionId: cast.actionId, text: `${actor.name}: оператору +${restored.toFixed(1)} щита.`, data: { amount: restored, source: skill.id } });
+    }
+    return;
+  }
+  if (skill.special === 'DRONE_EMP' && actor.kind === 'drone') {
+    const target = castTarget(state, actor, cast);
+    if (!target) return;
+    interruptCast(state, target, actor.id, cast.actionId);
+    applySkillHit(state, rng, actor, target, { base: actor.attackDamage, type: 'DIGITAL' }, skill.coefficient, skill, cast, true);
+    applyStatus(state, actor, target, 'JAM', { durationMs: 2000, actionId: cast.actionId });
+    return;
+  }
+
   if (skill.special === 'OVERCLOCK') {
     applyStatus(state, actor, actor, 'OVERCLOCK', { stacks: 1, durationMs: 8000, actionId: cast.actionId });
     return;
@@ -1650,14 +1732,37 @@ export function stepCombat(state: CombatState): CombatState {
     .filter((a) => a.alive)
     .sort((a, b) => byId(a.id, b.id));
   for (const actor of ready) {
+    if (actor.kind === 'drone' && !actor.reactionCast && actor.droneRole === 'medic') {
+      const skill = next.build.skills.find((candidate) => candidate.special === 'DRONE_REPAIR');
+      const needsRepair = actor.hp < eff(next, actor).maxHP || next.operator.shield < eff(next, next.operator).maxShield;
+      if (skill && needsRepair && (actor.cooldowns[skill.id] ?? 0) <= next.timeMs) startSkillCast(next, actor, skill, actor);
+    }
     if (actor.kind === 'operator') {
       if (!actor.reactionCast) chooseReaction(next, actor);
       if (!actor.cast && actor.nextAttackAt <= next.timeMs) chooseOperatorAction(next, rng, actor);
+    } else if (!actor.cast && !actor.reactionCast && actor.kind === 'drone' && actor.droneRole === 'emp'
+      && actor.abilityNext.droneEMP <= next.timeMs) {
+      actor.abilityNext.droneEMP += 14000;
+      actor.counters.droneEMP = (actor.counters.droneEMP ?? 0) + 1;
+      const target = next.enemies.filter((enemy) => enemy.alive && enemy.cast?.interruptible)
+        .sort((a, b) => byId(a.id, b.id))[0];
+      const skill = next.build.skills.find((candidate) => candidate.special === 'DRONE_EMP');
+      if (skill && !actor.reactionCast) {
+        startSkillCast(next, actor, skill, target ?? selectTarget(next, actor, skill.targetMode));
+      } else {
+        const actionId = `${actor.id}:emp:${actor.counters.droneEMP}`;
+        const interrupted = target ? interruptCast(next, target, actor.id, actionId) : false;
+        emit(next, 'TRIGGER', actor.id, {
+          targetId: target?.id, actionId, text: `${actor.name}: импульс EMP${interrupted ? ', каст прерван' : ''}.`,
+          data: { abilityId: 'DR_EMP_interrupt', interrupted },
+        });
+      }
     } else if (!actor.cast) {
       const ability = actor.side === 'enemy' ? readyEnemyAbility(next, actor) : undefined;
       if (ability) startEnemyAbility(next, actor, ability);
       else if (actor.nextAttackAt <= next.timeMs) startAutoAttack(next, rng, actor);
     }
+    if (actor.kind === 'drone' && !actor.cast && actor.nextAttackAt <= next.timeMs) startAutoAttack(next, rng, actor);
   }
 
   resolveBossPhases(next);

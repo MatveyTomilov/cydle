@@ -18,6 +18,16 @@ const makeBuild = (skillIds: string[] = [], includeDrone = false) => resolveBuil
   skillIds, attributePointsEarned: 0, unlockedImplantSlots: 4, unlockedDroneSlots: 1,
 });
 
+const makeBuildWithDrone = (templateId: string, skillIds: string[] = []) => resolveBuild({
+  attributes: { POW: 5, REF: 5, INT: 5, ENG: 5, SYN: 5 },
+  equipment: { MAIN: makeItem(`weapon-drone-${templateId}`), DRONE_1: makeItem(`test-${templateId}`, templateId) },
+  skillIds, attributePointsEarned: 0, unlockedImplantSlots: 4, unlockedDroneSlots: 1,
+});
+
+const droneConfig = (seed: string, templateId: string, enemyIds: string[] = ['E01'], skillIds: string[] = []): CombatConfig => ({
+  ...config(seed, enemyIds), build: makeBuildWithDrone(templateId, skillIds),
+});
+
 const config = (seed: string, templates: string | string[], skillIds: string[] = [], rules: TacticalProfile['rules'] = [], maxDurationMs = 30000): CombatConfig => {
   const enemyIds = Array.isArray(templates) ? templates : [templates];
   return {
@@ -435,5 +445,107 @@ describe('enemy ability scheduler', () => {
     expect(initial).toEqual(untouched);
     expect(stateHash(first)).toBe(stateHash(second));
     expect(first.log).toEqual(second.log);
+  });
+});
+
+describe('drone combat roles', () => {
+  it('fires all three DR_SWARM pellets as one scheduled attack', () => {
+    let state = createCombatState(droneConfig('drone-swarm-pellets', 'DR_SWARM'));
+    state.operator.nextAttackAt = 30000;
+    state.enemies[0]!.nextAttackAt = 30000;
+    state = until(state, (x) => x.log.filter((event) => event.kind === 'DAMAGE' && event.actorId === 'drone:0').length >= 3, 2000);
+
+    const hits = state.log.filter((event) => event.kind === 'DAMAGE' && event.actorId === 'drone:0');
+    expect(hits).toHaveLength(3);
+    expect(new Set(hits.map((event) => event.actionId)).size).toBe(1);
+    expect(hits.map((event) => event.amountBeforeDefense)).toEqual([8, 8, 8]);
+  });
+
+  it('DR_GUN prioritizes the marked enemy', () => {
+    let state = createCombatState(droneConfig('drone-mark-priority', 'DR_GUN', ['E01', 'E02']));
+    state.operator.nextAttackAt = 30000;
+    state.enemies.forEach((enemy) => { enemy.nextAttackAt = 30000; });
+    applyStatus(state, state.operator, state.enemies[1]!, 'DRONE_MARK', { durationMs: 5000 });
+    state = until(state, (x) => x.log.some((event) => event.kind === 'DAMAGE' && event.actorId === 'drone:0'), 2000);
+
+    expect(state.log.find((event) => event.kind === 'DAMAGE' && event.actorId === 'drone:0')?.targetId).toBe('enemy:1');
+  });
+
+  it('DR_ARC applies SHOCK on its fifth attack', () => {
+    let state = createCombatState(droneConfig('drone-arc-shock', 'DR_ARC'));
+    state.operator.nextAttackAt = 30000;
+    state.enemies[0]!.nextAttackAt = 30000;
+    state = until(state, (x) => x.log.some((event) => event.kind === 'STATUS_APPLY' && event.actorId === 'drone:0' && event.statusId === 'SHOCK'), 6000);
+
+    const shock = state.log.find((event) => event.kind === 'STATUS_APPLY' && event.actorId === 'drone:0' && event.statusId === 'SHOCK');
+    expect(shock?.timestamp).toBe(4300);
+    expect(statusStacks(state.enemies[0]!, 'SHOCK')).toBe(1);
+  });
+
+  it('DR_MED restores 18 operator shield every ten seconds', () => {
+    let state = createCombatState(droneConfig('drone-med-periodic', 'DR_MED'));
+    state.operator.nextAttackAt = 30000;
+    state.enemies[0]!.nextAttackAt = 30000;
+    state.operator.shield = 0;
+    state = until(state, (x) => x.log.some((event) => event.kind === 'SHIELD_GAIN' && event.actorId === 'drone:0'), 11000);
+
+    const gain = state.log.find((event) => event.kind === 'SHIELD_GAIN' && event.actorId === 'drone:0');
+    expect(gain?.timestamp).toBe(10000);
+    expect(state.operator.shield).toBe(18);
+  });
+
+  it('DR_EMP interrupts an enemy cast on its fourteen-second cycle', () => {
+    let state = createCombatState(droneConfig('drone-emp-interrupt', 'DR_EMP', ['E07']));
+    state.operator.nextAttackAt = 30000;
+    state.enemies[0]!.nextAttackAt = 30000;
+    state.enemies[0]!.hp = 1000;
+    state.enemies[0]!.abilityNext.E07_shell = 13000;
+    state = until(state, (x) => x.log.some((event) => event.kind === 'CAST_INTERRUPT' && event.actorId === 'drone:0'), 15000);
+
+    const interrupt = state.log.find((event) => event.kind === 'CAST_INTERRUPT' && event.actorId === 'drone:0');
+    expect(interrupt?.timestamp).toBe(14000);
+    expect(state.enemies[0]!.cast).toBeNull();
+  });
+
+  it('DR_BULWARK diverts at most 20 raw damage from the operator per hit', () => {
+    const state = createCombatState(droneConfig('drone-bulwark-redirect', 'DR_BULWARK'));
+    state.operator.nextAttackAt = 30000;
+    state.drones[0]!.nextAttackAt = 30000;
+    state.enemies[0]!.nextAttackAt = 1100;
+    state.enemies[0]!.attackDamage = 500;
+    const result = until(state, (x) => x.log.some((event) => event.kind === 'DAMAGE' && event.actorId === 'enemy:0'), 1300);
+    const operatorHit = result.log.find((event) => event.kind === 'DAMAGE' && event.actorId === 'enemy:0' && event.targetId === 'operator');
+    const redirectedHit = result.log.find((event) => event.kind === 'DAMAGE' && event.actorId === 'enemy:0' && event.targetId === 'drone:0');
+
+    expect(redirectedHit?.amountBeforeDefense).toBe(20);
+    expect(operatorHit?.amountBeforeDefense).toBe(480);
+    expect(result.drones[0]!.shield).toBeLessThan(result.drones[0]!.baseSheet.maxShield);
+  });
+
+  it('SK_DRONE_REPAIR restores the medic drone and operator shield through droneA', () => {
+    let state = createCombatState(droneConfig('drone-repair-skill', 'DR_MED', ['E01'], ['SK_DRONE_REPAIR']));
+    state.operator.nextAttackAt = 30000;
+    state.enemies[0]!.nextAttackAt = 30000;
+    state.drones[0]!.nextAttackAt = 30000;
+    state.drones[0]!.hp = 70;
+    state.operator.shield = 0;
+    state = until(state, (x) => x.log.some((event) => event.kind === 'HEAL' && event.actorId === 'drone:0'), 1000);
+
+    expect(state.drones[0]!.hp).toBe(95);
+    expect(state.operator.shield).toBe(20);
+    expect(state.log.some((event) => event.kind === 'SKILL_USE' && event.actorId === 'drone:0' && event.skillId === 'SK_DRONE_REPAIR')).toBe(true);
+  });
+
+  it('SK_DRONE_EMP damages and jams the target while interrupting its cast', () => {
+    let state = createCombatState(droneConfig('drone-emp-skill', 'DR_EMP', ['E07'], ['SK_DRONE_EMP']));
+    state.operator.nextAttackAt = 30000;
+    state.enemies[0]!.nextAttackAt = 30000;
+    state.enemies[0]!.hp = 1000;
+    state.enemies[0]!.abilityNext.E07_shell = 13000;
+    state = until(state, (x) => x.log.some((event) => event.kind === 'CAST_INTERRUPT' && event.actorId === 'drone:0'), 15000);
+
+    expect(hasStatus(state.enemies[0]!, 'JAM')).toBe(true);
+    expect(state.log.some((event) => event.kind === 'DAMAGE' && event.actorId === 'drone:0' && event.skillId === 'SK_DRONE_EMP')).toBe(true);
+    expect(state.log.some((event) => event.kind === 'SKILL_USE' && event.skillId === 'SK_DRONE_EMP')).toBe(true);
   });
 });
