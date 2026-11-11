@@ -48,6 +48,8 @@ export interface StatDef {
   additiveOnly?: boolean;
   /** true → значение-множитель: база 1, MORE умножает, LESS уменьшает. */
   multiplier?: boolean;
+  /** This stat stores an effective percentage bonus (e.g. +20% damage), not a base quantity to multiply. */
+  increasedAsValue?: boolean;
   integer?: boolean;
   group: 'defense' | 'resource' | 'offense' | 'time' | 'drone' | 'road' | 'meta';
   desc: string;
@@ -73,26 +75,26 @@ export const STAT_REGISTRY: Record<StatId, StatDef> = {
   heatCooling: def('heatCooling', 'Охлаждение', '/с', 5, 'resource', 'Сброс нагрева в секунду', { min: 0 }),
   neuralCapacity: def('neuralCapacity', 'Нейроёмкость', 'ед.', 100, 'resource', 'Слоты конфигурации имплантов', { min: 0 }),
   shieldRegen: def('shieldRegen', 'Регенерация щита', '/с', 0, 'resource', 'Работает после 4 секунд без урона'),
-  kineticDamage: def('kineticDamage', 'Кинетический урон', '%', 0, 'offense', 'INCREASED группа kinetic'),
-  energyDamage: def('energyDamage', 'Энергетический урон', '%', 0, 'offense', 'INCREASED группа energy'),
-  digitalDamage: def('digitalDamage', 'Цифровой урон', '%', 0, 'offense', 'INCREASED группа digital'),
-  mainDamage: def('mainDamage', 'Урон основного оружия', '%', 0, 'offense', 'INCREASED группа main'),
-  allDamage: def('allDamage', 'Весь урон', '%', 0, 'offense', 'INCREASED группа all'),
-  droneDamage: def('droneDamage', 'Урон дронов', '%', 0, 'drone', 'INCREASED группа drone'),
-  statusDamage: def('statusDamage', 'Урон статусов', '%', 0, 'offense', 'INCREASED группа status (все DoT)'),
-  virusDamage: def('virusDamage', 'Урон VIRUS', '%', 0, 'offense', 'INCREASED группа virus'),
-  bleedDamage: def('bleedDamage', 'Урон BLEED', '%', 0, 'offense', 'INCREASED группа bleed'),
-  dotDuration: def('dotDuration', 'Длительность DoT', '%', 0, 'offense', 'INCREASED длительности периодического урона'),
-  healing: def('healing', 'Сила лечения', '%', 0, 'defense', 'INCREASED лечения'),
+  kineticDamage: def('kineticDamage', 'Кинетический урон', '%', 0, 'offense', 'INCREASED группа kinetic', { increasedAsValue: true }),
+  energyDamage: def('energyDamage', 'Энергетический урон', '%', 0, 'offense', 'INCREASED группа energy', { increasedAsValue: true }),
+  digitalDamage: def('digitalDamage', 'Цифровой урон', '%', 0, 'offense', 'INCREASED группа digital', { increasedAsValue: true }),
+  mainDamage: def('mainDamage', 'Урон основного оружия', '%', 0, 'offense', 'INCREASED группа main', { increasedAsValue: true }),
+  allDamage: def('allDamage', 'Весь урон', '%', 0, 'offense', 'INCREASED группа all', { increasedAsValue: true }),
+  droneDamage: def('droneDamage', 'Урон дронов', '%', 0, 'drone', 'INCREASED группа drone', { increasedAsValue: true }),
+  statusDamage: def('statusDamage', 'Урон статусов', '%', 0, 'offense', 'INCREASED группа status (все DoT)', { increasedAsValue: true }),
+  virusDamage: def('virusDamage', 'Урон VIRUS', '%', 0, 'offense', 'INCREASED группа virus', { increasedAsValue: true }),
+  bleedDamage: def('bleedDamage', 'Урон BLEED', '%', 0, 'offense', 'INCREASED группа bleed', { increasedAsValue: true }),
+  dotDuration: def('dotDuration', 'Длительность DoT', '%', 0, 'offense', 'INCREASED длительности периодического урона', { increasedAsValue: true }),
+  healing: def('healing', 'Сила лечения', '%', 0, 'defense', 'INCREASED лечения', { increasedAsValue: true }),
   armorPen: def('armorPen', 'Пробитие брони', 'ед.', 0, 'offense', 'Плоское вычитание брони цели', { min: 0 }),
-  armorPenPercent: def('armorPenPercent', 'Пробитие брони', '%', 0, 'offense', 'Процентное пробитие, clamp [0;100]', { min: 0, max: 100 }),
+  armorPenPercent: def('armorPenPercent', 'Пробитие брони', '%', 0, 'offense', 'Процентное пробитие, clamp [0;100]', { min: 0, max: 100, increasedAsValue: true }),
   energyPen: def('energyPen', 'Пробитие сопр. энергии', 'п.п.', 0, 'offense', 'Плоское снижение сопротивления', { min: 0 }),
-  energyPenPercent: def('energyPenPercent', 'Пробитие сопр. энергии', '%', 0, 'offense', 'Доля от положительного сопротивления', { min: 0, max: 100 }),
+  energyPenPercent: def('energyPenPercent', 'Пробитие сопр. энергии', '%', 0, 'offense', 'Доля от положительного сопротивления', { min: 0, max: 100, increasedAsValue: true }),
   digitalPen: def('digitalPen', 'Пробитие сопр. цифры', 'п.п.', 0, 'offense', 'Плоское снижение сопротивления', { min: 0 }),
-  digitalPenPercent: def('digitalPenPercent', 'Пробитие сопр. цифры', '%', 0, 'offense', 'Доля от положительного сопротивления', { min: 0, max: 100 }),
-  attackSpeed: def('attackSpeed', 'Скорость атаки', '%', 0, 'time', 'INCREASED; интервал = base/(1+inc/100)/Πmore, min 150 мс'),
-  cooldownRecovery: def('cooldownRecovery', 'Восстановление CD', '%', 0, 'time', 'cooldown = base/(1+rate/100), min 250 мс'),
-  reactionCooldownLess: def('reactionCooldownLess', 'Сокращение CD реакций', '%', 0, 'time', 'LESS к базовому cooldown реакций', { min: 0, max: 80 }),
+  digitalPenPercent: def('digitalPenPercent', 'Пробитие сопр. цифры', '%', 0, 'offense', 'Доля от положительного сопротивления', { min: 0, max: 100, increasedAsValue: true }),
+  attackSpeed: def('attackSpeed', 'Скорость атаки', '%', 0, 'time', 'INCREASED; интервал = base/(1+inc/100)/Πmore, min 150 мс', { increasedAsValue: true }),
+  cooldownRecovery: def('cooldownRecovery', 'Восстановление CD', '%', 0, 'time', 'cooldown = base/(1+rate/100), min 250 мс', { increasedAsValue: true }),
+  reactionCooldownLess: def('reactionCooldownLess', 'Сокращение CD реакций', '%', 0, 'time', 'LESS к базовому cooldown реакций', { min: 0, max: 80, increasedAsValue: true }),
   moreKinetic: def('moreKinetic', 'Множитель кинетики', '×', 1, 'offense', 'Независимые множители MORE/LESS', { multiplier: true, min: 0 }),
   moreEnergy: def('moreEnergy', 'Множитель энергии', '×', 1, 'offense', 'Независимые множители MORE/LESS', { multiplier: true, min: 0 }),
   moreDigital: def('moreDigital', 'Множитель цифры', '×', 1, 'offense', 'Независимые множители MORE/LESS', { multiplier: true, min: 0 }),
@@ -110,16 +112,16 @@ export const STAT_REGISTRY: Record<StatId, StatDef> = {
   incomingDigital: def('incomingDigital', 'Входящая цифра', '×', 1, 'defense', 'MORE/LESS цифры', { multiplier: true, min: 0 }),
   incomingShield: def('incomingShield', 'Урон по щиту', '×', 1, 'defense', 'Меняет только часть, поглощённую щитом', { multiplier: true, min: 0 }),
   techPower: def('techPower', 'TechPower (плоский бонус)', 'ед.', 0, 'offense', 'Плоские добавки offhand-фокусов'),
-  droneHP: def('droneHP', 'HP дронов', '%', 0, 'drone', 'INCREASED HP дронов'),
-  droneShield: def('droneShield', 'Щит дронов', '%', 0, 'drone', 'INCREASED щита дронов'),
+  droneHP: def('droneHP', 'HP дронов', '%', 0, 'drone', 'INCREASED HP дронов', { increasedAsValue: true }),
+  droneShield: def('droneShield', 'Щит дронов', '%', 0, 'drone', 'INCREASED щита дронов', { increasedAsValue: true }),
   droneAccuracy: def('droneAccuracy', 'Точность дронов', 'ед.', 0, 'drone', 'Плоская точность дронов'),
-  droneAttackSpeed: def('droneAttackSpeed', 'Скорость атаки дронов', '%', 0, 'drone', 'INCREASED скорость дронов'),
-  repairPower: def('repairPower', 'Сила ремонта', '%', 0, 'drone', 'INCREASED лечения от дронов/сервисов'),
-  droneJamDurationLess: def('droneJamDurationLess', 'Сокращение DRONE_JAM', '%', 0, 'drone', 'LESS длительности помех дронам', { min: 0, max: 80 }),
+  droneAttackSpeed: def('droneAttackSpeed', 'Скорость атаки дронов', '%', 0, 'drone', 'INCREASED скорость дронов', { increasedAsValue: true }),
+  repairPower: def('repairPower', 'Сила ремонта', '%', 0, 'drone', 'INCREASED лечения от дронов/сервисов', { increasedAsValue: true }),
+  droneJamDurationLess: def('droneJamDurationLess', 'Сокращение DRONE_JAM', '%', 0, 'drone', 'LESS длительности помех дронам', { min: 0, max: 80, increasedAsValue: true }),
   procMultiplier: def('procMultiplier', 'Множитель проков', '×', 1, 'meta', 'actorProcMultiplier в effectiveChance', { multiplier: true, min: 0 }),
   extractionChance: def('extractionChance', 'Шанс аварийной эвакуации', 'п.п.', 0, 'meta', 'Бонус к рискованной эвакуации'),
-  bountyCurrency: def('bountyCurrency', 'Награды охотников', '%', 0, 'meta', 'Только bounty-источники'),
-  repairCostLess: def('repairCostLess', 'Скидка на ремонт', '%', 0, 'meta', 'LESS стоимости ремонта металлом', { min: 0, max: 80 }),
+  bountyCurrency: def('bountyCurrency', 'Награды охотников', '%', 0, 'meta', 'Только bounty-источники', { increasedAsValue: true }),
+  repairCostLess: def('repairCostLess', 'Скидка на ремонт', '%', 0, 'meta', 'LESS стоимости ремонта металлом; отрицательное значение повышает цену', { min: -100, max: 80, increasedAsValue: true }),
   empCostFlat: def('empCostFlat', 'Скидка энергии SK_EMP', 'ед.', 0, 'resource', 'Плоское снижение стоимости перехвата', { min: 0 }),
   shieldCostFlat: def('shieldCostFlat', 'Скидка энергии SK_SHIELD', 'ед.', 0, 'resource', 'Плоское снижение стоимости аварийного щита', { min: 0 }),
   detonateCoefficient: def('detonateCoefficient', 'Коэффициент детонации', '×', 0.6, 'offense', 'Доля остаточного потенциала VIRUS'),
@@ -141,7 +143,7 @@ export const STAT_REGISTRY: Record<StatId, StatDef> = {
   fuelMax: def('fuelMax', 'Запас топлива', 'ед.', 24, 'road', 'Базовый бак 24', { min: 0 }),
   hullMax: def('hullMax', 'Прочность корпуса', 'ед.', 100, 'road', 'Базовый корпус 100', { min: 1 }),
   cargoUnits: def('cargoUnits', 'Вместимость груза', 'ед.', 20, 'road', 'Базовый отсек 20', { min: 0 }),
-  travelDurationLess: def('travelDurationLess', 'Сокращение переездов', '%', 0, 'road', 'LESS 25 секунд переезда', { min: 0, max: 60 }),
+  travelDurationLess: def('travelDurationLess', 'Сокращение переездов', '%', 0, 'road', 'LESS 25 секунд переезда', { min: 0, max: 60, increasedAsValue: true }),
   scanRange: def('scanRange', 'Дальность разведки', 'слоёв', 0, 'road', 'Дополнительные раскрытые слои', { min: 0, integer: true }),
 };
 
@@ -428,7 +430,32 @@ export function computeStat(
     localizedExplanation: `${base} + ${flatSum} = ${afterFlat}`,
   }));
 
-  if (!d.additiveOnly && !d.multiplier) {
+  if (d.increasedAsValue) {
+    const groups = new Map<string, { sum: number; members: Modifier[] }>();
+    for (const m of list.filter((x) => x.op === 'INCREASED')) {
+      const active = evalCondition(m.condition, ctx);
+      const g = m.stackGroup ?? statId;
+      if (!groups.has(g)) groups.set(g, { sum: 0, members: [] });
+      const entry = groups.get(g)!;
+      entry.members.push(m);
+      if (active) entry.sum += m.value;
+      children.push(node('ADD', `складывающиеся % [${g}]`, m.value, {
+        sourceId: m.sourceId, sourceName: m.sourceName, sourceKind: m.sourceKind, unit: '%',
+        inputs: [m.value], conditionPredicate: m.condition ? conditionText(m.condition) : undefined,
+        conditionActive: active, localizedExplanation: `${m.sourceName}: ${m.value}% к группе ${g}`,
+      }));
+    }
+    let factor = 1 + value / 100;
+    for (const [g, entry] of groups) {
+      const groupFactor = 1 + entry.sum / 100;
+      factor *= groupFactor;
+      value = (factor - 1) * 100;
+      children.push(node('MULTIPLY', `эффективный % [${g}]`, value, {
+        sourceId: `group:${g}`, sourceName: `Группа ${g}`, unit: '%', inputs: [entry.sum, groupFactor],
+        localizedExplanation: `Группа ${g}: ${entry.sum}% → ×${groupFactor}; эффективный бонус ${value}%`,
+      }));
+    }
+  } else if (!d.additiveOnly && !d.multiplier) {
     const groups = new Map<string, { sum: number; members: Modifier[] }>();
     for (const m of list.filter((x) => x.op === 'INCREASED')) {
       const active = evalCondition(m.condition, ctx);

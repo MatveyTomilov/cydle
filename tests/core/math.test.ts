@@ -33,6 +33,24 @@ describe('CYDLE math contract', () => {
     expect(stats.armor.value).toBeCloseTo(5 * 1.5 * 1.2 * 1.3, 12);
   });
 
+  it('reports percentage-bonus stats as effective percentages instead of multiplying their zero base', () => {
+    const stats = resolveStats(bundle([
+      mod('kineticDamage', 'INCREASED', 20, { ...source, id: 'attribute' }),
+      mod('kineticDamage', 'INCREASED', 30, { ...source, id: 'tree' }),
+    ]));
+
+    expect(stats.kineticDamage.value).toBe(50);
+  });
+
+  it('keeps separate INCREASED groups multiplicative in the effective bonus trace', () => {
+    const stats = resolveStats(bundle([
+      mod('kineticDamage', 'INCREASED', 20, { ...source, id: 'source-a' }, { stackGroup: 'A' }),
+      mod('kineticDamage', 'INCREASED', 30, { ...source, id: 'source-b' }, { stackGroup: 'B' }),
+    ]));
+
+    expect(stats.kineticDamage.value).toBeCloseTo(56, 12);
+  });
+
   it('applies kinetic armor reduction from the spec', () => {
     const result = mitigatePacket(100, 'KINETIC', { armor: 5, energyRes: 0, digitalRes: 0 }, ZERO_PEN);
 
