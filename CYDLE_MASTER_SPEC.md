@@ -965,3 +965,234 @@ NOVICE (простые апгрейды), CAUTIOUS (выживание), FARMER 
 
 В завершённой версии: в Build Lab кнопка «Проверить слабое место» и «Предложить до 3 улучшений». Работает на owned inventory, раскрытых врагах и доступных ресурсах, читает сборку и запускает ограниченное число настоящих локальных тестов в worker. Показывает результат и уверенность; не заменяет Build Lab, не меняет экипировку без команды пользователя и не раскрывает hidden content. Если N tests недостаточно для statistical certainty, пишет «предварительная оценка». После ручного выбора игрок может применить один item swap или открыть тактический редактор с предложенным diff.
 
+
+## 25. ПОЛНЫЙ UX-КОНТРАКТ — ЭКРАНЫ И ДЕЙСТВИЯ
+
+### 25.1. Визуальный язык
+
+**Формат игры:** 2D side-view автобой (герой слева, враги справа, дроны вокруг героя), дорожная карта сверху или полускроллируемая DAG. Визуальный стиль: мрачная индустриальная эстетика, дождь/свет терминалов/неон, но не пустые градиентные панели. Оригинальные процедурные SVG/Canvas/Pixi фигуры допустимы в первом полном релизе, если дают идентифицируемых участников, атаки, телеграфы и анимации. Не брать нелицензированные изображения. Должна быть анимационная обратная связь: выстрел/попадание, получение щита, уклонение, статус, смерть, каст босса, ремонт и добыча.
+
+**Цветовые роли и дизайн-токены** (можно стилистически уточнить без изменения семантики):
+- bg #0B111A, surface #121C29, elevated #1B293B, border #344357;
+- основной акцент #58A6FF, HP #4CC99B, SHIELD #55B6F0, ENERGY #4E97EB, HEAT #EF9B42, danger #ED6767, unique #C38EF2, warning #E7BC65;
+- базовый размер текста 14px, line-height≥1.4, контраст достаточный для WCAG AA на основных элементах;
+- размеры интерактивной цели ≥44×44 CSS px на touch, стандартные кнопки высотой 40–44 px, стандартные поля 40–44 px;
+- scale spacing 4,8,12,16,24,32 px; модальные окна однородные, заголовок/содержимое/действия, явный close/cancel.
+- Не опираться только на цвет: текстовые подписи редкости, иконки типа урона, подписи при статусе.
+
+**Desktop 1280px+:** левое меню 220–250px, центр расширяется, правый контекстный блок 270–340px при наличии места. **Tablet 768–1279:** drawer меню, две основные колонки или stacked. **Mobile 320–767:** нижняя навигация 4 основные и More, все большие таблицы превращаются в вертикальные key/value, CalcTrace раскрывается по узлам, ни одна обязательная функция не требует hover; large hit targets и sticky primary action. На 320px не должно быть горизонтальной прокрутки ВСЕЙ страницы.
+
+### 25.2. Навигация/содержание
+
+| экран | Обязательное содержание | Игровые действия |
+|---|---|---|
+| GARAGE «Гараж» | текущая кампания/цель, 8 объектов, currency, форпосты, быстрый билд | выбрать стартовый сектор, upgrade, ремонт, начать выезд |
+| ROAD «Дорога» | DAG, текущая позиция, известные риски/loot bands, корпус/fuel/wanted, cargo, прогресс сектора | выбрать reachable node, открыть прогноз, зайти в сервис, изменить автопилот |
+| BATTLE «Бой» | 2D сцена, герой/дроны/враги, HP/shields, statuses, telegraphs, current timeline | pause/×1/×2/×4/skip render, раскрыть event, открыть тактику перед следующим боем |
+| CHARACTER «Оператор» | portrait, слоты, программы, пассивки, дроны, пять атрибутов, дерево | equip/unequip, skill, respec, сохранить пресет |
+| BUILD_LAB «Билдинг» | реестр statId/CalcTrace, DPS/EHP scenarios, сравнение, журнал, Player Advisor | раскрыть формулу, предпросмотр, симулировать known enemy, копировать отчёт |
+| AUTOPILOT «Автопилот» | 3 пресета+свои, условия выбора, эвакуация, safe stops, фильтр | настроить правила, разрешить расходы/restart, включить/поставить на паузу |
+| INVENTORY «Склад» | secured/unsecured tabs, rarity/slot filter, craft, calibration, repair, item tooltip | сравнить, экипировать, отправить, разобрать, изготовить/перекалибровать |
+| QUESTS «Журнал» | кампания, quest stages, событие/решение, 4 reputations, glossary enemies/tech | просмотреть последствия и выбрать отслеживаемую цель |
+| REPORT «Итог выезда» | узлы/сектора, deaths/evac reasons, granted/lost items, rep, net wallet, damage sources | сохранить summary, открыть replay и Build Lab, начать новый run |
+| SETTINGS | звук/вибрация/анимации, локализация, доступность, бэкапы, импорт/экспорт | сохранить параметры, экспортировать/восстановить сейв |
+
+**Фокус внимания:** во время боя пользователь видит события и HP, не миллион модификаторов. Полная детализация через «Подробнее» и Build Lab. В диалогах irreversible choices показывать конкретную цену. На всех экранах единая UI система sizing, scrollbar и modal.
+
+### 25.3. Запуск и основной экран
+
+Первый запуск → «Новая игра» или «Загрузить» (при наличии save) → короткий ввод → гараж с уже оснащённым героем, видимой задачей «Прорваться через первый сектор» и кнопкой «Начать выезд» → выбор профиля → дорога → бой → добыча → следующий узел/checkpoint → решение и результат → гараж. Никаких пустых экранов без понятного действия.
+
+В гараже перед стартом показать теги выбранных enemy угроз (если они известны), текущую стоимость риска и недопустимые нейро-конфигурации. Битый/несовместимый билд не позволяет нажать «Начать», но даёт понятный путь исправления.
+
+**Боевой HUD:** крупные шкалы героя HP/shields/energy/heat и один ряд статусов; список врагов с HP и dangerous cast telegraph; мини-таймлайн последних 8 событий; роль дронов и текущие кулдауны, настройка скорости. У игрока нет ручной кнопки «нанести урон», но есть пауза и анализ боя. Нет real-time manual intervention, который превращал бы автобой в APM-игру.
+
+**Road UI:** все доступные next nodes интерактивны и показывают известные элементы. Недоступная ветка визуально отличается и имеет причину. Выбранный узел фиксируется после commit; нельзя вернуться по стрелке в browser и отменить проигрыш без транзакции.
+
+### 25.4. Инвентарь/крафт
+
+Сортировки: slot, rarity, TechLevel, acquired, chosen affix, compatibility, estimated effect in current scenario; фильтры по тегам. Tooltip содержит ID, raw roll, tier, стоимость ремонта, neural cost, item ownership, origin source, unique effect conditions, CalcTrace. Выбор предмета на мобильном открывает full-screen sheet, на desktop pane.
+
+Craft preview: конкретные входящие предметы, ресурсы, TR before/after, вероятностный диапазон возможного результата, полное изменение Build Lab; confirm, then atomic single transaction. Если материалы исчезли из-за другой операции, отказ и пересчёт стоимости, не отрицательный баланс.
+
+### 25.5. Дорожный автопилот и idle-report
+
+Видимые поля: выбранный тип профиля, приоритет loot/XP/safety, пороги HP/shield/fuel/wanted, разрешение элиты/аномалии, разрешение расходов bank, max expense, условия extraction/restart, фильтр предметов. Кнопка «Проверить профиль» запускает дешёвый анализ текущего известного графа; не обещает будущей гарантии безопасности.
+
+После offline-return пользователь получает отчёт: elapsed wall-clock, simulated game-time, battles won/lost, visited nodes, items found/secured/lost, raw/net currencies, choice policy, stopped reason, started/finished runs, changes of faction, strongest drop, graph от начала до конца. Данные отчёта напрямую из event log, не нарисованы с нуля через вторую формулу.
+
+### 25.6. Доступность и настройки
+
+Keyboard focus visible, semantic roles, Escape closes modal, Enter activates focused node, touch interactions 44px, reduced motion, audio mute, text scale 100–150%, no mandatory flashing, high-contrast danger telegraphs, отдельные цвет/текст для HP vs shields. Звуки создаются процедурно или из лицензированного набора, все включаемы/выключаемы; отсутствие аудио не мешает играть.
+
+## 26. АРХИТЕКТУРА ДАННЫХ И ПРОИЗВОДСТВЕННЫЕ ИНВАРИАНТЫ
+
+**Предпочитаемый стек:** TypeScript strict, React + Vite, Zustand/React state adapter UI-only, pure TS deterministic engine, PixiJS или Canvas 2D, Zod, IndexedDB/Dexie, Web Worker for offline and experiments, Vitest, Playwright. Не использовать вторую игровую бизнес-логику в React, worker или Python.
+
+### 26.1. Логические модули
+
+- core/math: Stats, EffectGraph, CalcTrace, caps, percentages, accuracy, damage, conversions.
+- core/combat: actors, statuses, queue, channels, targeting, AI, event reducers, award resolution.
+- core/world: road DAG, sectors, factions, quests, story milestones, contracts.
+- core/items: item bases/affixes/unique effects, rolls, loot tables, cargo, crafting, calibration.
+- core/progression: XP, skills/tree, garage, unlocked foreposts, achievements.
+- core/autopilot: policy parser, legal info, road scoring, stop state machine, restart handling.
+- core/simulation: headless runners, seeded scenarios, experiment tasks, metrics.
+- data: versioned declarative balance tables, localized names/texts, enemy/quest templates.
+- app: commands, validation, persistence transactions, logging, state projection.
+- ui: router, reusable components, design system, screens, inventory modals, Build Lab.
+- render: Pixi/Canvas combat scene, timeline animations separate from game clock.
+- workers: offline, profile comparison, Dev Lab.
+- tests: math/golden, integration/commands, replay/property, E2E, balance smoke.
+
+### 26.2. Обязательные доменные сущности
+
+ActorState {id, kind, positionTag, baseStats, effects, hp, shield, energy, heat, cooldowns, castState, equipmentRef, droneOwnerRef}. ItemInstance {itemId, templateId, techLevel, rarity, affixes, uniqueEffectIds, neuralCost, durability, secured, originGrantId, rollSeed}. CombatEvent {timestamp, actorId, targetId, actionId, incomingTags, producedTags, amountBeforeDefense, amountAfterDefense, shieldConsumed, hpLost, causeId, eventId}. RunState {seed, sector, graph, currentNode, resources, runWallet, unsecuredCargo, mutators, plannedContract, activeQuestFlags, autopilotConfig, combatSnapshot, eventQueue, prngStreams}. MetaState {schemaVersion, saveId, playerStats, XP/tree, protectedBank, inventory, equipment, garage, factions, questProgress, unlockedForposts, discoveredContent, profilePresets, achievements, lastConfirmedWallTimestamp}. Definition schemas include id, tags, version, validSlots, effect definitions, localization keys and cross-references.
+
+Definition validation at build/startup: every referenced id exists; every item eligible pool nonempty or documented fallback; every Skill has resolvable target/formula; every tree node reachable; quest stages and choices consistent; enemy templates have valid role; all calculator stat IDs registered; every starting equipped item valid.
+
+### 26.3. Валидированные команды
+
+StartRun(startForpost,contractId,policyId), ChooseNode(nodeId), StartCombat(encounterId), AdvanceSimulation(toTimestamp), SetTacticProfile(profile), EquipItem(itemId,slot), UnequipItem, ApplyCraft(itemId,operation), Repair, UpgradeGarage, RespecTree, SelectMutation(mutationId), ResolveEventChoice(eventId,choiceId), PayService(serviceId), ClaimSecuredCargo, ShipCargo, EvacuateAtCheckpoint, AbandonRun, SetAutopilotProfile, PauseAutopilot, ResumeAutopilot, ImportSave, ExportSave.
+
+Команды возвращают {ok, domainEvents[], newStateHash, failureCode}. Приложение не применяет команду дважды из-за повторного рендера, async callback или возвращения к вкладке. grantId присутствует при любой выдаче item/XP/currency/quest flag. Критические изменения (смерть/эвакуация/крафт/награда) атомарны. Нельзя «отменить» опубликованный результат через browser back.
+
+### 26.4. Сохранения
+
+IndexedDB schemaVersion=1 for first release, migration framework from version0 unknown/legacy only when exists. State snapshots at safe nodes/after transaction, periodic battle checkpoint; two last valid snapshots retained, checksums, writing temp→validate→promote. Save exports JSON with schemaVersion, balanceVersion, itemIds, seed/PRNG-state, timeline commands, timestamp; imports Zod validated and never execute JS. Refuse incompatible future save with explanatory error, keep original intact. Confirmed story/loot grants idempotent. Offline simulation on copy in Worker; commit batch checkpoints in transactions; cancellation stops at last successfully committed snapshot, not half-way currency changes.
+
+Обработка wall-clock: if delta<0, warn and count0; if delta>12h, clamp12h and show unapplied time; no claims of cheat-proof without server. Don't allow invisible forward progress with no active authorized autopilot. If save corrupted, offer rollback to last valid snapshot and export current bytes for diagnostics; never silently reset player.
+
+### 26.5. Политика версионирования баланса
+
+gameVersion (UI/game features), balanceVersion (numbers, item/skill definitions), saveSchemaVersion (stored data). Every replay knows balanceVersion. After balance patch, old replay either reproduces against archived immutable balance snapshot or explicitly marks "unreproducible with current rules" with exportable original reference; never silently replays different data and claims equality. Старые equipped предметы мигрируют по ID and raw rolls, не превращаются в другие типы без явной миграции.
+
+### 26.6. Производительность
+
+Baseline targets (измерять на локальном браузере и бюджетном мобильном устройстве, это не обещание без теста): active battle render ~45–60 FPS on common laptop, responsive input under 100ms at normal load, scene cannot block UI >200ms. Offline 12h sim using headless worker, bounded CPU/time and incremental progress; if exceeds performance budget, return SAFE_ERROR_STOP with persisted partial completed time, not fake remaining rewards. Worker results version-tagged to avoid stale Build Lab results after equipment changes.
+
+Dev Lab reports written to noncommitted artifacts/sim-lab/{experimentId}, with compact benchmark fixtures under tests. Do not commit huge raw logs by default; expose summary and reproducible seeds.
+
+## 27. ИГРОВОЙ И АНАЛИТИЧЕСКИЙ ТЕСТОВЫЙ КОНТРАКТ
+
+### 27.1. Юнит-тесты математического ядра
+
+- все цифры из 6 и 23.2;
+- modifiers order, same-stack INCREASED, independent MORE, conversion cycle rejection, penalty + stat caps;
+- accuracy vs evasion (expected pHit by formula and deterministic seed), crit and chance clamp;
+- independent armor vs energy/digital resistance, penetration, negative resistance;
+- mixed weapon attack packets, distinct shield and HP, bypass ratios;
+- status snapshots, tick-count, refresh, expiry, caps, on-hit defaults;
+- trigger chain budget, procWeight 0, ICD, interrupt and simultaneous death;
+- cooldown/heat hysteresis, reaction energy consumed when cast begins, drone independent channel;
+- every 100 tree node id resolves to valid executable effect, and every item/skill/quest id exists;
+- legendary affix pool constraints, duplicate group forbidden;
+- TechLevel scaling at d1/d4/d8/d12/d20/d100/d1000 and no second multiplication.
+
+### 27.2. Интеграционные инварианты
+
+- grantId cannot be awarded twice, even after reload, retry, worker resume;
+- die with unsecured equipped unique → unique lost; protected originals returned damaged;
+- ship at checkpoint secures selected cargo/currency; death after shipment preserves shipped;
+- when d4 boss defeated, unlocked start sector5 remains after subsequent death; similarly d8→9, d12→13;
+- no fuel forces valid service/tow/abandon, never negative;
+- shop/craft/repair only with enough funds; no positive craft↔sell↔dismantle arbitrage without combat/time;
+- procedural DAG always connected; every depth has at least one legal start-to-end route;
+- quest state machine resilient to failed run and delayed events, no unreachables;
+- offline and active driven by same command stream produce equal stateHash for equal sim-time and seed;
+- player autopilot knowledge excludes unrevealed nodes/loot rolls;
+- no runtime syntax/eval inside imported item definitions.
+
+### 27.3. E2E — минимум 20 сценариев
+
+1. Новая игра: correctly equipped starter, four currency counters, first sector selected.
+2. Боевой цикл: beat E01, HP/energy/shields update, timeline event has provenance.
+3. Open Build Lab armor 5 +20% from implant and compare with/without gear, correct math.
+4. Choose one of three starter prototype items, see actual change in behavior.
+5. Equip invalid neural-capacity loadout → clear rejection, save unchanged.
+6. Tactic shield at HP<45% activates within available reaction channel and logs cause.
+7. Interrupt enemy telegraph; when energy insufficient, record reason.
+8. Fight with drone, kill drone, repair and see persistence.
+9. Complete sector1 checkpoint, choose exit; cargo persists in warehouse.
+10. Ship 1 selected unique; then die; shipped remains, new unsecured vanishes, originals damaged.
+11. Choose FUEL service and repair, currency decrements once; refresh does not duplicate service.
+12. Complete d4 boss and start from sector5 in a new run.
+13. Complete d8 and d12 with seeded scenarios and verify ENDGAME_UNLOCKED; real ending text and permanent achievement.
+14. Quest Q01 multirun continuation with different choices; one-time reward.
+15. Autopilot cautious chooses service/exit using known data, not hidden loot.
+16. Offline with profile runs real encounters, reports result and reason to stop; refresh replay stable.
+17. Build Lab item compare has delta and exact CalcTrace from same core.
+18. Save export/import preserves equipment, factions, unlocks, seed and player progression.
+19. Player Build Advisor returns only legal owned-item suggestions and exact test-based findings.
+20. Mobile viewport 320/390px: ability to complete first sector, edit tactics and navigate Build Lab without horizontal overflow or hover.
+21. Accessibility: keyboard navigation and modal close across major UI.
+22. Long-run stress: d100/d300 simulation no NaN/Infinity, no runaway chain, item scaling finite.
+
+### 27.4. Прогон реальных архетипов и прогрессии
+
+Run 12 canonical archetypes: HEAT, SHIELD_REACTOR, VIRUS, DRONE_SWARM, ARMOR_PEN, CRIT, DETONATION, COUNTER, EVASION, NET_CONTROL, COLD_CYCLE, BOUNTY. На глубинах 1,4,8,12,20,50,100,300,1000 построить валидные предметы соответствующего TechLevel и провести честные бои (для финального релизного балансного батча 100 seed на сочетание, быстрый smoke batch 8 seed). Считать median TTK, win rate, risk tails, resource drain, securedLoot/hour, not just raw DPS.
+
+**Целевые acceptance bands для release candidate, проверяются после настройки баланса:**
+- Новая игра: первый meaningful предмет/эффект ≤10 минут по тестовому пользовательскому прохождению.
+- Сектор1–4 для новой жизнеспособной стартовой сборки не hardlocked; на d4 существуют минимум 3 различных реально побеждающих игровых механизма.
+- d12 должен быть достижим не только одним обязательным unique. Победа кампании реалистична с 2–3 альтернативными комплектами.
+- На одной глубине TTK обычных встреч обычно в диапазоне 10–35 секунд, элита 20–70, боссы 45–150 в активном game-time; исключительные билды могут отклоняться.
+- Соответствующий TechLevel должен позволять поступательно бить новых врагов и выживать; никакой математической стены от несовпадения H и D.
+- Глубины d100/300/1000 не приводят к NaN, и по крайней мере один валидный archetype способен победить тщательно подобранный encounter при соответствующем T. Не требовать, чтобы один и тот же setup побеждал всё.
+- Проверка 12-часового offline processing без дубля rewards и без зависания UI.
+- Player Build Advisor минимум на benchmark из «energy starvation» показывает верную причинность; если нет уверенности, не придумывает число.
+
+**Balance tuning:** разрешено менять числовые const в отдельном balance config после отчёта; не менять основную loop/классовость или математический provenance. Если допущение TTK не подтверждается, указывать variance, предложить минимальный патч и прогнать регрессии. Не объявлять игру «исключительно осталось исправить баги», пока реальные плейтесты не подтвердили удовольствие/понятность.
+
+## 28. ВЫПУСК, ДЕФЕКТЫ И РУЧНАЯ ПРОВЕРКА
+
+Перед Release:
+- npm ci (или выбранный lockfile manager), npm run dev, build, typecheck, unit tests, E2E smoke и расширенный sim balance тест имеют документированные инструкции.
+- Нет экранов с неработающими основными действиями, empty placeholder вместо механики или сторонних нелицензированных media.
+- Visual smoke на desktop 1440×900, laptop 1280×720, iPhone-like viewport 390×844 и узком 320px; при возможности screenshot compare.
+- FPS и worker/offline performance измерены, не выдуманы.
+- Сборка доступна локально без внешнего сервера и без авторизации.
+- Базовый happy-path new game→d4→d8→d12→ending→endgame реально пройден агентом / Playwright с воспроизводимым seed без ручных модификаций статов.
+- Технические тесты дополняются игровым review «действительно ли отличие выездов содержательно», «почему герой погиб», «можно ли построить альтернативный билд», «не нужно ли вручную разбирать 500 предметов». Если нет настоящих человеческих плейтестов, прямо написать «не проверено на реальных игроках».
+
+**Severity:** BLOCKER — crash/corrupt save/unplayable path/duplicate grants; HIGH — nonfunctional screen/invalid math/idle unfairness; MEDIUM — QoL/visual mismatch; LOW — polish. Для выпуска все BLOCKER и HIGH закрыты; MEDIUM документированы и не делают игрока слепым к результатам. Ежедневный quick balance smoke на эталонных seed, full batch перед крупным релизом.
+
+## 29. АВТОНОМНЫЙ РАБОЧИЙ ПРОЦЕСС АГЕНТА
+
+Сначала создать environment and deterministic math core. Затем по dependency order:
+1. Boot app + CI + data validators + save schemas.
+2. Full exact math pipeline, five attribute formulas, CalcTrace with golden examples.
+3. Combat engine (channels, statuses, weapon classes, 6 enemies, basic boss) + readable 2D HUD + timeline.
+4. One complete playable sector, inventory/loot, reward/evac/death and persistent save.
+5. All 100 tree nodes via declarative effects, 18 unique mechanics, full item/skills/equipment catalog and Build Lab.
+6. Six biome DAG generator, 24 enemy types, six bosses, 12-sector campaign + endings and forposts.
+7. Economy and crafting/TechLevel, garage upgrades, contracts, quests, factions and targeted loot.
+8. Autopilot, offline exact worker, multiple run handling, item filters and reports.
+9. Dev Simulation Lab directed research engine; Player Build Advisor, vulnerability/balance suites.
+10. Mobile/accessibility/art/audio polish, full testing, seeded campaign E2E, balancing, verified release.
+
+**Dependency caveat:** Prototype Dev Lab can start as soon as core+combat work; do not wait until stage9 to create basic headless tests. Similarly simple default autopilot can be introduced before all content, but «полный done» only at release gates.
+
+**Agent cadence:** for each stage implement working code, run tests, commit code with clear message; record what actually works and failed checks, update CHANGELOG. Do not ask owner to choose every small trade-off. On major contradiction, prioritize one canonical document (THIS v2.0); if it still truly conflicts, choose simplest behavior consistent with invariant and document a single decision, not a new game. **Never say tests passed if not run**; don't invent screenshots, FPS, stories or balance results.
+
+**Final handoff to owner:** one command to launch, exact environment requirements, screenshots/short video or playable link if deployment supported, test report, campaign completion evidence on pinned seed, feature checklist with working/partial/absent, balance status, known defects. Cannot claim «полная игра» if any required gameplay system absent.
+
+## 30. НАУЧНАЯ/ТЕХНИЧЕСКАЯ БАЗА И ИСТОРИЯ РЕШЕНИЙ
+
+- История концепции, исследования, ранние примеры, ссылки на книги/статьи и forum cases сохранены полностью в docs/archive/CYDLE_MASTER_SPEC_v1.3.md, чтобы ничего не потерялось.
+- Каноническая v2.0 не требует, чтобы агент повторно изобретал классы, экономику и математические правила из ссылок; источники используются для улучшения методов тестирования и инструментов, не как альтернативное ТЗ.
+- Системный дизайн: MDA (Hunicke, LeBlanc, Zubek), Tracy Fullerton Game Design Workshop, Jesse Schell The Art of Game Design, Adams/Dormans Game Mechanics.
+- Оптимизация: Optuna TPE, pymoo NSGA-II, AIIDE/AAAI papers on automated game balancing, Game AI Pro, Path of Building Community как ориентир калькулятора.
+- В споре между старой архивной формулой и текущим текстом действует **только эта версия**. Архив является хронологией, не нормативной инструкцией.
+
+**Запрещено использовать AI-текст в качестве доказательства измерений, не было плейтеста или реальной симуляции.** Любые текущие числовые значения/гипотезы проверяются движком после реализации. Само наличие 30 страниц формул не гарантирует интересный ритм.
+
+## 31. КОНЕЧНАЯ ПРИЁМКА ДИЗАЙНА И КОНЕЧНЫЙ ПРИЁМ ПРОДУКТА
+
+**Готовность дизайн-спецификации** означает: определены начальный сейв, все основные предметные базы/уникальные эффекты, 100 узлов, способности, враги/боссы, 24 events, 6 quests, дорожные правила, экономика, TechLevel, смерть/сохранения, автономный режим, Build Lab, Simulation Lab, UX-переходы, граф зависимостей реализации и проверяемый сценарий финала. Это проверяется по полноте документа и наличию таблиц; НЕ доказывает отсутствия балансных изменений после внедрения.
+
+**Готовность игры** означает: оператор может реально выполнить непрерывный цикл со старта, исследовать/менять сборку, пройти три акта и босса d12, получить концовку, открыть эндгейм, уйти офлайн и получить реальный результат, при этом вся математика и сохранения воспроизводимы и управление не ломается на телефоне. Эту часть подтверждают код, тесты, сидированные прохождения и затем реальные люди, а не один документ.
+
+**Главный запрет на упрощение:** CYDLE нельзя превращать в кликер, обычную ARPG с ручными кнопками, статический лут-калькулятор или случайную экономику. Уникальность — **бесконечная дорога + глубина билдостроения + условный real-time автобой + честный idle + полная математическая прозрачность**.
+
+**Конец нормативного мастер-ТЗ CYDLE v2.0.**
