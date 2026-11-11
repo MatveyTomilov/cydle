@@ -11,7 +11,7 @@ import { createInitialRun } from '../core/run/run';
 import { chooseRunNode } from '../core/run/commands';
 import { resolveCurrentCombat } from '../core/run/combat';
 import { getRunShopStock, resolveRunCache, resolveRunEvent, resolveRunService, resolveRunShop, resolveRunShopPurchase } from '../core/run/nodes';
-import { resolveRunCheckpoint } from '../core/run/checkpoint';
+import { resolveRunCheckpoint, resolveRunEmergency } from '../core/run/checkpoint';
 import { equipRunItem, unequipRunSlot } from '../core/run/inventory';
 import { calibrateGarageItem, craftGarageAffix, dismantleGarageItem, equipGarageItem, garageRepairCost, repairGarageItem, unequipGarageSlot } from '../core/inventory/garage';
 import { affixName, calibrationCost, coreGroupForDepth, craftOperationCost, dismantleValue, shopPrice, templateOf } from '../core/items/items';
@@ -94,7 +94,7 @@ export function App() {
   }
 
   async function startRun() {
-    if (!save || (save.run && save.run.phase !== 'EXTRACTED' && save.run.phase !== 'DEFEATED') || busy) return;
+    if (!save || (save.run && !['EXTRACTED', 'TOWED', 'ABANDONED', 'DEFEATED'].includes(save.run.phase)) || busy) return;
     setBusy(true);
     setNotice('');
     try {
@@ -199,7 +199,7 @@ function GarageScreen({ save, buildValid, busy, onStartRun, onOpenRoad }: { save
     <section className="wallet-grid" aria-label="Ресурсы и транспорт"><WalletCard symbol="₡" label="КРЕДИТЫ" value={save.meta.protectedBank.CREDITS} detail="ЗАЩИЩЕНО" tone="gold"/><WalletCard symbol="▧" label="МЕТАЛЛОЛОМ" value={save.meta.protectedBank.SCRAP} detail="ЗАЩИЩЕНО" tone="blue"/><WalletCard symbol="⌘" label="ДАННЫЕ" value={save.meta.protectedBank.DATA} detail="ЗАЩИЩЕНО" tone="violet"/><WalletCard symbol="↗" label="ТОПЛИВО" value={save.meta.transport.fuel} detail={`КОРПУС ${save.meta.transport.hull}%`} tone="green"/></section>
     <section className="content-grid"><div className="panel loadout-panel"><div className="panel-head"><div><span className="eyebrow">АКТИВНАЯ ЭКИПИРОВКА</span><h2>Комплект · T1</h2></div><span className="count-chip">{equipment.length} ПРЕДМЕТОВ</span></div><div className="equipment-list">{equipment.map(({ slot, item }) => <div className="equipment-row" key={slot}><span className="slot-code">{slot.replace('_', ' ')}</span><span className={`rarity-line rarity-${item.rarity.toLowerCase()}`} /><div className="equipment-name"><strong>{itemName(item.templateId)}</strong><small>{item.templateId} · прочность {item.durability}%</small></div><span className="tech-label">T{item.techLevel}</span></div>)}</div></div>
       <div className="side-stack"><div className="panel objective-card"><span className="eyebrow">ТЕКУЩИЙ ПРИОРИТЕТ</span><div className="objective-number">{String(save.run?.depth ?? (save.meta.unlockedForpost + 1)).padStart(2, '0')}<span>/12</span></div><h2>{save.run ? `Выезд · ${runPhaseName(save.run.phase)}` : 'Прорваться через первый сектор'}</h2><p>{save.run ? `Топливо ${save.run.resources.fuel}/${save.run.resources.maxFuel} · груз ${save.run.unsecuredCargo.length} предметов · розыск ${Math.round(save.run.wanted)}` : 'Подготовка завершена. Первый выезд уже доступен.'}</p>
-          <button className="primary-button garage-run-button" disabled={busy || (!!save.run && save.run.phase !== 'EXTRACTED' && save.run.phase !== 'DEFEATED') || !buildValid} onClick={save.run && save.run.phase !== 'EXTRACTED' && save.run.phase !== 'DEFEATED' ? onOpenRoad : onStartRun}>{save.run && save.run.phase !== 'EXTRACTED' && save.run.phase !== 'DEFEATED' ? 'ПРОДОЛЖИТЬ ВЫЕЗД' : 'НАЧАТЬ ВЫЕЗД'} <span>→</span></button>
+          <button className="primary-button garage-run-button" disabled={busy || (!!save.run && !['EXTRACTED', 'TOWED', 'ABANDONED', 'DEFEATED'].includes(save.run.phase)) || !buildValid} onClick={save.run && !['EXTRACTED', 'TOWED', 'ABANDONED', 'DEFEATED'].includes(save.run.phase) ? onOpenRoad : onStartRun}>{save.run && !['EXTRACTED', 'TOWED', 'ABANDONED', 'DEFEATED'].includes(save.run.phase) ? 'ПРОДОЛЖИТЬ ВЫЕЗД' : 'НАЧАТЬ ВЫЕЗД'} <span>→</span></button>
           <div className="progress-track"><span style={{ width: `${Math.min(100, ((save.meta.maxSectorCleared ?? 0) / 12) * 100)}%` }}/></div><small className="progress-caption">ПРОЙДЕНО СЕКТОРОВ · {save.meta.maxSectorCleared ?? 0} / 12</small></div>
         <div className="panel protocol-card"><div className="panel-head"><div><span className="eyebrow">ТАКТИЧЕСКИЙ ПРОФИЛЬ</span><h2>{save.meta.tactics.find((p) => p.id === save.meta.activeTacticId)?.name ?? 'Не выбран'}</h2></div><span className="signal-dot"/></div><div className="protocol-summary"><span>РЕАКЦИЯ</span><strong>щит при HP &lt; 45% · EMP по касту</strong><span>ОСНОВНОЙ КАНАЛ</span><strong>очередь при 2+ целях · иначе автоатака</strong></div></div></div></section>
   </div>;
@@ -210,7 +210,7 @@ function WalletCard({ symbol, label, value, detail, tone }: { symbol: string; la
 }
 
 function runPhaseName(phase: RunState['phase']): string {
-  return ({ ROUTE: 'выбор маршрута', NODE: 'узел дороги', CHECKPOINT: 'контрольная точка', EXTRACTED: 'выезд завершён', DEFEATED: 'оператор потерян', SAFE_ERROR_STOP: 'безопасная остановка' })[phase];
+  return ({ ROUTE: 'выбор маршрута', NODE: 'узел дороги', CHECKPOINT: 'контрольная точка', EXTRACTED: 'выезд завершён', TOWED: 'тягач вернул в гараж', ABANDONED: 'выезд оставлен', DEFEATED: 'оператор потерян', SAFE_ERROR_STOP: 'безопасная остановка' })[phase];
 }
 
 const RUN_LOADOUT_SLOTS: { id: EquipSlotId; label: string; category: ItemCategory }[] = [
@@ -248,7 +248,7 @@ function RoadScreen({ save, busy, onResult, onReturn, onNewRun, commandId }: {
   const nodes = run.graph.layers.flat();
   const current = nodes.find((node) => node.id === run.currentNodeId);
   const choices = run.graph.edges.filter((edge) => edge.from === run.currentNodeId).map((edge) => ({ edge, node: nodes.find((node) => node.id === edge.to)! })).filter(({ node }) => !!node);
-  const terminal = run.phase === 'EXTRACTED' || run.phase === 'DEFEATED';
+  const terminal = ['EXTRACTED', 'TOWED', 'ABANDONED', 'DEFEATED'].includes(run.phase);
   const combat = run.combatResult;
   const availableItems = [...save.meta.inventory, ...run.unsecuredCargo];
 
@@ -262,7 +262,7 @@ function RoadScreen({ save, busy, onResult, onReturn, onNewRun, commandId }: {
   }
 
   return <div className="screen-content road-screen">
-    <section className="hero-row"><div><span className="eyebrow">ДОРОГА <i>·</i> {run.biome} <i>·</i> SEED {run.seed.slice(0, 8).toUpperCase()}</span><h1>{terminal ? run.phase === 'EXTRACTED' ? 'Груз доставлен' : 'Выезд завершён' : `Сектор ${String(run.depth).padStart(2, '0')}`}</h1><p>{terminal ? run.phase === 'EXTRACTED' ? 'Защищённый груз и ресурсы доступны в гараже.' : 'Незакреплённый груз потерян; предыдущие отправки сохранены.' : `${runPhaseName(run.phase)} · ${run.graph.layers.flat().length} точек на карте сектора.`}</p></div>
+    <section className="hero-row"><div><span className="eyebrow">ДОРОГА <i>·</i> {run.biome} <i>·</i> SEED {run.seed.slice(0, 8).toUpperCase()}</span><h1>{terminal ? run.phase === 'EXTRACTED' ? 'Груз доставлен' : run.phase === 'TOWED' ? 'Тягач доставил в гараж' : run.phase === 'ABANDONED' ? 'Выезд оставлен' : 'Выезд завершён' : `Сектор ${String(run.depth).padStart(2, '0')}`}</h1><p>{terminal ? run.phase === 'EXTRACTED' || run.phase === 'TOWED' ? 'Защищённый груз и ресурсы доступны в гараже.' : 'Незакреплённый груз потерян; предыдущие отправки сохранены.' : `${runPhaseName(run.phase)} · ${run.graph.layers.flat().length} точек на карте сектора.`}</p></div>
       <div className="operator-chip road-resources"><span><small>ОПЕРАТОР</small><strong>{Math.ceil(run.resources.hp)} / {run.resources.maxHP} HP</strong></span><span><small>ЩИТ</small><strong>{Math.ceil(run.resources.shield)} / {run.resources.maxShield}</strong></span><span><small>ТОПЛИВО</small><strong>{run.resources.fuel} / {run.resources.maxFuel}</strong></span></div>
     </section>
 
@@ -271,6 +271,7 @@ function RoadScreen({ save, busy, onResult, onReturn, onNewRun, commandId }: {
 
     <section className="road-layout"><div className="panel road-map"><div className="panel-head"><div><span className="eyebrow">МАРШРУТ</span><h2>Секторная карта</h2></div><span className="count-chip">ШАГ {run.visitedNodeIds.length} / 6</span></div><div className="route-trail"><span className="trail-origin">ФОРПОСТ</span>{run.visitedNodeIds.map((id, index) => { const node = nodes.find((candidate) => candidate.id === id); return <span className={id === run.currentNodeId ? 'trail-node current' : 'trail-node'} key={id}><i>{String(index + 1).padStart(2, '0')}</i>{node ? NODE_TYPE_RU[node.type] : 'узел'}</span>; })}</div>
       {run.phase === 'ROUTE' && choices.length > 0 && <div className="route-choices"><h3>ДОСТУПНЫЕ ПЕРЕХОДЫ</h3>{choices.map(({ edge, node }) => <button className="route-card" key={node.id} disabled={busy || run.resources.fuel < edge.fuelCost} onClick={() => dispatch(chooseRunNode(save, commandId(), node.id))}><span className="route-card-type">{NODE_TYPE_RU[node.type]}</span><strong>{node.threat.toUpperCase()} {node.type === 'COMBAT' ? `· ${node.enemies.length} противник(а)` : ''}</strong><small>{node.lootHint} · топливо {edge.fuelCost} · слой {node.layer + 1}/6</small><b>ВЫБРАТЬ →</b></button>)}</div>}
+      {run.phase === 'ROUTE' && choices.length > 0 && choices.every(({ edge }) => run.resources.fuel < edge.fuelCost) && <div className="checkpoint-panel emergency-panel"><span className="eyebrow">НЕТ ТОПЛИВА ДЛЯ ПЕРЕХОДА</span><p>Тягач стоит {Math.ceil(30 * R(run.depth))} кредитов, теряется 30% незакреплённых валют и один случайный предмет. Отказ от выезда теряет весь незакреплённый груз и валюты; постоянная экипировка теряет 10 прочности.</p><label className="protected-spend"><input type="checkbox" checked={spendProtected} onChange={(event) => setSpendProtected(event.target.checked)} /> разрешить оплату тягача из защищённого банка</label><div className="action-row">{actionButton('ВЫЗВАТЬ ТЯГАЧ', () => dispatch(resolveRunEmergency(save, { id: commandId(), choice: 'REQUEST_TOW', spendProtected })))}{actionButton('ОСТАВИТЬ ВЫЕЗД', () => dispatch(resolveRunEmergency(save, { id: commandId(), choice: 'ABANDON_RUN' })), true)}</div></div>}
       {run.phase === 'ROUTE' && choices.length === 0 && <p className="muted">Маршрут не найден. Состояние сохранено для диагностики.</p>}
       {run.phase === 'NODE' && current && <div className="current-node"><span className="eyebrow">ТЕКУЩИЙ УЗЕЛ · СЛОЙ {current.layer + 1}</span><h3>{NODE_TYPE_RU[current.type]}</h3><p>{current.lootHint}</p>
         {['COMBAT', 'ELITE', 'BOUNTY', 'BOSS'].includes(current.type) && actionButton('РАЗРЕШИТЬ БОЙ', () => dispatch(resolveCurrentCombat(save, commandId())))}
@@ -318,7 +319,7 @@ function RoadScreen({ save, busy, onResult, onReturn, onNewRun, commandId }: {
 function BuildScreen({ save, buildValid, busy, onResult }: { save: SaveGame; buildValid: boolean; busy: boolean; onResult: (result: RunCommandResult) => void }) {
   const { attributes } = save.meta.operator;
   const availableItems = save.meta.inventory.filter((item) => item.secured);
-  const runActive = !!save.run && !['EXTRACTED', 'DEFEATED'].includes(save.run.phase);
+  const runActive = !!save.run && !['EXTRACTED', 'TOWED', 'ABANDONED', 'DEFEATED'].includes(save.run.phase);
   return <div className="screen-content"><section className="hero-row"><div><span className="eyebrow">BUILD LAB <i>·</i> ОПЕРАТОР {save.saveId.slice(0, 8).toUpperCase()}</span><h1>Сборка оператора</h1><p>Начальные характеристики и установленные протоколы.</p></div><span className={buildValid ? 'valid-badge' : 'invalid-badge'}>{buildValid ? 'ПРОВЕРКА СБОРКИ ПРОЙДЕНА' : 'ОШИБКА СБОРКИ'}</span></section>
     <section className="content-grid build-grid"><div className="panel"><div className="panel-head"><div><span className="eyebrow">АТРИБУТЫ</span><h2>Уровень {save.meta.operator.level} <small>· {save.meta.operator.xp} XP</small></h2></div><span className="count-chip">ОЧКИ {save.meta.operator.attributePoints}</span></div><div className="attribute-grid">{Object.entries(attributes).map(([id, value]) => <div className="attribute" key={id}><span>{id}</span><strong>{value}</strong><small>{attributeName(id)}</small></div>)}</div><div className="tree-summary"><div><span className="eyebrow">ДЕРЕВО СПЕЦИАЛИЗАЦИИ</span><strong>{save.meta.operator.treePoints} свободных очков</strong></div><small>ПОЛУЧЕНО УЗЛОВ · {save.meta.treeNodeIds.length}</small></div></div>
       <div className="panel"><div className="panel-head"><div><span className="eyebrow">УСТАНОВЛЕННЫЕ ПРОТОКОЛЫ</span><h2>Активные и пассивные</h2></div></div><div className="protocol-summary">{save.meta.skillIds.map((id) => <Fragment key={id}><span>УМЕНИЕ</span><strong>{id}</strong></Fragment>)}{save.meta.passiveIds.map((id) => <Fragment key={id}><span>ПАССИВ</span><strong>{id}</strong></Fragment>)}</div><div className="build-footnote">Нейроёмкость: 100 · имплантных слотов: {save.meta.unlockedImplantSlots} · слот дрона: {save.meta.unlockedDroneSlots}</div></div>
@@ -339,7 +340,7 @@ function BuildScreen({ save, buildValid, busy, onResult }: { save: SaveGame; bui
 
 function InventoryScreen({ save, busy, onResult }: { save: SaveGame; busy: boolean; onResult: (result: RunCommandResult) => void }) {
   const equipped = new Map(Object.entries(save.meta.equipment).map(([slot, itemId]) => [itemId, slot]));
-  const activeRun = !!save.run && !['EXTRACTED', 'DEFEATED'].includes(save.run.phase);
+  const activeRun = !!save.run && !['EXTRACTED', 'TOWED', 'ABANDONED', 'DEFEATED'].includes(save.run.phase);
   const [replacementIds, setReplacementIds] = useState<Record<string, string>>({});
   const [addAffixIds, setAddAffixIds] = useState<Record<string, string>>({});
   const [calibrationTargets, setCalibrationTargets] = useState<Record<string, number>>({});

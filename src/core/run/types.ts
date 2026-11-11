@@ -31,7 +31,7 @@ export interface RoadGraph {
   edges: RoadEdge[];
 }
 
-export type RunPhase = 'ROUTE' | 'NODE' | 'CHECKPOINT' | 'EXTRACTED' | 'DEFEATED' | 'SAFE_ERROR_STOP';
+export type RunPhase = 'ROUTE' | 'NODE' | 'CHECKPOINT' | 'EXTRACTED' | 'TOWED' | 'ABANDONED' | 'DEFEATED' | 'SAFE_ERROR_STOP';
 
 export interface RunResources {
   fuel: number;
@@ -80,6 +80,8 @@ export type RunCommand =
   | { id: string; type: 'BUY_SHOP_ITEM'; stockIndex: number }
   | { id: string; type: 'RESOLVE_SHOP' }
   | { id: string; type: 'RESOLVE_EVENT'; choiceId: 'A' | 'B' }
+  | { id: string; type: 'REQUEST_TOW'; spendProtected?: boolean }
+  | { id: string; type: 'ABANDON_RUN' }
   | { id: string; type: 'CHOOSE_PROTOTYPE'; templateId: string }
   | { id: string; type: 'EQUIP_ITEM'; itemId: string; slot: EquipSlotId }
   | { id: string; type: 'UNEQUIP_ITEM'; slot: EquipSlotId }

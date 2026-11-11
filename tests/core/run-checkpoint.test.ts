@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialSave } from '../../src/core/save/initial';
 import { createInitialRun } from '../../src/core/run/run';
-import { resolveRunCheckpoint } from '../../src/core/run/checkpoint';
+import { resolveRunCheckpoint, resolveRunEmergency } from '../../src/core/run/checkpoint';
 import { createItem } from '../../src/core/items/items';
 import { Rng } from '../../src/core/rng';
 
@@ -22,6 +22,70 @@ function atCheckpoint(saveId: string) {
 }
 
 describe('checkpoint settlement', () => {
+  it('tow costs the run wallet, loses 30% currency and one deterministic cargo item, then secures the remainder', () => {
+    const save = createInitialSave({ saveId: 'tow', now: 100 });
+    const run = createInitialRun(save, 'tow-seed');
+    const roadNode = run.graph.layers[0]![0]!;
+    run.currentNodeId = roadNode.id;
+    run.visitedNodeIds = [roadNode.id];
+    run.phase = 'ROUTE';
+    run.resources.fuel = 0;
+    run.runWallet = { CREDITS: 100, SCRAP: 10, DATA: 10 };
+    for (const [templateId, grantId] of [['PISTOL_K1', 'tow-item-1'], ['DR_GUN', 'tow-item-2']]) run.unsecuredCargo.push(createItem(new Rng('loot', grantId), {
+      templateId, techLevel: 1, rarity: 'COMMON', secured: false, originGrantId: grantId, origin: 'test',
+    }));
+    const result = resolveRunEmergency({ ...save, run }, { id: 'tow-command', choice: 'REQUEST_TOW' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.save.run).toMatchObject({ phase: 'TOWED', runWallet: { CREDITS: 0, SCRAP: 0, DATA: 0 }, unsecuredCargo: [] });
+    expect(result.save.meta.protectedBank).toEqual({ CREDITS: 169, SCRAP: 37, DATA: 27 });
+    const retained = result.save.meta.inventory.filter((item) => ['tow-item-1', 'tow-item-2'].includes(item.originGrantId));
+    expect(retained).toHaveLength(1);
+    expect(retained[0]?.secured).toBe(true);
+  });
+
+  it('abandons only on explicit choice, loses unsecured cargo and wears secured equipment by ten', () => {
+    const save = createInitialSave({ saveId: 'abandon', now: 100 });
+    const run = createInitialRun(save, 'abandon-seed');
+    const roadNode = run.graph.layers[0]![0]!;
+    run.currentNodeId = roadNode.id;
+    run.visitedNodeIds = [roadNode.id];
+    run.phase = 'ROUTE';
+    run.resources.fuel = 0;
+    run.unsecuredCargo.push(createItem(new Rng('loot', 'abandon-item'), {
+      templateId: 'DR_GUN', techLevel: 1, rarity: 'COMMON', secured: false, originGrantId: 'abandon-item', origin: 'test',
+    }));
+    const equippedId = save.meta.equipment.MAIN!;
+    const result = resolveRunEmergency({ ...save, run }, { id: 'abandon-command', choice: 'ABANDON_RUN' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.save.run).toMatchObject({ phase: 'ABANDONED', runWallet: { CREDITS: 0, SCRAP: 0, DATA: 0 }, unsecuredCargo: [] });
+    expect(result.save.meta.inventory.find((item) => item.originGrantId === 'abandon-item')).toBeUndefined();
+    expect(result.save.meta.inventory.find((item) => item.itemId === equippedId)?.durability).toBe(90);
+    expect(result.save.meta.protectedBank).toEqual(save.meta.protectedBank);
+  });
+
+  it('requires explicit protected-bank permission to pay the tow and refuses emergency exit when a route is affordable', () => {
+    const save = createInitialSave({ saveId: 'tow-bank', now: 100 });
+    const run = createInitialRun(save, 'tow-bank-seed');
+    const roadNode = run.graph.layers[0]![0]!;
+    run.currentNodeId = roadNode.id;
+    run.visitedNodeIds = [roadNode.id];
+    run.phase = 'ROUTE';
+    run.resources.fuel = 0;
+    run.runWallet = { CREDITS: 0, SCRAP: 0, DATA: 0 };
+    const stranded = { ...save, run };
+    const refused = resolveRunEmergency(stranded, { id: 'tow-refused', choice: 'REQUEST_TOW' });
+    expect(refused).toMatchObject({ ok: false, failureCode: 'INSUFFICIENT_FUNDS', save: stranded });
+    const paid = resolveRunEmergency(stranded, { id: 'tow-bank-ok', choice: 'REQUEST_TOW', spendProtected: true });
+    expect(paid.ok).toBe(true);
+    if (paid.ok) expect(paid.save.meta.protectedBank.CREDITS).toBe(90);
+
+    const fueled = { ...stranded, run: { ...run, resources: { ...run.resources, fuel: 1 } } };
+    const unnecessary = resolveRunEmergency(fueled, { id: 'tow-unneeded', choice: 'ABANDON_RUN' });
+    expect(unnecessary).toMatchObject({ ok: false, failureCode: 'EMERGENCY_NOT_NEEDED', save: fueled });
+  });
+
   it('evacuates all unsecured cargo and currencies exactly once', () => {
     const save = atCheckpoint('exit');
     const item = save.run!.unsecuredCargo[0]!;

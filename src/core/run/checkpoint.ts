@@ -6,6 +6,8 @@ import { parseSave, type SaveGame } from '../save/schema';
 import type { RunCommandResult, RunState } from './types';
 import { generateSectorGraph } from './graph';
 
+const zeroWallet = () => ({ CREDITS: 0, SCRAP: 0, DATA: 0 });
+
 function fail(save: SaveGame, failureCode: string, reason: string): RunCommandResult {
   return { ok: false, save, failureCode, reason };
 }
@@ -54,14 +56,74 @@ function mergeRunWallet(save: SaveGame, run: RunState, wallet = run.runWallet): 
   };
 }
 
-function finishRun(save: SaveGame, run: RunState): void {
+function finishRun(save: SaveGame, run: RunState, terminalPhase: 'EXTRACTED' | 'TOWED' = 'EXTRACTED'): void {
   for (const item of run.unsecuredCargo) secureItem(save, item);
   run.unsecuredCargo = [];
   mergeRunWallet(save, run);
   save.meta.transport.fuel = run.resources.fuel;
   save.meta.transport.hull = run.resources.hull;
   save.meta.equipment = { ...run.equipment };
-  run.phase = 'EXTRACTED';
+  run.phase = terminalPhase;
+}
+
+/** Resolve a costly emergency exit only when every outgoing road edge exceeds current fuel. */
+export function resolveRunEmergency(
+  save: SaveGame,
+  command: { id: string; choice: 'REQUEST_TOW' | 'ABANDON_RUN'; spendProtected?: boolean },
+): RunCommandResult {
+  const parsed = parseSave(save);
+  if (!parsed.success) return fail(save, 'INVALID_SAVE', parsed.error);
+  const run = save.run;
+  if (!run) return fail(save, 'NO_ACTIVE_RUN', 'Нет активного выезда.');
+  if (!command.id.trim()) return fail(save, 'INVALID_COMMAND_ID', 'Команде требуется стабильный идентификатор.');
+  if (run.commandIds.includes(command.id)) return { ok: true, save, events: [] };
+  if (run.phase !== 'ROUTE') return fail(save, 'NOT_AT_ROUTE', 'Аварийный выход доступен только между дорожными узлами.');
+  const outgoing = run.graph.edges.filter((edge) => edge.from === run.currentNodeId);
+  if (!outgoing.length || outgoing.some((edge) => edge.fuelCost <= run.resources.fuel)) return fail(save, 'EMERGENCY_NOT_NEEDED', 'Есть доступный путь с текущим запасом топлива.');
+
+  const next = markCommand(save, command.id);
+  const nextRun = next.run!;
+  next.meta.transport.fuel = nextRun.resources.fuel;
+  next.meta.transport.hull = nextRun.resources.hull;
+  if (command.choice === 'ABANDON_RUN') {
+    const equipped = new Set(Object.values(next.meta.equipment));
+    next.meta.inventory = next.meta.inventory.map((item) => equipped.has(item.itemId) ? { ...item, durability: Math.max(0, item.durability - 10) } : item);
+    nextRun.runWallet = zeroWallet();
+    nextRun.unsecuredCargo = [];
+    nextRun.equipment = { ...next.meta.equipment };
+    nextRun.phase = 'ABANDONED';
+    const checked = parseSave(next);
+    if (!checked.success) return fail(save, 'INVALID_RESULT', checked.error);
+    return { ok: true, save: checked.data, events: [{ type: 'RUN_ABANDONED', text: 'Выезд оставлен. Незакреплённый груз и валюты потеряны; постоянная экипировка теряет 10 прочности.' }] };
+  }
+
+  const towCost = Math.ceil(30 * R(nextRun.depth));
+  const runCredits = nextRun.runWallet.CREDITS;
+  const bankCredits = next.meta.protectedBank.CREDITS;
+  if (runCredits + (command.spendProtected ? bankCredits : 0) < towCost) return fail(save, 'INSUFFICIENT_FUNDS', `Тягач стоит ${towCost} кредитов. Разрешите защищённый банк или откажитесь от выезда.`);
+  const fromRun = Math.min(runCredits, towCost);
+  nextRun.runWallet.CREDITS -= fromRun;
+  if (towCost > fromRun) next.meta.protectedBank.CREDITS -= towCost - fromRun;
+  const lostWallet = {
+    CREDITS: Math.floor(nextRun.runWallet.CREDITS * 0.3),
+    SCRAP: Math.floor(nextRun.runWallet.SCRAP * 0.3),
+    DATA: Math.floor(nextRun.runWallet.DATA * 0.3),
+  };
+  nextRun.runWallet = {
+    CREDITS: nextRun.runWallet.CREDITS - lostWallet.CREDITS,
+    SCRAP: nextRun.runWallet.SCRAP - lostWallet.SCRAP,
+    DATA: nextRun.runWallet.DATA - lostWallet.DATA,
+  };
+  let lostItemId: string | null = null;
+  if (nextRun.unsecuredCargo.length) {
+    const towRng = new Rng('tow', `${nextRun.seed}:${nextRun.currentNodeId}`);
+    const [lost] = nextRun.unsecuredCargo.splice(towRng.int(0, nextRun.unsecuredCargo.length - 1), 1);
+    lostItemId = lost?.itemId ?? null;
+  }
+  finishRun(next, nextRun, 'TOWED');
+  const checked = parseSave(next);
+  if (!checked.success) return fail(save, 'INVALID_RESULT', checked.error);
+  return { ok: true, save: checked.data, events: [{ type: 'RUN_TOWED', text: `Тягач доставил вас в гараж · −${towCost} кредитов, потеряно 30% оставшихся валют и ${lostItemId ? '1 предмет' : 'нет предметов груза'}. Остальное закреплено.` }] };
 }
 
 function advanceSector(run: RunState): void {
