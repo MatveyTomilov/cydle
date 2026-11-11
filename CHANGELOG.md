@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Enforced run cargo capacity using the canonical build's cargo stat and item cargo-unit values. The road screen shows used/capacity; SHOP blocks purchases that do not fit; EVENT item grants are rejected atomically when full; CACHE and combat loot keep fitting items in stable order and report discarded overflow; CARGO-module swaps cannot strand the current load above capacity.
+- Added regression coverage for cargo unit totals, base and CARGO_2 capacity, shop/event overflow, combat/cache overflow, and loadout capacity reduction.
 - Added a playable deterministic SHOP road node to regular sectors. Each store shows five seed-stable biome-pool items and exact §19 prices; one-time purchases spend unsecured run credits and add at-risk cargo. Closing the node advances game time by 8 seconds.
 - Added tests for shop stock, purchase payment and ownership, idempotency, sold/invalid items, insufficient funds, shop completion, and regular-sector placement.
 - Enabled optional ELITE encounters in regular routes and a wanted-gated BOUNTY encounter (at most one per sector at wanted 50+). Both use the existing deterministic combat simulator and their §19 currency/item/core rewards.

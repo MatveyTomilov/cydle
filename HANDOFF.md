@@ -6,13 +6,14 @@ Last updated: 2026-11-12
 
 The user explicitly resumed autonomous implementation after the earlier audit handoff. Work is now on `development/luna`, created from user-specified base `2e5a59798695aaf7666a8fa13cb709fcdaad9fc7`. The recovery branch remains the untouched source of the handoff.
 
-- Current work: the first persisted sector loop, run-specific loadout, protected garage equipment editor, dismantling, repair, all four affix operations, secured-item TechLevel calibration, deterministic SHOP, ELITE/BOUNTY encounters, and partial EVENT choices are committed. Inventory separates protected items from at-risk cargo, displays explicit costs, and commits actions atomically.
+- Current work: the first persisted sector loop, run-specific loadout, protected garage equipment editor, dismantling, repair, all four affix operations, secured-item TechLevel calibration, deterministic SHOP, ELITE/BOUNTY encounters, partial EVENT choices, fuel emergency exits, and cargo-capacity enforcement are committed. Inventory separates protected items from at-risk cargo, displays explicit costs, and commits actions atomically.
 - SHOP is now a playable road node: each regular sector has one deterministic store with a stable five-item biome assortment; purchases use the canonical item generator and §19 price, spend only unsecured run credits, and become at-risk cargo. Each item can be bought once, and closing the shop advances game time by 8 seconds.
 - ELITE and BOUNTY encounters now appear in generated routes, with bounty chances gated by wanted. Their §19 reward tables, biome credit/data bonuses, and corporate wanted changes run through the existing combat/reward path.
 - EVENT nodes store a selected catalog ID in the sector graph. Implemented choices persist permanent faction reputation, apply run resources/currencies, create unsecured items, and resolve once. Used event IDs survive sector changes and are excluded from future maps. Save schema defaults preserve older saves.
 - Fuel emergencies now have explicit REQUEST_TOW and ABANDON_RUN outcomes when no outgoing edge is affordable. Tow costs `ceil(30×R(d))`, consumes run credits first, optionally uses the protected bank, loses 30% of remaining unsecured currencies and one deterministic cargo item, then secures the remainder. Abandon loses all unsecured rewards and reduces protected equipped gear durability by 10. Both states are persisted terminal outcomes.
-- Checks after this stage: typecheck, all 183 tests, data validation, and production build pass. Playwright is not installed, so automated E2E is unavailable. Browser smoke from the earlier stage only reached the first E01 victory and did not complete a sector.
-- Next task: implement cargo capacity enforcement across reward/purchase/shipment paths, then finish event deferred effects and implement ANOMALY and multi-stage QUEST nodes. Continue with autopilot/offline, Simulation Lab, and final visuals.
+- Cargo capacity is calculated from canonical equipped build stats and item cargo sizes. SHOP and item-grant EVENT actions reject items that cannot fit; CACHE and combat rewards accept fitting items in deterministic order and report overflow; run CARGO-module swaps cannot leave carried items above capacity. The road wallet shows used/capacity and the shop disables items that do not fit. Overflowing CACHE/combat loot is currently discarded after a visible log message.
+- Checks after this stage: typecheck, all 186 tests, data validation, and production build pass. Playwright is not installed, so automated E2E is unavailable. Browser smoke from the earlier stage only reached the first E01 victory and did not complete a sector.
+- Next task: review cargo overflow UX and implement deferred EVENT effects, then ANOMALY and multi-stage QUEST nodes. Continue with inventory transfer, autopilot/offline, Simulation Lab, and final visuals.
 - The user requests continued implementation through a playable CYDLE 1.0; the old emergency stop is superseded.
 
 ## Current status
@@ -24,7 +25,7 @@ This is `development/luna`, based on the preserved Qwen snapshot. Combat expansi
 - Working directory: `E:\cydle\project`
 - Remote: `https://github.com/MatveyTomilov/cydle.git`
 - Branch: `development/luna`
-- Latest feature commit: `44c6b88300164613ff16cfaf14667597cf56a4f7` (`feat: resolve fuel emergency exits`)
+- Latest feature commit: `eade89c7e3da3c4f8b3d59aa69659499175fec26` (`feat: enforce run cargo capacity`).
 - Base: `2e5a59798695aaf7666a8fa13cb709fcdaad9fc7` from `recovery/qwen-snapshot`. Current commit: check `git rev-parse HEAD`.
 - Last fully-verified feature checkpoint before Luna work: `f14bdbc8fda39bc75e277219002194dab61d9061` (stage 2c). Earlier clean core checkpoint: `a06dbbab98581a95ae9b7af72f8a7be29fc659a2` (`feat: resolve validated CYDLE builds`).
 - Preserved original archive: `E:\cydle\workspace.tar.gz` (SHA-256 `5E82E5BDA30D38A0FB551F242E1B14E44E8B75B1D51A874B208AD45E96D24630`). Extracted read-only comparison snapshot: `E:\cydle\recovered-snapshot\cydle`.
@@ -128,8 +129,8 @@ npm run build
 npm run dev
 ```
 
-At feature commit `44c6b88`, the unit suite has 183 tests. `npm run sim` and `npm run balance` are not implemented; `npm run e2e` needs Playwright and a harness. The first-sector loop plus SHOP/ELITE/BOUNTY, partial EVENT, and emergency exits are wired, while campaign progression and most content systems remain absent.
+At the cargo-capacity feature checkpoint, the unit suite has 186 tests. `npm run sim` and `npm run balance` scripts exist but their full Simulation Lab workflows are not implemented; `npm run e2e` needs Playwright and a harness. The first-sector loop plus SHOP/ELITE/BOUNTY, partial EVENT, emergency exits, and cargo accounting are wired, while campaign progression and most content systems remain absent.
 
 ## Short continuation prompt
 
-Open `https://github.com/MatveyTomilov/cydle/tree/development/luna` and `E:\cydle\project`. Read `CYDLE_MASTER_SPEC.md`, `HANDOFF.md`, and `docs/ROADMAP.md`; inspect `git status` and recent commits. Combat 2a–2e, save persistence, the playable sector loop, protected inventory operations, and SHOP are implemented and verified. Continue with ELITE/BOUNTY road encounters and §19 rewards, then remaining node types. Reuse the existing math/build/combat cores and commit each verified stage.
+Open `https://github.com/MatveyTomilov/cydle/tree/development/luna` and `E:\cydle\project`. Read `CYDLE_MASTER_SPEC.md`, `HANDOFF.md`, and `docs/ROADMAP.md`; inspect `git status` and recent commits. Combat 2a–2e, save persistence, the playable sector loop, protected inventory operations, SHOP/ELITE/BOUNTY, partial EVENT choices, emergency exits, and cargo-capacity enforcement are implemented and verified. Continue with deferred EVENT effects and ANOMALY/QUEST nodes. Reuse the existing math/build/combat cores and commit each verified stage.
