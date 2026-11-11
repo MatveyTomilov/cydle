@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialSave } from '../../src/core/save/initial';
+import { parseSave } from '../../src/core/save/schema';
 import { createInitialRun } from '../../src/core/run/run';
 import { templateOf } from '../../src/core/items/items';
 import { createItem } from '../../src/core/items/items';
 import { Rng } from '../../src/core/rng';
 import { runCargoCapacity, runCargoUnits } from '../../src/core/run/cargo';
+import { chooseRunNode } from '../../src/core/run/commands';
 import { getRunShopStock, resolveRunCache, resolveRunEvent, resolveRunService, resolveRunShop, resolveRunShopPurchase } from '../../src/core/run/nodes';
 
 function nodeSave(type: 'CACHE' | 'REPAIR' | 'FUEL' | 'SHOP', saveId: string) {
@@ -152,6 +154,57 @@ describe('run road nodes', () => {
     expect(result.save.meta.campaignFlags).toContain('event:EV02:A');
     expect(resolveRunEvent(result.save, { id: 'event-hack', choiceId: 'A' })).toMatchObject({ ok: true, save: result.save, events: [] });
     expect(resolveRunEvent(result.save, { id: 'event-again', choiceId: 'A' })).toMatchObject({ ok: false, failureCode: 'NODE_NOT_EVENT' });
+  });
+
+  it('applies a travel event to exactly the next valid edge and then consumes it', () => {
+    const base = createInitialSave({ saveId: 'event-travel', now: 100 });
+    const run = createInitialRun(base, 'event-travel-seed');
+    const eventNode = run.graph.layers[3]![0]!;
+    eventNode.type = 'EVENT';
+    eventNode.eventId = 'EV19';
+    run.currentNodeId = eventNode.id;
+    run.visitedNodeIds = [eventNode.id];
+    run.phase = 'NODE';
+    const save = { ...base, run };
+
+    const resolved = resolveRunEvent(save, { id: 'event-travel-choice', choiceId: 'A' });
+    expect(resolved.ok).toBe(true);
+    if (!resolved.ok) return;
+    expect(resolved.save.run!.pendingTravelDeltaMs).toBe(15_000);
+    const destination = resolved.save.run!.graph.edges.find((edge) => edge.from === eventNode.id)!.to;
+    const adjusted = chooseRunNode(resolved.save, 'event-travel-edge', destination);
+    const baselineSave = { ...resolved.save, run: { ...resolved.save.run!, pendingTravelDeltaMs: 0 } };
+    const baseline = chooseRunNode(baselineSave, 'event-travel-baseline', destination);
+    expect(adjusted.ok).toBe(true);
+    expect(baseline.ok).toBe(true);
+    if (!adjusted.ok || !baseline.ok) return;
+    expect(adjusted.save.run!.resources.gameTimeMs - baseline.save.run!.resources.gameTimeMs).toBe(15_000);
+    expect(adjusted.save.run!.pendingTravelDeltaMs).toBe(0);
+  });
+
+  it('does not consume pending travel time on invalid routes and clamps a negative adjustment at zero', () => {
+    const base = createInitialSave({ saveId: 'event-travel-invalid', now: 100 });
+    const run = createInitialRun(base, 'event-travel-invalid-seed');
+    const startEdge = run.graph.edges.find((edge) => edge.from === 'START')!;
+    const save = { ...base, run: { ...run, pendingTravelDeltaMs: -60_000 } };
+    const invalid = chooseRunNode(save, 'event-travel-invalid', 'not-a-node');
+    expect(invalid).toMatchObject({ ok: false, failureCode: 'INVALID_ROUTE', save });
+    expect(save.run!.pendingTravelDeltaMs).toBe(-60_000);
+
+    const entered = chooseRunNode(save, 'event-travel-zero', startEdge.to);
+    expect(entered.ok).toBe(true);
+    if (!entered.ok) return;
+    expect(entered.save.run!.resources.gameTimeMs).toBe(0);
+    expect(entered.save.run!.pendingTravelDeltaMs).toBe(0);
+  });
+
+  it('reads a legacy active run without pending travel time as zero', () => {
+    const save = createInitialSave({ saveId: 'event-travel-legacy', now: 100 });
+    const run = createInitialRun(save, 'event-travel-legacy-seed');
+    const { pendingTravelDeltaMs: _ignored, ...legacyRun } = run;
+    const parsed = parseSave({ ...save, run: legacyRun });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.run!.pendingTravelDeltaMs).toBe(0);
   });
 
   it('rejects an unaffordable event choice without mutating the save', () => {

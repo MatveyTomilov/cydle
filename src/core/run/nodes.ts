@@ -175,6 +175,7 @@ export function resolveRunEvent(save: SaveGame, command: { id: string; choiceId:
     nextRun.runWallet[currency] = nextRun.runWallet[currency] - (costs[currency] ?? 0) + scaledGain;
   }
   if (choice.wanted) nextRun.wanted = Math.max(0, Math.min(100, nextRun.wanted + choice.wanted));
+  if (choice.travelDelta) nextRun.pendingTravelDeltaMs += choice.travelDelta;
   if (choice.fuel) nextRun.resources.fuel = Math.max(0, Math.min(nextRun.resources.maxFuel, nextRun.resources.fuel + choice.fuel));
   if (choice.hull) nextRun.resources.hull = Math.max(0, Math.min(nextRun.resources.maxHull, nextRun.resources.hull + choice.hull));
   if (choice.healMissingFraction) nextRun.resources.hp = Math.min(nextRun.resources.maxHP, nextRun.resources.hp + (nextRun.resources.maxHP - nextRun.resources.hp) * choice.healMissingFraction);

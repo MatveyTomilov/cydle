@@ -8,7 +8,7 @@ import type { EncounterEnemySpec } from '../combat/types';
 import type { RoadEdge, RoadGraph, RoadNode } from './types';
 
 const BASE_WIDTHS = [1, 2, 3, 3, 2, 1] as const;
-const ROAD_EVENTS = EVENTS.filter((event) => !event.choices.some((choice) => choice.flag || choice.reveal || choice.nextCombat || choice.travelDelta || choice.grantMutation || (choice.special && choice.special !== 'greyDealer' && choice.special !== 'dataForCredits')));
+const ROAD_EVENTS = EVENTS.filter((event) => !event.choices.some((choice) => choice.flag || choice.reveal || choice.nextCombat || choice.grantMutation || (choice.special && choice.special !== 'greyDealer' && choice.special !== 'dataForCredits')));
 function threatFor(type: NodeType): NodeThreatBand {
   if (type === 'BOSS') return 'boss';
   if (type === 'ELITE' || type === 'BOUNTY' || type === 'ANOMALY') return 'high';

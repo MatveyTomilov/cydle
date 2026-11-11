@@ -68,6 +68,7 @@ export interface RunState {
   shippedCheckpointIds: string[];
   wanted: number;
   revealLevel: number;
+  pendingTravelDeltaMs: number;
   combatResult: CombatResult | null;
   lastCommandId: string | null;
   worldRng: import('../rng').SerializedRng;

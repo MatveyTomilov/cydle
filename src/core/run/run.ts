@@ -46,6 +46,7 @@ export function createInitialRun(save: SaveGame, seed: string): RunState {
     phase: 'ROUTE',
     wanted: 0,
     revealLevel: 1,
+    pendingTravelDeltaMs: 0,
     resources: {
       fuel: save.meta.transport.fuel,
       maxFuel: save.meta.transport.fuelMax,

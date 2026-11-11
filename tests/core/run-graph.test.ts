@@ -20,6 +20,14 @@ describe('deterministic sector graph', () => {
     expect(nextSector.layers.flat().find((node) => node.type === 'EVENT')?.eventId).not.toBe(event?.eventId);
   });
 
+  it('can generate EV19 after its one-edge travel effects are supported', () => {
+    const eventIds = new Set(Array.from({ length: 100 }, (_, index) => {
+      const graph = generateSectorGraph({ seed: `ev19-availability-${index}`, depth: 2, biome: 'B03' });
+      return graph.layers.flat().find((node) => node.type === 'EVENT')?.eventId;
+    }));
+    expect(eventIds.has('EV19')).toBe(true);
+  });
+
   it('adds optional elite encounters and gates the single bounty option on wanted', () => {
     const quiet = Array.from({ length: 40 }, (_, index) => generateSectorGraph({ seed: `optional-${index}`, depth: 2, biome: 'B03' }));
     const hunted = Array.from({ length: 40 }, (_, index) => generateSectorGraph({ seed: `optional-${index}`, depth: 2, biome: 'B03', wanted: 60 }));
