@@ -187,3 +187,206 @@ Event: timestamp, actorId, targetId, type, originActionId, causeId, chainDepth, 
 
 **Основной fallback:** если ни один SKILL не доступен, оператор производит автоатаку доступным оружием в main-канале. Если нет врагов — wait, если main заблокирован — wait до ближайшего события. Не тратить каждый тик энергию на недоступную команду.
 
+
+## 9. TECHLEVEL И БАЗОВАЯ СИЛА ПРЕДМЕТОВ
+
+**Функции (первичная гипотеза баланса, обязательный тест на d=1,4,8,12,20,50,100,300,1000):**
+- H(T) = (1 + 0.14 × max(0,T−1))^1.70 — масштабирует исходный урон оружия/программ/дронов.
+- D(T) = (1 + 0.08 × max(0,T−1))^1.50 — масштабирует базовые HP/щит носителя, а также базовый урон врагов соответствующей глубины.
+- R(d) = (1 + 0.06 × max(0,d−1))^1.40 — масштабирует кредитные/материальные награды, но не шанс уникального предмета.
+- TechLevel выпавшего item = max(1, d + offset), offset -1/0/+1 с шансами 20%/65%/15%; в отдельном контракте +2 у награды вместо offset при обозначении награды до запуска.
+- Базовый урон main weapon = listedBaseDamage × H(T); базовые HP/щиты брони = listedValue × D(T); базовая защита брони/armour не масштабируется D(T), её числа остаются flat согласно данным предметов. Защита дронов тоже не становится бессмертной только от T.
+- **TechPower для активных программ**: если оснащён main weapon, 0.65 × weaponBaseDamage(T) + 0.35 × 30 × H(T); это число до бонусов INT/weapon/skill. Для цифровых программ использовать это значение независимо от типа основного оружия; energy-программы аналогично. Технологические фокусы offhand могут добавить FLAT TechPower. Не умножать TechPower повторно на H(T).
+- Дрон имеет собственный T от модуля: droneBaseDamage(T) = template.baseDamage × H(T); drone HP/shields = template base × D(T). Герой не может мгновенно поднять дрон выше открытой калибровки.
+- TechLevel не меняет шанс критического удара, сопротивления, пробитие, cooldown, проценты урона, лимит стека или neuroCapacity без отдельного эффекта. **Никакой скрытой экспоненты в одном из этих параметров**.
+- Уровень оператора не даёт вторично +5% damage за каждый level; основная вертикальная сила — технологии + реальные свойства предметов.
+
+**Калибровка старого предмета:** допускается для любого permanent secured item, не меняет его уникальную механику, аффиксы, класс, редкость и инвентарный ID. Новый T не выше максимального открытого форпоста d (для d=1–3 допустим T≤4). Цена повышения одним действием от currentT до targetT: metalscrap = ceil(5 × (targetT−currentT) × R(targetT)), data = ceil(2 × (targetT−currentT) × R(targetT)), плюс 1 CalibrationCore подходящего диапазона [1–4]/[5–8]/[9–12]/[13+] на каждые начатые 4 ступени. Core выпадает с каждого босса/элиты по правилам раздела 19. Доступность и стоимость заранее отображаются. Калибровка не тратит TR аффиксов, не может совершаться во время боя/неподтверждённого выезда.
+
+## 10. ПОЛНЫЙ КАТАЛОГ БАЗОВЫХ ПРЕДМЕТОВ
+
+Здесь перечислены **базовые типы**. Случайные экземпляры генерируются из одного типа + TechLevel + rare/affix rolls; это не «копии одного предмета», потому что механика, скорость, слот, теги, аффиксы и синергии меняют поведение.
+
+### 10.1. Вооружение (8 main)
+
+| id | Название | T1 damage | Интервал | Тип | Роль/врождённое свойство |
+|---|---|---:|---:|---|---|
+| PISTOL_K1 | «Кобра» | 34 | 750ms | K | +5 accuracy |
+| RIFLE_K2 | «Гвоздь» | 52 | 1100ms | K | 10 flat armor penetration в первой атаке каждого боя |
+| SMG_K3 | «Искра» | 19 | 360ms | K | 0.6 procWeight на выстрел |
+| BLADE_K4 | «Сдвиг» | 68 | 1350ms | K | +10% damage по bleeding |
+| SHOTGUN_K5 | «Соты» | 24×4 | 1600ms | K | каждый пеллет 0.25 procWeight, одна общая атака |
+| RAIL_K6 | «Нить» | 92 | 1900ms | K | +25 flat pen, windup 350ms |
+| PLASMA_E1 | «Жар» | 47 | 1200ms | E | +8 heat за автоатаку |
+| ARC_E2 | «Разряд» | 31 | 950ms | E | каждая 4-я атака 25% splash по второй цели, без on-hit |
+| LASER_E3 | «Световод» | 30 | 620ms | E | +3 heat, +3 energy cost на атаку, стабильно высокая точность +8 |
+| FOCUS_D1 | «Кодер» | 33 | 1000ms | D | +1 virus stack на 4-й успешный direct hit |
+| SPIKE_D2 | «Жало» | 50 | 1300ms | D | +5 flat digital penetration p.p. |
+| DUAL_H1 | «Синхроны» | 36 K + 19 E | 1150ms | MIXED | каждая половина резолвится собственной защитой |
+
+В таблице фактически 12 main-типов, что превосходит минимальный порог релиза. Для shotgun 4×24 — четыре пакета одной атаки; каждый пакет имеет собственный hit-roll, crit-roll, общий attackCooldown; эффекты shield/HP резолвятся по пакету. Смешанный packet DUAL_H1 корректно проходит две защиты.
+
+### 10.2. Offhand (6)
+
+| id | Название | Base | Эффект |
+|---|---|---|---|
+| SIDEARM_1 | Запасной пистолет | 18 K | может участвовать только в умении SIDE_FIRE, не в пассивной main автоатаке |
+| OFF_SHIELD | Генератор щита | +35 shield ×D(T) | +1 shield regen/сек после отсутствия урона 4 сек |
+| OFF_CORE_E | Энергоблок | +12 FLAT TechPower ×H(T) | −2 energy cost энергетических программ |
+| OFF_CORE_D | Нейроключ | +10 FLAT TechPower ×H(T) | +10% virus duration |
+| OFF_TARGET | Оптическая рамка | +12 accuracy | +5 flat armor penetration |
+| OFF_COOL | Теплосток | +4 heat cooling/сек | −10% energy damage, trade-off |
+
+### 10.3. Бронекостюмы (6)
+
+| id | Название | HP T1 / shield T1 | Armor | Эффект |
+|---|---|---|---:|---|
+| ARM_CLOTH | Городская оболочка | 20 / 10 | 2 | +10 evasion |
+| ARM_LIGHT | Курьер | 40 / 15 | 4 | +4% attack speed |
+| ARM_MID | Корпоративный | 80 / 25 | 10 | +10 energy resistance p.p. |
+| ARM_HEAVY | Бастион | 120 / 10 | 20 | −10% attack speed |
+| ARM_NET | Сетевая кожа | 45 / 45 | 5 | +10 digital resistance p.p. |
+| ARM_HEAT | Термоконтур | 65 / 35 | 8 | +3 heat cooling/сек |
+
+Base operator HP=300, armor=5; броня добавляет HP/щит/armor FLAT, не заменяет всю базу. Броня имеет maxDurability=100; когда износ ниже 25, её FLAT armor и shield бонусы работают с множителем 0.75 до ремонта. Другое постоянное снаряжение ниже 25 durability получает 10% LESS своих числовых бонусов; уникальный boolean эффект не отключается, если описание не говорит обратное.
+
+### 10.4. Стандартные импланты (12)
+
+| id | Название | Slot | Neural cost | Эффект |
+|---|---|---|---:|---|
+| IMP_ARMOR | «Титановая решётка» | CHEST | 16 | +20% INCREASED armor |
+| IMP_HP | «Глубокий резерв» | CHEST | 12 | +60 FLAT HP ×D(T) |
+| IMP_REFLEX | «Миоконтур» | ARMS | 14 | +12% INCREASED attack speed |
+| IMP_CRIT | «Слепая игла» | HEAD | 16 | +5 critical chance p.p. |
+| IMP_DATA | «Дешифратор» | HEAD | 14 | +18% INCREASED digital damage |
+| IMP_HEAT | «Турбопроток» | CHEST | 15 | −2 cooling/сек, +20% INCREASED energy damage |
+| IMP_COOL | «Сухой лёд» | UNIVERSAL | 10 | +5 cooling/сек, −8% energy damage |
+| IMP_REGEN | «Периферийный заряд» | NEURAL | 15 | +5 energy regen/сек |
+| IMP_CAP | «Пустой канал» | NEURAL | 8 | +24 FLAT neural capacity |
+| IMP_SHIELD | «Эхобарьер» | CHEST | 16 | +60 FLAT shield ×D(T) |
+| IMP_DRONE | «Тактовый центр» | NEURAL | 18 | +20% INCREASED drone damage |
+| IMP_VIRUS | «Мнемофаг» | HEAD | 17 | +15% INCREASED status digital damage |
+
+slot type означает совместимый тип посадочного места, не эксклюзивность категории: два CHEST одновременно допустимы, если доступны два универсальных/грудных implant positions. Для стартовых 4 мест: HEAD, CHEST, ARMS, UNIVERSAL; позже добавляются NEURAL, UNIVERSAL. SYN effect magnitude влияет на масштабируемые числовые стат-бонусы только с пометкой SYN_SCALABLE; перечисленные абсолютные значения скейлируются у имплантов, кроме neuralCost и cap. Точная формула видна в Build Lab.
+
+### 10.5. Дроны (6 templates)
+
+| id | Название | T1 HP / armor / shield | T1 attack damage, interval | Активная роль |
+|---|---|---|---|---|
+| DR_GUN | «Оса» | 100/4/0 | 20 K / 950ms | приоритет marked target |
+| DR_ARC | «Молния» | 80/3/10 | 16 E / 850ms | каждая 5-я атака переносит SHOCK |
+| DR_MED | «Санитар» | 120/4/10 | 6 D / 1700ms | 18 shield оператору каждые 10 сек |
+| DR_EMP | «Фантом» | 75/3/10 | 15 D / 1300ms | EMP interrupt каждые 14 сек |
+| DR_BULWARK | «Клин» | 180/10/30 | 7 K / 1800ms | 10% incoming damage перенаправляет на себя до 20 ед. на попадание |
+| DR_SWARM | «Рой» | 90/2/0 | 8 K ×3 / 1500ms | три пакета с procWeight 0.25 каждый |
+
+Дрон живёт и умирает отдельно, его смерть не убивает героя. В конце боя повреждённый дрон возвращается и в следующем бою начинает с предыдущим текущим HP; при наличии ремонтной службы/модуля восстанавливается. При 0 HP дрон недоступен до ремонта на сервисном узле/форпосте. DRONE_JAM снижает эффективность дронов на 50%, но не обнуляет их. Дрон имеет автономную энергию только при конкретном skill cost, базовая автоатака бесплатна.
+
+### 10.6. Транспорт (шесть обязательных модулей)
+
+| slot | стандартный модуль | базовый эффект | улучшенный вариант |
+|---|---|---|---|
+| ENGINE | Двигатель «Трасса» | 24 fuel max, 1 fuel/edge | «Дальний ход»: 32 fuel, −10% travel duration |
+| CHASSIS | Корпус «Ржавчина» | 100 hull | «Шёлк»: +30 hull, +10% ремонтный cost |
+| SCANNER | Приёмник | видит тип соседних узлов | «Вектор»: показывает диапазон угроз/loot |
+| SERVICE | Набор ремонта | нет авто-ремонта | «Медтех»: после checkpoint +15% lost HP/armor durability, стоит 5 scrap |
+| CARGO | Отсек 1 | 20 item-units | Отсек 2: 32 units |
+| SUPPORT | Связь | нет боевой атаки | Релейная батарея: один ENERGY blast 40×H(T) каждые 25 сек (procWeight 0) |
+
+Корпус теряет 1–4 пункта на опасных дорожных узлах/событиях, не от каждого обычного удара по герою. При hull=0 автопилот прекращает движение до ремонта/эвакуации. Предмет занимает 1 cargo-unit, кроме тяжёлого оружия/бронекостюма, которые занимают 2; валюта и чертежи не занимают cargo space.
+
+## 11. СПОСОБНОСТИ И ПАССИВНЫЕ ПРОТОКОЛЫ
+
+Общие поля: id, channel, skillTags, damageCoefficient, energyCost, heatDelta, windupMs, recoveryMs, cooldownMs, targetMode, procWeight, effects[], requirements, interruptible. Все cooldown от конца начала каста (момента старта), не пересчитываются задним числом при смене предмета.
+
+| id / имя | Channel | Energy / heat | Windup / Recovery / Cooldown (мс) | Эффект |
+|---|---|---|---|---|
+| SK_BURST / Очередь | main | 0 / +2 | 180/220/900 | 3×0.45 main K, procWeight=.35/pellet |
+| SK_PIERCE / Бронебойный | main | 12 / +1 | 300/350/4000 | 1.60 main K, +20 flat penetration |
+| SK_EXEC / Контрольный | main | 15 / +2 | 220/350/6000 | 1.30 main K, ×1.4 MORE по HP цели <30% |
+| SK_BLADE / Серия | main | 10 / +4 | 240/360/3000 | 3×0.55 main K, 1 BLEED на последнем hit |
+| SK_PLASMA / Плазменный | main | 16 / +12 | 260/320/3000 | 1.45 TechPower E |
+| SK_ARC / Электродуга | main | 24 / +10 | 350/450/7000 | 1.00 TechPower E primary, 0.50 secondary to 2 targets; shock 1s |
+| SK_OVR / Форсаж | main | 20 / +15 | 250/250/15000 | +20% attack speed 8 sec, +5 heat per main autoattack |
+| SK_NEURO / Нейроукол | main | 12 / +2 | 180/280/3000 | 1.00 TechPower D, +1 VIRUS |
+| SK_SEED / Вирусное семя | main | 20 / +1 | 320/400/6000 | 0.70 TechPower D, +2 VIRUS stacks |
+| SK_DETONATE / Детонация | main | 18 / +4 | 200/350/8000 | 0.60 current remaining VIRUS potential as immediate D; consume max 3 stacks |
+| SK_BREAK / Разлом | main | 12 / +2 | 240/330/5000 | 0.80 main K and +1 ARMOR_BREAK stack |
+| SK_SCAN / Слабое место | main | 12 / 0 | 220/270/8000 | +12% MORE direct damage against marked target for 6 sec, mark same target |
+| SK_LEECH / Паразит | main | 14 / +5 | 280/330/6000 | 1.00 TechPower D, restore 8 energy if infected target hit |
+| SK_CHAIN / Перегрузка | main | 18 / +18 | 400/500/10000 | 1.65 TechPower E, if heat≥80 then +25% MORE |
+| SK_KINETIC / Ударная волна | main | 20 / +5 | 350/400/9000 | 0.75 main K to up to 4 targets; procWeight=0.35 each |
+| SK_SIDE_FIRE / Второй ствол | main | 8 / +1 | 170/240/2500 | 1.30 OFFHAND weapon damage, only if sidearm equipped |
+| SK_SHIELD / Аварийный щит | reaction | 30 / +5 | 100/0/20000 | +60 temporary shields for 5sec, max temporaryShieldCap=90, expires leftover |
+| SK_EMP / Перехват | reaction | 18 / +4 | 150/0/9000 | interrupt interruptible cast, 0.60 TechPower D |
+| SK_GUARD / Дефлектор | reaction | 10 / 0 | 100/0/8000 | 20% LESS incoming K damage for 2sec |
+| SK_VENT / Продувка | reaction | 0 / −35 | 100/0/12000 | cool 35 heat; if heat lowered from 100, remove lockout |
+| SK_HEAL / Ремодуль | reaction | 20 / +3 | 150/0/12000 | 30+0.10×maxHP healing capped at 12% maxHP from bonus, total heal≤0.22×maxHP |
+| SK_DRONE_MARK / Синхрометка | reaction | 12 / +1 | 100/0/6000 | +15 accuracy to drones against one target 5sec |
+| SK_DRONE_REPAIR / Техподдержка | drone | 0 / 0 | 200/0/15000 | DR_MED heals self 25 HP and grants operator +20 shields |
+| SK_DRONE_EMP / Малый EMP | drone | 0 / 0 | 200/0/14000 | DR_EMP 0.75 own TechDamage D + JAM on target |
+| SK_ROUTE_SCAN / Разведка | route | 5 data / 0 | 0/0/1 edge | reveals threatened enemy families on next available node |
+| SK_EXTRACT / Вывоз | route | checkpoint rule | 0/0/1 checkpoint | successful extraction according to section 20 |
+
+Атака с коэффициентом main K/E/D использует текущий тип урона соответствующего weapon template, но если конкретное умение требует K, а main оружие E/D, это умение НЕ экипируется; skillTags и requirements должны валидироваться. SK_NEURO и прочие TechPower используют D независимо от main type. Цифровое взрывное умение SK_DETONATE использует сохранённый remaining potential тех трех стеков, не повторно добавляет исходный DoT-урон. Если нет virus — оно недоступно. Windup и Recovery на main определяют блокировку main-канала; без cooldown остаётся интервал автоатаки.
+
+**Пассивные протоколы (10, выбрать ≤3):**
+- PP_ARMOR: +12% INCREASED armor;
+- PP_ACCURACY: +10 accuracy;
+- PP_AMMO: +8% INCREASED main damage;
+- PP_HEAT: +2 cooling/сек;
+- PP_VIRUS: +15% INCREASED VIRUS tick damage;
+- PP_SHIELD: +1.5 shield regen/сек после 4 секунд без урона;
+- PP_DRONE: +12% INCREASED drone damage;
+- PP_HUNTER: +10% currency rewards from bounty hunters only;
+- PP_ESCAPE: +15% extraction chance on risky emergency-extraction event;
+- PP_ECONOMY: −10% repair metal scrap cost (round up and never below 1).
+Это не одноразовый бонус поверх слота предмета, а самостоятельный PASSIVE_PROTOCOL слот. Условные эффекты и стоимость всегда объяснимы.
+
+## 12. ПЯТЬ РЕДКОСТЕЙ, АФФИКСЫ И КРАФТ
+
+Редкости: COMMON (0 аффиксов), MODIFIED (1–2), RARE (3–4), LEGENDARY (4–5 плюс более высокие диапазоны), UNIQUE (фиксированный уникальный эффект и 0–2 заявленных свойства; не просто «самые большие цифры»). При генерации COMMON всегда 0; MODIFIED chooses 1/2 evenly; RARE 3/4 evenly; LEGENDARY 4/5 evenly. Slot/affix incompatibility check до ролла; если кандидатный аффикс невалиден, исключить и выбрать из оставшихся. Не выбирать случайно, пока RNG не попадёт «правильно».
+
+**Аффикс tiers по T:** T1–4 tier1; T5–8 tier2; T9–12 tier3; T13+ tier4. Для редкой/легендарной экипировки 20% роллов могут получить tier выше максимального для указанного T, но не более tier4; повышенная возможность явно отражена в roll details. Значения от tier1 до tier4 перечислены в таблицах; вместо повторного roll значений внутри tier допускается min..max равномерный конкретный roll и он сохраняется в item instance.
+
+**Словарь механических аффиксов (числа — значения tier1 / tier2 / tier3 / tier4):**
+
+| id | stat / unit | Tiers | Slots |
+|---|---|---|---|
+| AF_HP | +flatHP ×D(T) | 20/35/55/80 | ARMOR,IMPLANT |
+| AF_SH | +flatShield ×D(T) | 10/20/30/45 | ARMOR,OFFHAND,IMPLANT |
+| AF_ARM | +flatArmor | 2/4/6/8 | ARMOR,IMPLANT |
+| AF_ERE | +ENERGY_RES percentage points | 3/5/7/10 | ARMOR,OFFHAND |
+| AF_DRE | +DIGITAL_RES percentage points | 3/5/7/10 | ARMOR,OFFHAND |
+| AF_EVA | +flatEvasion | 4/7/10/15 | ARMOR,IMPLANT |
+| AF_ACC | +flatAccuracy | 4/8/12/16 | MAIN,OFFHAND |
+| AF_KDM | kinetic INCREASED % | 5/9/13/18 | MAIN,IMPLANT |
+| AF_EDM | energy INCREASED % | 5/9/13/18 | MAIN,IMPLANT |
+| AF_DDM | digital INCREASED % | 5/9/13/18 | MAIN,IMPLANT |
+| AF_AS | attack speed INCREASED % | 3/5/8/10 | MAIN,IMPLANT |
+| AF_CR | crit chance percentage points | 2/3/4/5 | MAIN,OFFHAND |
+| AF_CM | crit multiplier INCREASED percentage points | 5/10/15/20 | MAIN,OFFHAND |
+| AF_PEN | flatArmorPen | 3/6/9/12 | MAIN,OFFHAND |
+| AF_EPN | +energy pen percentage points | 2/3/5/7 | MAIN,OFFHAND |
+| AF_DPN | +digital pen percentage points | 2/3/5/7 | MAIN,OFFHAND |
+| AF_ER | flatEnergyRegen/сек | 1/2/3/4 | IMPLANT,OFFHAND |
+| AF_COO | heatCooling/сек | 1/2/3/4 | IMPLANT,OFFHAND |
+| AF_NC | flatNeuralCapacity | 4/8/12/16 | IMPLANT |
+| AF_DRO | drone damage INCREASED % | 5/10/15/20 | IMPLANT,OFFHAND |
+| AF_DHP | drone HP INCREASED % | 5/10/15/20 | IMPLANT,OFFHAND |
+| AF_VIR | virus status damage INCREASED % | 5/9/13/18 | MAIN,IMPLANT |
+| AF_DOT | all DoT duration INCREASED % | 4/7/10/15 | IMPLANT |
+| AF_HEA | healing INCREASED % | 5/10/15/20 | ARMOR,IMPLANT |
+| AF_SR | shield regeneration/сек FLAT | 1/2/3/4 | ARMOR,OFFHAND |
+| AF_CDR | cooldown recovery INCREASED % | 3/5/7/10 | IMPLANT |
+| AF_FUEL | fuel capacity FLAT | 2/3/4/6 | ENGINE |
+| AF_CARGO | cargo units FLAT | 2/4/6/8 | CARGO |
+| AF_SCAN | threat reveal range +layers | 0/0/1/1 | SCANNER |
+| AF_ROAD | travel duration LESS % | 2/4/6/8 | ENGINE |
+
+Все одинаковые аффикс группы на ОДНОМ предмете могут встречаться не более 1 раза. В легендарном аффиксы не обязаны все быть offensive; генератор использует веса по слоту (MAIN: 55% offensive, 30% resource,15% utility; ARMOR: 70% defensive,20% resource,10% utility; IMPLANT: 33/33/34; transport свой пул). Не генерировать combat-only аффиксы на транспорте, где они не объявлены.
+
+**Технологический ресурс предмета TR (задаётся при создании):** COMMON 8–12, MODIFIED 12–18, RARE 18–28, LEGENDARY 12–20, UNIQUE 0. Изменение одного roll внутри tier — TR3 и 10×R(T) scrap; повысить tier до cap — TR6 и 20×R(T) scrap +5×R(T) data; заменить конкретный аффикс — TR8 и 12×R(T) data; добавить аффикс в свободный слот — TR10 и 20×R(T) scrap +10×R(T) data. Числа округляются вверх. Стоимость фиксирована и проверяется до запуска; roll новой величины равномерный в объявленном диапазоне. После исчерпания TR дальнейшие обычные rerolls невозможны, TR не покупается безлимитно. Для UNIQUE отдельная калибровка TechLevel, но нет произвольного изменения уникального эффекта.
+
+**Один предмет = один itemId**. Любые действия в гараже по созданию/переносу/разбору/продаже проверяют собственность и grantId; повторное применение запрещено. Ремонт не тратит TR; расход scrap = ceil((100-durability)/10 × (2+T/5)), capped at cost of new comparable common item; выброс в мусор не является источником бесконечных денег.
+
