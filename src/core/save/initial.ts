@@ -39,6 +39,8 @@ export function createInitialSave(options: { saveId?: string; now?: number } = {
     meta: {
       operator: { level: 1, xp: 0, attributes: { POW: 5, REF: 5, INT: 5, ENG: 5, SYN: 5 }, attributePoints: 0, treePoints: 0 },
       tutorial: { firstSectorCompleted: false, starterPrototypeSecured: false },
+      reputation: { F_VANTA: 0, F_RUST: 0, F_CHOIR: 0, F_ECHO: 0 },
+      campaignFlags: [],
       transport: { fuel: 24, fuelMax: 24, hull: 100, hullMax: 100, cargoCapacity: 20 },
       protectedBank: { CREDITS: 120, SCRAP: 30, DATA: 20 },
       unsecuredWallet: { CREDITS: 0, SCRAP: 0, DATA: 0 },

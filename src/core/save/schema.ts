@@ -55,6 +55,8 @@ export const SaveGameSchema = z.object({
   meta: z.object({
     operator: z.object({ level: z.number().int().min(1).max(999), xp: z.number().int().nonnegative(), attributes: attributeMap, attributePoints: z.number().int().nonnegative(), treePoints: z.number().int().nonnegative() }).strict(),
     tutorial: z.object({ firstSectorCompleted: z.boolean(), starterPrototypeSecured: z.boolean() }).strict(),
+    reputation: z.object({ F_VANTA: z.number().int().min(-100).max(100), F_RUST: z.number().int().min(-100).max(100), F_CHOIR: z.number().int().min(-100).max(100), F_ECHO: z.number().int().min(-100).max(100) }).strict().default({ F_VANTA: 0, F_RUST: 0, F_CHOIR: 0, F_ECHO: 0 }),
+    campaignFlags: z.array(z.string().min(1)).default([]),
     transport: z.object({ fuel: z.number().finite().min(0), fuelMax: z.number().finite().min(0), hull: z.number().finite().min(0), hullMax: z.number().finite().min(0), cargoCapacity: z.number().finite().min(0) }).strict(),
     protectedBank: wallet, unsecuredWallet: wallet,
     inventory: z.array(itemInstance), equipment: z.record(z.enum(['MAIN', 'OFFHAND', 'ARMOR', 'IMP_1', 'IMP_2', 'IMP_3', 'IMP_4', 'IMP_5', 'IMP_6', 'DRONE_1', 'DRONE_2', 'ENGINE', 'CHASSIS', 'SCANNER', 'SERVICE', 'CARGO', 'SUPPORT']), z.string().min(1)),

@@ -1,18 +1,20 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { resolveBuild } from '../core/build/build';
 import { ITEM_BY_ID } from '../data/items';
+import { EVENT_BY_ID } from '../data/events';
 import { createInitialSave } from '../core/save/initial';
 import { commitSave, exportSaveText, importSaveText, loadSave, type LoadSaveResult } from '../core/save/storage';
 import type { SaveGame } from '../core/save/schema';
 import { validateCatalog } from '../data/validate';
+import { R } from '../core/math/formula';
 import { createInitialRun } from '../core/run/run';
 import { chooseRunNode } from '../core/run/commands';
 import { resolveCurrentCombat } from '../core/run/combat';
-import { getRunShopStock, resolveRunCache, resolveRunService, resolveRunShop, resolveRunShopPurchase } from '../core/run/nodes';
+import { getRunShopStock, resolveRunCache, resolveRunEvent, resolveRunService, resolveRunShop, resolveRunShopPurchase } from '../core/run/nodes';
 import { resolveRunCheckpoint } from '../core/run/checkpoint';
 import { equipRunItem, unequipRunSlot } from '../core/run/inventory';
 import { calibrateGarageItem, craftGarageAffix, dismantleGarageItem, equipGarageItem, garageRepairCost, repairGarageItem, unequipGarageSlot } from '../core/inventory/garage';
-import { affixName, calibrationCost, coreGroupForDepth, craftOperationCost, dismantleValue, templateOf } from '../core/items/items';
+import { affixName, calibrationCost, coreGroupForDepth, craftOperationCost, dismantleValue, shopPrice, templateOf } from '../core/items/items';
 import { AFFIXES, AFFIX_BY_ID, RARITY_AFFIX_COUNT, tierForTech } from '../data/affixes';
 import type { RunCommandResult, RunState } from '../core/run/types';
 import { IMPLANT_SLOT_TYPES, NODE_TYPE_RU, type EquipSlotId, type ItemCategory } from '../core/types';
@@ -279,6 +281,13 @@ function RoadScreen({ save, busy, onResult, onReturn, onNewRun, commandId }: {
           const sold = run.grantIds.includes(entry.grantId);
           return <article className="route-card prototype-card" key={entry.grantId}><strong>{itemName(entry.item.templateId)}</strong><small>{entry.item.rarity} · T{entry.item.techLevel} · {entry.item.templateId}</small><b>{entry.price} ₡</b>{actionButton(sold ? 'ПРОДАНО' : 'КУПИТЬ', () => dispatch(resolveRunShopPurchase(save, { id: commandId(), stockIndex: entry.index })), true)}</article>;
         })}</div>{actionButton('ЗАВЕРШИТЬ ПОКУПКИ · 8 СЕК', () => dispatch(resolveRunShop(save, commandId())))}</>}
+        {current.type === 'EVENT' && current.eventId && EVENT_BY_ID[current.eventId] && <div className="event-choices"><h3>{EVENT_BY_ID[current.eventId].name}</h3><p>{EVENT_BY_ID[current.eventId].text}</p>{EVENT_BY_ID[current.eventId].choices.map((choice) => {
+          const specialCost = choice.special === 'greyDealer' ? Math.ceil(shopPrice('PISTOL_K1', run.depth, 'RARE') * 0.6) : choice.special === 'dataForCredits' ? Math.ceil(10 * R(run.depth)) : 0;
+          const cost = { CREDITS: Math.max(choice.cost?.CREDITS ?? 0, choice.special === 'greyDealer' ? specialCost : 0), SCRAP: choice.cost?.SCRAP ?? 0, DATA: Math.max(choice.cost?.DATA ?? 0, choice.special === 'dataForCredits' ? specialCost : 0) };
+          const blocked = (Object.keys(cost) as (keyof typeof cost)[]).some((currency) => cost[currency] > run.runWallet[currency]);
+          const costText = Object.entries(cost).filter(([, amount]) => amount > 0).map(([currency, amount]) => `−${amount} ${currency}`).join(' · ');
+          return <button className="route-card event-choice" key={choice.id} disabled={busy || blocked} onClick={() => dispatch(resolveRunEvent(save, { id: commandId(), choiceId: choice.id }))}><strong>{choice.label}</strong><small>{choice.desc}{costText ? ` · ${costText}` : ''}</small><b>{blocked ? 'НЕ ХВАТАЕТ РЕСУРСОВ' : 'ВЫБРАТЬ'}</b></button>;
+        })}</div>}
         {(current.type === 'REPAIR' || current.type === 'FUEL') && <label className="protected-spend"><input type="checkbox" checked={spendProtected} onChange={(event) => setSpendProtected(event.target.checked)} /> разрешить оплату из защищённого банка</label>}
       </div>}
       {run.phase === 'CHECKPOINT' && <div className="checkpoint-panel"><span className="eyebrow">КОНТРОЛЬНЫЙ УЗЕЛ</span><h3>Добыча сектора под защитой решения</h3><p>Эвакуация защищает всё. Отправка стоит {Math.ceil(10 * (1 + 0.06 * (run.depth - 1)) ** 1.4)} кредитов и сохраняет выезд активным. Продолжение открывает следующий сектор.</p>

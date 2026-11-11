@@ -1,4 +1,5 @@
 import { BIOME_BY_ID } from '../../data/biomes';
+import { EVENTS } from '../../data/events';
 import { BOSSES, ENEMY_BY_ID } from '../../data/enemies';
 import { Rng } from '../rng';
 import type { BiomeId, NodeType } from '../types';
@@ -7,6 +8,7 @@ import type { EncounterEnemySpec } from '../combat/types';
 import type { RoadEdge, RoadGraph, RoadNode } from './types';
 
 const BASE_WIDTHS = [1, 2, 3, 3, 2, 1] as const;
+const ROAD_EVENTS = EVENTS.filter((event) => !event.choices.some((choice) => choice.flag || choice.reveal || choice.nextCombat || choice.travelDelta || choice.grantMutation || (choice.special && choice.special !== 'greyDealer' && choice.special !== 'dataForCredits')));
 function threatFor(type: NodeType): NodeThreatBand {
   if (type === 'BOSS') return 'boss';
   if (type === 'ELITE' || type === 'BOUNTY' || type === 'ANOMALY') return 'high';
@@ -83,7 +85,7 @@ function linkLayers(rng: Rng, layers: RoadNode[][]): RoadEdge[] {
   return edges;
 }
 
-export function generateSectorGraph(input: { seed: string; depth: number; biome: BiomeId; tutorial?: boolean; wanted?: number }): RoadGraph {
+export function generateSectorGraph(input: { seed: string; depth: number; biome: BiomeId; tutorial?: boolean; wanted?: number; usedEventIds?: string[] }): RoadGraph {
   if (!Number.isInteger(input.depth) || input.depth < 1) throw new Error('Sector depth must be a positive integer.');
   if (!BIOME_BY_ID[input.biome]) throw new Error(`Unknown biome ${input.biome}.`);
   const rng = new Rng('world', input.seed);
@@ -104,6 +106,11 @@ export function generateSectorGraph(input: { seed: string; depth: number; biome:
     else if (layer === 5) type = input.depth % 4 === 0 ? 'BOSS' : 'CHECKPOINT';
     else if (layer === 0 || layer === 2) { type = 'COMBAT'; fixed = [enemyFor(input.biome, input.depth, rng)]; }
     else if (layer === 4) type = index % 2 === 0 ? 'REPAIR' : 'FUEL';
+    else if (!tutorial && layer === 3 && index === 0) {
+      const availableEvents = ROAD_EVENTS.filter((event) => !input.usedEventIds?.includes(event.id));
+      if (availableEvents.length) { type = 'EVENT'; extras = { eventId: rng.pick(availableEvents).id }; }
+      else type = 'CACHE';
+    }
     else if (!tutorial && layer === 3 && index === 1) type = 'SHOP';
     else if (!tutorial && layer === 1 && index === 0 && rng.chance(0.22)) type = 'ELITE';
     else if (!tutorial && layer === 1 && index === 1 && (input.wanted ?? 0) >= 50 && rng.chance(0.25)) type = 'BOUNTY';

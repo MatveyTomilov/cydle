@@ -10,6 +10,16 @@ describe('deterministic sector graph', () => {
     }
   });
 
+  it('persists a deterministic real event on regular sector maps', () => {
+    const input = { seed: 'event-map', depth: 2, biome: 'B03' as const };
+    const graph = generateSectorGraph(input);
+    const event = graph.layers.flat().find((node) => node.type === 'EVENT');
+    expect(event?.eventId).toMatch(/^EV\d{2}$/);
+    expect(generateSectorGraph(input)).toEqual(graph);
+    const nextSector = generateSectorGraph({ ...input, seed: 'event-map-next', usedEventIds: [event!.eventId!] });
+    expect(nextSector.layers.flat().find((node) => node.type === 'EVENT')?.eventId).not.toBe(event?.eventId);
+  });
+
   it('adds optional elite encounters and gates the single bounty option on wanted', () => {
     const quiet = Array.from({ length: 40 }, (_, index) => generateSectorGraph({ seed: `optional-${index}`, depth: 2, biome: 'B03' }));
     const hunted = Array.from({ length: 40 }, (_, index) => generateSectorGraph({ seed: `optional-${index}`, depth: 2, biome: 'B03', wanted: 60 }));

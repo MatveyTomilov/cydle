@@ -1,8 +1,10 @@
 import { createCore, createItem, rollItem, shopPrice, type ItemInstance } from '../items/items';
+import { EVENT_BY_ID } from '../../data/events';
 import { R } from '../math/formula';
 import { Rng } from '../rng';
 import { parseSave, type SaveGame } from '../save/schema';
-import type { Currency } from '../types';
+import { resolveRunBuild } from './build';
+import type { Currency, FactionId } from '../types';
 import type { RunCommandResult, RunState } from './types';
 
 const zeroWallet = () => ({ CREDITS: 0, SCRAP: 0, DATA: 0 });
@@ -134,6 +136,82 @@ export function resolveRunShop(save: SaveGame, commandId: string): RunCommandRes
   const checked = parseSave(next);
   if (!checked.success) return fail(save, 'INVALID_RESULT', checked.error);
   return { ok: true, save: checked.data, events: [{ type: 'SHOP_RESOLVED', text: 'Магазин закрыт · потрачено 8 секунд.' }] };
+}
+
+export function resolveRunEvent(save: SaveGame, command: { id: string; choiceId: 'A' | 'B' }): RunCommandResult {
+  const parsed = parseSave(save);
+  if (!parsed.success) return fail(save, 'INVALID_SAVE', parsed.error);
+  const run = save.run;
+  if (!run) return fail(save, 'NO_ACTIVE_RUN', 'Нет активного выезда.');
+  if (!command.id.trim()) return fail(save, 'INVALID_COMMAND_ID', 'Команде требуется стабильный идентификатор.');
+  if (run.commandIds.includes(command.id)) return { ok: true, save, events: [] };
+  const node = currentNode(run);
+  if (!node || node.type !== 'EVENT' || run.phase !== 'NODE') return fail(save, 'NODE_NOT_EVENT', 'Выбор доступен только в открытом узле события.');
+  if (run.clearedNodeIds.includes(node.id)) return fail(save, 'NODE_ALREADY_CLEARED', 'Это событие уже разрешено.');
+  const event = node.eventId ? EVENT_BY_ID[node.eventId] : undefined;
+  if (!event) return fail(save, 'EVENT_MISSING', 'У этого узла отсутствует сохранённое событие.');
+  const choice = event.choices.find((candidate) => candidate.id === command.choiceId);
+  if (!choice) return fail(save, 'INVALID_EVENT_CHOICE', 'Такого выбора нет у текущего события.');
+  const costs = { ...choice.cost };
+  let itemGrant = choice.grantItem;
+  if (choice.special === 'greyDealer') {
+    costs.CREDITS = Math.ceil(shopPrice('PISTOL_K1', run.depth, 'RARE') * 0.6);
+    itemGrant = { rarity: 'RARE' };
+  }
+  if (choice.special === 'dataForCredits') costs.DATA = Math.ceil(10 * R(run.depth));
+  for (const currency of ['CREDITS', 'SCRAP', 'DATA'] as const) {
+    if ((costs[currency] ?? 0) > run.runWallet[currency]) return fail(save, 'INSUFFICIENT_FUNDS', `Для выбора требуется ${costs[currency]} ${currency}; защищённый банк не расходуется.`);
+  }
+
+  const next = markCommand(save, command.id);
+  const nextRun = next.run!;
+  for (const currency of ['CREDITS', 'SCRAP', 'DATA'] as const) {
+    const gain = choice.gains?.[currency] ?? (choice.special === 'dataForCredits' && currency === 'CREDITS' ? Math.ceil(30 * R(run.depth)) : 0);
+    const scaledGain = choice.scaled ? Math.ceil(gain * R(run.depth)) : gain;
+    nextRun.runWallet[currency] = nextRun.runWallet[currency] - (costs[currency] ?? 0) + scaledGain;
+  }
+  if (choice.wanted) nextRun.wanted = Math.max(0, Math.min(100, nextRun.wanted + choice.wanted));
+  if (choice.fuel) nextRun.resources.fuel = Math.max(0, Math.min(nextRun.resources.maxFuel, nextRun.resources.fuel + choice.fuel));
+  if (choice.hull) nextRun.resources.hull = Math.max(0, Math.min(nextRun.resources.maxHull, nextRun.resources.hull + choice.hull));
+  if (choice.healMissingFraction) nextRun.resources.hp = Math.min(nextRun.resources.maxHP, nextRun.resources.hp + (nextRun.resources.maxHP - nextRun.resources.hp) * choice.healMissingFraction);
+  if (choice.refillEnergy) {
+    const build = resolveRunBuild(next);
+    if (!build.valid) return fail(save, 'INVALID_BUILD', build.issues.map((issue) => issue.message).join(' '));
+    nextRun.resources.energy = build.stats.maxEnergy;
+  }
+  for (const [faction, amount] of Object.entries(choice.reputation ?? {})) {
+    const id = faction as FactionId;
+    next.meta.reputation[id] = Math.max(-100, Math.min(100, next.meta.reputation[id] + amount));
+  }
+  if (choice.special?.startsWith('schematic:') || choice.special?.startsWith('signalContract:')) next.meta.campaignFlags.push(choice.special);
+
+  const loot = Rng.fromSerialized(nextRun.lootRng);
+  const items: ItemInstance[] = [];
+  const grants: string[] = [];
+  if (itemGrant) {
+    const count = itemGrant.count ?? 1;
+    for (let index = 0; index < count; index++) {
+      const grantId = `event:${run.seed}:${node.id}:${choice.id}:${index}`;
+      const rolled = rollItem(loot, {
+        depth: run.depth, biome: run.biome, table: 'ORDINARY', secured: false,
+        grantId, origin: 'event', forceTemplateId: itemGrant.templateId,
+        forceCategory: itemGrant.category, forceTag: itemGrant.tag, forceRarity: itemGrant.rarity,
+      });
+      items.push(rolled.item);
+      grants.push(grantId);
+    }
+  }
+  nextRun.unsecuredCargo.push(...items);
+  nextRun.grantIds.push(...grants);
+  nextRun.lootRng = loot.serialize();
+  next.meta.campaignFlags.push(`event:${event.id}:${choice.id}`);
+  if (!nextRun.eventsSeen.includes(event.id)) nextRun.eventsSeen.push(event.id);
+  nextRun.clearedNodeIds = [...nextRun.clearedNodeIds, node.id];
+  nextRun.resources.gameTimeMs += 10_000;
+  nextRun.phase = 'ROUTE';
+  const checked = parseSave(next);
+  if (!checked.success) return fail(save, 'INVALID_RESULT', checked.error);
+  return { ok: true, save: checked.data, events: [{ type: 'EVENT_RESOLVED', text: `${event.name}: ${choice.label}` }] };
 }
 
 function pay(save: SaveGame, run: RunState, currency: Currency, cost: number, spendProtected: boolean): boolean {

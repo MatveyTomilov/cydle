@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createInitialSave } from '../../src/core/save/initial';
 import { createInitialRun } from '../../src/core/run/run';
 import { templateOf } from '../../src/core/items/items';
-import { getRunShopStock, resolveRunCache, resolveRunService, resolveRunShop, resolveRunShopPurchase } from '../../src/core/run/nodes';
+import { getRunShopStock, resolveRunCache, resolveRunEvent, resolveRunService, resolveRunShop, resolveRunShopPurchase } from '../../src/core/run/nodes';
 
 function nodeSave(type: 'CACHE' | 'REPAIR' | 'FUEL' | 'SHOP', saveId: string) {
   const save = createInitialSave({ saveId, now: 100 });
@@ -52,7 +52,7 @@ describe('run caches and road services', () => {
   });
 });
 
-describe('run shops', () => {
+describe('run road nodes', () => {
   it('offers a deterministic five-item biome stock and buys an item into at-risk cargo', () => {
     const base = nodeSave('SHOP', 'shop-stock');
     const node = base.run!.graph.layers.flat().find((candidate) => candidate.type === 'SHOP')!;
@@ -90,5 +90,76 @@ describe('run shops', () => {
     if (!closed.ok) return;
     expect(closed.save.run).toMatchObject({ phase: 'ROUTE', clearedNodeIds: [node.id], resources: { gameTimeMs: 8_000 } });
     expect(resolveRunShop(closed.save, 'shop-close')).toMatchObject({ ok: true, save: closed.save, events: [] });
+  });
+
+  it('resolves a data event once and persists its wanted and permanent faction reputation changes', () => {
+    const base = createInitialSave({ saveId: 'event-choice', now: 100 });
+    const run = createInitialRun(base, 'event-choice-seed');
+    const eventNode = run.graph.layers[3]![0]!;
+    eventNode.type = 'EVENT';
+    eventNode.eventId = 'EV02';
+    run.currentNodeId = eventNode.id;
+    run.visitedNodeIds = [eventNode.id];
+    run.phase = 'NODE';
+    const save = { ...base, run };
+
+    const result = resolveRunEvent(save, { id: 'event-hack', choiceId: 'A' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.save.run).toMatchObject({
+      phase: 'ROUTE', clearedNodeIds: [eventNode.id], wanted: 10,
+      runWallet: { CREDITS: 0, SCRAP: 0, DATA: 12 },
+      resources: { gameTimeMs: 10_000 },
+    });
+    expect(result.save.meta.reputation.F_ECHO).toBe(5);
+    expect(result.save.meta.campaignFlags).toContain('event:EV02:A');
+    expect(resolveRunEvent(result.save, { id: 'event-hack', choiceId: 'A' })).toMatchObject({ ok: true, save: result.save, events: [] });
+    expect(resolveRunEvent(result.save, { id: 'event-again', choiceId: 'A' })).toMatchObject({ ok: false, failureCode: 'NODE_NOT_EVENT' });
+  });
+
+  it('rejects an unaffordable event choice without mutating the save', () => {
+    const base = createInitialSave({ saveId: 'event-cost', now: 100 });
+    const run = createInitialRun(base, 'event-cost-seed');
+    const eventNode = run.graph.layers[3]![0]!;
+    eventNode.type = 'EVENT';
+    eventNode.eventId = 'EV03';
+    run.currentNodeId = eventNode.id;
+    run.visitedNodeIds = [eventNode.id];
+    run.phase = 'NODE';
+    const save = { ...base, run: { ...run, runWallet: { CREDITS: 0, SCRAP: 0, DATA: 0 } } };
+    const result = resolveRunEvent(save, { id: 'event-fuel-cost', choiceId: 'A' });
+    expect(result).toMatchObject({ ok: false, failureCode: 'INSUFFICIENT_FUNDS' });
+    expect(result.save).toBe(save);
+  });
+
+  it('grants event items only as unsecured run cargo and handles the supported grey-dealer exchange', () => {
+    const base = createInitialSave({ saveId: 'event-item', now: 100 });
+    const run = createInitialRun(base, 'event-item-seed');
+    const eventNode = run.graph.layers[3]![0]!;
+    eventNode.type = 'EVENT';
+    eventNode.eventId = 'EV01';
+    run.currentNodeId = eventNode.id;
+    run.visitedNodeIds = [eventNode.id];
+    run.phase = 'NODE';
+    run.runWallet = { CREDITS: 0, SCRAP: 5, DATA: 0 };
+    const save = { ...base, run };
+    const restored = resolveRunEvent(save, { id: 'event-restore', choiceId: 'A' });
+    expect(restored.ok).toBe(true);
+    if (!restored.ok) return;
+    expect(restored.save.run!.unsecuredCargo).toMatchObject([{ templateId: 'DR_GUN', rarity: 'COMMON', secured: false, origin: 'event' }]);
+    expect(restored.save.run!.runWallet.SCRAP).toBe(0);
+    expect(restored.save.meta.inventory).toHaveLength(base.meta.inventory.length);
+
+    const dealerRun = { ...createInitialRun(base, 'dealer-seed'), runWallet: { CREDITS: 100_000, SCRAP: 0, DATA: 100_000 } };
+    const dealerNode = dealerRun.graph.layers[3]![0]!;
+    dealerNode.type = 'EVENT';
+    dealerNode.eventId = 'EV13';
+    dealerRun.currentNodeId = dealerNode.id;
+    dealerRun.visitedNodeIds = [dealerNode.id];
+    dealerRun.phase = 'NODE';
+    const dealer = resolveRunEvent({ ...base, run: dealerRun }, { id: 'event-exchange', choiceId: 'B' });
+    if (!dealer.ok) throw new Error(dealer.reason);
+    if (!dealer.ok) return;
+    expect(dealer.save.run!.runWallet).toMatchObject({ CREDITS: 100_030, DATA: 100_000 - 10 });
   });
 });

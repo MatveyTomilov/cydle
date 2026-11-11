@@ -29,3 +29,4 @@
 @media(max-width:760px){.inventory-affix{grid-template-columns:minmax(0,1fr) auto auto;gap:3px}.craft-mini{font-size:6px;padding:0 4px}}
 @media(max-width:360px){.inventory-affix{grid-template-columns:1fr 1fr}.inventory-affix>span{grid-column:1/-1}}
 .shop-stock{grid-template-columns:repeat(2,minmax(0,1fr));margin:12px 0}.shop-stock .route-card{margin:0}.shop-stock .route-card>b{grid-column:1;grid-row:auto}.shop-stock .road-action-secondary{grid-column:2;grid-row:1/4;align-self:center}
+.event-choices{display:grid;gap:7px;margin-top:12px}.event-choices h3{margin:0}.event-choices p{margin:0 0 4px}.event-choice{min-height:70px}

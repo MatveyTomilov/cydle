@@ -42,6 +42,7 @@ export function createInitialRun(save: SaveGame, seed: string): RunState {
     currentNodeId: graph.startNodeId,
     visitedNodeIds: [],
     clearedNodeIds: [],
+    eventsSeen: [],
     phase: 'ROUTE',
     wanted: 0,
     revealLevel: 1,

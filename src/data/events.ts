@@ -26,7 +26,7 @@ export const EVENTS: GameEventDef[] = [
   {
     id: 'EV04', name: 'Полевой хирург', text: 'Подпольный хирург предлагает стабилизацию.',
     choices: [
-      { id: 'A', label: 'Лечение (−12 кредитов)', desc: 'Восстановить 50% потерянного HP.', cost: { CREDITS: 10 }, healMissingFraction: 0.5, special: 'healCost12' },
+      { id: 'A', label: 'Лечение (−12 кредитов)', desc: 'Восстановить 50% потерянного HP.', cost: { CREDITS: 12 }, healMissingFraction: 0.5 },
       { id: 'B', label: 'Обобрать кабинет', desc: '+8 лома, +5 розыска.', gains: { SCRAP: 8 }, scaled: true, wanted: 5 },
     ],
   },

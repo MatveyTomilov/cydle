@@ -8,6 +8,7 @@ export interface RoadNode {
   type: NodeType;
   threat: NodeThreatBand;
   enemies: EncounterEnemySpec[];
+  eventId?: string;
   prototypeChoices?: [string, string, string];
   revealLevel: number;
   lootHint: string;
@@ -55,6 +56,7 @@ export interface RunState {
   currentNodeId: string;
   visitedNodeIds: string[];
   clearedNodeIds: string[];
+  eventsSeen: string[];
   phase: RunPhase;
   resources: RunResources;
   runWallet: Wallet;
@@ -77,6 +79,7 @@ export type RunCommand =
   | { id: string; type: 'RESOLVE_COMBAT' }
   | { id: string; type: 'BUY_SHOP_ITEM'; stockIndex: number }
   | { id: string; type: 'RESOLVE_SHOP' }
+  | { id: string; type: 'RESOLVE_EVENT'; choiceId: 'A' | 'B' }
   | { id: string; type: 'CHOOSE_PROTOTYPE'; templateId: string }
   | { id: string; type: 'EQUIP_ITEM'; itemId: string; slot: EquipSlotId }
   | { id: string; type: 'UNEQUIP_ITEM'; slot: EquipSlotId }
