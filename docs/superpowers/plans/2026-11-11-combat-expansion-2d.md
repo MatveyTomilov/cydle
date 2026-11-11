@@ -62,9 +62,9 @@
 
 **Interfaces:** consume `EncounterEnemySpec.elite`; use typed elite IDs and existing status/hit/summon paths.
 
-- [ ] Test all six elite definitions: shield threshold restore, fast/HP tradeoff, every-third-hit VIRUS, telegraphed DRONE_JAM, extra penetration/windup, and bounded split on death.
-- [ ] Implement exact stat/event hooks without duplicating the defense or status pipeline.
-- [ ] Run full suite/typecheck and encounter smoke cases; commit `feat: implement elite combat modifiers`.
+- [x] Test all six elite definitions: shield threshold restore, fast/HP tradeoff, every-third-hit VIRUS, telegraphed DRONE_JAM, extra penetration/windup, and bounded split on death.
+- [x] Implement exact stat/event hooks without duplicating the defense or status pipeline.
+- [x] Run full suite/typecheck and encounter smoke cases; commit `feat: implement elite combat modifiers`.
 
 ### Task 4: Verify and hand off this combat stage
 

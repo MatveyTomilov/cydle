@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { applyStatus, createCombatState, hasStatus, stepCombat, type CombatState } from '../../src/core/combat/engine';
+import { applyStatus, createCombatState, hasStatus, statusStacks, stepCombat, type CombatState } from '../../src/core/combat/engine';
 import type { CombatConfig, TacticalProfile } from '../../src/core/combat/types';
 import { resolveBuild } from '../../src/core/build/build';
 import { createItem } from '../../src/core/items/items';
 import { Rng } from '../../src/core/rng';
+import { D, H } from '../../src/core/math/formula';
+import { mitigatePacket, ZERO_PEN } from '../../src/core/math/damage';
+import { ENEMY_BY_ID } from '../../src/data/enemies';
 
 const makeItem = (grantId: string, templateId = 'PISTOL_K1') => createItem(new Rng('loot', grantId), {
   templateId, techLevel: 1, rarity: 'COMMON', secured: true, originGrantId: grantId, origin: 'test',
@@ -22,6 +25,12 @@ const config = (seed: string, templates: string | string[], skillIds: string[] =
   build: makeBuild(skillIds), enemies: enemyIds.map((templateId) => ({ templateId })),
   tactics: { id: 'test', name: 'test', rules }, maxDurationMs,
   };
+};
+
+const eliteConfig = (seed: string, templateId: string, elite: string): CombatConfig => {
+  const result = config(seed, templateId);
+  result.enemies[0]!.elite = elite;
+  return result;
 };
 
 function until(state: CombatState, predicate: (value: CombatState) => boolean, limitMs = 20000): CombatState {
@@ -213,5 +222,149 @@ describe('enemy ability scheduler', () => {
     const hit = state.log.find((event) => event.kind === 'DAMAGE' && event.data?.abilityId === 'CORE_rail')!;
     expect(hit.timestamp).toBe(13300);
     expect(state.enemies[0]!.flags.bossCastSpeedIncrease).toBe(0.2);
+  });
+
+  it('applies elite base multipliers and EL_FAST tradeoffs', () => {
+    const state = createCombatState(eliteConfig('elite-fast', 'E01', 'EL_FAST'));
+    const elite = state.enemies[0]!;
+
+    expect(elite.hp).toBeCloseTo(elite.baseSheet.maxHP, 6);
+    expect(elite.baseSheet.maxHP).toBeCloseTo(ENEMY_BY_ID['E01']!.hp * H(2) * 1.75 * 0.9, 6);
+    expect(elite.attackDamage).toBeCloseTo(ENEMY_BY_ID['E01']!.damage * 1.25 * D(2), 6);
+    expect(elite.attackIntervalMs).toBeCloseTo(ENEMY_BY_ID['E01']!.intervalMs / 1.2, 6);
+  });
+
+  it('restores EL_SHIELD once after crossing below half HP', () => {
+    let state = createCombatState(eliteConfig('elite-shield', 'E03', 'EL_SHIELD'));
+    const elite = state.enemies[0]!;
+    expect(elite.baseSheet.maxShield).toBeCloseTo(ENEMY_BY_ID['E03']!.shield * H(2) * 1.3, 6);
+    elite.shield = 0;
+    elite.hp = elite.baseSheet.maxHP * 0.5002;
+    state.operator.nextAttackAt = 100;
+    state.operator.baseSheet.accuracy = 1e9;
+    state.build.mainWeapon!.damage = 1;
+    state = stepCombat(state);
+    expect(state.enemies[0]!.shield).toBe(20);
+    state = stepCombat(state);
+    expect(state.enemies[0]!.shield).toBe(20);
+  });
+
+  it('EL_VIRUS adds digital resistance and applies VIRUS on every third hit', () => {
+    let state = createCombatState(eliteConfig('elite-virus', 'E01', 'EL_VIRUS'));
+    const elite = state.enemies[0]!;
+    expect(elite.baseSheet.digitalRes).toBe(ENEMY_BY_ID['E01']!.resD + 10);
+    state.operator.hp = 10000;
+    state.operator.baseSheet.evasion = 0;
+    elite.baseSheet.accuracy = 1e9;
+    elite.attackIntervalMs = 100;
+    elite.nextAttackAt = 100;
+    state = until(state, (x) => x.metrics.hits >= 3, 1000);
+
+    expect(hasStatus(state.operator, 'VIRUS')).toBe(true);
+    expect(state.enemies[0]!.flags.virusDirectHitCount).toBe(3);
+  });
+
+  it('E14 applies VIRUS on every third successful hit', () => {
+    let state = createCombatState(config('e14-third-hit', 'E14'));
+    state.operator.hp = 10000;
+    state.operator.baseSheet.evasion = 0;
+    state.enemies[0]!.baseSheet.accuracy = 1e9;
+    state.enemies[0]!.attackIntervalMs = 100;
+    state.enemies[0]!.nextAttackAt = 100;
+    state = until(state, (x) => x.metrics.hits >= 3, 1000);
+
+    expect(hasStatus(state.operator, 'VIRUS')).toBe(true);
+    expect(state.enemies[0]!.flags.virusDirectHitCount).toBe(3);
+  });
+
+  it('EL_ANTI_DRONE telegraphs and applies its timed drone jam', () => {
+    const combatConfig = eliteConfig('elite-anti-drone', 'E01', 'EL_ANTI_DRONE');
+    const droneBuild = makeBuild([], true);
+    let state = createCombatState({ ...combatConfig, build: droneBuild });
+    state.operator.hp = 10000;
+    state.operator.nextAttackAt = 30000;
+    state.drones.forEach((drone) => { drone.nextAttackAt = 30000; });
+    state.enemies[0]!.nextAttackAt = 30000;
+    state = until(state, (x) => hasStatus(x.drones[0]!, 'DRONE_JAM'), 11000);
+
+    const telegraph = state.log.find((event) => event.kind === 'TELEGRAPH' && event.data?.abilityId === 'EL_ANTI_DRONE_jam')!;
+    expect(telegraph.timestamp).toBe(8000);
+    expect(state.log.find((event) => event.kind === 'STATUS_APPLY' && event.statusId === 'DRONE_JAM')?.timestamp).toBe(9200);
+  });
+
+  it('EL_PEN adds armor penetration and a 200 ms basic-attack windup', () => {
+    let state = createCombatState(eliteConfig('elite-pen', 'E01', 'EL_PEN'));
+    const elite = state.enemies[0]!;
+    state.operator.hp = 10000;
+    state.operator.baseSheet.armor = 30;
+    elite.baseSheet.accuracy = 1e9;
+    elite.nextAttackAt = 100;
+    state = until(state, (x) => x.log.some((event) => event.kind === 'DAMAGE' && event.actorId === 'enemy:0'), 1000);
+    const cast = state.log.find((event) => event.kind === 'CAST_START' && event.actorId === 'enemy:0')!;
+    const hit = state.log.find((event) => event.kind === 'DAMAGE' && event.actorId === 'enemy:0')!;
+
+    expect(cast.data?.windupMs).toBe(200);
+    expect(hit.timestamp).toBe(300);
+    const expected = mitigatePacket(hit.amountBeforeDefense!, 'KINETIC', { armor: 30, energyRes: 0, digitalRes: 0 }, { ...ZERO_PEN, armorPen: 10 }).afterDefense;
+    expect(hit.amountAfterDefense!).toBeCloseTo(expected, 6);
+  });
+
+  it('EL_SPLIT creates exactly two half-HP E20 summons with no loot', () => {
+    let state = createCombatState(eliteConfig('elite-split', 'E01', 'EL_SPLIT'));
+    state.enemies[0]!.hp = 0;
+    state = stepCombat(state);
+    const splits = state.enemies.filter((enemy) => enemy.summoned && enemy.templateId === 'E20');
+
+    expect(splits).toHaveLength(2);
+    expect(splits.every((enemy) => enemy.noLoot && enemy.hp === enemy.baseSheet.maxHP * 0.5)).toBe(true);
+    expect(state.log.filter((event) => event.kind === 'SUMMON' && event.actorId === 'enemy:0')).toHaveLength(2);
+  });
+
+  it('E18 applies SHIELD_LEAK on its first successful direct hit', () => {
+    let state = createCombatState(config('e18-first-hit', 'E18'));
+    state.operator.hp = 10000;
+    state.operator.baseSheet.evasion = 0;
+    state.enemies[0]!.baseSheet.accuracy = 1e9;
+    state.enemies[0]!.nextAttackAt = 100;
+    state = until(state, (x) => hasStatus(x.operator, 'SHIELD_LEAK'), 2000);
+    expect(state.log.filter((event) => event.kind === 'STATUS_APPLY' && event.statusId === 'SHIELD_LEAK')).toHaveLength(1);
+  });
+
+  it('E23 gains one capped BERSERK stack when an enemy ally dies', () => {
+    let state = createCombatState(config('e23-ally-death', ['E23', 'E01']));
+    state.enemies[1]!.hp = 0;
+    state = stepCombat(state);
+    expect(statusStacks(state.enemies[0]!, 'BERSERK')).toBe(1);
+  });
+
+  it('E19 retains its telegraphed death burst until resolution', () => {
+    let state = createCombatState(config('e19-death-burst', 'E19', [], [], 10000));
+    state.operator.hp = 10000;
+    state.operator.baseSheet.evasion = 0;
+    state.enemies[0]!.hp = 0;
+    state = stepCombat(state);
+    expect(state.outcome).toBeNull();
+    expect(state.log.find((event) => event.kind === 'TELEGRAPH' && event.data?.abilityId === 'E19_death')?.timestamp).toBe(100);
+    state = until(state, (x) => x.log.some((event) => event.kind === 'DAMAGE' && event.data?.abilityId === 'E19_death'), 2000);
+    expect(state.log.find((event) => event.kind === 'DAMAGE' && event.data?.abilityId === 'E19_death')?.timestamp).toBe(1300);
+  });
+
+  it('E24 punishes three consecutive casts of the same program with JAM', () => {
+    let state = createCombatState(config('e24-repeat-program', 'E24', ['SK_BURST'], [{
+      id: 'repeat-burst', priority: 1, enabled: true, skillId: 'SK_BURST', target: 'nearest', conditions: [], logic: 'AND',
+    }]));
+    state.operator.nextAttackAt = 100;
+    state.operator.hp = 10000;
+    state.enemies[0]!.nextAttackAt = 30000;
+    state.enemies[0]!.hp = 10000;
+
+    while (state.log.filter((event) => event.kind === 'CAST_START' && event.skillId === 'SK_BURST').length < 3 && state.timeMs < 3000) {
+      if (state.operator.cast?.skillId === 'SK_BURST') state.operator.cooldowns.SK_BURST = state.timeMs;
+      state = stepCombat(state);
+    }
+
+    expect(state.log.filter((event) => event.kind === 'CAST_START' && event.skillId === 'SK_BURST')).toHaveLength(3);
+    expect(hasStatus(state.operator, 'JAM')).toBe(true);
+    expect(state.log.find((event) => event.kind === 'STATUS_APPLY' && event.statusId === 'JAM')?.timestamp).toBe(900);
   });
 });

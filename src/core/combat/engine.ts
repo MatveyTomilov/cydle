@@ -4,7 +4,7 @@
  * Вся математика урона проходит через math/damage.ts ровно один раз.
  * Никакого Math.random, настенных часов и глобальных счётчиков событий.
  */
-import { ENEMY_BY_ID, BOSS_BY_ID, enemyTemplate } from '../../data/enemies';
+import { ENEMY_BY_ID, BOSS_BY_ID, ELITE_MODS, enemyTemplate } from '../../data/enemies';
 import { ITEM_BY_ID } from '../../data/items';
 import { SKILL_BY_ID } from '../../data/skills';
 import { UNIQUE_TEMPLATE_BY_ID } from '../../data/uniques';
@@ -125,6 +125,10 @@ function createEnemyActor(spec: { templateId: string; hpMult?: number; damageMul
   const t = enemyTemplate(spec.templateId);
   if (!t) throw new Error(`Неизвестный шаблон врага: ${spec.templateId}`);
   const sheet = enemySheet(t, depth, extraDigitalBonus);
+  if (spec.elite) sheet.maxHP *= 1.75;
+  if (spec.elite === 'EL_FAST') sheet.maxHP *= 0.9;
+  if (spec.elite === 'EL_SHIELD') sheet.maxShield *= 1.3;
+  if (spec.elite === 'EL_VIRUS') sheet.digitalRes += 10;
   const hp = sheet.maxHP * (spec.hpMult ?? 1);
   const actor = baseActor({
     id: `enemy:${index}`, kind: t.role === 'boss' ? 'boss' : 'enemy', side: 'enemy',
@@ -132,14 +136,14 @@ function createEnemyActor(spec: { templateId: string; hpMult?: number; damageMul
     isMechanical: t.mechanical, isHealer: t.healer,
     hp, shield: sheet.maxShield, baseSheet: sheet,
     baseMods: sheetOverrideMods(sheet, { id: `enemy:${t.id}`, name: t.name, kind: 'enemy' }),
-    attackDamage: t.damage * D(depth) * (spec.damageMult ?? 1),
-    attackIntervalMs: t.intervalMs, attackType: t.type,
+    attackDamage: t.damage * D(depth) * (spec.damageMult ?? 1) * (spec.elite ? 1.25 : 1),
+    attackIntervalMs: t.intervalMs / (spec.elite === 'EL_FAST' ? 1.2 : 1), attackType: t.type,
     accuracyBase: sheet.accuracy, threatUnits: t.threatUnits,
-    nextAttackAt: t.intervalMs,
+    nextAttackAt: t.intervalMs / (spec.elite === 'EL_FAST' ? 1.2 : 1),
     summoned: spec.summoned, noLoot: spec.noLoot, eliteMod: spec.elite,
   });
   actor.flags.lastDamagedAt = -100000;
-  for (const ability of [...t.abilities, ...('rotating' in t ? t.rotating ?? [] : [])]) actor.abilityNext[ability.id] = ability.firstAtMs;
+  for (const ability of actorAbilities(actor)) actor.abilityNext[ability.id] = ability.firstAtMs;
   return actor;
 }
 
@@ -213,6 +217,7 @@ export function createCombatState(config: CombatConfig): CombatState {
     if (!ENEMY_BY_ID[spec.templateId] && !BOSS_BY_ID[spec.templateId]) {
       throw new Error(`Неизвестный шаблон врага: ${spec.templateId}`);
     }
+    if (spec.elite && !ELITE_MODS.some((elite) => elite.id === spec.elite)) throw new Error(`Неизвестный элитный модификатор: ${spec.elite}`);
   }
   const extraDigital = config.extraEnemyDigitalBonus ?? 0;
   const operator = createOperator(config.build, config);
@@ -383,7 +388,7 @@ function defenseOf(state: CombatState, actor: CombatActor): DefenseSnapshot {
 function penOf(state: CombatState, actor: CombatActor): PenetrationSnapshot {
   const s = eff(state, actor);
   return {
-    armorPen: s.armorPen, armorPenPercent: s.armorPenPercent,
+    armorPen: s.armorPen + state.elitePen + (actor.eliteMod === 'EL_PEN' ? 10 : 0), armorPenPercent: s.armorPenPercent,
     energyPen: s.energyPen, energyPenPercent: s.energyPenPercent,
     digitalPen: s.digitalPen, digitalPenPercent: s.digitalPenPercent,
   };
@@ -410,6 +415,36 @@ function incomingMultiplier(state: CombatState, target: CombatActor, type: Damag
   const s = eff(state, target);
   const typeMult = type === 'KINETIC' ? s.incomingKinetic : type === 'ENERGY' ? s.incomingEnergy : s.incomingDigital;
   return s.incomingAll * typeMult;
+}
+
+function restoreEliteShield(state: CombatState, target: CombatActor): void {
+  if (target.side !== 'enemy' || target.eliteMod !== 'EL_SHIELD' || target.hp <= 0
+    || target.hp / Math.max(1, target.baseSheet.maxHP) >= 0.5 || target.flags.eliteShieldRestored) return;
+  target.flags.eliteShieldRestored = 1;
+  const before = target.shield;
+  target.shield = clamp(target.shield + 20, 0, eff(state, target).maxShield);
+  emit(state, 'SHIELD_GAIN', target.id, {
+    text: `${target.name}: элитный щит +${(target.shield - before).toFixed(1)}.`,
+    data: { amount: target.shield - before, trigger: 'EL_SHIELD' },
+  });
+}
+
+function resolveDirectHitTriggers(state: CombatState, source: CombatActor, target: CombatActor, actionId: string, raw: number): void {
+  if (raw < 0) return;
+  if (source.side === 'enemy' && target.side === 'player') {
+    const leak = actorAbilities(source).find((ability) => ability.id === 'E18_leak');
+    if (leak && !source.flags.E18_leak_triggered && leak.status) {
+      source.flags.E18_leak_triggered = 1;
+      applyStatus(state, source, target, leak.status, { durationMs: leak.statusDurationMs, actionId });
+    }
+    if (source.templateId === 'E14' || source.eliteMod === 'EL_VIRUS') {
+      source.flags.virusDirectHitCount = (source.flags.virusDirectHitCount ?? 0) + 1;
+      if (source.flags.virusDirectHitCount % 3 === 0) {
+        applyStatus(state, source, target, 'VIRUS', { stacks: 1, actionId });
+      }
+    }
+  }
+  restoreEliteShield(state, target);
 }
 
 /** Скорость действий: SHOCK −30%, DRONE_JAM у дрона −50%. */
@@ -506,6 +541,7 @@ function tickStatuses(state: CombatState): void {
         const incoming = mitigated.afterDefense * incomingMultiplier(state, actor, def.damageType);
         const partition = partitionDamage(incoming, { hp: actor.hp, shield: actor.shield, temp: actor.tempShields }, 0, eff(state, actor).incomingShield);
         applyPartition(actor, partition);
+        restoreEliteShield(state, actor);
         actor.flags.lastDamagedAt = state.timeMs;
         state.metrics.statusTicks++;
         const dealt = partition.shieldConsumed + partition.hpLost;
@@ -694,10 +730,11 @@ function applyHit(state: CombatState, rng: Rng, actor: CombatActor, target: Comb
     text: `${actor.name} → ${target.name}: ${incoming.toFixed(1)} ${type}${crit ? ' (крит)' : ''}, щит −${partition.shieldConsumed.toFixed(1)}, HP −${partition.hpLost.toFixed(1)}.`,
     data: { overkill: partition.overkill, ...(opts.abilityId ? { abilityId: opts.abilityId } : {}) },
   });
+  resolveDirectHitTriggers(state, actor, target, opts.actionId ?? '', raw);
   return raw;
 }
 
-function resolveAttack(state: CombatState, rng: Rng, actor: CombatActor): void {
+function resolveAttack(state: CombatState, rng: Rng, actor: CombatActor, preparedActionId?: string): void {
   const target = pickAutoTarget(state, actor);
   if (!target) return;
   const isOperator = actor.kind === 'operator';
@@ -718,8 +755,8 @@ function resolveAttack(state: CombatState, rng: Rng, actor: CombatActor): void {
     if (hasStatus(actor, 'OVERCLOCK')) heatGain += 5;
     if (heatGain > 0) actor.heat = clamp(actor.heat + heatGain, 0, as.maxHeat);
   }
-  actor.counters.attacks = (actor.counters.attacks ?? 0) + 1;
-  const actionId = `${actor.id}:atk:${actor.counters.attacks}`;
+  if (!preparedActionId) actor.counters.attacks = (actor.counters.attacks ?? 0) + 1;
+  const actionId = preparedActionId ?? `${actor.id}:atk:${actor.counters.attacks}`;
   actor.lastMainAttackAt = state.timeMs;
   emit(state, 'ATTACK', actor.id, { targetId: target.id, actionId, text: `${actor.name} атакует ${target.name}.` });
 
@@ -916,6 +953,25 @@ function selectMainRule(state: CombatState, actor: CombatActor): MainChoice {
 /* Касты активных умений (Windup → Resolve → Recovery → Ready)         */
 /* ------------------------------------------------------------------ */
 
+function recordJudgeProgram(state: CombatState, skillId: string | null, actionId: string): void {
+  for (const judge of state.enemies.filter((enemy) => enemy.alive && enemy.templateId === 'E24')) {
+    const punish = actorAbilities(judge).find((ability) => ability.kind === 'jamPunish');
+    if (!skillId || !punish?.status) {
+      judge.observedProgramId = undefined;
+      judge.observedProgramCount = 0;
+      continue;
+    }
+    judge.observedProgramCount = judge.observedProgramId === skillId ? (judge.observedProgramCount ?? 0) + 1 : 1;
+    judge.observedProgramId = skillId;
+    if (judge.observedProgramCount >= 3) {
+      applyStatus(state, judge, state.operator, punish.status, {
+        durationMs: punish.statusDurationMs, actionId,
+      });
+      judge.observedProgramCount = 0;
+    }
+  }
+}
+
 function startSkillCast(state: CombatState, actor: CombatActor, skill: SkillDef, target: CombatActor | undefined): void {
   const s = eff(state, actor);
   const cost = skillEnergyCost(state, actor, skill);
@@ -934,6 +990,7 @@ function startSkillCast(state: CombatState, actor: CombatActor, skill: SkillDef,
   if (skill.channel === 'reaction') actor.reactionCast = cast;
   else actor.cast = cast;
   actor.lastSkillId = skill.id;
+  if (actor.kind === 'operator') recordJudgeProgram(state, skill.id, actionId);
   if (target) actor.lastTargetId = target.id;
   if (skill.channel === 'main') actor.nextAttackAt = cast.endAt;
   emit(state, 'CAST_START', actor.id, {
@@ -962,7 +1019,13 @@ function castTarget(state: CombatState, actor: CombatActor, cast: CastState): Co
 
 function actorAbilities(actor: CombatActor): EnemyAbility[] {
   const template = enemyTemplate(actor.templateId);
-  return [...template.abilities, ...('rotating' in template ? template.rotating ?? [] : [])];
+  const abilities = [...template.abilities, ...('rotating' in template ? template.rotating ?? [] : [])];
+  if (actor.eliteMod === 'EL_ANTI_DRONE') abilities.push({
+    id: 'EL_ANTI_DRONE_jam', kind: 'applyStatus', firstAtMs: 8000, everyMs: 8000,
+    windupMs: 1200, telegraphMs: 1200, interruptible: true,
+    status: 'DRONE_JAM', statusDurationMs: 2000, desc: 'Элитная помеха дронам',
+  });
+  return abilities;
 }
 
 function isScheduledAbility(ability: EnemyAbility): boolean {
@@ -979,7 +1042,8 @@ function readyEnemyAbility(state: CombatState, actor: CombatActor): EnemyAbility
 
 function startEnemyAbility(state: CombatState, actor: CombatActor, ability: EnemyAbility): void {
   const castSpeed = Math.max(0, actor.flags.bossCastSpeedIncrease ?? 0);
-  const windup = Math.max(0, ability.windupMs * state.enemyWindupMult / (1 + castSpeed));
+  const eliteWindup = actor.eliteMod === 'EL_PEN' ? 200 : 0;
+  const windup = Math.max(0, (ability.windupMs * state.enemyWindupMult + eliteWindup) / (1 + castSpeed));
   actor.counters.abilities = (actor.counters.abilities ?? 0) + 1;
   const actionId = `${actor.id}:ability:${ability.id}:${actor.counters.abilities}`;
   const cast: CastState = {
@@ -1007,7 +1071,7 @@ function startEnemyAbility(state: CombatState, actor: CombatActor, ability: Enem
 
 const MAX_SUMMONED_ENEMIES = 2;
 
-function spawnSummonedEnemy(state: CombatState, owner: CombatActor, templateId: string): CombatActor | undefined {
+function spawnSummonedEnemy(state: CombatState, owner: CombatActor, templateId: string, hpMult = 1): CombatActor | undefined {
   const livingSummons = state.enemies.filter((enemy) => enemy.alive && enemy.summoned).length;
   if (livingSummons >= MAX_SUMMONED_ENEMIES) {
     emit(state, 'CAST_FIZZLE', owner.id, { reason: 'summon_cap', text: `${owner.name}: лимит призывов достигнут.`, data: { templateId, summonCap: MAX_SUMMONED_ENEMIES } });
@@ -1017,7 +1081,7 @@ function spawnSummonedEnemy(state: CombatState, owner: CombatActor, templateId: 
     emit(state, 'CAST_FIZZLE', owner.id, { reason: 'unknown_summon', text: `${owner.name}: неизвестный призыв ${templateId}.` });
     return undefined;
   }
-  const summon = createEnemyActor({ templateId, summoned: true, noLoot: true }, state.enemies.length, state.depth, state.extraEnemyDigitalBonus);
+  const summon = createEnemyActor({ templateId, hpMult, summoned: true, noLoot: true }, state.enemies.length, state.depth, state.extraEnemyDigitalBonus);
   summon.id = `enemy:${state.enemies.length}`;
   summon.ownerId = owner.id;
   summon.nextAttackAt = state.timeMs + summon.attackIntervalMs;
@@ -1187,6 +1251,14 @@ function resolveEnemyAbility(state: CombatState, rng: Rng, actor: CombatActor, c
       emit(state, 'SHIELD_GAIN', actor.id, { actionId: cast.actionId, text: `${actor.name}: щит +${(actor.shield - before).toFixed(1)}.`, data: { abilityId: ability.id, amount: actor.shield - before } });
       break;
     }
+    case 'deathBurst': {
+      const target = playerTarget(cast.targetId ?? undefined);
+      if (!target) return;
+      applyHit(state, rng, actor, target, ability.damage ?? 0, ability.damageType ?? actor.attackType, {
+        actionId: cast.actionId, isMain: false, procWeight: 0, abilityId: ability.id,
+      });
+      break;
+    }
     default:
       abilityEvent(`${actor.name}: ${ability.desc}`);
   }
@@ -1195,7 +1267,7 @@ function resolveEnemyAbility(state: CombatState, rng: Rng, actor: CombatActor, c
 /** Продвижение активных кастов: STUN приостанавливает, resolveAt разрешает эффект, endAt освобождает канал. */
 function advanceCasts(state: CombatState, rng: Rng): void {
   for (const actor of allActors(state)) {
-    if (!actor.alive || !actor.cast) continue;
+    if ((!actor.alive && actor.cast?.abilityId !== 'E19_death') || !actor.cast) continue;
     const cast = actor.cast;
     if (hasStatus(actor, 'STUN')) {
       cast.resolveAt += TICK_MS;
@@ -1205,7 +1277,10 @@ function advanceCasts(state: CombatState, rng: Rng): void {
     }
     if (!cast.resolved && state.timeMs >= cast.resolveAt) {
       cast.resolved = true;
-      if (cast.abilityId) resolveEnemyAbility(state, rng, actor, cast);
+      if (cast.basicAttack) {
+        resolveAttack(state, rng, actor, cast.actionId);
+        scheduleNextAttack(state, actor);
+      } else if (cast.abilityId) resolveEnemyAbility(state, rng, actor, cast);
       else if (cast.skillId) resolveSkillCast(state, rng, actor, cast);
     }
     if (state.timeMs >= cast.endAt) actor.cast = null;
@@ -1418,6 +1493,22 @@ function resolveSkillCast(state: CombatState, rng: Rng, actor: CombatActor, cast
 }
 
 function startAutoAttack(state: CombatState, rng: Rng, actor: CombatActor): void {
+  if (actor.kind === 'operator') recordJudgeProgram(state, null, `${actor.id}:auto:${state.timeMs}`);
+  if (actor.side === 'enemy' && actor.eliteMod === 'EL_PEN') {
+    actor.counters.attacks = (actor.counters.attacks ?? 0) + 1;
+    const actionId = `${actor.id}:atk:${actor.counters.attacks}`;
+    actor.cast = {
+      actionId, skillId: null, startedAt: state.timeMs,
+      resolveAt: state.timeMs + 200, endAt: state.timeMs + 200,
+      targetId: pickAutoTarget(state, actor)?.id ?? null,
+      interruptible: false, telegraph: false, channel: 'main', basicAttack: true,
+    };
+    emit(state, 'CAST_START', actor.id, {
+      targetId: actor.cast.targetId ?? undefined, actionId,
+      text: `${actor.name} замахивается.`, data: { basicAttack: true, windupMs: 200 },
+    });
+    return;
+  }
   resolveAttack(state, rng, actor);
   scheduleNextAttack(state, actor);
 }
@@ -1472,6 +1563,34 @@ function resolveDeaths(state: CombatState): void {
     if (actor.side === 'enemy') {
       state.metrics.kills++;
       state.metrics.ttk.push({ enemyId: actor.id, name: actor.name, ms: state.timeMs });
+      if (actor.eliteMod === 'EL_SPLIT') {
+        spawnSummonedEnemy(state, actor, 'E20', 0.5);
+        spawnSummonedEnemy(state, actor, 'E20', 0.5);
+      }
+      const deathBurst = actorAbilities(actor).find((ability) => ability.kind === 'deathBurst');
+      if (deathBurst) {
+        const windup = Math.max(deathBurst.windupMs, deathBurst.telegraphMs);
+        const actionId = `${actor.id}:death:${deathBurst.id}`;
+        actor.cast = {
+          actionId, skillId: null, abilityId: deathBurst.id, startedAt: state.timeMs,
+          resolveAt: state.timeMs + windup, endAt: state.timeMs + windup,
+          targetId: state.operator.alive ? state.operator.id : null,
+          interruptible: false, telegraph: deathBurst.telegraphMs > 0, channel: 'main',
+        };
+        emit(state, 'CAST_START', actor.id, {
+          targetId: actor.cast.targetId ?? undefined, actionId,
+          text: `${actor.name}: ${deathBurst.desc}`,
+          data: { abilityId: deathBurst.id, windupMs: windup, interruptible: false, deathBurst: true },
+        });
+        if (actor.cast.telegraph) emit(state, 'TELEGRAPH', actor.id, {
+          targetId: actor.cast.targetId ?? undefined, actionId,
+          text: `${actor.name}: ${deathBurst.desc}`,
+          data: { abilityId: deathBurst.id, dangerTag: deathBurst.kind, windupMs: windup },
+        });
+      }
+      for (const ally of state.enemies.filter((enemy) => enemy.alive && enemy.templateId === 'E23')) {
+        applyStatus(state, ally, ally, 'BERSERK', { stacks: 1 });
+      }
     }
     if (actor.kind === 'drone') state.metrics.droneDeaths++;
   }
@@ -1481,7 +1600,8 @@ function checkTerminal(state: CombatState): void {
   if (state.outcome) return;
   if (!state.operator.alive) {
     state.outcome = 'DEFEAT';
-  } else if (!state.enemies.some((e) => e.alive)) {
+  } else if (!state.enemies.some((e) => e.alive)
+    && !state.enemies.some((e) => e.cast?.abilityId === 'E19_death' && !e.cast.resolved)) {
     state.outcome = 'VICTORY';
   } else if (state.timeMs >= state.maxDurationMs) {
     state.outcome = 'TIMEOUT';

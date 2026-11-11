@@ -22,4 +22,4 @@ The normative design source is `CYDLE_MASTER_SPEC.md` v2.0. This roadmap records
 
 ## Active work
 
-Stage 2d tasks 1–2 are implemented on `development/luna`: timed enemy abilities, boss threshold effects, CORE's timed rotation, and shield bypass through the shared damage path. Typecheck passes and 79 unit tests pass. Remaining work in this stage is event-driven enemy behavior and elite modifiers; see `docs/superpowers/plans/2026-11-11-combat-expansion-2d.md`. Do not mark a roadmap item complete until its code, tests, and interactions work.
+Stage 2d tasks 1–3 are implemented on `development/luna`: timed enemy abilities, boss threshold effects/CORE rotation, all six elite modifiers, and cataloged event-driven enemy behaviors. Typecheck passes and 90 unit tests pass. Remaining work is adversarial verification of death ordering, target loss, summon caps, and determinism; then stage 2e drone abilities and bounded triggers. See `docs/superpowers/plans/2026-11-11-combat-expansion-2d.md`. Do not mark a roadmap item complete until its code, tests, and interactions work.

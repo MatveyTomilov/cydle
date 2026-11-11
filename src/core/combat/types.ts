@@ -41,6 +41,7 @@ export interface CastState {
   dangerTag?: string;
   channel: Channel;
   abilityId?: string;
+  basicAttack?: boolean;
   resolved?: boolean;
 }
 
@@ -100,6 +101,8 @@ export interface CombatActor {
   sameTargetHits: number;
   lastSkillId: string | null;
   sameSkillCount: number;
+  observedProgramId?: string;
+  observedProgramCount?: number;
   lastDigitalSkill: { skillId: string; targetId: string } | null;
   shieldSpentWindow: number[];
   energyGainWindow: number[];
