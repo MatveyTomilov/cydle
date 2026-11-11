@@ -3,7 +3,7 @@ import { applyStatus, createCombatState, hasStatus, statusStacks, stepCombat, ty
 import type { CombatConfig, TacticalProfile } from '../../src/core/combat/types';
 import { resolveBuild } from '../../src/core/build/build';
 import { createItem } from '../../src/core/items/items';
-import { Rng } from '../../src/core/rng';
+import { Rng, stateHash } from '../../src/core/rng';
 import { D, H } from '../../src/core/math/formula';
 import { mitigatePacket, ZERO_PEN } from '../../src/core/math/damage';
 import { ENEMY_BY_ID } from '../../src/data/enemies';
@@ -344,8 +344,12 @@ describe('enemy ability scheduler', () => {
     state.enemies[0]!.hp = 0;
     state = stepCombat(state);
     expect(state.outcome).toBeNull();
+    expect(state.log.findIndex((event) => event.kind === 'DEATH' && event.actorId === 'enemy:0'))
+      .toBeLessThan(state.log.findIndex((event) => event.kind === 'TELEGRAPH' && event.data?.abilityId === 'E19_death'));
     expect(state.log.find((event) => event.kind === 'TELEGRAPH' && event.data?.abilityId === 'E19_death')?.timestamp).toBe(100);
     state = until(state, (x) => x.log.some((event) => event.kind === 'DAMAGE' && event.data?.abilityId === 'E19_death'), 2000);
+    expect(state.log.findIndex((event) => event.kind === 'TELEGRAPH' && event.data?.abilityId === 'E19_death'))
+      .toBeLessThan(state.log.findIndex((event) => event.kind === 'DAMAGE' && event.data?.abilityId === 'E19_death'));
     expect(state.log.find((event) => event.kind === 'DAMAGE' && event.data?.abilityId === 'E19_death')?.timestamp).toBe(1300);
   });
 
@@ -366,5 +370,70 @@ describe('enemy ability scheduler', () => {
     expect(state.log.filter((event) => event.kind === 'CAST_START' && event.skillId === 'SK_BURST')).toHaveLength(3);
     expect(hasStatus(state.operator, 'JAM')).toBe(true);
     expect(state.log.find((event) => event.kind === 'STATUS_APPLY' && event.statusId === 'JAM')?.timestamp).toBe(900);
+  });
+
+  it('lets a reaction interrupt an enemy cast on the exact resolve tick', () => {
+    let state = createCombatState(config('interrupt-resolve-tick', 'E07', ['SK_EMP']));
+    state.operator.nextAttackAt = 30000;
+    state.enemies[0]!.nextAttackAt = 30000;
+    state.enemies[0]!.baseSheet.accuracy = 1e9;
+    state = until(state, (x) => x.log.some((event) => event.kind === 'TELEGRAPH' && event.actorId === 'enemy:0'));
+    const resolveAt = state.enemies[0]!.cast!.resolveAt;
+    while (state.timeMs < resolveAt - 100) state = stepCombat(state);
+    state.operator.reactionCast = {
+      actionId: 'operator:skill:SK_EMP:resolve-tick', skillId: 'SK_EMP', startedAt: state.timeMs,
+      resolveAt, endAt: resolveAt, targetId: 'enemy:0', interruptible: false, telegraph: false, channel: 'reaction',
+    };
+    state = stepCombat(state);
+
+    expect(state.log.find((event) => event.kind === 'CAST_INTERRUPT')?.timestamp).toBe(resolveAt);
+    expect(state.log.some((event) => event.kind === 'DAMAGE' && event.data?.abilityId === 'E07_shell')).toBe(false);
+  });
+
+  it('retargets a boss ability to a living drone if the telegraphed operator target is lost', () => {
+    const combatConfig = config('boss-target-loss', 'BOSS_B');
+    combatConfig.build = makeBuild([], true);
+    let state = createCombatState(combatConfig);
+    state.operator.hp = 10000;
+    state.operator.nextAttackAt = 30000;
+    state.drones.forEach((drone) => { drone.nextAttackAt = 30000; });
+    state.enemies[0]!.nextAttackAt = 30000;
+    state.enemies[0]!.baseSheet.accuracy = 1e9;
+    state = until(state, (x) => x.log.some((event) => event.kind === 'TELEGRAPH' && event.data?.abilityId === 'BOSS_B_scalpel'), 12000);
+    state.enemies[0]!.cast!.targetId = 'lost-target';
+    state = until(state, (x) => x.log.some((event) => event.kind === 'DAMAGE' && event.data?.abilityId === 'BOSS_B_scalpel'), 14000);
+
+    expect(state.log.find((event) => event.kind === 'DAMAGE' && event.data?.abilityId === 'BOSS_B_scalpel')?.targetId).toBe('drone:0');
+  });
+
+  it('enforces the two-living-summon cap when a boss phase summons', () => {
+    let state = createCombatState(config('boss-summon-cap', ['BOSS_A', 'E20', 'E20']));
+    state.enemies[0]!.hp = state.enemies[0]!.baseSheet.maxHP * 0.69;
+    state.enemies[0]!.nextAttackAt = 30000;
+    for (const summon of state.enemies.slice(1)) {
+      summon.summoned = true;
+      summon.noLoot = true;
+      summon.nextAttackAt = 30000;
+    }
+    state.operator.nextAttackAt = 30000;
+    state = stepCombat(state);
+
+    expect(state.enemies.filter((enemy) => enemy.alive && enemy.summoned)).toHaveLength(2);
+    expect(state.log.filter((event) => event.kind === 'CAST_FIZZLE' && event.reason === 'summon_cap')).toHaveLength(1);
+  });
+
+  it('keeps enemy AI deterministic and does not mutate an input snapshot', () => {
+    const initial = createCombatState(config('enemy-ai-purity', 'E14'));
+    const untouched = structuredClone(initial);
+    let first = initial;
+    let second = initial;
+    for (let i = 0; i < 120; i++) {
+      first = stepCombat(first);
+      second = stepCombat(second);
+    }
+
+    expect(initial).toEqual(untouched);
+    expect(stateHash(first)).toBe(stateHash(second));
+    expect(first.log).toEqual(second.log);
   });
 });

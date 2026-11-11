@@ -68,6 +68,6 @@
 
 ### Task 4: Verify and hand off this combat stage
 
-- [ ] Run typecheck and full unit tests; inspect determinism, input mutation, death ordering, cap behavior, and event order.
-- [ ] Run production build and record the expected missing real app entrypoint.
-- [ ] Update `HANDOFF.md` and `docs/ROADMAP.md`; commit the verified stage.
+- [x] Run typecheck and full unit tests; inspect determinism, input mutation, death ordering, cap behavior, and event order.
+- [x] Run production build and record the expected missing real app entrypoint.
+- [x] Update `HANDOFF.md` and `docs/ROADMAP.md`; commit the verified stage.
