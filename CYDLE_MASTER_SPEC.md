@@ -347,7 +347,7 @@ slot type означает совместимый тип посадочного 
 
 Редкости: COMMON (0 аффиксов), MODIFIED (1–2), RARE (3–4), LEGENDARY (4–5 плюс более высокие диапазоны), UNIQUE (фиксированный уникальный эффект и 0–2 заявленных свойства; не просто «самые большие цифры»). При генерации COMMON всегда 0; MODIFIED chooses 1/2 evenly; RARE 3/4 evenly; LEGENDARY 4/5 evenly. Slot/affix incompatibility check до ролла; если кандидатный аффикс невалиден, исключить и выбрать из оставшихся. Не выбирать случайно, пока RNG не попадёт «правильно».
 
-**Аффикс tiers по T:** T1–4 tier1; T5–8 tier2; T9–12 tier3; T13+ tier4. Для редкой/легендарной экипировки 20% роллов могут получить tier выше максимального для указанного T, но не более tier4; повышенная возможность явно отражена в roll details. Значения от tier1 до tier4 перечислены в таблицах; вместо повторного roll значений внутри tier допускается min..max равномерный конкретный roll и он сохраняется в item instance.
+**Аффикс tiers по T:** T1–4 tier1; T5–8 tier2; T9–12 tier3; T13+ tier4. Для редкой/легендарной экипировки 20% роллов могут получить tier выше максимального для указанного T, но не более tier4; повышенная возможность явно отражена в roll details. Значения аффиксов в таблице — ЦЕНТР ролла tier. Конкретный roll = tierValue × uniform(0.80,1.20), затем округление до 2 десятичных знаков и сохранение в ItemInstance. Целочисленные бонусы (flat armor, capacity, evasion, accuracy, cargo) округляются до ближайшего целого (минимум +1 при положительном ролле); AF_SCAN имеет фиксированное целое tierValue без random. Операция изменения roll за TR3 повторяет бросок в том же tier, не меняя tier и не гарантируя улучшение. Все пределы и полученное значение видны в item tooltip.
 
 **Словарь механических аффиксов (числа — значения tier1 / tier2 / tier3 / tier4):**
 
@@ -381,7 +381,7 @@ slot type означает совместимый тип посадочного 
 | AF_CDR | cooldown recovery INCREASED % | 3/5/7/10 | IMPLANT |
 | AF_FUEL | fuel capacity FLAT | 2/3/4/6 | ENGINE |
 | AF_CARGO | cargo units FLAT | 2/4/6/8 | CARGO |
-| AF_SCAN | threat reveal range +layers | 0/0/1/1 | SCANNER |
+| AF_SCAN | threat reveal range +layers | 1/1/2/2 | SCANNER |
 | AF_ROAD | travel duration LESS % | 2/4/6/8 | ENGINE |
 
 Все одинаковые аффикс группы на ОДНОМ предмете могут встречаться не более 1 раза. В легендарном аффиксы не обязаны все быть offensive; генератор использует веса по слоту (MAIN: 55% offensive, 30% resource,15% utility; ARMOR: 70% defensive,20% resource,10% utility; IMPLANT: 33/33/34; transport свой пул). Не генерировать combat-only аффиксы на транспорте, где они не объявлены.
@@ -584,6 +584,16 @@ Score route = 3×normalizedLoot + 2×normalizedXP + 2×questPriority + serviceNe
 
 **Смерть:** ранение HP=0, run state→DEFEATED; временные мутации удаляются, незакреплённый груз/валюты удаляются, постоянная экипировка возвращается damaged (−20 durability), герой в гараже восстанавливается до 100% HP/щит после оплаты стандартного медицинского обслуживания 10 credits (при 0 credits базовая бесплатная стабилизация до 50% HP для исключения softlock; дальнейшее лечение стандартным способом). Максимальная глубина и открытый форпост не откатываются.
 
+### 16.7. Дополнительные инварианты точности и AI
+
+**Скорость UI и offline:** в активной сессии ×2/×4 может быстрее воспроизводить/просчитывать события game-time, но не меняет шанс лута, статусы и урон на единицу game-time. «Пропустить бой» = тот же headless simulation до результата. Офлайн рассчитывает до 12 часов elapsed wall-clock при базовой скорости ×1; одинаковые outcomes гарантированы для одинакового game-time, seed и команд. При ускорении активная сессия может давать больше game-time/real-time — UI не должен обещать равного loot за реальный час при разных скоростях.
+
+**Совместимость перегрева:** U01 заменяет обычный heat-lockout. Узел H4C способен выдать импульс при том же пересечении порога, но его дополнительный lockout не применяется, если U01 заменил перегрев. U01 consumes min(currentShield,max(1,0.25×currentShield)); shields никогда не становятся отрицательными.
+
+**Enemy AI:** стандартная цель врага — оператор; особые действия выбирают дрона/союзника только при явном описании. При готовности action channel: выбрать ready special согласно шаблону→в противном случае обычную атаку. Тайминги из таблиц имеют приоритет, для E07 тяжёлый опасный каст first at t=5s, repeat every9s, windup2s. Если враг потерял цель до Resolve, команда retargets по определённому fallback, иначе fizzle с reason code. Нет неописанных «скрытых» автоатак и телепорта эффектов.
+
+**Статы без экипировки:** для исключительно Build Lab preview TechPower fallback=30×H(max(1,currentStartSector)); такой невалидный бой не запускается без MAIN. Если эффект ссылается на T брони, а ARMOR не оснащена, в preview берём T=1 с пометкой о неполной конфигурации.
+  
 ## 17. ВРАГИ — КАНОНИЧЕСКИЙ КАТАЛОГ 24 ОБЫЧНЫХ ТИПОВ
 
 EnemyTemplate at d=1: hp, shield, armor, K/E/D resistance, evasion, attackDamage, attackInterval, damageType, skill AI. На глубине d: hp × H(d), shield × H(d), damage × D(d); armor/resist/evasion не увеличиваются скрыто с глубиной, только от конкретной elite-модификации и состояния. Accuracy у всех обычных врагов 100, critChance 0 если явно не объявлено, hit formula из раздела 6. В списке «-» сопротивления 0; указанные res — percentage points.
@@ -629,7 +639,7 @@ No absolute immunities, no untelegraphed instakill, no proc-loop.
 
 ## 18. ШЕСТЬ БОССОВ И 12-Й СЕКТОР
 
-Boss scaling hp × H(d), shields × H(d), damage × D(d); accuracy=110. Boss encounters at d4/8/12 and then every4 in endless; d4 uses BOSS_A; d8 BOSS_B; d12 BOSS_CORE; later deterministically select from six with anti-repeat and biome compatibility. Each boss has 2 phases, except BOSS_CORE 3. Time to kill 45–150 секунд при предметах соответствующего TechLevel — проверяемая целевая метрика, не гарантированная формула.
+Boss scaling hp × H(d), shields × H(d), damage × D(d); accuracy=110. Boss encounters at d4/8/12 and then every4 in endless; d4 uses BOSS_A; d8 BOSS_B; d12 BOSS_CORE; later deterministically select from six with anti-repeat and biome compatibility. Есть базовая фаза и объявленные пороговые переходы/события. Каждый порог в таблице активируется один раз за бой, а число формальных фаз не фиксируется искусственно; CORE имеет три пороговых перехода. Time to kill 45–150 секунд при предметах соответствующего TechLevel — проверяемая целевая метрика, не гарантированная формула.
 
 | id / имя | Base HP / shield / armor | ResE/D | Phase triggers | Dangerous mechanics and available response |
 |---|---|---|---|---|
@@ -638,7 +648,7 @@ Boss scaling hp × H(d), shields × H(d), damage × D(d); accuracy=110. Boss enc
 | BOSS_C Хор-9 | 1350/350/12 | 5/35 | 65%,30% | 45 D/1.6с, summon E14 at 65% and E15 at 30% (cap2), telegraph 1.5с network pulse 75 D every 15с, virus control/interrupt |
 | BOSS_D Огненное сердце | 1650/150/16 | 35/5 | 60%,25% | 48 E/1.7с, ambient heat+2/сек to operator, telegraph heat burst 85 E each 14с, 1.5с; at 25% heat burst interval 10с; cooling/shields/burst race |
 | BOSS_E Патрон | 1500/230/20 | 10/10 | 70%,40% | 40 K/1.4с; E09 technician summons once at 70%, E08 turret once at 40%, heavy attack 100K with 1.6с telegraph each 13с; target priority matters |
-| BOSS_CORE Сердце тракта (d12) | 1900/400/22 | 20/25 | 70%,40%,15% | 45 mixed E/D/1.4с; rotating telegraph every 12s: K rail 115, digital JAM wave 80, drone suppression 2s; at 70% spawn E09, at 40% shield bypass 25% on digital wave, at 15% +20% cast speed; all waves have at least 1.5s telegraph; adaptable tactics necessary |
+| BOSS_CORE Сердце тракта (d12) | 1900/400/22 | 20/25 | 70%,40%,15% | два пакета 22.5 E + 22.5 D в одной атаке/1.4с; rotating telegraph every 12s: K rail 115, digital JAM wave 80, drone suppression 2s; at 70% spawn E09, at 40% shield bypass 25% on digital wave, at 15% +20% cast speed; all waves have at least 1.5s telegraph; adaptable tactics necessary |
 
 **Боссовая награда:** минимум 1 item rarity roll по boss distribution, 1 соответствующий CalibrationCore, 1 гарантированная фракционная/сюжетная награда в кампании, если milestone не был выдан. Boss не повторяет campaign one-time rewards при последующих выездах. На d4/8/12 открывается форпост, сюжетная метка и прогресс гарантированно persists до смерти следующего рейда.
 
@@ -726,7 +736,7 @@ Reputation каждой ∈[−100,100], старт 0. Изменения сра
 | EV10 | Вражеский сканер | disable scanner: data−4, wanted−8 | использовать: reveal biome boss weak tag, wanted+4 |
 | EV11 | Потерянная вакцина | heal 35% missing HP, F_RUST+3 | sell: credits+20, F_RUST−5 |
 | EV12 | Брошенные аккумуляторы | energy refilled, −5 hull | scrap+10, wanted+2 |
-| EV13 | Серый дилер | pay 20 credits, random RARE eligible item | sell 10 data for 30 credits |
+| EV13 | Серый дилер | оплатить ceil(0.60×shopPriceOfRare(T=d)) credits, получить один случайный RARE eligible item | обменять 10×R(d) data на 30×R(d) credits |
 | EV14 | Сеть камер | dodge patrol: fuel−2, wanted−10 | engage next BOUNTY with +25% credits |
 | EV15 | Уличный архив | data+12, one random enemy codex entry | credits+16, F_ECHO−3 |
 | EV16 | Плата за проход | credits−12, avoid next ordinary combat, advance | fight next ELITE for extra item roll |
@@ -755,7 +765,7 @@ Reputation каждой ∈[−100,100], старт 0. Изменения сра
 3. На B03 после доставки выбрать очистку данных (−8 data, +чертёж OFF_TARGET) или продать (credits+35, F_ECHO−5).
 **Q03 «Долг механика» (B03 / F_RUST):**
 1. Дать 10 scrap мастеру (+6 F_RUST) либо выкупить tool (+10 credits, Quest ends).
-2. Победить E09 technician ELITE (grants UNIQUE module reroll contract, F_RUST+6) либо купить запасной двигатель за 20 credits.
+2. Победить E09 technician ELITE (открывает гарантированный тематический RARE drone-module контракт, F_RUST+6) либо купить запасной двигатель за 20×R(d) credits.
 3. Выбрать доступ к SERVICE upgrade (открывает +15% hull repair at checkpoints) либо +1 calibration core of current group.
 **Q04 «Чужая броня» (B02 / F_VANTA):**
 1. Захватить код доступа (wanted+10, data+10) либо передать VANTA (F_VANTA+8, Quest ends).
@@ -857,7 +867,7 @@ Reputation каждой ∈[−100,100], старт 0. Изменения сра
 - личные рекорды текущего tactical preset;
 - дальность автономного выезда и data accuracy.
 
-Новые системы открываются **по явным milestones**, а не по числу часов; никакой искусственной постройки на 12 реальных часов. Progression gates для 100-tree nodes задаются очками ветвей из section14, не сюжетным актом.
+Новые системы открываются **по явным milestones**, а не по числу часов; никакой искусственной постройки на 12 реальных часов. FORPOST_0 = старт с sector1; после FORPOST_4 новый выезд можно начать с sector5, после FORPOST_8 — с sector9, после FORPOST_12 — с sector13. Ранее открытые точки входа не исчезают; максимальный прогресс не откатывается. Progression gates для 100-tree nodes задаются очками ветвей из section14, не сюжетным актом.
 
 ## 23. BUILD LAB / «БИЛДИНГ» — ПОЛНЫЙ ПРОДУКТОВЫЙ КОНТРАКТ
 
