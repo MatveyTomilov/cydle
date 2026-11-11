@@ -2,6 +2,34 @@
 
 Last updated: 2026-11-11
 
+## EMERGENCY CHECKPOINT STOP — audit handoff (read first)
+
+Development is **HALTED** at the user's request to preserve the remaining Qwen4 limits for an independent technical audit by another model (GPT-6 Luna). No new game features and no large refactor were started after this stop. The next agent should expect to do **independent review and targeted fixes**, not automatic continuation of stage 2d, unless the user explicitly asks.
+
+- **Working branch:** `recovery/qwen-snapshot`
+- **Local project path:** `E:\cydle\project`
+- **Remote:** `https://github.com/MatveyTomilov/cydle.git`
+- **WIP checkpoint commit (HEAD):** `e9ddfd15a69e037307a71cc4e7b35f58805e9808` (`chore: checkpoint WIP bypass-shield hit option before audit handoff`).
+- **Last fully-verified feature checkpoint (parent):** `f14bdbc8fda39bc75e277219002194dab61d9061` (stage 2c — reaction channel + interrupt/telegraph; typecheck + 68 tests green).
+
+### Incomplete functionality explicitly preserved (WIP)
+
+The WIP commit `e9ddfd1` contains exactly **one** change, saved as-is per the instruction to preserve all WIP:
+
+- `src/core/combat/engine.ts:632` — added an **unused** optional field `bypassShieldRatio?: number;` to the `HitOptions` interface. It is **declared but NOT wired**: `applyHit` still passes a hardcoded `0` as the bypass ratio to `partitionDamage`. This is harmless preparation for stage 2d enemy shield-bypass attacks (E21, BOSS_B, BOSS_CORE phase). **Stage 2d is NOT implemented** — no enemy ability scheduler, boss phases/rotating casts, elite mods, drone active abilities, or bounded trigger chains exist yet. The field has no runtime effect; removing or wiring it is a future decision for the reviewer.
+
+No WIP test files were left failing or deleted. All existing tests pass unmodified.
+
+### Checks actually run at this stop
+
+- `npm run typecheck`: **passes** (exit 0, no errors) — re-run at the stop with the WIP field present.
+- `npm test`: **68 tests pass across 8 files** — re-run at the stop (math 11, build 14, combat 3, combat-status 7, combat-skills 16, combat-reactions 12, rng 4, catalog 1).
+- `npm run build` and `npm run e2e`: **NOT re-run at this stop.** Their last-known status (unchanged by a single unused optional field) is documented below: Vite build passes `tsc` then fails to resolve the missing `/src/main.tsx`; `e2e` fails because Playwright is not installed. These are pre-existing UI-stage blockers, not regressions.
+
+### Git state at handoff
+
+All changes are committed and pushed to `origin/recovery/qwen-snapshot`. No `reset`, `clean`, or `force push` was used. The working tree is clean after the handoff commit. See the exact HEAD SHA above and verify with `git rev-parse HEAD` / `git ls-remote origin recovery/qwen-snapshot`.
+
 ## Current status
 
 This is a recovery branch containing the preserved Qwen snapshot, two completed recovery stages, an implemented **combat kernel**, and three combat-expansion sub-stages (**2a: effective stats + status lifecycle + DoT**, **2b: active main-channel skills + tactical rules + targeting**, **2c: independent reaction channel + interrupt/telegraph**). `src/core/combat/engine.ts` satisfies the WIP combat tests and now also resolves statuses/DoT, active skills, and defensive reactions through the same pure 100 ms `stepCombat`. Typecheck passes and all 68 unit tests pass. The kernel resolves deterministic auto-attacks, continuous resources, status effects, main-channel skill casts (Windup → Resolve → Recovery → Ready) selected by tactical rules, and an independent reaction channel (shield/EMP/guard/vent/heal/drone-mark) with cast interrupts; drone/enemy abilities, boss AI, and bounded trigger chains are **not yet implemented** (stage 2d–2e). The Vite production build still stops at the missing real app entrypoint `src/main.tsx`, a UI-stage task — no placeholder was added to silence it.
@@ -11,7 +39,7 @@ This is a recovery branch containing the preserved Qwen snapshot, two completed 
 - Working directory: `E:\cydle\project`
 - Remote: `https://github.com/MatveyTomilov/cydle.git`
 - Branch: `recovery/qwen-snapshot`
-- Current handoff commit: use `git rev-parse HEAD` on this branch. Previous clean, verified checkpoint: `a06dbbab98581a95ae9b7af72f8a7be29fc659a2` (`feat: resolve validated CYDLE builds`); at that commit typecheck and all 30 unit tests passed, while Vite remained blocked by missing `src/main.tsx`.
+- Current handoff commit (HEAD): `e9ddfd15a69e037307a71cc4e7b35f58805e9808` (emergency-stop WIP checkpoint). Last fully-verified feature checkpoint: `f14bdbc8fda39bc75e277219002194dab61d9061` (stage 2c). Earlier clean core checkpoint: `a06dbbab98581a95ae9b7af72f8a7be29fc659a2` (`feat: resolve validated CYDLE builds`); at that commit typecheck and all 30 unit tests passed, while Vite remained blocked by missing `src/main.tsx`.
 - Preserved original archive: `E:\cydle\workspace.tar.gz` (SHA-256 `5E82E5BDA30D38A0FB551F242E1B14E44E8B75B1D51A874B208AD45E96D24630`). Extracted read-only comparison snapshot: `E:\cydle\recovered-snapshot\cydle`.
 - The Qwen snapshot and follow-up fixes are committed locally; see the recovery commits in `git log`. The master spec matches GitHub `main` at the recovery point.
 
@@ -62,6 +90,8 @@ The presence of catalogs and interfaces does not mean those systems are playable
 - `npm ci` succeeded during recovery. An earlier `npm audit` reported 7 advisories (3 moderate, 2 high, 2 critical); dependencies were not upgraded during recovery.
 
 ## Exact stop point and next task
+
+**EMERGENCY STOP (governing):** Development is halted at WIP commit `e9ddfd1` (parent `f14bdbc`, stage 2c verified). The only post-2c change is the unused `HitOptions.bypassShieldRatio` field described above; stage 2d is not implemented. The immediate next task is **independent technical review and targeted fixes** by the audit model, per the user. Do **not** auto-continue feature development. The stage-2d–2e plan below is retained only as context for a later, explicitly authorized resumption.
 
 Stop point: combat kernel + stages 2a (statuses/DoT), 2b (main-channel skills + tactical rules) and 2c (independent reaction channel + interrupt/telegraph) implemented and verified (typecheck + 68 tests green). The engine resolves auto-attacks, continuous resources, status effects, tactical skill casts and defensive reactions deterministically. The worktree is on `recovery/qwen-snapshot`; the previous known-good core checkpoint is `a06dbba`.
 
