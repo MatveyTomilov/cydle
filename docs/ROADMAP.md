@@ -1,25 +1,36 @@
-# CYDLE 1.0 delivery roadmap
+# CYDLE 1.0 delivery roadmap — Godot
 
-The normative design source is `CYDLE_MASTER_SPEC.md` v2.0. This roadmap records implementation order and actual completion; catalog entries and interfaces alone are not counted as working gameplay.
+`CYDLE_MASTER_SPEC.md` is the normative source for game design and release requirements. `docs/godot/` records the current engine, architecture, visual direction, and asset production rules. This roadmap records what actually exists; a plan or catalog entry is not working gameplay.
 
-## Recovered baseline (`2e5a597`)
+## Current migration checkpoint
 
-- Recovered source and data catalogs, deterministic math/CalcTrace, item instances, and validated build resolver.
-- Combat transition with 100 ms deterministic steps, auto-attacks, statuses/DoT, tactical main-channel skills, and reaction-channel defensive skills/interruption.
-- Typecheck and 68 unit tests pass. Vite build fails because `src/main.tsx` is missing; E2E cannot run because Playwright is absent.
-- Enemy ability/phase/elite/drone combat behavior, game state/persistence, run loop, progression/economy, UI, Simulation Lab, and campaign are incomplete or absent.
+- Product direction changed to standalone Godot 4.x Windows game on 2026-11-12. Current engine pin: Godot 4.7.2 stable.
+- Root TypeScript/React/Vite project is frozen legacy/reference source for rules, catalog values, and golden fixtures. Do not continue it as the product and do not delete it.
+- Documentation checkpoint is in progress on `development/luna`, whose code history descends from the preserved Qwen SHA `2e5a59798695aaf7666a8fa13cb709fcdaad9fc7`.
+- Godot implementation has not started; no `game/project.godot`, native scenes, native tests, or Windows export exist yet. Godot CLI was not installed/discoverable during the audit.
+- Legacy baseline freshly verified before this documentation update: typecheck pass; 206/206 tests pass; content validation pass; Vite build pass (611.46 kB JS, 192.24 kB gzip). These checks do not verify the future Godot game.
 
 ## Delivery sequence
 
-1. **Finish combat rules:** execute the existing enemy abilities, boss thresholds/rotations, elite modifiers, drone behavior, and bounded event/proc chains inside the existing `stepCombat` transition. Complete shield bypass and combat acceptance tests.
-2. **Bootable application and save boundary:** implemented for the unreleased v1 save format. A React entrypoint, Garage/Build navigation, strict Zod validation, legal starter-build validation, checksummed Dexie snapshots with recovery, import/export, and catalog validation are in place. Active run state is persisted while prior `run:null` v1 saves remain valid. No CI or E2E harness exists yet. Keep the simulation core independent of rendering/storage.
-3. **First persisted sector loop:** implemented at `38a5787`; deterministic six-layer graph, tutorial, validated route/cache/service/combat/checkpoint commands, rewards and death settlement, run-safe save validation, and a connected road screen. The implemented node set is intentionally limited to COMBAT/CACHE/REPAIR/FUEL/CHECKPOINT/BOSS. Full sector behavior has core tests; browser smoke reached and resolved only the opening combat.
-4. **Build, garage, and road economy:** run-specific equipment at `9598e11`; protected garage equipment at `5fa32c3`; dismantling at `7c50820`; repair at `be1a549`; affix operations/calibration at `6130774`; deterministic SHOP at `2001402`; ELITE/BOUNTY at `6ae8bfe`; partial persistent EVENT choices at `1027b5f`; fuel emergency exits at `44c6b88`; cargo-capacity enforcement at `eade89c`; EV19 one-edge travel effects at `dc94e46`; EV17/EV24 combat effects at `764d71b`; EV16 skip/elite encounter effects at `0f730dd`; EV14/EV21 forced BOUNTY choices at `726b76d`; EV18 allied turret at `e7bd5ec`; EV05 elite contract at `dffab9f`. Next: complete remaining deferred EVENT effects and improve overflow recovery, then implement ANOMALY/QUEST nodes, TechLevel progression/unlocks, tree/skills, Build Lab, contracts, quests, and factions.
-5. **Campaign and endgame:** all six biomes, encounter budgets and elites, six bosses, sector milestones and story outcomes, campaign sectors 1–12, finale, and depth-13+ escalation.
-6. **Automation and offline:** route autopilot policies and thresholds, exact deterministic offline game-time through the same world/combat engines, 12-hour cap, safe handling and one-time reward guarantees.
-7. **Build Lab and Simulation Lab:** exact source/CalcTrace view and comparisons; worker-based reproducible scenarios, directed search, statistical reports, replay, and player build advisor without direct save mutation.
-8. **Visual finish and release verification:** original SVG/Canvas/Pixi art and motion, responsive desktop/mobile screens, accessibility/settings, minimum E2E flows, seeded campaign acceptance, balance smoke/full batches, and manual visual checks.
+1. **Engine and production documentation:** update the master spec to remove browser stack constraints while preserving game rules; document Godot architecture, Art Bible, Asset Pipeline, and initial Asset Manifest. Commit these documents before runtime code.
+2. **Godot foundation:** pin stable engine, create `game/project.godot`, typed app shell, keyboard/controller focus, headless test runner, Windows export profile, and local versioned save repository. Validate import, headless launch, tests, and export.
+3. **Golden port harness:** port the existing deterministic RNG exactly; pin seed streams, serialized state, hashes, and event fixtures against the legacy TypeScript reference.
+4. **Math and build core:** port stats, modifiers, formulas, CalcTrace, mitigation, damage partition, item instances, and build resolution without balance changes. Compare golden outputs at each boundary.
+5. **Combat core:** port the existing single 100 ms simulation including statuses/DoT, skills/reactions, AI, boss phases, elite modifiers, drones, interrupts, and bounded procs. Same seeded input must match legacy expected results.
+6. **First illustrated vertical slice:** garage, one road, one arena, operator, one drone, three enemy types, one boss, several items, rewards, extraction/death, save recovery, readable timeline and real original assets. Run in Godot, not in a browser.
+7. **Full game systems:** port catalog, equipment/crafting/tree, events/contracts/quests/factions, all biomes/enemies/bosses, sectors 1–12 and endings, then depth-13+ progression.
+8. **Autopilot and offline:** legal-data route policy and real 12-hour-capped simulation through the shared core; exactly-once rewards, safe checkpoints, cancel/recovery.
+9. **Build Lab and Simulation Lab:** complete mathematical provenance, comparison, directed search, reproducible archetype/seed batches and reports on the same core.
+10. **Art, accessibility, and release:** produce/validate original art, animation, audio, controller support, Steam Deck review, save migration/recovery, seeded full-campaign acceptance, balance suites, Windows export, and manual playtest report.
 
-## Active work
+## Legacy project status at freeze
 
-Combat expansion 2d–2e, the persisted sector loop, run/garage equipment, inventory salvage/repair, affix/TechLevel calibration, deterministic SHOP, ELITE/BOUNTY, partial EVENT choices, fuel emergency exits, cargo-capacity enforcement, EV19 next-edge timing, EV17/EV24 combat modifiers, EV16 skip/elite outcomes, EV14/EV21 forced bounty choices, EV18 allied turret, and EV05 elite contract are committed on `development/luna` through `dffab9f`. Latest checks: typecheck, all 206 unit tests, `npm run validate`, and production build pass. Browser smoke verified the first combat from a newly-created profile; no full-sector/E2E/mobile pass has been recorded. Next task: implement EV06 reveal and EV10 boss-weakness effects, remaining EVENT hooks, improve cargo overflow recovery, then implement ANOMALY/QUEST nodes. See `HANDOFF.md`. Do not mark a roadmap item complete until its code, tests, and interactions work.
+The preserved web implementation on `development/luna` through `739ff3654317d19d609bcd61c2ba17ab2112a4f3` contains recovered math/build foundations, a deterministic combat engine, a first-sector loop, equipment/inventory operations, shop/elite/bounty and partial events. It is incomplete relative to 1.0: later campaign/endgame, quests/contracts, autopilot/offline, full Build Lab/Simulation Lab, and final art are missing. `HANDOFF.md` holds the detailed per-system inventory and known limitations.
+
+## Commit gates
+
+- Make one focused commit per complete feature slice; keep documentation and implementation commits separate when requested.
+- Every ported calculation has a checked reference fixture before downstream consumers are connected.
+- Run the relevant tests after each slice; run full import, headless tests, and Windows build at each release gate.
+- Preserve the reference code and baseline; do not mark a subsystem complete based on file presence.
+- Do not claim 1.0 until the master-spec release checklist is verified on a real native build.

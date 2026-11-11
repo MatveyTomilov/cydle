@@ -2,7 +2,22 @@
 
 Last updated: 2026-11-12
 
-## Resumed development — current checkpoint
+## Current checkpoint — migrate product to Godot
+
+The user's latest instruction supersedes the prior web-game continuation. CYDLE 1.0 is now a native 2D Windows game built in Godot 4.x with strictly typed GDScript. Do not implement more React/Vite/PixiJS product features. Preserve the entire existing TypeScript tree and its tests as legacy/reference and as a source for golden outputs.
+
+- Working directory: `E:\cydle\project`.
+- Branch: `development/luna`, based on the exact handoff SHA `2e5a59798695aaf7666a8fa13cb709fcdaad9fc7`; recovery remains untouched. Latest remote heads at audit: `origin/main` = `8f7f3c7adaaaff127963b100145c5a5d4f15cc2a`, `origin/recovery/qwen-snapshot` = `2e5a59798695aaf7666a8fa13cb709fcdaad9fc7`. The development branch is local and is not pushed.
+- Current local source checkpoint before the Godot documentation commit: `739ff3654317d19d609bcd61c2ba17ab2112a4f3`. Git working tree was clean before documentation edits.
+- Godot CLI is not installed or discoverable in this environment. Official release archive review on 2026-11-12 showed Godot 4.7.2 stable; Godot 4.8 was beta. The project documentation pins 4.7.2 stable until a verified stable update is chosen.
+- The legacy web baseline was freshly checked before documentation changes: `npm run typecheck` passes; `npm test -- --run` passes 206 tests in 22 files; `npm run validate` passes; `npm run build` passes (JS 611.46 kB, gzip 192.24 kB). These commands verify only the legacy web reference, not a Godot build.
+- No `game/project.godot` or native scenes exist yet. This checkpoint is the required documentation gate before implementation.
+- Read next: `CYDLE_MASTER_SPEC.md`, `docs/godot/TECHNICAL_ARCHITECTURE.md`, `docs/godot/ART_BIBLE.md`, `docs/godot/ASSET_PIPELINE.md`, `docs/godot/ASSET_MANIFEST.csv`, `docs/superpowers/plans/2026-11-12-godot-migration.md`, and `docs/ROADMAP.md`.
+- First implementation task after this documentation-only commit: obtain/use the pinned Godot 4.7.2 stable binary, create `game/project.godot` and the typed headless test runner, and verify import/parse plus a minimal native Windows launch. Then port RNG and establish golden comparisons before formulas or content.
+
+The requested Godot technical architecture, Art Bible, Asset Pipeline, Asset Manifest, master-spec corrections, roadmap, and handoff are in this documentation checkpoint. Runtime code and game assets have not been migrated yet. The following history is retained to document the frozen web implementation accurately.
+
+## Frozen legacy implementation — EV05 checkpoint (historical)
 
 The user explicitly resumed autonomous implementation after the earlier audit handoff. Work is now on `development/luna`, created from user-specified base `2e5a59798695aaf7666a8fa13cb709fcdaad9fc7`. The recovery branch remains the untouched source of the handoff.
 
@@ -20,14 +35,14 @@ The user explicitly resumed autonomous implementation after the earlier audit ha
 - EV05 A now persists an elite-targeted contract through ordinary battles; the first later ELITE gets one guaranteed RARE roll. An ordinary combat leaves the contract pending, and an elite attempt consumes it.
 - Active-run commands explicitly tolerate missing travel/combat-effect fields, because save parsing defaults do not mutate the original input object. Regression tests exercise old save shapes through route, event, and combat commands.
 - Checks after this stage: typecheck, all 206 tests, data validation, and production build pass. Playwright is not installed, so automated E2E is unavailable. Browser smoke from the earlier stage only reached the first E01 victory and did not complete a sector.
-- Next task: complete remaining EVENT reveal/flag choices and improve cargo overflow recovery; then implement ANOMALY and multi-stage QUEST nodes. Continue with inventory transfer, autopilot/offline, Simulation Lab, and final visuals.
-- The user requests continued implementation through a playable CYDLE 1.0; the old emergency stop is superseded.
+- The historical web roadmap at this checkpoint proposed remaining EVENT effects and cargo recovery. The user's later platform decision supersedes that plan; do not resume web feature work.
+- The legacy implementation has been frozen as a reference for the Godot port.
 
-## Current status
+## Legacy web implementation status at freeze
 
 This is `development/luna`, based on the preserved Qwen snapshot. Combat expansions **2a–2e task 2** remain in the existing deterministic engine. Stage 3 boot/save now supports a first sector: the exact starter save, strict validation, checksummed Dexie snapshots, import/export, and catalog validation. Stage 4 is active: deterministic run/map state, route selection, combat/rewards, cache and repair/fuel nodes, checkpoint shipment/evacuation/continuation, defeat settlement, and a connected road screen are implemented. This remains a partial game, not a CYDLE 1.0 release.
 
-## Repository and checkpoint
+## Legacy branch and checkpoint history
 
 - Working directory: `E:\cydle\project`
 - Remote: `https://github.com/MatveyTomilov/cydle.git`
@@ -113,7 +128,7 @@ The presence of catalogs and interfaces does not mean those systems are playable
 
 Current code checkpoint: branch `development/luna`, feature commit `dffab9fb22e053404d719c2013e2c1787289c8ee`. Run commands live in `src/core/run/`; SHOP/EVENT handlers are in `src/core/run/nodes.ts`; route timing and selected-node promotion are centralized in `src/core/run/commands.ts`; combat rewards, skip handling, and one-shot pending effects are in `src/core/run/combat.ts`; permanent faction reputation and campaign flags are in `src/core/save/schema.ts`; garage ownership/repair/salvage/affix calibration lives in `src/core/inventory/garage.ts`; combat uses `simulateCombat()` from `src/core/combat/engine.ts`; UI persistence remains in `src/core/save/storage.ts`. Current checks: typecheck, 206 tests, `npm run validate`, and production build pass. Design/plan documents for the event-effect stages are under `docs/superpowers/specs/` and `docs/superpowers/plans/`. Browser smoke only verified the opening combat; there is no E2E.
 
-Next task: implement EV06's future-node reveal and EV10's boss-weakness effects, then remaining codex/mutation/quest hooks. Keep run-scoped effects in `RunState`, permanent outcomes in META, and route/combat math in the existing transition functions. Then add ANOMALY/multi-stage QUEST nodes. Keep UI/storage outside the combat engine; do not duplicate verified math/build/combat rules.
+Historical next task at the EV05 checkpoint was EV06/EV10. That plan is superseded by the Godot migration above; do not resume web feature work.
 
 ## Important implementation decisions
 
@@ -123,7 +138,7 @@ Next task: implement EV06's future-node reveal and EV10's boss-weakness effects,
 - Item instance IDs are deterministic from stable grant/template identity, not wall-clock time or process order.
 - Damage to shields uses the shield-specific incoming multiplier only during shield absorption; overflow becomes ordinary incoming damage before HP loss.
 
-## Commands for the next agent
+## Legacy verification commands
 
 ```powershell
 Set-Location E:\cydle\project
@@ -136,8 +151,8 @@ npm run build
 npm run dev
 ```
 
-At the EV05 feature checkpoint, the unit suite has 206 tests. `npm run sim` and `npm run balance` scripts exist but their full Simulation Lab workflows are not implemented; `npm run e2e` needs Playwright and a harness. The first-sector loop plus SHOP/ELITE/BOUNTY, partial EVENT, emergency exits, cargo accounting, EV05 elite contract, EV19 route timing, EV17/EV24 combat modifiers, EV16 skip/elite outcomes, EV14/EV21 bounty effects, and EV18 allied turret are wired, while campaign progression and most content systems remain absent.
+These commands validate the frozen legacy project only. At the EV05 checkpoint, the unit suite has 206 tests. `npm run sim` and `npm run balance` scripts refer to incomplete workflows; `npm run e2e` needs Playwright and a harness. The first-sector loop plus SHOP/ELITE/BOUNTY, partial EVENT, emergency exits, cargo accounting, EV05 elite contract, EV19 route timing, EV17/EV24 combat modifiers, EV16 skip/elite outcomes, EV14/EV21 bounty effects, and EV18 allied turret are wired, while campaign progression and most content systems remain absent.
 
 ## Short continuation prompt
 
-Open `https://github.com/MatveyTomilov/cydle/tree/development/luna` and `E:\cydle\project`. Read `CYDLE_MASTER_SPEC.md`, `HANDOFF.md`, and `docs/ROADMAP.md`; inspect `git status` and recent commits. Combat 2a–2e, save persistence, the playable sector loop, protected inventory operations, SHOP/ELITE/BOUNTY, partial EVENT choices (including EV05/EV14/EV16/EV17/EV18/EV19/EV21/EV24), emergency exits, and cargo-capacity enforcement are implemented and verified. Continue with remaining deferred EVENT effects and ANOMALY/QUEST nodes. Reuse the existing math/build/combat cores and commit each verified stage.
+Open `E:\cydle\project`. Read `CYDLE_MASTER_SPEC.md`, `HANDOFF.md`, `docs/godot/TECHNICAL_ARCHITECTURE.md`, `docs/godot/ART_BIBLE.md`, `docs/godot/ASSET_PIPELINE.md`, `docs/godot/ASSET_MANIFEST.csv`, `docs/superpowers/plans/2026-11-12-godot-migration.md`, and `docs/ROADMAP.md`; inspect `git status` and the latest docs commit. Keep legacy `src/` and `tests/` unchanged as reference. Start with the Godot foundation and headless test runner, then port the existing RNG with golden fixtures. Do not redo functionality already present in legacy; use it as the oracle and port into `game/` once.
