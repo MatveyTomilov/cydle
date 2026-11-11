@@ -75,7 +75,7 @@ function emptyMetrics(): CombatMetrics {
     skillUses: {}, ruleFailures: [],
     energySpent: 0, energyStarvedMs: 0, heatLockouts: 0, heatLockoutMs: 0,
     shieldAbsorbed: 0, hpLost: 0, healingDone: 0, statusTicks: 0,
-    procsTriggered: 0, chainLimitHits: 0, ttk: [], droneDeaths: 0, escaped: [],
+    procsTriggered: 0, interrupts: 0, chainLimitHits: 0, ttk: [], droneDeaths: 0, escaped: [],
     lowestHpFraction: 1, timeWithoutShieldMs: 0,
   };
 }
@@ -86,7 +86,7 @@ function baseActor(partial: Partial<CombatActor> & Pick<CombatActor, 'id' | 'kin
     isBoss: false, isMechanical: false, isHealer: false,
     hp: 1, shield: 0, tempShields: [], energy: 0, heat: 0,
     heatLockout: false, lockoutUntil: 0,
-    statuses: {}, buffs: [], cooldowns: {}, cast: null, channelBusy: {},
+    statuses: {}, buffs: [], cooldowns: {}, cast: null, reactionCast: null, channelBusy: {},
     nextAttackAt: 0, flags: {}, counters: {}, icds: {}, oncePerCombat: {}, abilityNext: {},
     alive: true, baseSheet: emptySheet(), baseMods: [], runtimeMods: [],
     damageDealt: 0, damageTaken: 0, threatUnits: 1,
@@ -778,6 +778,12 @@ function skillEnergyCost(state: CombatState, actor: CombatActor, skill: SkillDef
   return Math.max(0, cost);
 }
 
+/** Cooldown реакции: LESS к базе (reactionCooldownLess), затем общая формула восстановления. */
+function reactionCooldownMs(skill: SkillDef, s: StatSheet): number {
+  const base = skill.cooldownMs * (1 - clamp(s.reactionCooldownLess, 0, 80) / 100);
+  return cooldownMs(base, s.cooldownRecovery);
+}
+
 /** Изменение нагрева с проверкой пересечения порога перегрева и снятия lockout. */
 function gainHeat(state: CombatState, actor: CombatActor, amount: number): void {
   if (amount === 0) return;
@@ -911,7 +917,7 @@ function startSkillCast(state: CombatState, actor: CombatActor, skill: SkillDef,
   actor.energy = clamp(actor.energy - cost, 0, s.maxEnergy);
   state.metrics.energySpent += cost;
   gainHeat(state, actor, skill.heatDelta);
-  const cd = cooldownMs(skill.cooldownMs, s.cooldownRecovery);
+  const cd = skill.channel === 'reaction' ? reactionCooldownMs(skill, s) : cooldownMs(skill.cooldownMs, s.cooldownRecovery);
   actor.cooldowns[skill.id] = state.timeMs + cd;
   actor.counters.casts = (actor.counters.casts ?? 0) + 1;
   const actionId = `${actor.id}:skill:${skill.id}:${actor.counters.casts}`;
@@ -920,7 +926,8 @@ function startSkillCast(state: CombatState, actor: CombatActor, skill: SkillDef,
     resolveAt: state.timeMs + skill.windupMs, endAt: state.timeMs + skill.windupMs + skill.recoveryMs,
     targetId: target?.id ?? null, interruptible: skill.interruptible, telegraph: false, channel: skill.channel,
   };
-  actor.cast = cast;
+  if (skill.channel === 'reaction') actor.reactionCast = cast;
+  else actor.cast = cast;
   actor.lastSkillId = skill.id;
   if (target) actor.lastTargetId = target.id;
   if (skill.channel === 'main') actor.nextAttackAt = cast.endAt;
@@ -929,6 +936,13 @@ function startSkillCast(state: CombatState, actor: CombatActor, skill: SkillDef,
     text: `${actor.name}: ${skill.name}.`,
     data: { channel: skill.channel, windupMs: skill.windupMs, recoveryMs: skill.recoveryMs, cooldownMs: cd },
   });
+  if (cast.telegraph) {
+    emit(state, 'TELEGRAPH', actor.id, {
+      skillId: skill.id, targetId: target?.id, actionId,
+      text: `${actor.name} готовит ${skill.name}.`,
+      data: { dangerTag: cast.dangerTag ?? '', windupMs: skill.windupMs },
+    });
+  }
 }
 
 function castTarget(state: CombatState, actor: CombatActor, cast: CastState): CombatActor | undefined {
@@ -958,6 +972,38 @@ function advanceCasts(state: CombatState, rng: Rng): void {
     }
     if (state.timeMs >= cast.endAt) actor.cast = null;
   }
+}
+
+/** Реактивный канал разрешается раньше обычных кастов (шаг 2 порядка событий). */
+function advanceReactionCasts(state: CombatState, rng: Rng): void {
+  for (const actor of allActors(state)) {
+    if (!actor.alive || !actor.reactionCast) continue;
+    const cast = actor.reactionCast;
+    if (hasStatus(actor, 'STUN')) {
+      cast.resolveAt += TICK_MS;
+      cast.endAt += TICK_MS;
+      continue;
+    }
+    if (!cast.resolved && state.timeMs >= cast.resolveAt) {
+      cast.resolved = true;
+      if (cast.skillId) resolveSkillCast(state, rng, actor, cast);
+    }
+    if (state.timeMs >= cast.endAt) actor.reactionCast = null;
+  }
+}
+
+/** Прерывание прерываемого каста цели. Возвращает true, если каст был сорван. */
+function interruptCast(state: CombatState, target: CombatActor, sourceId: string, actionId: string): boolean {
+  const cast = target.cast;
+  if (!cast || !cast.interruptible) return false;
+  target.cast = null;
+  state.metrics.interrupts++;
+  emit(state, 'CAST_INTERRUPT', sourceId, {
+    targetId: target.id, actionId, skillId: cast.skillId ?? undefined,
+    text: `${target.name}: каст прерван.`,
+    data: { interruptedSkill: cast.skillId ?? '', abilityId: cast.abilityId ?? '' },
+  });
+  return true;
 }
 
 function skillBase(state: CombatState, actor: CombatActor, skill: SkillDef): { base: number; type: DamageType } | null {
@@ -1032,11 +1078,64 @@ function resolveDetonate(state: CombatState, rng: Rng, actor: CombatActor, targe
   applyHit(state, rng, actor, target, raw, 'DIGITAL', { actionId: cast.actionId, isMain: false, procWeight: skill.procWeight, skillId: skill.id });
 }
 
+/** Эффекты защитных реакций (раздел 11): щит/EMP/дефлектор/продувка/ремодуль/синхрометка. */
+function resolveReaction(state: CombatState, rng: Rng, actor: CombatActor, skill: SkillDef, cast: CastState): void {
+  const s = eff(state, actor);
+  switch (skill.special) {
+    case 'TEMP_SHIELD': {
+      const cap = 90;
+      const existing = actor.tempShields.find((p) => p.sourceId === 'SK_SHIELD');
+      const before = existing?.amount ?? 0;
+      const amount = Math.min(cap, before + 60);
+      if (existing) { existing.amount = amount; existing.expiresAt = state.timeMs + 5000; }
+      else actor.tempShields.push({ sourceId: 'SK_SHIELD', amount, cap, expiresAt: state.timeMs + 5000 });
+      emit(state, 'SHIELD_GAIN', actor.id, { actionId: cast.actionId, text: `${actor.name}: аварийный щит +${(amount - before).toFixed(0)}.`, data: { amount: amount - before, total: amount, cap } });
+      return;
+    }
+    case 'EMP': {
+      const target = castTarget(state, actor, cast);
+      if (!target) return;
+      interruptCast(state, target, actor.id, cast.actionId);
+      const baseInfo = skillBase(state, actor, skill);
+      if (baseInfo) applySkillHit(state, rng, actor, target, baseInfo, skill.coefficient, skill, cast, true);
+      return;
+    }
+    case 'GUARD': {
+      applyStatus(state, actor, actor, 'GUARD', { stacks: 1, durationMs: 2000, actionId: cast.actionId });
+      return;
+    }
+    case 'VENT': {
+      // Охлаждение −35 уже применено на старте каста (heatDelta); здесь только запись в таймлайн.
+      emit(state, 'HEAT', actor.id, { actionId: cast.actionId, text: `${actor.name}: продувка, нагрев ${actor.heat.toFixed(0)}.`, data: { heat: actor.heat } });
+      return;
+    }
+    case 'HEAL': {
+      const maxHP = s.maxHP;
+      const bonus = Math.min(0.10 * maxHP, 0.12 * maxHP);
+      const heal = Math.min(30 + bonus, 0.22 * maxHP) * (1 + s.healing / 100);
+      const before = actor.hp;
+      actor.hp = clamp(actor.hp + heal, 0, maxHP);
+      const actual = actor.hp - before;
+      state.metrics.healingDone += actual;
+      emit(state, 'HEAL', actor.id, { actionId: cast.actionId, text: `${actor.name}: ремодуль +${actual.toFixed(1)} HP.`, data: { amount: actual, overheal: heal - actual } });
+      return;
+    }
+    case 'DRONE_MARK': {
+      const target = castTarget(state, actor, cast);
+      if (target) applyStatus(state, actor, target, 'DRONE_MARK', { stacks: 1, durationMs: 5000 + s.droneMarkBonusMs, actionId: cast.actionId });
+      return;
+    }
+  }
+}
+
 function resolveSkillCast(state: CombatState, rng: Rng, actor: CombatActor, cast: CastState): void {
   const skill = cast.skillId ? SKILL_BY_ID[cast.skillId] : undefined;
   if (!skill) return;
   state.metrics.skillUses[skill.id] = (state.metrics.skillUses[skill.id] ?? 0) + 1;
-  emit(state, 'SKILL_USE', actor.id, { skillId: skill.id, targetId: cast.targetId ?? undefined, actionId: cast.actionId, text: `${actor.name}: ${skill.name}.` });
+  const isReaction = skill.channel === 'reaction';
+  emit(state, isReaction ? 'REACTION' : 'SKILL_USE', actor.id, { skillId: skill.id, targetId: cast.targetId ?? undefined, actionId: cast.actionId, text: `${actor.name}: ${skill.name}.`, data: { channel: skill.channel } });
+
+  if (isReaction) { resolveReaction(state, rng, actor, skill, cast); return; }
 
   if (skill.special === 'OVERCLOCK') {
     applyStatus(state, actor, actor, 'OVERCLOCK', { stacks: 1, durationMs: 8000, actionId: cast.actionId });
@@ -1093,6 +1192,32 @@ function chooseOperatorAction(state: CombatState, rng: Rng, actor: CombatActor):
   const choice = selectMainRule(state, actor);
   if (choice.kind === 'skill') startSkillCast(state, actor, choice.skill, choice.target);
   else startAutoAttack(state, rng, actor);
+}
+
+type ReactionChoice = { kind: 'none' } | { kind: 'skill'; skill: SkillDef; target: CombatActor | undefined; rule: TacticRule };
+
+/** Первое валидное правило reaction-канала по приоритету и stable ruleId; канал независим от main. */
+function selectReactionRule(state: CombatState, actor: CombatActor): ReactionChoice {
+  const rules = state.tactics.rules
+    .filter((r) => r.enabled && r.skillId !== 'AUTO' && skillChannel(r.skillId) === 'reaction')
+    .sort((a, b) => b.priority - a.priority || byId(a.id, b.id));
+  for (const rule of rules) {
+    const skill = equippedSkill(state, rule.skillId);
+    if (!skill) { recordRuleFail(state, rule.id, 'not_equipped'); continue; }
+    if ((actor.cooldowns[skill.id] ?? 0) > state.timeMs) { recordRuleFail(state, rule.id, 'cooldown'); continue; }
+    if (actor.energy < skillEnergyCost(state, actor, skill)) { recordRuleFail(state, rule.id, 'energy'); continue; }
+    const target = selectTarget(state, actor, rule.target);
+    if (!target && skill.targetMode !== 'self') { recordRuleFail(state, rule.id, 'no_target'); continue; }
+    if (skill.special === 'EMP' && (!target || !target.cast || !target.cast.interruptible)) { recordRuleFail(state, rule.id, 'no_interruptible'); continue; }
+    if (!ruleConditionsPass(state, actor, rule, target)) { recordRuleFail(state, rule.id, 'conditions'); continue; }
+    return { kind: 'skill', skill, target, rule };
+  }
+  return { kind: 'none' };
+}
+
+function chooseReaction(state: CombatState, actor: CombatActor): void {
+  const choice = selectReactionRule(state, actor);
+  if (choice.kind === 'skill') startSkillCast(state, actor, choice.skill, choice.target);
 }
 
 /* ------------------------------------------------------------------ */
@@ -1158,16 +1283,21 @@ export function stepCombat(state: CombatState): CombatState {
   tickStatuses(next);
   expireStatuses(next);
 
-  // Подготовленные касты разрешаются в стабильном порядке акторов (шаг 3 порядка событий).
+  // Реактивные/interrupt-действия разрешаются раньше обычных кастов (шаг 2), затем main (шаг 3).
+  advanceReactionCasts(next, rng);
   advanceCasts(next, rng);
 
-  // Выбор новых действий: оператор — тактика main-канала, остальные — автоатака (шаг 7).
+  // Выбор новых действий (шаг 7): у оператора независимые reaction- и main-каналы.
   const ready = allActors(next)
-    .filter((a) => a.alive && !a.cast && a.nextAttackAt <= next.timeMs)
+    .filter((a) => a.alive)
     .sort((a, b) => byId(a.id, b.id));
   for (const actor of ready) {
-    if (actor.kind === 'operator') chooseOperatorAction(next, rng, actor);
-    else startAutoAttack(next, rng, actor);
+    if (actor.kind === 'operator') {
+      if (!actor.reactionCast) chooseReaction(next, actor);
+      if (!actor.cast && actor.nextAttackAt <= next.timeMs) chooseOperatorAction(next, rng, actor);
+    } else if (!actor.cast && actor.nextAttackAt <= next.timeMs) {
+      startAutoAttack(next, rng, actor);
+    }
   }
 
   resolveDeaths(next);

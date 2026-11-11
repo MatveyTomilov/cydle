@@ -65,6 +65,7 @@ export interface CombatActor {
   buffs: RuntimeBuff[];
   cooldowns: Record<string, number>;
   cast: CastState | null;
+  reactionCast: CastState | null;
   channelBusy: Partial<Record<Channel, number>>;
   nextAttackAt: number;
   flags: Record<string, number>;
@@ -108,7 +109,7 @@ export interface CombatActor {
 export type CombatEventKind =
   | 'COMBAT_START' | 'COMBAT_END' | 'ATTACK' | 'HIT' | 'MISS' | 'CRIT' | 'DAMAGE' | 'DOT_TICK'
   | 'STATUS_APPLY' | 'STATUS_EXPIRE' | 'HEAL' | 'SHIELD_GAIN' | 'SHIELD_EXPIRE' | 'ENERGY' | 'HEAT'
-  | 'HEAT_LOCKOUT' | 'HEAT_LOCKOUT_END' | 'CAST_START' | 'CAST_INTERRUPT' | 'CAST_FIZZLE' | 'SKILL_USE'
+  | 'HEAT_LOCKOUT' | 'HEAT_LOCKOUT_END' | 'CAST_START' | 'CAST_INTERRUPT' | 'CAST_FIZZLE' | 'SKILL_USE' | 'REACTION'
   | 'DEATH' | 'SUMMON' | 'RULE_FAIL' | 'TRIGGER' | 'CHAIN_LIMIT' | 'PHASE' | 'ESCAPE' | 'TELEGRAPH'
   | 'BUFF' | 'CONTROL' | 'REVIVE' | 'WANTED';
 
@@ -238,6 +239,7 @@ export interface CombatMetrics {
   healingDone: number;
   statusTicks: number;
   procsTriggered: number;
+  interrupts: number;
   chainLimitHits: number;
   ttk: { enemyId: string; name: string; ms: number }[];
   droneDeaths: number;
