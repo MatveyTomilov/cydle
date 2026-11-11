@@ -12,6 +12,8 @@
 - Added regression tests for one-time dismantling, equipped-item protection, unsecured ownership, and active-run restrictions.
 - Added protected item repair from the Inventory screen. The cost follows the master-spec durability formula, is capped by a comparable common item's price, consumes protected scrap only, restores durability to 100%, and leaves TR unchanged.
 - Added repair tests for exact cost, insufficient scrap, already repaired items, unsecured ownership, and active-run restrictions.
+- Added deterministic affix reroll and one-tier upgrade operations to the Inventory screen. They consume the declared TR/scrap/data costs, obey the TechLevel tier cap, preserve unselected rolls, reject fixed AF_SCAN rerolls, and preview costs before use.
+- Added craft tests for targeted reroll, tier upgrade, exact resource/TR consumption, insufficient resources, tier caps, and fixed affixes.
 - Added a deterministic, persisted first-sector run loop with validated route, combat, cache, service, and checkpoint commands; battle resolution reuses the existing simulator. Checkpoint shipment/evacuation, death settlement, item/currency rewards, XP, and six-layer graph state are tested.
 - Connected the road screen to transactional save commits with route selection, combat report/log, cache choice, repair/fuel services, and checkpoint decisions.
 - Kept old schema-v1 saves compatible and verified active-run save/reload without graph reroll.
@@ -20,4 +22,4 @@
 - Added IndexedDB persistence through Dexie with transactional, checksummed snapshots, two-valid-snapshot retention, recovery to a prior valid snapshot, and checked JSON import/export.
 - Added catalog cross-reference validation at app startup and through `npm run validate`.
 - Added four save-boundary tests, including IndexedDB integration through `fake-indexeddb`.
-- Multi-sector campaign, general inventory transfer, crafting/calibration, other road-node systems, later save migrations, CI, browser E2E, and final art/animation remain incomplete.
+- Multi-sector campaign, general inventory transfer, affix replacement/addition and TechLevel calibration, other road-node systems, later save migrations, CI, browser E2E, and final art/animation remain incomplete.
