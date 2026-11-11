@@ -644,3 +644,155 @@ Boss scaling hp × H(d), shields × H(d), damage × D(d); accuracy=110. Boss enc
 
 **Условие победы:** HP босса 0 и активные опасные призывы уничтожены либо покинули бой после смерти controller; combat end idempotent. Два уникальных ответа на угрозы у каждого босса, нет boss immunity к K/E/D; отдельные эффекты перехвата личности могут вместо захвата накладывать JAM.
 
+
+## 19. КАНОНИЧЕСКАЯ ЭКОНОМИКА, ЛУТ, ОПЫТ, КРАФТ-ИСТОЧНИКИ
+
+### 19.1. Валюты и источники
+
+Только три расходные глобальные валюты: CREDITS, SCRAP, DATA. CalibrationCore — редкий предметный материал конкретной технологической группы, не четвёртая свободная валюта. Чертежи — постоянные открытия. В текущем рейде добытые валюты лежат в runWallet unsecured; перевезённые или полученные за завершённый permanent milestone — metaWallet protected.
+
+| Источник | Credits | Scrap | Data | Item drop chance |
+|---|---|---|---|---|
+| обычное столкновение (за узел) | ceil(12×R(d)) | ceil(3×R(d)) | ceil(1×R(d)) | 70% одного item-roll |
+| элита | ceil(28×R(d)) | ceil(7×R(d)) | ceil(3×R(d)) | 100% одного item-roll +25% ещё одного |
+| bounty hunter | ceil(35×R(d)) | ceil(5×R(d)) | ceil(3×R(d)) | 90% одного item-roll |
+| босс | ceil(85×R(d)) | ceil(18×R(d)) | ceil(8×R(d)) | 100% одного boss-roll +50% ещё одного |
+| CACHE | ceil(8×R(d)) | ceil(2×R(d)) | 0 | 45% одного ordinary-roll |
+| QUEST milestone | см. конкретное событие | см. событие | см. событие | only if specified |
+
+**Калибровочные ядра:** босс гарантированно 1 item Core(group of d). ELITE имеет 15% шанс Core, BOUNTY 8%, CACHE 2%; определяется loot RNG отдельно от item rarity. Бонус item quantity увеличивает количество роллов (гарантированная дополнительная дробная chance), но не rarity probability. Значения округлить после применения к источнику, не за каждый enemy в группе.
+
+**Редкость одного item-roll:**
+- ORDINARY: 60% COMMON, 28% MODIFIED, 10% RARE, 1.8% LEGENDARY, 0.2% UNIQUE;
+- ELITE: 30% / 35% / 25% / 8.5% / 1.5%;
+- BOSS: 10% / 20% / 38% / 25% / 7%;
+- BOUNTY uses ELITE; CACHE uses ORDINARY.
+Таблицы ровно суммируются до 100%. UNIQUE берётся из biome/target pool; если pool пуст, выпадает LEGENDARY с явно записью fallback, а не hidden fake unique.
+
+**Опыт:** за обычный бой ceil(22×R(d)), элита ceil(55×R(d)), босс ceil(160×R(d)), квесты ceil(60×R(d)) при milestone, CACHE no XP. XPRequired(L→L+1)=round(100×L^1.35). После 61-level attribute/skill points больше нет; сам уровень может расти для архива и достижений, без усиления hidden stats. Персонаж получает XP даже если эвакуируется позднее, только когда xp было зафиксировано в permanent meta при завершении узла (XP защищён от смерти). Currency/loot нет. Это разделение прозрачно отображается.
+
+### 19.2. Расходы и цены
+
+| Действие | Стоимость (округлять вверх) | Доступность |
+|---|---|---|
+| 1 fuel | 3×R(d) credits или 5 scrap | FUEL nodes |
+| +30 hull | 15×R(d) credits | REPAIR |
+| restore 30% missing HP | 10×R(d) credits | REPAIR |
+| восстановление дрона +50% missingHP | 8×R(d) scrap | REPAIR/garage |
+| ship ≤5 units unsecured cargo +50% run currencies | 10×R(d) credits | checkpoint |
+| shop item | (25+7T)×rarityMultiplier×R(T) credits | SHOP |
+| base item craft | 18×R(T) scrap + 10×R(T) data, +чертёж | garage |
+| перенос предмета с runCargo в equipped | бесплатно, но ownership остаётся unsecured | между боями |
+| обнулить respec skill node | 10 credits/очко | garage |
+| respec attribute point | 10 credits/очко | garage |
+| revive after death | 10 credits или бесплатная стабилизация 50% HP | garage |
+| repair gear durability | ceil((100−durability)/10 × (2+T/5)) scrap | garage |
+| item craft operations | section 12 | garage |
+| TechLevel calibration | section 9 | garage |
+
+**Не вводить дополнительных глобальных валют, которые обесценивают старые.** Сильная экипировка не должна продаваться выше затрат на её воспроизводимое изготовление/продажу; sell value=itemPurchasePrice×0.25, roundDown; dismantle value=ceil(3×R(T)) scrap (+1 data, если digital-tag), не больше 60% craftCost. Проверять граф craft→sell→buy→dismantle на положительные циклы.
+
+### 19.3. Лут-фильтр
+
+Пресеты: «Сохранять всё», «Сохранять редкое+», «Сохранять только нужные теги», пользовательские фильтры. Новые неоткрытые UNIQUE всегда сохраняются по умолчанию. Условия по rarity, itemType, slot, tag, minAffixTier, конкретному аффиксу, сравнению preview Build Lab. Авторазбор требует сканер/гаражный модуль и соблюдает cargo ownership; разбираемый run-item даёт unsecured scrap (только в границах текущего выезда), не защищённый сразу. В истории последних 100 разобранных предметов показать seed, reason и ресурсы; undo доступен только до следующего игрового узла и если предмет не был уже расходован в транзакции.
+
+**Роль crafting:** полное редактирование предметов недоступно. Система позволяет целевой путь: добыть подходящую базу/слот/аффикс → при необходимости повысить roll/tier ограниченным TR → перекалибровать T → пройти более сложную глубину. Это предотвращает чистый казино-гринд и бессмысленную смену любимого unique каждые 4 района.
+
+## 20. ФРАКЦИИ, СОБЫТИЯ, КВЕСТЫ
+
+Четыре фракции:
+- F_VANTA — корпорация боевой электроники; награда оружием, бронёй, корпоративными пропусками.
+- F_RUST — «Ржавчина», инженеры и торговцы; ремонт, дроны, скидки.
+- F_CHOIR — «Хор Нуля», автономный ИИ; цифровые импланты, нестабильные протоколы.
+- F_ECHO — «Протокол Эхо», подпольные нетраннеры; разведка, контракты, сетевые данные.
+
+Reputation каждой ∈[−100,100], старт 0. Изменения сразу permanent после завершённого event choice, даже если рейд закончится смертью, но они дают соответствующую цену. При +30 доступен тематический shop discount 10%, при +60 — 15% и один тематический контракт; при −30 повышается wanted при встрече с группировкой на 3, при −60 появляется themed bounty. Reputation не должна приносить эквивалент бесконечного +% damage.
+
+### 20.1. 24 одношаговых события (все являются реальными выборами)
+
+Каждое событие — eventId, choiceId, money delta, resource delta, reputation delta, status flags, loot or world effect. Для указанных ниже наград сумма CREDITS/SCRAP/DATA масштабируется R(d) и ceil, но изменение репутации/розыска/ремонт/топливо/HP% не масштабируется. Для получения конкретного предмета гарантирован технически совместимый type at TechLevel(d), rarity MODIFIED unless noted. Недостаточно ресурсов на действие — choice disabled with reason, не выбирается автопилотом.
+
+| event ID | Название | Выбор A и результат | Выбор B и результат |
+|---|---|---|---|
+| EV01 | Разобранный дрон | восстановить: −5 scrap, +1 DR_GUN как unsecured loot | разобрать: +8 scrap |
+| EV02 | Блокпост | взлом: +12 data, wanted+10, F_ECHO+5 | оплатить: −10 credits, wanted−5 |
+| EV03 | Тихая заправка | +5 fuel, −10 credits | забрать без оплаты: +5 fuel, wanted+12 |
+| EV04 | Полевой хирург | heal 50% missing HP за 12 credits | взять scrap+8, wanted+5 |
+| EV05 | Контракт крови | hunt flag next ELITE, reward +1 extra RARE | отказаться, +5 data разведки |
+| EV06 | Слепой терминал | reveal next 3 nodes, F_ECHO+4, data−5 | вскрыть и продать: credits+18, F_ECHO−4 |
+| EV07 | Сгоревшая мастерская | scrap+12, 10% hull loss | repair +25 hull, scrap−8 |
+| EV08 | Контрабандист | credits+20, wanted+6, F_RUST+3 | сдать груз VANTA, credits+12, F_VANTA+5 |
+| EV09 | Сторожевой ИИ | 1 DIGITAL rare-tag item, F_CHOIR+5, wanted+5 | data+15, F_CHOIR−5 |
+| EV10 | Вражеский сканер | disable scanner: data−4, wanted−8 | использовать: reveal biome boss weak tag, wanted+4 |
+| EV11 | Потерянная вакцина | heal 35% missing HP, F_RUST+3 | sell: credits+20, F_RUST−5 |
+| EV12 | Брошенные аккумуляторы | energy refilled, −5 hull | scrap+10, wanted+2 |
+| EV13 | Серый дилер | pay 20 credits, random RARE eligible item | sell 10 data for 30 credits |
+| EV14 | Сеть камер | dodge patrol: fuel−2, wanted−10 | engage next BOUNTY with +25% credits |
+| EV15 | Уличный архив | data+12, one random enemy codex entry | credits+16, F_ECHO−3 |
+| EV16 | Плата за проход | credits−12, avoid next ordinary combat, advance | fight next ELITE for extra item roll |
+| EV17 | Дефектный конденсатор | get random ENERGY MODIFIED item, +10 heat next fight | dismantle, scrap+13 |
+| EV18 | Взломанная турель | next combat one E08 joins as allied 50% strength, F_CHOIR+2 | scrap+10, data+4 |
+| EV19 | Гражданская колонна | accompany, next 1 travel edge +15s, F_RUST+8 | sell route info: credits+22, F_RUST−8 |
+| EV20 | Аварийный ремонт | −10 data, +35 hull | +20 credits, −15 hull |
+| EV21 | Служба взыскания | pay 15 credits, wanted−12 | defeat BOUNTY E21, +1 EXTRA RARE roll |
+| EV22 | Машинное эхо | receive MUT_REGEN if mutation slot exists, F_CHOIR+4 | +14 data, F_CHOIR−3 |
+| EV23 | Топливный коллектор | fuel+8, scrap−10 | credits+15, wanted+5 |
+| EV24 | Мост без хозяина | short route: next edge −15s and +10 wanted | long route: next edge +20s, shield+20 temporary next combat |
+
+Никакая сумма credits не уходит ниже нуля; heal/repair не превышают max. Флаг 'next combat' сбрасывается после ровно одного следующего combat encounter. «Пропуск» COMBAT не даёт XP или loot от несыгранного боя. Risk vs reward видны в выборе; ветки A/B не сводятся к одинаковому плюсу. Каждый event can occur at most once/run; эвенты сюжета имеют отдельные IDs.
+
+### 20.2. Шесть полноценных трёхстадийных цепочек
+
+Каждый quest — state machine QUEST_OFFERED→STAGE_1→STAGE_2→STAGE_3→COMPLETE/FAILED. В каждой стадии присутствуют один конкретный event action и награда/флаг. При exit/death подтверждённые стадии остаются в META, временная подсистема run уничтожается; игра должна предлагать восстановление цепочки при следующем доступном тематическом секторе. Каждая награда только по (questId, stageId, choiceId) один раз.
+
+**Q01 «Потерянный сигнал» (B04 / F_CHOIR/F_VANTA):**
+1. Найти автономный ИИ у перевёрнутого транспорта: установить в сервис (+5 F_CHOIR, −5 F_VANTA) либо продать VANTA (+5 F_VANTA, +20 credits, Quest ends alternative completion).
+2. При установке в следующем B04 открыть повреждённый ретранслятор: data−10, +чертёж OFF_CORE_D, wanted+8; либо отключить ИИ, +10 scrap, Quest ends.
+3. Финал: спрятать ИИ (F_CHOIR+15, открыть U09 target contract), либо выдать корпорации (F_VANTA+15, открыть U04 target contract), с текстовым изменением road lore.
+**Q02 «Мёртвый курьер» (B01 / F_ECHO):**
+1. Найти контейнер и взять (wanted+5); отказаться (credits+8, Quest ends).
+2. Доставить на B03 через ≤3 новых сектора (F_ECHO+10) или вскрыть (data+20, F_ECHO−10).
+3. На B03 после доставки выбрать очистку данных (−8 data, +чертёж OFF_TARGET) или продать (credits+35, F_ECHO−5).
+**Q03 «Долг механика» (B03 / F_RUST):**
+1. Дать 10 scrap мастеру (+6 F_RUST) либо выкупить tool (+10 credits, Quest ends).
+2. Победить E09 technician ELITE (grants UNIQUE module reroll contract, F_RUST+6) либо купить запасной двигатель за 20 credits.
+3. Выбрать доступ к SERVICE upgrade (открывает +15% hull repair at checkpoints) либо +1 calibration core of current group.
+**Q04 «Чужая броня» (B02 / F_VANTA):**
+1. Захватить код доступа (wanted+10, data+10) либо передать VANTA (F_VANTA+8, Quest ends).
+2. Устранить E12 ELITE в следующем B02 (grant rare armor) либо заплатить 25 credits за оборудование.
+3. Установить защиту гражданскому форпосту (F_RUST+10, +ARM_MID schematic) или продать протокол (F_VANTA+10, +35 credits).
+**Q05 «Термальный шрам» (B05):**
+1. Исследовать реактор (−10 hull, +12 data) либо уничтожить (scrap+12, Quest ends).
+2. Победить E19 ELITE или пережить 3 B05 combat nodes, выбрать одно: +1 heat-tech item или +10 credits.
+3. Передать термо-данные F_CHOIR (+12 rep, открыть U14 signal contract) либо VANTA (+12 rep, открыть U07 signal contract).
+**Q06 «Забытая граница» (B06 / late-game):**
+1. Снять старый сенсор за 15 data, открыть следующий anomaly modifier раньше времени (или отказаться, +10 credits, Quest ends).
+2. Провести anom route с extra threat node, −5 wanted if survived; либо эвакуироваться, Quest pauses.
+3. Отдать карту F_ECHO (+12 rep, открыть целевой контракт U18) или сохранить для гаража (unlock +1 extra anomaly preview in future B06).
+
+**Сроки:** «в следующем B03» означает отложенная стадия, не автоматический fail при смене сектора; только Q02 с ограничением ≤3 новых секторов имеет fail on timeout и компенсационный F_ECHO−3. Квестовый журнал показывает requirements, таймеры, последствия, возможные альтернативы. Автопилот не принимает впервые значимое фракционное решение без явной настройки.
+
+### 20.3. Сюжетные акты и финальный исход
+
+Акт I: после BOSS_A d4 открывается FORPOST_4 и архив «Первый коридор». Акт II: после BOSS_B d8 открывается FORPOST_8, новая гаражная линия ENHANCED_DRONES и инструменты целевой охоты. Акт III: после BOSS_CORE d12 выбор «Создать свободный коридор» (доступ к нейтральным контрактам; все фракции доступны) либо «Передать контроль выбранной фракции» (её exclusive contracts и альтернативный текст концовки, другие не исчезают). Выбор фиксируется и в журнале, но не запрещает player endgame. Оба исхода дают ENDGAME_UNLOCKED and FORPOST_12.
+
+## 21. КОНТРАКТЫ И КОНТРОЛИРУЕМАЯ РЕИГРАБЕЛЬНОСТЬ
+
+Перед новым выездом до трёх доступных контрактов с seed из мира, не ежедневный таймер:
+- **HUNT:** победить указанного ELITE/BOSS в конкретном biome, гарантия RARE (или выше согласно обычному loot-roll) с одной выбранной меткой нужного источника; basic reward +ceil(30×R(d)) credits.
+- **TECH:** найти CACHE/ANOMALY в доступном биоме и завершить его выбор; награда один конкретный compatible MODIFIED tech item +ceil(15×R(d)) data, чертёж при первом успехе.
+- **ESCORT:** завершить минимум два combat nodes, Wanted≤40, и добраться до checkpoint с fuel≥3; награда +ceil(50×R(d)) credits и +8 репутации выбранной тематической фракции.
+
+Контракт привязан к targetBiome, targetTechTag, reward definition, eventId. По умолчанию не более одного активного контракта на выезд; без контракта свободный рейд с обычными наградами. Завершение — единовременное по contractInstanceId. При death недоставленный ESCORT и незакреплённые TECH/HUNT награды теряются, но открытая permanently quest-information сохраняется. Контракты переиздаются новым instanceId без скрытых штрафов, старый grantId не повторяется.
+
+**Эндгейм: «Договоры эскалации»** — добровольные 0–3 модификатора из 8:
+1. WANTED_PLUS: +5 wanted per elite, +15% credits reward.
+2. HUNT_FAST: heavy cast windup −20% (минимум 600ms telegraph), +15% item quantity.
+3. REPAIR_RARE: в секторе на один REPAIR node меньше (не нарушать достижимость), +10% scrap.
+4. SCAN_DARK: −1 уровень раскрытия скрытых узлов, +10% data.
+5. DRONE_WAR: elites могут выбирать DRONE_JAM, +15% loot quantity.
+6. HEAT_FOG: all combat cooling −2/s floor0, +10% ENERGY-tag weights.
+7. SHIELD_BREAK: elites get +10 flat armor penetration, +10% RARE chance by shifting COMMON weight.
+8. LONG_RUN: travel edges +15s, boss gives +25% item quantity.
+Бонусы +item quantity меняют число роллов, а +rare chance перераспределяет веса с суммой100, не создаёт невалидной таблицы. Изменения доступны до выезда, не задним числом. Любой набор из 3 должен быть проходим хотя бы некоторыми достижимыми билдами, проверяется Simulation Lab.
+
