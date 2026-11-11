@@ -120,13 +120,13 @@ export function resolveCurrentCombat(save: SaveGame, commandId: string): RunComm
   const node = run.graph.layers.flat().find((candidate) => candidate.id === run.currentNodeId);
   if (!node || !['COMBAT', 'ELITE', 'BOUNTY', 'BOSS'].includes(node.type)) return fail(save, 'NODE_NOT_COMBAT', 'Текущий узел не является боевым.');
   if (run.clearedNodeIds.includes(node.id)) return fail(save, 'NODE_ALREADY_CLEARED', 'Этот боевой узел уже пройден.');
-  const pendingNextCombat = run.pendingNextCombat ?? { skipOrdinary: false, forceElite: false, extraItemRoll: false, forceBounty: false, bountyCreditsBonus: 0, bountyEnemyId: null, extraRareItemRoll: false, alliedTurret: false };
+  const pendingNextCombat = run.pendingNextCombat ?? { skipOrdinary: false, forceElite: false, extraItemRoll: false, forceBounty: false, bountyCreditsBonus: 0, bountyEnemyId: null, extraRareItemRoll: false, alliedTurret: false, extraRareOnElite: false };
   if (pendingNextCombat.skipOrdinary && node.type === 'COMBAT') {
     const next = structuredClone(save);
     const nextRun = next.run!;
     nextRun.commandIds = [...nextRun.commandIds, commandId].slice(-128);
     nextRun.lastCommandId = commandId;
-    nextRun.pendingNextCombat = { skipOrdinary: false, forceElite: false, extraItemRoll: false, forceBounty: false, bountyCreditsBonus: 0, bountyEnemyId: null, extraRareItemRoll: false, alliedTurret: false };
+    nextRun.pendingNextCombat = { skipOrdinary: false, forceElite: false, extraItemRoll: false, forceBounty: false, bountyCreditsBonus: 0, bountyEnemyId: null, extraRareItemRoll: false, alliedTurret: false, extraRareOnElite: pendingNextCombat.extraRareOnElite };
     nextRun.clearedNodeIds = [...nextRun.clearedNodeIds, node.id];
     nextRun.combatResult = null;
     nextRun.phase = node.layer === 5 ? 'CHECKPOINT' : 'ROUTE';
@@ -163,7 +163,8 @@ export function resolveCurrentCombat(save: SaveGame, commandId: string): RunComm
   const next = structuredClone(save);
   const nextRun = next.run!;
   nextRun.pendingCombatEffects = { initialTempShield: 0, extraHeat: 0 };
-  nextRun.pendingNextCombat = { skipOrdinary: false, forceElite: false, extraItemRoll: false, forceBounty: false, bountyCreditsBonus: 0, bountyEnemyId: null, extraRareItemRoll: false, alliedTurret: false };
+  const retainEliteContract = pendingNextCombat.extraRareOnElite && node.type !== 'ELITE' && result.outcome === 'VICTORY';
+  nextRun.pendingNextCombat = { skipOrdinary: false, forceElite: false, extraItemRoll: false, forceBounty: false, bountyCreditsBonus: 0, bountyEnemyId: null, extraRareItemRoll: false, alliedTurret: false, extraRareOnElite: retainEliteContract };
   nextRun.commandIds = [...nextRun.commandIds, commandId].slice(-128);
   nextRun.lastCommandId = commandId;
   nextRun.combatResult = result;
@@ -194,7 +195,7 @@ export function resolveCurrentCombat(save: SaveGame, commandId: string): RunComm
     return { ok: true, save: checked.data, events: [{ type: 'COMBAT_TIMEOUT', text: 'Бой достиг лимита симуляции. Выезд остановлен безопасно; награды не выданы.' }] };
   }
 
-  const reward = makeBattleReward(nextRun, node.id, node.type, pendingNextCombat.extraItemRoll, pendingNextCombat.extraRareItemRoll, pendingNextCombat.bountyCreditsBonus);
+  const reward = makeBattleReward(nextRun, node.id, node.type, pendingNextCombat.extraItemRoll, pendingNextCombat.extraRareItemRoll || (node.type === 'ELITE' && pendingNextCombat.extraRareOnElite), pendingNextCombat.bountyCreditsBonus);
   if (reward.xp > 0) grantExperience(next, nextRun, reward.xp, `xp:${node.id}`);
   nextRun.runWallet = {
     CREDITS: nextRun.runWallet.CREDITS + reward.wallet.CREDITS,

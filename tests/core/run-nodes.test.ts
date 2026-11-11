@@ -289,12 +289,12 @@ describe('run road nodes', () => {
     expect(skipped.ok).toBe(true);
     if (!skipped.ok) return;
     expect(skipped.save.run!.runWallet.CREDITS).toBe(0);
-    expect(skipped.save.run!.pendingNextCombat).toEqual({ skipOrdinary: true, forceElite: false, extraItemRoll: false, forceBounty: false, bountyCreditsBonus: 0, bountyEnemyId: null, extraRareItemRoll: false, alliedTurret: false });
+    expect(skipped.save.run!.pendingNextCombat).toEqual({ skipOrdinary: true, forceElite: false, extraItemRoll: false, forceBounty: false, bountyCreditsBonus: 0, bountyEnemyId: null, extraRareItemRoll: false, alliedTurret: false, extraRareOnElite: false });
 
     const elite = resolveRunEvent({ ...base, run: prepareEventRun('event-force-elite') }, { id: 'event-force-elite', choiceId: 'B' });
     expect(elite.ok).toBe(true);
     if (!elite.ok) return;
-    expect(elite.save.run!.pendingNextCombat).toEqual({ skipOrdinary: false, forceElite: true, extraItemRoll: true, forceBounty: false, bountyCreditsBonus: 0, bountyEnemyId: null, extraRareItemRoll: false, alliedTurret: false });
+    expect(elite.save.run!.pendingNextCombat).toEqual({ skipOrdinary: false, forceElite: true, extraItemRoll: true, forceBounty: false, bountyCreditsBonus: 0, bountyEnemyId: null, extraRareItemRoll: false, alliedTurret: false, extraRareOnElite: false });
   });
 
   it('stores EV14 and EV21 as forced bounty choices with their authored modifiers', () => {
@@ -334,6 +334,21 @@ describe('run road nodes', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.save.run!.pendingNextCombat.alliedTurret).toBe(true);
+  });
+
+  it('stores EV05 A as a RARE reward for the next ELITE, not the next combat', () => {
+    const base = createInitialSave({ saveId: 'event-elite-contract', now: 100 });
+    const run = createInitialRun(base, 'event-elite-contract-seed');
+    const eventNode = run.graph.layers[1]![0]!;
+    eventNode.type = 'EVENT';
+    eventNode.eventId = 'EV05';
+    run.currentNodeId = eventNode.id;
+    run.visitedNodeIds = [eventNode.id];
+    run.phase = 'NODE';
+    const result = resolveRunEvent({ ...base, run }, { id: 'event-elite-contract-choice', choiceId: 'A' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.save.run!.pendingNextCombat.extraRareOnElite).toBe(true);
   });
 
   it('rejects an unaffordable event choice without mutating the save', () => {

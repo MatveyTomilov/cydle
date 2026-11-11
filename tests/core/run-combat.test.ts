@@ -207,6 +207,44 @@ describe('run combat integration', () => {
     expect(result.save.run!.pendingNextCombat.alliedTurret).toBe(false);
   });
 
+  it('keeps EV05 through ordinary combat and awards one guaranteed RARE at the next elite', () => {
+    const base = combatSave('event-elite-contract');
+    const run = base.run!;
+    const eventNode = run.graph.layers[1]![0]!;
+    eventNode.type = 'EVENT';
+    eventNode.eventId = 'EV05';
+    run.currentNodeId = eventNode.id;
+    run.visitedNodeIds = [eventNode.id];
+    run.phase = 'NODE';
+    const choice = resolveRunEvent({ ...base, run }, { id: 'event-elite-contract-choice', choiceId: 'A' });
+    expect(choice.ok).toBe(true);
+    if (!choice.ok) return;
+
+    const ordinary = choice.save.run!.graph.layers[2]![0]!;
+    ordinary.enemies = [{ templateId: 'E01', hpMult: 0.1, damageMult: 0.1 }];
+    const enteredOrdinary = chooseRunNode(choice.save, 'elite-contract-ordinary-enter', ordinary.id);
+    expect(enteredOrdinary.ok).toBe(true);
+    if (!enteredOrdinary.ok) return;
+    const ordinaryResult = resolveCurrentCombat(enteredOrdinary.save, 'elite-contract-ordinary-fight');
+    expect(ordinaryResult.ok).toBe(true);
+    if (!ordinaryResult.ok) return;
+    expect(ordinaryResult.save.run!.pendingNextCombat.extraRareOnElite).toBe(true);
+    expect(ordinaryResult.save.run!.unsecuredCargo.some((item) => item.originGrantId === `combat:${run.seed}:${ordinary.id}:event-extra-rare`)).toBe(false);
+
+    const elite = ordinaryResult.save.run!.graph.edges.find((edge) => edge.from === ordinary.id && edge.toLayer === 3)!.to;
+    const eliteNode = ordinaryResult.save.run!.graph.layers.flat().find((node) => node.id === elite)!;
+    eliteNode.type = 'ELITE';
+    eliteNode.enemies = [{ templateId: 'E01', hpMult: 0.1, damageMult: 0.1, elite: 'EL_PEN' }];
+    const enteredElite = chooseRunNode(ordinaryResult.save, 'elite-contract-elite-enter', eliteNode.id);
+    expect(enteredElite.ok).toBe(true);
+    if (!enteredElite.ok) return;
+    const eliteResult = resolveCurrentCombat(enteredElite.save, 'elite-contract-elite-fight');
+    expect(eliteResult.ok).toBe(true);
+    if (!eliteResult.ok) return;
+    expect(eliteResult.save.run!.unsecuredCargo).toContainEqual(expect.objectContaining({ originGrantId: `combat:${run.seed}:${eliteNode.id}:event-extra-rare`, rarity: 'RARE' }));
+    expect(eliteResult.save.run!.pendingNextCombat.extraRareOnElite).toBe(false);
+  });
+
   it('applies elite rewards, corporate wanted, and biome wallet bonuses through the shared combat result', () => {
     const save = combatSave('elite-reward');
     const run = save.run!;

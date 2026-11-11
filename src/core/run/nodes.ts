@@ -179,7 +179,7 @@ export function resolveRunEvent(save: SaveGame, command: { id: string; choiceId:
   nextRun.pendingCombatEffects ??= { initialTempShield: 0, extraHeat: 0 };
   if (choice.nextCombat?.shieldBonus) nextRun.pendingCombatEffects.initialTempShield += choice.nextCombat.shieldBonus;
   if (choice.nextCombat?.extraHeat) nextRun.pendingCombatEffects.extraHeat += choice.nextCombat.extraHeat;
-  nextRun.pendingNextCombat ??= { skipOrdinary: false, forceElite: false, extraItemRoll: false, forceBounty: false, bountyCreditsBonus: 0, bountyEnemyId: null, extraRareItemRoll: false, alliedTurret: false };
+  nextRun.pendingNextCombat ??= { skipOrdinary: false, forceElite: false, extraItemRoll: false, forceBounty: false, bountyCreditsBonus: 0, bountyEnemyId: null, extraRareItemRoll: false, alliedTurret: false, extraRareOnElite: false };
   if (choice.nextCombat?.skip) nextRun.pendingNextCombat.skipOrdinary = true;
   if (choice.nextCombat?.forceElite) nextRun.pendingNextCombat.forceElite = true;
   if (choice.nextCombat?.forceBounty) nextRun.pendingNextCombat.forceBounty = true;
@@ -190,6 +190,7 @@ export function resolveRunEvent(save: SaveGame, command: { id: string; choiceId:
     nextRun.pendingNextCombat.bountyEnemyId = 'E21';
     nextRun.pendingNextCombat.extraRareItemRoll = true;
   }
+  if (choice.flag === 'huntElite') nextRun.pendingNextCombat.extraRareOnElite = true;
   if (choice.fuel) nextRun.resources.fuel = Math.max(0, Math.min(nextRun.resources.maxFuel, nextRun.resources.fuel + choice.fuel));
   if (choice.hull) nextRun.resources.hull = Math.max(0, Math.min(nextRun.resources.maxHull, nextRun.resources.hull + choice.hull));
   if (choice.healMissingFraction) nextRun.resources.hp = Math.min(nextRun.resources.maxHP, nextRun.resources.hp + (nextRun.resources.maxHP - nextRun.resources.hp) * choice.healMissingFraction);
