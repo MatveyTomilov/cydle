@@ -390,3 +390,125 @@ slot type означает совместимый тип посадочного 
 
 **Один предмет = один itemId**. Любые действия в гараже по созданию/переносу/разбору/продаже проверяют собственность и grantId; повторное применение запрещено. Ремонт не тратит TR; расход scrap = ceil((100-durability)/10 × (2+T/5)), capped at cost of new comparable common item; выброс в мусор не является источником бесконечных денег.
 
+
+## 13. 18 УНИКАЛЬНЫХ ЭФФЕКТОВ — ТОЧНЫЙ КАТАЛОГ
+
+Каждый уникальный предмет — фиксированный itemDefinition с tag UNIQUE, совместимым baseTemplateId, named uniqueEffectId, TechLevel, одним указанным слотом и явно заданной стоимостью нейроёмкости, если это имплант. Может выпасть в тематическом биоме/у босса, либо из специального сигнального контракта. Unique effect всегда присутствует, обычные аффиксы только если указаны в data. Предметы доступные с T1 могут быть перекалиброваны согласно разделу 9.
+
+| id / название | Основа / слот | Уникальный эффект и явные ограничения |
+|---|---|---|
+| U01 «Чёрный конденсатор» | IMP_HEAT / CHEST cost20 | При достижении heat=100 снимает 25% ТЕКУЩИХ щитов вместо обычного lockout, не менее 1 если shield>0; следующая энергетическая атака в течение 5с получает MORE=(1+0.01×shieldsConsumed), максимум ×2.0; ICD 8с; если щита 0, обычный lockout. |
+| U02 «Эхо смерти» | IMP_DATA / HEAD cost18 | При убийстве DIRECT DIGITAL создаёт SECONDARY hit на 60% TechPower D по другой живой цели, ICD 3с, depthBudget стандартный; не триггерит другое убийство от U02. |
+| U03 «Нулевой провод» | FOCUS_D1 / MAIN | Убийство заражённого врага: переносит min(2,remainingVirusStacks) на другую цель на исходной остаточной длительности, ICD 2с. Нет цели — ничего. |
+| U04 «Реактивная оболочка» | ARM_HEAVY / ARMOR | Из реально ПОГЛОЩЁННОГО щитом урона 20% накапливается в заряде max(100×H(T)); каждые 4с следующий успешный main direct hit добавляет заряд как SECONDARY ENERGY packet. |
+| U05 «Рой-матрица» | IMP_DRONE / NEURAL cost20 | Когда дрон впервые получает lethal damage в бою, генерирует EMP secondary по всем врагам 0.5×droneTechDamage D, ICD 12с для каждого дрона, без self-resurrection. |
+| U06 «Слепая зона» | ARM_CLOTH / ARMOR | После боя без SK_EMP/SK_CHAIN/SK_PLASMA −4 розыска и +10% доходов за скрытную победу, но 15% LESS direct damage всегда. |
+| U07 «Красная линия» | PLASMA_E1 / MAIN | При heat≥70, +40% MORE ENERGY damage, cooling−3/сек, heat lockout сохраняется. |
+| U08 «Перепрошивка» | OFF_CORE_D / OFFHAND | После successful SK_NEURO по механической небоссовой цели с HP≤25% шанс 35% перехватить на 4с; ICD 20с, перехваченная цель наносит 40% своего обычного урона и не может выполнять onDeath loot. На боссах вместо перехвата 2с JAM. |
+| U09 «Дублирующий контур» | IMP_REGEN / NEURAL cost20 | Каждые 12с повторяет последнюю применённую DIGITAL программу по той же доступной цели на 50% урона и 0 procWeight; повтор не расходует энергию и не запускает U09 вновь. |
+| U10 «Бастион» | OFF_SHIELD / OFFHAND | Получить дополнительные maxShields = 0.30×итоговая броня в контексте без U10. Броня НЕ тратится; зависимость односторонняя, чтобы исключить цикл. |
+| U11 «Квантовый долг» | IMP_HP / CHEST cost15 | За каждую потерю 10% максимального HP: +5% INCREASED damage, максимум +35%; при HP>80% −10% MORE direct damage. Бонус текущий, не snapshot. |
+| U12 «Паразитический коллектор» | FOCUS_D1 / MAIN | При прямом попадании по заражённой цели восстановить 4 energy; ICD 1с и максимум 12 energy/сек суммарно с иных эффектов U12. |
+| U13 «Призрачный курьер» | IMP_REFLEX / ARMS cost18 | Каждое успешное уклонение даёт stack «фаза» на 8с (до 3). Следующая main direct атака расходует все стеки, +12% MORE damage на stack. |
+| U14 «Холодное ядро» | OFF_COOL / OFFHAND | Если heat≤25 в течение непрерывных 3с, +25% MORE digital skill damage и +2 energy regen; при выходе за порог эффект исчезает. |
+| U15 «Архивариус» | OFF_TARGET / OFFHAND | После успешного SK_SCAN появляется +1 дополнительно раскрытый дорожный узел на карте следующего сектора, но +2 розыска; во время боя SK_SCAN даёт ещё +5 accuracy. |
+| U16 «Командная нить» | IMP_DRONE / NEURAL cost22 | Если оба дрона живы и атакуют одну цель, их атаки получают +30% MORE drone damage; при уничтожении любого бонус пропадает немедленно. |
+| U17 «Сердце помех» | ARM_NET / ARMOR | Каждый законченный вражеский JAM сокращает CD ближайшего доступного SK_EMP на 2с, максимум одно срабатывание за 5с; против digital enemies +10 shield regen/сек на 3с. |
+| U18 «Долгий импульс» | RAIL_K6 / MAIN | Каждая секунда без main атаки копит +10% MORE следующему K direct hit, до 6 стеков; стаки сбрасываются только после успешного direct K hit; cooldown перерасчёт не меняет уже накопленные стаки. |
+
+Числовая спецификация U04 «заряд» и U01 «heat» должна быть реализована как effect definitions с видимым CalcTrace, а не как обычный статический % в item tooltip. «Заряженный» показатель не является постоянным DPS и не отображается как всегда активный.
+
+Источники дропа: U01,U07,U14 — Термический пояс; U03,U08,U09,U12,U17 — Слепая сеть; U05,U16 — Ржавые верфи; U04,U10,U11 — Корпоративный периметр; U06,U13,U15 — Неоновая магистраль; U02,U18 — Нулевая зона. Боссы имеют дополнительный собственный вес на тематические уникальные эффекты. Уникальный эффект одного itemId нельзя получить дважды в рамках одного экземпляра.
+
+## 14. ДЕРЕВО СПЕЦИАЛИЗАЦИИ — ВСЕ 100 УЗЛОВ
+
+**Топология:** шесть ветвей (K=Кинетика; H=Нагрев/Энергия; N=Нетраннер; D=Дроны; S=Защита; R=Реакция/Тактика), по 16 конкретных узлов (4 tier × 4 позиции A–D) = 96, плюс 4 cross-branch nodes X1–X4 = **100**. Каждый узел стоит ровно 1 очко, одного ранга (нельзя купить три ранга одного узла). Максимум 60 распределённых очков, не больше 2 tier4 keystones (позиции C/D любой ветви) одновременно. Допускается респек в гараже: 10 credits за снятый узел; удаление узла с активными зависимостями автоматически подсвечивает и снимает соответствующих детей при подтверждении и возвращает очки. Игрок не может потерять очки.
+
+**Доступность:** T1 любой без предыдущих; T2 после ≥2 очков в той же ветви + как минимум одного T1; T3 после ≥5 в той же ветви + T2; T4 после ≥9 в той же ветви + T3. X1–X4 после ≥6 очков в каждой из двух соответствующих ветвей. Нет скрытых графовых prereq. Для обычных узлов global caps из раздела 6 действуют; keystones могут задавать отдельное поведение, но обязаны показывать цену/негатив.
+
+### 14.1. K — кинетика (16)
+
+| Tier | A | B | C | D |
+|---|---|---|---|---|
+| K1 | +6% K damage | +3 flat armor pen | +4 accuracy | +5% bleed damage |
+| K2 | +5% attack speed с K MAIN | +10% K damage vs ARMOR_BREAK | +2 flat pen, +6% SHOTGUN damage | +1 max BLEED stack (cap 11) |
+| K3 | 12% chance direct K hit → 1 ARMOR_BREAK, ICD 4с | +8% MORE K damage vs HP>80% | +10% crit multiplier при main K | при K kill +4 energy, ICD 2с |
+| K4 | +15% MORE K damage, −8% ENERGY damage | K hit with ≥2 ARMOR_BREAK restores 12 shields, ICD3с | **KEYSTONE:** каждое 3-е K direct hit удваивает текущий flatArmorPen на эту атаку, но −10% attack speed | **KEYSTONE:** BLEED stacks ≥5 дают +30% MORE K execute damage, но −15% K against unbleeding |
+
+### 14.2. H — энергетика/нагрев (16)
+
+| Tier | A | B | C | D |
+|---|---|---|---|---|
+| H1 | +6% E damage | +2 heat cooling/сек | +10 maxEnergy | +3 energy regen/сек |
+| H2 | при heat≥60 +10% MORE E damage | SK_VENT +10 heat removal | −8% E skill energy cost (floor1) | при energy≥80 +8% attack speed |
+| H3 | heat 80→100: +20 temp shield один раз на пересечение, ICD 10с | на SK_PLASMA +1 BURN stack, ICD3с | после E kill −15 heat | после HEAT lockout +5 energy regen на 4с |
+| H4 | +20% MORE E при heat≥70 и −3 cooling | при heat≤25 +20% MORE D skill damage, −10% E | **KEYSTONE:** heat=100 запускает бесплатный 0.7 TechPower E pulse, ICD 12с, и lockout 1с | **KEYSTONE:** E attacks at heat≥80 consume 10 shield and gain +25% MORE, can't trigger if shield<10 |
+
+### 14.3. N — цифровая система (16)
+
+| Tier | A | B | C | D |
+|---|---|---|---|---|
+| N1 | +6% D damage | +10% VIRUS damage | +2 energy regen/сек | +4 DIGITAL_RES p.p. |
+| N2 | VIRUS duration +1с | SK_NEURO +10% damage | SK_EMP cost −4 energy | +10% direct D vs JAM target |
+| N3 | VIRUS ticks apply 1 shield leak stack on hit of direct skill, ICD 6с | SK_SEED +1 stack, max virus stack cap applies | на D kill restore 8 energy, ICD3с | +15% MORE D vs alone target |
+| N4 | SK_DETONATE coefficient .80 вместо .60, −10% normal VIRUS tick damage | +15% D resistance and −5% K damage | **KEYSTONE:** VIRUS on kill transfers 2 remaining stacks to another target, ICD2с; −15% single-target D | **KEYSTONE:** successful EMP grants 1 extra reaction action within 2с, ICD 15с; reaction energy costs +20% |
+
+### 14.4. D — инженерия/дроны (16)
+
+| Tier | A | B | C | D |
+|---|---|---|---|---|
+| D1 | +8% drone damage | +10% drone HP | +5 drone accuracy | +5% repair power |
+| D2 | drone downtime from JAM −20% duration | +10% drone shield | DR_MED restore +8 shields | +5% drone attack speed |
+| D3 | one active drone damage +15% MORE if other dead/absent | both active same target +10% MORE damage | on drone death restore 20 energy to hero, once per drone per fight | drone MARK lasts +2с |
+| D4 | +20% MORE drone damage, −10% main hero damage | drone HP +25% MORE, −5% drone damage | **KEYSTONE:** two living drones build 1 synchrony/sec (max5); at max next hit spends stacks for ×1.5 MORE, then reset | **KEYSTONE:** drone death secondary EMP 0.6 droneTechPower D, ICD15с; drone maxHP −20% |
+
+### 14.5. S — живучесть/щиты (16)
+
+| Tier | A | B | C | D |
+|---|---|---|---|---|
+| S1 | +8% maxHP | +8% maxShield | +6% armor | +4 ENERGY_RES p.p. |
+| S2 | +2 shield regen/сек после 4с без урона | +5 DIGITAL_RES p.p. | +20 flatHP ×D(T current gear) | shield damage taken −5% MORE (щит только) |
+| S3 | shield absorbed ≥50 one hit → +8 energy, ICD3с | HP<35% +10% LESS all incoming, ICD no, only while threshold | +15% healing power | SHIELD_LEAK duration −25% |
+| S4 | +15% MORE maxHP, −5% attack speed | +20% MORE maxShield, −5% energy regen | **KEYSTONE:** HP below 20% triggers 80 temporary shield ×D(T armor) for 5с once per combat, −10% damage | **KEYSTONE:** shield absorbed hit produces 15% reflected D SECONDARY, ICD3с, −10% maxShield |
+
+### 14.6. R — реакция/тактика (16)
+
+| Tier | A | B | C | D |
+|---|---|---|---|---|
+| R1 | +5 accuracy | +5 evasion | +5% attack speed | −5% reaction cooldown |
+| R2 | successful dodge +2 energy, ICD1с | +8% crit multiplier | SK_SHIELD energy cost −5 | boss telegraph readability +200ms (telegraph starts earlier) |
+| R3 | dodge → next attack +12% MORE, ICD3с | successful interrupt → restore 10 shield | SK_SCAN mark +2с | attacking same target 4 times grants +8% accuracy for 4с |
+| R4 | +15% MORE crit damage, −8% crit chance p.p. (clamp 0) | +8% LESS damage on first 3сек of combat | **KEYSTONE:** once per combat, emergency reaction ignores energy requirement but grants +20 heat and +3с its cooldown | **KEYSTONE:** every 3rd successful dodge refreshes nearest ready main skill by 2с, ICD12с; −10% maxHP |
+
+### 14.7. Четыре перекрёстных узла
+
+| ID | Требуется | Эффект |
+|---|---|---|
+| X1 Термоброня | H≥6 and S≥6 | каждый потраченный на U01 или H4D shield даёт 0.5 temporary shield на 5сек (max25), ICD1с |
+| X2 Киберрой | N≥6 and D≥6 | каждый direct digital удар дрона по VIRUS target продлевает один стек на 1с, ICD2с |
+| X3 Предвидение | R≥6 and S≥6 | при телеграфе dangerous cast на 1с +20% MORE evasion, no stacking |
+| X4 Взломный выстрел | K≥6 and N≥6 | первый successful direct K hit по JAM enemy наносит дополнительный 0.30 TechPower D secondary, ICD3с |
+
+Для дерева все эффекты должны быть строково сериализуемы как типизированные операторы. В интерфейсе показывать lock reason, точную формулу, стоимость respec и изменившийся Build Lab. Нельзя предполагать, что один T4 узел обязательно лучший: trade-offs и ограничение двух keystones обеспечивают разные направления.
+
+## 15. ОСНОВНЫЕ ВРЕМЕННЫЕ МУТАЦИИ ВЫЕЗДА
+
+После первого checkpoint выезда и после победы над крупным боссом игрок выбирает одну из трёх предложенных мутаций, с общим лимитом 2 крупных активных одновременно. Стандартная карта вариантов содержит минимум 12 эффектов, каждый с trade-off и источником:
+
+| id | Польза | Цена |
+|---|---|---|
+| MUT_CHAIN | DIRECT E attack gives secondary 0.3 TechPower E to adjacent enemy, ICD2с | −10% E direct damage |
+| MUT_VIRUS | VIRUS kill transfers 1 stack, ICD2с | −15% single-target D |
+| MUT_SWARM | Два дрона атакуют одну marked target +25% MORE drone damage | +20% drone cooldown |
+| MUT_HEAT | Heat buildup +30% → +15% MORE E damage at heat≥70 | cooling −2/сек |
+| MUT_SAFE | +25% MORE maxHP | −15% main damage |
+| MUT_RISK | +25% item quantity on elite nodes (not rarity) | −20% maxShield |
+| MUT_FUEL | each checkpoint +3 fuel | +5 wanted after boss |
+| MUT_GHOST | +15 evasion | −10% K damage |
+| MUT_REGEN | +3 energy regen/сек | +2 heat for each skill use |
+| MUT_BLEED | BLEED +2 stack cap | −12% all non-BLEED DoT |
+| MUT_WARD | incoming D damage −20% MORE | incoming K damage +10% MORE |
+| MUT_CRIT | crit damage ×1.30 MORE | −5 crit chance percentage points |
+
+Мутация может быть выбрана только при удовлетворении compatibility tags. Если все предложения полностью несовместимы, генератор предложит MUT_SAFE/MUT_FUEL/MUT_REGEN с предупреждением о причинах. Автопилот выбирает по preset preference tags с пользователем явным подтверждением допустимости; если предпочтения нет — PAUSED_FOR_DECISION, а не случайный выбор.
+
