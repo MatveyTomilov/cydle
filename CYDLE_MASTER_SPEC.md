@@ -796,3 +796,172 @@ Reputation каждой ∈[−100,100], старт 0. Изменения сра
 8. LONG_RUN: travel edges +15s, boss gives +25% item quantity.
 Бонусы +item quantity меняют число роллов, а +rare chance перераспределяет веса с суммой100, не создаёт невалидной таблицы. Изменения доступны до выезда, не задним числом. Любой набор из 3 должен быть проходим хотя бы некоторыми достижимыми билдами, проверяется Simulation Lab.
 
+
+## 22. НОВАЯ ИГРА, ГАРАЖ И ТЕМП ОТКРЫТИЙ
+
+### 22.1. Начальное состояние — ZERO_AMBIGUITY
+
+Новый saveId генерирует: оператор level1, XP0; POW/REF/INT/ENG/SYN по5; 0 свободных очков дерева и атрибутов; HP300+бонусы установленной брони; shields75+бонусы снаряжения; energy100; heat0; neural cap100.
+
+Постоянно надето:
+- MAIN PISTOL_K1 T1 COMMON, durability100.
+- OFFHAND OFF_SHIELD T1 COMMON, durability100.
+- ARMOR ARM_CLOTH T1 COMMON, durability100.
+- IMPLANT IMP_ARMOR T1 COMMON cost16 в CHEST, IMP_REFLEX T1 COMMON cost14 в ARMS, остальные 2 начальных слота пустые.
+- skills SK_BURST, SK_SHIELD, SK_EMP (три активных места; reaction channel не зависит от положения в списке).
+- passive protocols PP_ACCURACY and PP_SHIELD (третье место пустое).
+- DRONE DR_GUN T1 COMMON, 100% HP.
+- Transport standard six modules from section 10.6, fuel24, hull100, cargo20.
+- credits120 protected, scrap30 protected, data20 protected; 0 unsecured.
+- Один встроенный tacticalPreset DEFAULT: priority1 SK_SHIELD if HP%<45; priority2 SK_EMP if enemy casts dangerous interruptible; priority3 SK_BURST if ≥2 enemies; fallback main autoattack. Должны работать даже если пользователь ничего не настроил.
+- Один дорожный autopilot profile BALANCED (не запущен автоматически без выбора «Начать выезд»).
+- Forpost 0 (гараж), campaign sector1, разблокирован biome B01.
+- Полный Build Lab доступен с начала; вкладки для ещё не полученных технологий показывают объяснимое «нет источников», не пустые графики.
+- Intro text не задерживает первые 1–2 боя, tutorial можно пропустить и прочитать в справке.
+
+### 22.2. Гарантированное обучение механикам
+
+Сектор1 первые три шага при первом прохождении имеют фиксированное тематическое ядро с seed-вариациями врагов:
+1. COMBAT с E01, объяснение direct damage/armor, бейдж по щиту.
+2. CACHE с выбором одного из 3 фиксированных T1 MODIFIED прототипов: «Горячий импульс» (IMP_HEAT), «Нейроветка» (IMP_VIRUS), «Пластины» (IMP_SHIELD), каждый permanently secured **только при успешной эвакуации или отправке**; если игрок погиб, возможность выбора снова появляется при следующем старте сектора1, пока первый прототип не был закреплён.
+3. COMBAT с E01+E02, где атака E02 телеграфируется, появляется пояснение редактора условий и таймлайна.
+Остальные узлы сектора1 генерируются обычным алгоритмом, но гарантированы REPAIR/SHOP alternative before checkpoint. Это исключение учебного ядра явно документировано, чтобы не нарушить случайность остальных выездов.
+
+### 22.3. Гараж — восемь развиваемых объектов
+
+Объекты разблокированы с первого посещения, кроме указанных. MaxLevel=3 для каждого; цена перехода с l до l+1: ceil((40+25×l)×R(maxUnlockedForpost+1)) credits + ceil((15+10×l)×R(maxUnlockedForpost+1)) scrap; специализированные варианты с data отмечены ниже. Гаражные уровни постоянны, альтернативы не взаимоисключающие.
+
+| Объект | L1 / L2 / L3 конкретная выгода |
+|---|---|
+| WORKSHOP | L1 repair and dismantle; L2 craft base items and modify roll; L3 tier upgrade and add affix |
+| NEUROLAB | L1 read implants; L2 unlock 5th implant slot after d5; L3 unlock 6th slot after d8 |
+| SERVER | L1 edit tactics; L2 5 saved profiles; L3 stat trace exports and searchable combat replay archive |
+| HANGAR | L1 start DR_GUN; L2 second DRONE slot after clearing d6; L3 reduced drone repair scrap cost by 20% |
+| MARKET | L1 3 starter offers; L2 5 rotating offers each new run; L3 +1 additional thematic target offer |
+| INTEL | L1 reveals type of adjacent nodes; L2 shows reward/threat band; L3 scans one extra layer of known map |
+| GARAGE_MED | L1 repair/revive default; L2 revival fee −50%; L3 restoration of 100% hull/HP at START new run for ceil(8×R(startDepth)) credits |
+| CALIBRATOR | L1 T calibration until unlockedForpost; L2 cost scrap −10%; L3 calibrate two items as one UI batch (no extra stat bonus) |
+
+**Новые ограничения доступа:** игрок не может купить NEUROLAB L2 без sector5 unlock, NEUROLAB L3 без sector9; HANGAR L2 после d6. Гараж L1 доступен бесплатно; l2/l3 требуют оплату по формуле. Для CALIBRATOR upgrade additionally +ceil(5×R(startDepth)) DATA. Для SERVER L3 дополнительно +10 data. Каталог и границы честно показываются.
+
+**Возможность free repair при softlock:** если protected currencies=0 и permanent weapon durability≤0, выдаётся non-tradable starter basic repair до durability25, при этом нет бонусных ресурсов или уникального предмета. Предотвращает необратимую потерю возможности сражаться и бесконечные источники scrap.
+
+### 22.4. Отображение роста
+
+Игрок видит independent показатели:
+- sector max cleared and unlocked start sector;
+- operator level, XP до следующего, tree points available;
+- экипировка и максимальный TechLevel;
+- гаражный прогресс;
+- 4 reputations и stage каждой quest;
+- личные рекорды текущего tactical preset;
+- дальность автономного выезда и data accuracy.
+
+Новые системы открываются **по явным milestones**, а не по числу часов; никакой искусственной постройки на 12 реальных часов. Progression gates для 100-tree nodes задаются очками ветвей из section14, не сюжетным актом.
+
+## 23. BUILD LAB / «БИЛДИНГ» — ПОЛНЫЙ ПРОДУКТОВЫЙ КОНТРАКТ
+
+**Главный принцип:** любое число в интерфейсе имеет конкретное statId или metricId, вызов единой engine-функции и дерево источников. Не допускается «приблизительный калькулятор» рядом с другим уроновым движком.
+
+### 23.1. Вкладки
+
+- **Обзор:** HP, shield, armor, effective mitigations, DPS theoretical/observed, энергия/нагрев, дрон/transport, ошибки конфигурации.
+- **Живучесть:** HP/shield/EHP vs выбранный threat stream, downtime, survivalTime distribution, dodge и его шанс, damage type split, periods without shield, healing.
+- **Урон:** каждое оружие/программа/дрон, hit, crit, pen, status ticks, skill coefficient, chance, proc/chain budgets, theoretical vs simulated vs measured.
+- **Энергосистема:** energy regeneration/cost, heat buildup/cooling/lockout, neuralCapacity used/max, opportunity cost of unused slots.
+- **Экипировка:** для каждого предмета CalcTrace, conditional status, durability, stat source/affix tiers, expected change on swap.
+- **Тактика:** каждое правило, frequency, rule cooldown/priority, number of trigger failures with reason and sampled timestamp.
+- **Эксперимент:** выбранный противник, depth, threat mods, seed, N tests, статистические uncertainty/CI and warnings.
+- **Боевой журнал:** раскрываемые events с input damage, target res/armor, shield/HP partition, energy/heat delta, proc cause chain and death cause.
+- **Автономный фарм:** trace route decisions, actual secured/unsecured resources/hour, repairs, losses, reasons to extract/stop.
+
+### 23.2. CalcTrace — точный типизированный выход
+
+Every calculateStat() returns {numericValue, unit, contextFingerprint, traceRootId}. Trace nodes are {id,operation,stage,inputs,exactValue,sourceId,sourceName,sourceKind,conditionPredicate,conditionActive,unit,tags,localizedExplanation,formulaVersion}. Operation vocab BASE/ADD/SUM/MULTIPLY/DIVIDE/CLAMP/CONVERT/CONDITIONAL/ROUND_DISPLAY/RANDOM_SAMPLE. Зафиксировать отдельный "snapshot" if conditional. UI показывает «база», «плоские», «складывающиеся %», «независимые множители», «конверсия», «ограничение», «итог» без скрытых ингредиентов.
+
+**Must-pass examples:**
+- 5 armor ×1.20=6.
+- (5+2)×1.20×1.10=9.24.
+- armor 6 vs 100 kinetic = 6/106=5.660377...% снижение; 94.339622... remaining HP+shields damage before additional effects.
+- Increase modifiers of 20%+30% = ×1.50, two MORE 1.2 and 1.3 =>×1.56; итог chain ×2.34 if both apply.
+- HP200, shields30, after-defense50 => 20 HP lost, 30 shield lost.
+- Hero shield +1/s if no hits last 4 sec; explain lack of regen during 4s cooldown, not call it broken.
+
+### 23.3. Честная атрибуция и допущения
+
+**Теоретический DPS** = ожидаемые direct actions по выбранному установленному профилю/условиям при фиксированном режиме; он не включает неизвестные появления врагов и не обязан совпадать с наблюдением. **Симулированный DPS** = реальный trace с выбранным seed and scenario. **Наблюдаемый DPS** = последние реально завершённые бои с учётом промахов/простоя/ожидания/смены цели.
+
+**EHP** — не просто (HP+shield)/(1−kineticReduction), если смешанный урон, регенерация, обход щита и уклонение. Показывать: raw pool; scenario EHP как суммарный premigation damage до смерти для фиксированного входящего потока; survival time distribution по seeded tests. Помечать конкретного врага и глубину.
+
+**Синергии не аддитивны.** Дельта от снятия предмета A и B может пересекаться. Отдельно показывать source contribution, marginal counterfactual (fixed scenario A/B), synergy interaction. Не суммировать marginal DPS в fictitious additive totals.
+
+### 23.4. Сравнение предметов
+
+Hover на ПК и tap на телефоне: overlay «сейчас» / «после», без изменений настоящего save. Предпросмотр вычисляет все связанные stat roots по воображаемому клону gameState, в том числе важные условные значения, neuralCapacity and incompatibility. Новое weapon с высоким damage может иметь ниже hit chance/resource sustainability; при сравнении показывается реальная цена. Можно сохранить до 5 билд-пресетов на персонажа; недоступный предмет в пресете подсвечивать, не создавать его.
+
+### 23.5. «Почему умер?» и «Почему не сработало?»
+
+DeathReport минимум last 30 sec combat events, grouped by source; immediate lethal cause, shields absorbed, missed interrupts, energy starvation, heat lockout, wrong targets, passive effects active/not active. Все выводы по фактическим events; причинность проверяется контрфактическим прогоном, если нужна рекомендация, а не фантазируется.
+
+Экспорт Math report в JSON/Markdown с gameVersion/balanceVersion/scenario/seed, без исполнения импортированных JS. Экспорт не содержит secrets и приватных внешних данных. Опциональный интеллектуальный Player Advisor описан в разделе24.
+
+## 24. УМНАЯ SIMULATION LAB — ИНСТРУМЕНТ РАЗРАБОТЧИКА И ПОМОЩНИК ИГРОКА
+
+**Цель:** не миллион случайных экипировок, а **направленная диагностика и поиск** по настоящему игровому движку. Никакая LLM не является арбитром damage, survival или loot. Dev Lab и UI используют тот же core; разные права доступа и интерфейсы.
+
+### 24.1. Состав системы
+
+- deterministic headless TS combat and full-run runner;
+- constraint checker (слоты, нейроёмкость, дерево, TechLevel, предметы/валюта, знания персонажа);
+- typed synergy hypergraph of GENERATES/CONSUMES/CONVERTS/MODIFIES/TRIGGERS/COUNTERS/CONFLICTS;
+- candidate proposer с эвристическими мутациями под наблюдаемый deficit;
+- Pareto Beam Search как обязательный базовый алгоритм;
+- adaptive budget / successive evaluation, approximate screening только с точной конечной проверкой;
+- statistical validator (paired scenarios, independent holdout, uncertainty);
+- explainer/replay, visual report and suggested but **never auto-applied** changes to balance config.
+
+### 24.2. Виды экспериментов
+
+IMPROVE_BUILD, FIND_VIABLE_BUILDS, FIND_SYNERGIES, FIND_EXPLOITS, FIND_DEAD_CONTENT, FIND_PROGRESSION_WALL, EVALUATE_AUTOPILOT, ADVERSARIAL_SCENARIOS, SUGGEST_BALANCE_PATCH, EXPLAIN_FAILURE.
+
+Inputs: objective, constraints, available inventory/TechLevel, enemy/depth scenario, risk criteria, currencies, budget of exact simulation, seed sets, max modifications, time/CPU budget. Outputs: candidates/Pareto, legality, exact trials count, outcomes/win chance, CI where meaningful, traces, failure causes, replay IDs, uncertainty, tested and untested situations. Never promise «глобально лучший билд» without proof.
+
+### 24.3. Направленный поиск
+
+Algorithm:
+1. Build typed synergy graph from data definitions, not hand-maintained fantasy list.
+2. Seed candidates from reference archetypes, current build, complementary items and a small valid random diversity sample.
+3. Generate local modifications addressing measured bottlenecks (regen shortage, high heat, drone suppression, shield bypass, low accuracy, overlong cast, poorly chosen target).
+4. Reject invalid configurations structurally before calling simulation; no negative fake DPS.
+5. Cheap analytic preview: exact static stats and resource bounds. Do NOT reject novel multicomponent loop solely on static DPS.
+6. Pilot each plausible candidate on 4–8 seeded scenarios; compare to the same baseline conditions.
+7. Rank by Pareto: combat win probability, survival/worst-tail, damage/TTK, confirmed net loot/hour, resource cost and robustness. Keep diverse mechanistic families.
+8. Promote uncertain/promising candidates to 24–64 seeded trials, finalists to 64–256 exact scenarios/full runs according to budget. Lock unseen validation/holdout seeds before candidate search.
+9. Diagnose unsuccessful cases via event trace, try counterfactual changes one at a time and compare paired deltas. Report statistical intervals and limitations.
+10. End on budget/stagnation, save complete experiment repro with rulesHash and seed.
+
+**Common random numbers:** scenarios/loot/route RNG separated and keyed; different attack counts change combat RNG consumption, so identical seed alone is not statistical control. Use separate streams and paired scenario IDs. Не заявлять ±X% при 4 trials; use Wilson/Jeffreys CI for proportions and bootstrap for continuous outcomes across independent scenarios.
+
+**Не добавлять TPE, NSGA-II, MCTS, суррогаты в runtime только по имени.** Допустимы после собственного доказательства преимущества по quality-per-exact-simulation относительно ValidRandom/GreedyOneSwap/ParetoBeam при равном бюджете. Разрешён офлайн Python optimizer via typed JSONL→same TS core, но не второй боевой движок.
+
+### 24.4. Персоны для проверки игры
+
+NOVICE (простые апгрейды), CAUTIOUS (выживание), FARMER (добыча), EXPLORER (события), EXPERT (правильная тактика), EXPLOITER (прецизионные баги), AFK (строго сохранённая политика), RESTRICTED (без указанного предмета/умения). Полные экспедиции: предметы, валюта, ремонт, смерть, контракт, фракции, крафт, TechLevel, форпосты. Ни одна персона не знает неопубликованные будущие дропы.
+
+### 24.5. Десять обязательных проверок интеллектуальности
+
+1. Найти замену при energy starvation с меньшим числом exact trials, чем ValidRandom, либо честно объяснить неудачу.
+2. Удержать пару слабых поодиночке предметов, которые вместе дают эффективную heat→shield loop.
+3. Не назвать универсально лучшим билд, отлично работающий только против одного босса; holdout выявляет контрматч.
+4. Найти реальные интервалы прогрессии, где нет достижимого улучшения несколько выездов.
+5. Найти однократный payout duplication, сохранить replay, тестировать исправление.
+6. Сохранить как минимум три различающихся Pareto-варианта: DPS, защита, чистый фарм.
+7. Отклонить незаконные билды neuroCapacity105/100 и skillPoints61/60.
+8. Один seed+state+commands повторяет точный исход; при асинхронной оценке candidate results стабильны, порядок scheduler documented.
+9. Автопилот не читает заранее hidden future item-rolls.
+10. Причину погибшего defensive build проверить контрфактическими изменениями, не выдавать недоказанных советов.
+
+### 24.6. Внутриигровой Player Build Advisor
+
+В завершённой версии: в Build Lab кнопка «Проверить слабое место» и «Предложить до 3 улучшений». Работает на owned inventory, раскрытых врагах и доступных ресурсах, читает сборку и запускает ограниченное число настоящих локальных тестов в worker. Показывает результат и уверенность; не заменяет Build Lab, не меняет экипировку без команды пользователя и не раскрывает hidden content. Если N tests недостаточно для statistical certainty, пишет «предварительная оценка». После ручного выбора игрок может применить один item swap или открыть тактический редактор с предложенным diff.
+
