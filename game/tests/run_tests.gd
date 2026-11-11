@@ -1,0 +1,35 @@
+extends SceneTree
+
+const TEST_PATHS: Array[String] = ["res://tests/test_app_boot.gd"]
+
+func _initialize() -> void:
+	call_deferred("_run")
+
+func _run() -> void:
+	var passed: int = 0
+	var failed: int = 0
+	var assertions: int = 0
+	var assertion_failures: int = 0
+	for test_path: String in TEST_PATHS:
+		var test_script: Script = load(test_path) as Script
+		if test_script == null:
+			push_error("Cannot load test script: %s" % test_path)
+			failed += 1
+			continue
+		var test_case: RefCounted = test_script.new() as RefCounted
+		if test_case == null:
+			push_error("Test does not extend RefCounted: %s" % test_path)
+			failed += 1
+			continue
+		var test_result: Variant = await test_case.call("run", self)
+		assertions += int(test_case.get("assertion_count"))
+		assertion_failures += int(test_case.get("failure_count"))
+		if test_result is bool and test_result and int(test_case.get("failure_count")) == 0:
+			passed += 1
+			print("PASS %s" % test_path.get_file().get_basename())
+		else:
+			failed += 1
+			if int(test_case.get("failure_count")) == 0:
+				assertion_failures += 1
+	print("CYDLE headless tests: %d tests passed, %d tests failed; %d assertions, %d assertion failures" % [passed, failed, assertions, assertion_failures])
+	quit(1 if failed > 0 else 0)

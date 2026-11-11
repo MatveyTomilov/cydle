@@ -1,5 +1,8 @@
 node_modules/
 dist/
+/game/.godot/
+/game/build/
+/build/
 artifacts/sim-lab/*/
 !artifacts/sim-lab/.gitkeep
 *.log

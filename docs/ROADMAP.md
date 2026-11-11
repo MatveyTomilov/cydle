@@ -6,14 +6,16 @@
 
 - Product direction changed to standalone Godot 4.x Windows game on 2026-11-12. Current engine pin: Godot 4.7.2 stable.
 - Root TypeScript/React/Vite project is frozen legacy/reference source for rules, catalog values, and golden fixtures. Do not continue it as the product and do not delete it.
-- Documentation checkpoint is in progress on `development/luna`, whose code history descends from the preserved Qwen SHA `2e5a59798695aaf7666a8fa13cb709fcdaad9fc7`.
-- Godot implementation has not started; no `game/project.godot`, native scenes, native tests, or Windows export exist yet. Godot CLI was not installed/discoverable during the audit.
+- Documentation checkpoint is committed as `cf915277b5002a64e2558aed7a8f674bd195b5f5` on `development/luna`, whose code history descends from the preserved Qwen SHA `2e5a59798695aaf7666a8fa13cb709fcdaad9fc7`.
+- The native shell now has `game/project.godot`, one startup scene, typed app root, headless runner, and a Windows export preset. Gameplay logic and art have not been migrated.
+- Godot 4.7.2 stable and Windows x86_64 export templates are installed in the current user profile for local verification; they are not vendored into the repository.
+- Current shell checks: import/parse passes; 1 headless test and 10 assertions pass; Windows release export succeeds; exported app and editor GUI both start/exit cleanly in short smoke runs.
 - Legacy baseline freshly verified before this documentation update: typecheck pass; 206/206 tests pass; content validation pass; Vite build pass (611.46 kB JS, 192.24 kB gzip). These checks do not verify the future Godot game.
 
 ## Delivery sequence
 
 1. **Engine and production documentation:** update the master spec to remove browser stack constraints while preserving game rules; document Godot architecture, Art Bible, Asset Pipeline, and initial Asset Manifest. Commit these documents before runtime code.
-2. **Godot foundation:** pin stable engine, create `game/project.godot`, typed app shell, keyboard/controller focus, headless test runner, Windows export profile, and local versioned save repository. Validate import, headless launch, tests, and export.
+2. **Godot foundation:** project config, typed app shell, controller/keyboard focus, headless runner, and Windows export preset are implemented. Next add the local versioned save repository and validation.
 3. **Golden port harness:** port the existing deterministic RNG exactly; pin seed streams, serialized state, hashes, and event fixtures against the legacy TypeScript reference.
 4. **Math and build core:** port stats, modifiers, formulas, CalcTrace, mitigation, damage partition, item instances, and build resolution without balance changes. Compare golden outputs at each boundary.
 5. **Combat core:** port the existing single 100 ms simulation including statuses/DoT, skills/reactions, AI, boss phases, elite modifiers, drones, interrupts, and bounded procs. Same seeded input must match legacy expected results.

@@ -59,9 +59,9 @@
 - Create: `game/tests/run_tests.gd`
 - Create: `game/export_presets.cfg` when the Windows template is available
 
-- [ ] Create a bootable minimal scene with typed navigation and keyboard/controller focus.
-- [ ] Add a headless script runner that reports assertion count/failures with a nonzero exit.
-- [ ] Run import/parse, test runner, and editor launch on the pinned stable Godot binary.
+- [x] Create a bootable minimal scene with typed navigation and keyboard/controller focus.
+- [x] Add a headless script runner that reports assertion count/failures with a nonzero exit.
+- [x] Run import/parse, test runner, and editor launch on the pinned stable Godot binary; verify Windows release export and app launch.
 
 ### Task 2: deterministic RNG, state hashing, and golden harness
 

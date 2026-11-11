@@ -9,13 +9,17 @@ The user's latest instruction supersedes the prior web-game continuation. CYDLE 
 - Working directory: `E:\cydle\project`.
 - Branch: `development/luna`, based on the exact handoff SHA `2e5a59798695aaf7666a8fa13cb709fcdaad9fc7`; recovery remains untouched. Latest remote heads at audit: `origin/main` = `8f7f3c7adaaaff127963b100145c5a5d4f15cc2a`, `origin/recovery/qwen-snapshot` = `2e5a59798695aaf7666a8fa13cb709fcdaad9fc7`. The development branch is local and is not pushed.
 - Current local source checkpoint before the Godot documentation commit: `739ff3654317d19d609bcd61c2ba17ab2112a4f3`. Git working tree was clean before documentation edits.
-- Godot CLI is not installed or discoverable in this environment. Official release archive review on 2026-11-12 showed Godot 4.7.2 stable; Godot 4.8 was beta. The project documentation pins 4.7.2 stable until a verified stable update is chosen.
+- Godot 4.7.2 stable was downloaded from the official release archive and installed at `C:\Users\Matve\AppData\Local\Programs\Godot\4.7.2\godot_console.exe`; Windows x86_64 export templates are installed at `%APPDATA%\Godot\export_templates\4.7.2.stable`. Official archive review on 2026-11-12 showed Godot 4.8 was beta.
 - The legacy web baseline was freshly checked before documentation changes: `npm run typecheck` passes; `npm test -- --run` passes 206 tests in 22 files; `npm run validate` passes; `npm run build` passes (JS 611.46 kB, gzip 192.24 kB). These commands verify only the legacy web reference, not a Godot build.
-- No `game/project.godot` or native scenes exist yet. This checkpoint is the required documentation gate before implementation.
+- The native project shell exists in `game/`: Godot project config, centered technical launch scene, typed app root, controller/keyboard focusable exit, Windows Desktop export preset, and a headless test runner. It contains no gameplay loop or migrated game systems.
+- `godot --headless --path game --editor --quit`: passes import/parse. The Godot editor GUI also starts and exits cleanly in a short launch smoke.
+- `godot --headless --path game --script res://tests/run_tests.gd`: 1 test passes, 10 assertions pass, 0 failures.
+- `godot --headless --path game --export-release "Windows Desktop" build/CYDLE.exe`: passes; exported `game/build/CYDLE.exe` is 109,136,064 bytes and ignored by Git. A native 5-frame launch smoke exits with code 0.
+- First implementation task after this shell checkpoint: port legacy deterministic RNG and add golden fixtures before porting formulas or content.
 - Read next: `CYDLE_MASTER_SPEC.md`, `docs/godot/TECHNICAL_ARCHITECTURE.md`, `docs/godot/ART_BIBLE.md`, `docs/godot/ASSET_PIPELINE.md`, `docs/godot/ASSET_MANIFEST.csv`, `docs/superpowers/plans/2026-11-12-godot-migration.md`, and `docs/ROADMAP.md`.
 - First implementation task after this documentation-only commit: obtain/use the pinned Godot 4.7.2 stable binary, create `game/project.godot` and the typed headless test runner, and verify import/parse plus a minimal native Windows launch. Then port RNG and establish golden comparisons before formulas or content.
 
-The requested Godot technical architecture, Art Bible, Asset Pipeline, Asset Manifest, master-spec corrections, roadmap, and handoff are in this documentation checkpoint. Runtime code and game assets have not been migrated yet. The following history is retained to document the frozen web implementation accurately.
+The Godot technical architecture, Art Bible, Asset Pipeline, Asset Manifest, master-spec corrections, roadmap, and handoff were committed before runtime work. This first native project shell is now bootable/exportable but has no gameplay logic or final art. The following history is retained to document the frozen web implementation accurately.
 
 ## Frozen legacy implementation — EV05 checkpoint (historical)
 
@@ -153,6 +157,18 @@ npm run dev
 
 These commands validate the frozen legacy project only. At the EV05 checkpoint, the unit suite has 206 tests. `npm run sim` and `npm run balance` scripts refer to incomplete workflows; `npm run e2e` needs Playwright and a harness. The first-sector loop plus SHOP/ELITE/BOUNTY, partial EVENT, emergency exits, cargo accounting, EV05 elite contract, EV19 route timing, EV17/EV24 combat modifiers, EV16 skip/elite outcomes, EV14/EV21 bounty effects, and EV18 allied turret are wired, while campaign progression and most content systems remain absent.
 
+## Godot project commands
+
+`game/README.md` documents the portable commands. On this machine, the installed executable is `C:\Users\Matve\AppData\Local\Programs\Godot\4.7.2\godot_console.exe`; export templates are under `%APPDATA%\Godot\export_templates\4.7.2.stable`.
+
+```powershell
+$godot = Join-Path $env:LOCALAPPDATA 'Programs\Godot\4.7.2\godot_console.exe'
+& $godot --headless --path game --editor --quit
+& $godot --headless --path game --script res://tests/run_tests.gd
+& $godot --headless --path game --export-release 'Windows Desktop' build/CYDLE.exe
+& (Resolve-Path 'game\build\CYDLE.exe')
+```
+
 ## Short continuation prompt
 
-Open `E:\cydle\project`. Read `CYDLE_MASTER_SPEC.md`, `HANDOFF.md`, `docs/godot/TECHNICAL_ARCHITECTURE.md`, `docs/godot/ART_BIBLE.md`, `docs/godot/ASSET_PIPELINE.md`, `docs/godot/ASSET_MANIFEST.csv`, `docs/superpowers/plans/2026-11-12-godot-migration.md`, and `docs/ROADMAP.md`; inspect `git status` and the latest docs commit. Keep legacy `src/` and `tests/` unchanged as reference. Start with the Godot foundation and headless test runner, then port the existing RNG with golden fixtures. Do not redo functionality already present in legacy; use it as the oracle and port into `game/` once.
+Open `E:\cydle\project`. Read `CYDLE_MASTER_SPEC.md`, `HANDOFF.md`, `game/README.md`, `docs/godot/TECHNICAL_ARCHITECTURE.md`, `docs/godot/ART_BIBLE.md`, `docs/godot/ASSET_PIPELINE.md`, `docs/godot/ASSET_MANIFEST.csv`, `docs/superpowers/plans/2026-11-12-godot-migration.md`, and `docs/ROADMAP.md`; inspect `git status` and recent commits. The Godot shell, headless test runner, and Windows export are implemented. Keep legacy `src/` and `tests/` unchanged as reference. Next port the existing RNG with golden fixtures, then save infrastructure and mathematical formulas. Do not redo functionality already present in legacy; use it as the oracle and port into `game/` once.
