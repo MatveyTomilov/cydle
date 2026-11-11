@@ -70,7 +70,7 @@ export interface RunState {
   revealLevel: number;
   pendingTravelDeltaMs: number;
   pendingCombatEffects: { initialTempShield: number; extraHeat: number };
-  pendingNextCombat: { skipOrdinary: boolean; forceElite: boolean; extraItemRoll: boolean };
+  pendingNextCombat: { skipOrdinary: boolean; forceElite: boolean; extraItemRoll: boolean; forceBounty: boolean; bountyCreditsBonus: number; bountyEnemyId: string | null; extraRareItemRoll: boolean };
   combatResult: CombatResult | null;
   lastCommandId: string | null;
   worldRng: import('../rng').SerializedRng;

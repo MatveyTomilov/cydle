@@ -289,12 +289,36 @@ describe('run road nodes', () => {
     expect(skipped.ok).toBe(true);
     if (!skipped.ok) return;
     expect(skipped.save.run!.runWallet.CREDITS).toBe(0);
-    expect(skipped.save.run!.pendingNextCombat).toEqual({ skipOrdinary: true, forceElite: false, extraItemRoll: false });
+    expect(skipped.save.run!.pendingNextCombat).toEqual({ skipOrdinary: true, forceElite: false, extraItemRoll: false, forceBounty: false, bountyCreditsBonus: 0, bountyEnemyId: null, extraRareItemRoll: false });
 
     const elite = resolveRunEvent({ ...base, run: prepareEventRun('event-force-elite') }, { id: 'event-force-elite', choiceId: 'B' });
     expect(elite.ok).toBe(true);
     if (!elite.ok) return;
-    expect(elite.save.run!.pendingNextCombat).toEqual({ skipOrdinary: false, forceElite: true, extraItemRoll: true });
+    expect(elite.save.run!.pendingNextCombat).toEqual({ skipOrdinary: false, forceElite: true, extraItemRoll: true, forceBounty: false, bountyCreditsBonus: 0, bountyEnemyId: null, extraRareItemRoll: false });
+  });
+
+  it('stores EV14 and EV21 as forced bounty choices with their authored modifiers', () => {
+    const base = createInitialSave({ saveId: 'event-bounty-effects', now: 100 });
+    const prepare = (seed: string, eventId: string) => {
+      const run = createInitialRun(base, seed);
+      const eventNode = run.graph.layers[1]![0]!;
+      eventNode.type = 'EVENT';
+      eventNode.eventId = eventId;
+      run.currentNodeId = eventNode.id;
+      run.visitedNodeIds = [eventNode.id];
+      run.phase = 'NODE';
+      return run;
+    };
+    const ev14 = resolveRunEvent({ ...base, run: prepare('ev14-bounty', 'EV14') }, { id: 'ev14-bounty-choice', choiceId: 'B' });
+    expect(ev14.ok).toBe(true);
+    if (!ev14.ok) return;
+    expect(ev14.save.run!.pendingNextCombat.forceBounty).toBe(true);
+    expect(ev14.save.run!.pendingNextCombat.bountyCreditsBonus).toBe(0.25);
+
+    const ev21 = resolveRunEvent({ ...base, run: prepare('ev21-bounty', 'EV21') }, { id: 'ev21-bounty-choice', choiceId: 'B' });
+    expect(ev21.ok).toBe(true);
+    if (!ev21.ok) return;
+    expect(ev21.save.run!.pendingNextCombat).toMatchObject({ forceBounty: true, bountyEnemyId: 'E21', extraRareItemRoll: true });
   });
 
   it('rejects an unaffordable event choice without mutating the save', () => {

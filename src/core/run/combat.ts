@@ -39,11 +39,11 @@ function rewardForNode(nodeType: string, depth: number) {
   return { credits: Math.ceil(12 * scale), scrap: Math.ceil(3 * scale), data: Math.ceil(1 * scale), xp: Math.ceil(22 * scale), itemChance: 0.7, extraItemChance: 0, coreChance: 0, table: 'ORDINARY' as const };
 }
 
-function makeBattleReward(run: RunState, nodeId: string, nodeType: string, extraItemRoll = false): { wallet: ReturnType<typeof zeroWallet>; items: ItemInstance[]; grantIds: string[]; rng: Rng; xp: number } {
+function makeBattleReward(run: RunState, nodeId: string, nodeType: string, extraItemRoll = false, extraRareItemRoll = false, bountyCreditsBonus = 0): { wallet: ReturnType<typeof zeroWallet>; items: ItemInstance[]; grantIds: string[]; rng: Rng; xp: number } {
   const spec = rewardForNode(nodeType, run.depth);
   const biome = BIOME_BY_ID[run.biome];
   const wallet = {
-    CREDITS: Math.ceil(spec.credits * (1 + (biome?.creditsBonus ?? 0))),
+    CREDITS: Math.ceil(spec.credits * (1 + (biome?.creditsBonus ?? 0)) * (1 + (nodeType === 'BOUNTY' ? bountyCreditsBonus : 0))),
     SCRAP: spec.scrap,
     DATA: Math.ceil(spec.data * (1 + (biome?.dataBonus ?? 0))),
   };
@@ -61,6 +61,12 @@ function makeBattleReward(run: RunState, nodeId: string, nodeType: string, extra
   if (extraItemRoll) {
     const grantId = `combat:${run.seed}:${nodeId}:event-extra-item`;
     const rolled = rollItem(rng, { depth: run.depth, biome: run.biome, table: spec.table, secured: false, grantId, origin: 'combat' });
+    items.push(rolled.item);
+    grantIds.push(grantId);
+  }
+  if (extraRareItemRoll) {
+    const grantId = `combat:${run.seed}:${nodeId}:event-extra-rare`;
+    const rolled = rollItem(rng, { depth: run.depth, biome: run.biome, table: spec.table, secured: false, grantId, origin: 'combat', forceRarity: 'RARE' });
     items.push(rolled.item);
     grantIds.push(grantId);
   }
@@ -114,13 +120,13 @@ export function resolveCurrentCombat(save: SaveGame, commandId: string): RunComm
   const node = run.graph.layers.flat().find((candidate) => candidate.id === run.currentNodeId);
   if (!node || !['COMBAT', 'ELITE', 'BOUNTY', 'BOSS'].includes(node.type)) return fail(save, 'NODE_NOT_COMBAT', 'Текущий узел не является боевым.');
   if (run.clearedNodeIds.includes(node.id)) return fail(save, 'NODE_ALREADY_CLEARED', 'Этот боевой узел уже пройден.');
-  const pendingNextCombat = run.pendingNextCombat ?? { skipOrdinary: false, forceElite: false, extraItemRoll: false };
+  const pendingNextCombat = run.pendingNextCombat ?? { skipOrdinary: false, forceElite: false, extraItemRoll: false, forceBounty: false, bountyCreditsBonus: 0, bountyEnemyId: null, extraRareItemRoll: false };
   if (pendingNextCombat.skipOrdinary && node.type === 'COMBAT') {
     const next = structuredClone(save);
     const nextRun = next.run!;
     nextRun.commandIds = [...nextRun.commandIds, commandId].slice(-128);
     nextRun.lastCommandId = commandId;
-    nextRun.pendingNextCombat = { skipOrdinary: false, forceElite: false, extraItemRoll: false };
+    nextRun.pendingNextCombat = { skipOrdinary: false, forceElite: false, extraItemRoll: false, forceBounty: false, bountyCreditsBonus: 0, bountyEnemyId: null, extraRareItemRoll: false };
     nextRun.clearedNodeIds = [...nextRun.clearedNodeIds, node.id];
     nextRun.combatResult = null;
     nextRun.phase = node.layer === 5 ? 'CHECKPOINT' : 'ROUTE';
@@ -156,7 +162,7 @@ export function resolveCurrentCombat(save: SaveGame, commandId: string): RunComm
   const next = structuredClone(save);
   const nextRun = next.run!;
   nextRun.pendingCombatEffects = { initialTempShield: 0, extraHeat: 0 };
-  nextRun.pendingNextCombat = { skipOrdinary: false, forceElite: false, extraItemRoll: false };
+  nextRun.pendingNextCombat = { skipOrdinary: false, forceElite: false, extraItemRoll: false, forceBounty: false, bountyCreditsBonus: 0, bountyEnemyId: null, extraRareItemRoll: false };
   nextRun.commandIds = [...nextRun.commandIds, commandId].slice(-128);
   nextRun.lastCommandId = commandId;
   nextRun.combatResult = result;
@@ -187,7 +193,7 @@ export function resolveCurrentCombat(save: SaveGame, commandId: string): RunComm
     return { ok: true, save: checked.data, events: [{ type: 'COMBAT_TIMEOUT', text: 'Бой достиг лимита симуляции. Выезд остановлен безопасно; награды не выданы.' }] };
   }
 
-  const reward = makeBattleReward(nextRun, node.id, node.type, pendingNextCombat.extraItemRoll);
+  const reward = makeBattleReward(nextRun, node.id, node.type, pendingNextCombat.extraItemRoll, pendingNextCombat.extraRareItemRoll, pendingNextCombat.bountyCreditsBonus);
   if (reward.xp > 0) grantExperience(next, nextRun, reward.xp, `xp:${node.id}`);
   nextRun.runWallet = {
     CREDITS: nextRun.runWallet.CREDITS + reward.wallet.CREDITS,

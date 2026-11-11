@@ -34,9 +34,15 @@ export function chooseRunNode(save: SaveGame, commandId: string, nodeId: string)
 
   const next = markCommand(save, commandId);
   const updatedRun = next.run!;
-  updatedRun.pendingNextCombat ??= { skipOrdinary: false, forceElite: false, extraItemRoll: false };
+  updatedRun.pendingNextCombat ??= { skipOrdinary: false, forceElite: false, extraItemRoll: false, forceBounty: false, bountyCreditsBonus: 0, bountyEnemyId: null, extraRareItemRoll: false };
   const selectedNode = updatedRun.graph.layers.flat().find((candidate) => candidate.id === nodeId)!;
-  if (selectedNode.type === 'COMBAT' && updatedRun.pendingNextCombat.forceElite && selectedNode.enemies.length > 0) {
+  if (selectedNode.type === 'COMBAT' && updatedRun.pendingNextCombat.forceBounty && selectedNode.enemies.length > 0) {
+    const original = selectedNode.enemies[0]!;
+    selectedNode.type = 'BOUNTY';
+    selectedNode.threat = 'high';
+    selectedNode.lootHint = 'добыча охотника за головами';
+    selectedNode.enemies = [{ ...original, templateId: updatedRun.pendingNextCombat.bountyEnemyId ?? original.templateId, elite: original.elite ?? 'EL_PEN' }];
+  } else if (selectedNode.type === 'COMBAT' && updatedRun.pendingNextCombat.forceElite && selectedNode.enemies.length > 0) {
     selectedNode.type = 'ELITE';
     selectedNode.threat = 'high';
     selectedNode.lootHint = 'элитная добыча';

@@ -131,7 +131,57 @@ describe('run combat integration', () => {
     if (!result.ok) return;
     expect(result.save.run!.runWallet.CREDITS).toBe(28);
     expect(result.save.run!.unsecuredCargo.filter((item) => item.origin === 'combat').length).toBeGreaterThanOrEqual(2);
-    expect(result.save.run!.pendingNextCombat).toEqual({ skipOrdinary: false, forceElite: false, extraItemRoll: false });
+    expect(result.save.run!.pendingNextCombat).toMatchObject({ skipOrdinary: false, forceElite: false, extraItemRoll: false });
+  });
+
+  it('turns EV14 into a bounty and adds 25% credits to its reward', () => {
+    const base = combatSave('event-bounty-bonus');
+    const run = base.run!;
+    const eventNode = run.graph.layers[1]![0]!;
+    eventNode.type = 'EVENT';
+    eventNode.eventId = 'EV14';
+    run.currentNodeId = eventNode.id;
+    run.visitedNodeIds = [eventNode.id];
+    run.phase = 'NODE';
+    const choice = resolveRunEvent({ ...base, run }, { id: 'event-bounty-bonus-choice', choiceId: 'B' });
+    expect(choice.ok).toBe(true);
+    if (!choice.ok) return;
+    const nextCombat = choice.save.run!.graph.layers[2]![0]!;
+    nextCombat.enemies = [{ templateId: 'E01', hpMult: 0.1, damageMult: 0.1 }];
+    const entered = chooseRunNode(choice.save, 'event-bounty-bonus-enter', nextCombat.id);
+    expect(entered.ok).toBe(true);
+    if (!entered.ok) return;
+    expect(entered.save.run!.graph.layers[2]![0]).toMatchObject({ type: 'BOUNTY', threat: 'high' });
+    const result = resolveCurrentCombat(entered.save, 'event-bounty-bonus-fight');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.save.run!.runWallet.CREDITS).toBe(44);
+    expect(result.save.meta.operator.xp).toBe(0);
+  });
+
+  it('turns EV21 into an E21 bounty with one guaranteed RARE roll', () => {
+    const base = combatSave('event-bounty-e21');
+    const run = base.run!;
+    const eventNode = run.graph.layers[1]![0]!;
+    eventNode.type = 'EVENT';
+    eventNode.eventId = 'EV21';
+    run.currentNodeId = eventNode.id;
+    run.visitedNodeIds = [eventNode.id];
+    run.phase = 'NODE';
+    const choice = resolveRunEvent({ ...base, run }, { id: 'event-bounty-e21-choice', choiceId: 'B' });
+    expect(choice.ok).toBe(true);
+    if (!choice.ok) return;
+    const nextCombat = choice.save.run!.graph.layers[2]![0]!;
+    nextCombat.enemies = [{ templateId: 'E01', hpMult: 0.1, damageMult: 0.1 }];
+    const entered = chooseRunNode(choice.save, 'event-bounty-e21-enter', nextCombat.id);
+    expect(entered.ok).toBe(true);
+    if (!entered.ok) return;
+    expect(entered.save.run!.graph.layers[2]![0]).toMatchObject({ type: 'BOUNTY', enemies: [{ templateId: 'E21', elite: 'EL_PEN' }] });
+    const result = resolveCurrentCombat(entered.save, 'event-bounty-e21-fight');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.save.run!.unsecuredCargo).toContainEqual(expect.objectContaining({ originGrantId: `combat:${run.seed}:${nextCombat.id}:event-extra-rare`, rarity: 'RARE' }));
+    expect(result.save.meta.operator.xp).toBe(0);
   });
 
   it('applies elite rewards, corporate wanted, and biome wallet bonuses through the shared combat result', () => {
