@@ -34,13 +34,18 @@ function rewardForNode(nodeType: string, depth: number) {
   const scale = R(depth);
   if (nodeType === 'BOSS') return { credits: Math.ceil(85 * scale), scrap: Math.ceil(18 * scale), data: Math.ceil(8 * scale), xp: Math.ceil(160 * scale), itemChance: 1, extraItemChance: 0.5, coreChance: 1, table: 'BOSS' as const };
   if (nodeType === 'ELITE') return { credits: Math.ceil(28 * scale), scrap: Math.ceil(7 * scale), data: Math.ceil(3 * scale), xp: Math.ceil(55 * scale), itemChance: 1, extraItemChance: 0.25, coreChance: 0.15, table: 'ELITE' as const };
-  if (nodeType === 'BOUNTY') return { credits: Math.ceil(35 * scale), scrap: Math.ceil(5 * scale), data: Math.ceil(3 * scale), xp: Math.ceil(55 * scale), itemChance: 0.9, extraItemChance: 0, coreChance: 0.08, table: 'ELITE' as const };
+  if (nodeType === 'BOUNTY') return { credits: Math.ceil(35 * scale), scrap: Math.ceil(5 * scale), data: Math.ceil(3 * scale), xp: 0, itemChance: 0.9, extraItemChance: 0, coreChance: 0.08, table: 'ELITE' as const };
   return { credits: Math.ceil(12 * scale), scrap: Math.ceil(3 * scale), data: Math.ceil(1 * scale), xp: Math.ceil(22 * scale), itemChance: 0.7, extraItemChance: 0, coreChance: 0, table: 'ORDINARY' as const };
 }
 
 function makeBattleReward(run: RunState, nodeId: string, nodeType: string): { wallet: ReturnType<typeof zeroWallet>; items: ItemInstance[]; grantIds: string[]; rng: Rng; xp: number } {
   const spec = rewardForNode(nodeType, run.depth);
-  const wallet = { CREDITS: spec.credits, SCRAP: spec.scrap, DATA: spec.data };
+  const biome = BIOME_BY_ID[run.biome];
+  const wallet = {
+    CREDITS: Math.ceil(spec.credits * (1 + (biome?.creditsBonus ?? 0))),
+    SCRAP: spec.scrap,
+    DATA: Math.ceil(spec.data * (1 + (biome?.dataBonus ?? 0))),
+  };
   const rng = Rng.fromSerialized(run.lootRng);
   const items: ItemInstance[] = [];
   const grantIds: string[] = [];
@@ -139,7 +144,8 @@ export function resolveCurrentCombat(save: SaveGame, commandId: string): RunComm
     heat: result.operator.heat,
     gameTimeMs: nextRun.resources.gameTimeMs + result.durationMs,
   };
-  nextRun.wanted = Math.min(100, Math.max(0, nextRun.wanted + result.wantedDelta));
+  const corporateWanted = run.biome === 'B02' ? node.type === 'ELITE' ? 7 : node.type === 'COMBAT' ? 4 : 0 : 0;
+  nextRun.wanted = Math.min(100, Math.max(0, nextRun.wanted + result.wantedDelta + corporateWanted));
   nextRun.revealLevel = Math.max(0, Math.min(2, nextRun.revealLevel + result.revealDelta)) as 0 | 1 | 2;
 
   if (result.outcome === 'DEFEAT') {
@@ -156,7 +162,7 @@ export function resolveCurrentCombat(save: SaveGame, commandId: string): RunComm
   }
 
   const reward = makeBattleReward(nextRun, node.id, node.type);
-  grantExperience(next, nextRun, reward.xp, `xp:${node.id}`);
+  if (reward.xp > 0) grantExperience(next, nextRun, reward.xp, `xp:${node.id}`);
   nextRun.runWallet = {
     CREDITS: nextRun.runWallet.CREDITS + reward.wallet.CREDITS,
     SCRAP: nextRun.runWallet.SCRAP + reward.wallet.SCRAP,

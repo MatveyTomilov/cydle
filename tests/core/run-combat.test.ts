@@ -46,4 +46,45 @@ describe('run combat integration', () => {
     expect(result).toMatchObject({ ok: false, failureCode: 'NODE_NOT_COMBAT' });
     expect(result.save).toBe(save);
   });
+
+  it('applies elite rewards, corporate wanted, and biome wallet bonuses through the shared combat result', () => {
+    const save = combatSave('elite-reward');
+    const run = save.run!;
+    const elite = run.graph.layers[1]![0]!;
+    elite.type = 'ELITE';
+    elite.enemies = [{ templateId: 'E01' }];
+    run.biome = 'B02';
+    run.graph.biome = 'B02';
+    run.currentNodeId = elite.id;
+    run.visitedNodeIds = [elite.id];
+    run.phase = 'NODE';
+
+    const result = resolveCurrentCombat(save, 'elite-fight');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.save.run).toMatchObject({ phase: 'ROUTE', runWallet: { CREDITS: 31, SCRAP: 7, DATA: 3 }, wanted: 7 });
+    expect(result.save.meta.operator.xp).toBe(55);
+    expect(result.save.run!.unsecuredCargo.length).toBeGreaterThanOrEqual(1);
+    expect(result.save.run!.unsecuredCargo.every((item) => !item.secured)).toBe(true);
+  });
+
+  it('applies bounty rewards without unstated bounty XP and scales B04 data', () => {
+    const save = combatSave('bounty-reward');
+    const run = save.run!;
+    const bounty = run.graph.layers[1]![1]!;
+    bounty.type = 'BOUNTY';
+    bounty.enemies = [{ templateId: 'E01' }];
+    run.biome = 'B04';
+    run.graph.biome = 'B04';
+    run.currentNodeId = bounty.id;
+    run.visitedNodeIds = [bounty.id];
+    run.phase = 'NODE';
+
+    const result = resolveCurrentCombat(save, 'bounty-fight');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.save.run).toMatchObject({ phase: 'ROUTE', runWallet: { CREDITS: 35, SCRAP: 5, DATA: 4 } });
+    expect(result.save.meta.operator.xp).toBe(0);
+    expect(result.save.run!.grantIds).not.toContain(`xp:${bounty.id}`);
+  });
 });

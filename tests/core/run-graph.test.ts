@@ -10,6 +10,15 @@ describe('deterministic sector graph', () => {
     }
   });
 
+  it('adds optional elite encounters and gates the single bounty option on wanted', () => {
+    const quiet = Array.from({ length: 40 }, (_, index) => generateSectorGraph({ seed: `optional-${index}`, depth: 2, biome: 'B03' }));
+    const hunted = Array.from({ length: 40 }, (_, index) => generateSectorGraph({ seed: `optional-${index}`, depth: 2, biome: 'B03', wanted: 60 }));
+    expect(quiet.some((graph) => graph.layers.flat().some((node) => node.type === 'ELITE'))).toBe(true);
+    expect(quiet.every((graph) => graph.layers.flat().every((node) => node.type !== 'BOUNTY'))).toBe(true);
+    expect(hunted.some((graph) => graph.layers.flat().some((node) => node.type === 'BOUNTY'))).toBe(true);
+    expect(hunted.every((graph) => graph.layers.flat().filter((node) => node.type === 'BOUNTY').length <= 1)).toBe(true);
+  });
+
   it('keeps the authored first-sector tutorial sequence on every route', () => {
     const graph = generateSectorGraph({ seed: 'tutorial-pinned', depth: 1, biome: 'B01', tutorial: true });
     expect(graph.layers.map((layer) => layer.length)).toEqual([1, 2, 3, 3, 2, 1]);

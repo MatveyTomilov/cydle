@@ -83,7 +83,7 @@ function linkLayers(rng: Rng, layers: RoadNode[][]): RoadEdge[] {
   return edges;
 }
 
-export function generateSectorGraph(input: { seed: string; depth: number; biome: BiomeId; tutorial?: boolean }): RoadGraph {
+export function generateSectorGraph(input: { seed: string; depth: number; biome: BiomeId; tutorial?: boolean; wanted?: number }): RoadGraph {
   if (!Number.isInteger(input.depth) || input.depth < 1) throw new Error('Sector depth must be a positive integer.');
   if (!BIOME_BY_ID[input.biome]) throw new Error(`Unknown biome ${input.biome}.`);
   const rng = new Rng('world', input.seed);
@@ -105,6 +105,8 @@ export function generateSectorGraph(input: { seed: string; depth: number; biome:
     else if (layer === 0 || layer === 2) { type = 'COMBAT'; fixed = [enemyFor(input.biome, input.depth, rng)]; }
     else if (layer === 4) type = index % 2 === 0 ? 'REPAIR' : 'FUEL';
     else if (!tutorial && layer === 3 && index === 1) type = 'SHOP';
+    else if (!tutorial && layer === 1 && index === 0 && rng.chance(0.22)) type = 'ELITE';
+    else if (!tutorial && layer === 1 && index === 1 && (input.wanted ?? 0) >= 50 && rng.chance(0.25)) type = 'BOUNTY';
     else if (tutorial && layer === 3) type = (['REPAIR', 'FUEL', 'COMBAT'] as const)[index]!;
     else if (tutorial && layer === 4) type = index === 0 ? 'FUEL' : 'REPAIR';
     else {

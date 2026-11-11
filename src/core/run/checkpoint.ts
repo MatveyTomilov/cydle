@@ -69,7 +69,7 @@ function advanceSector(run: RunState): void {
   const world = Rng.fromSerialized(run.worldRng);
   const biome = campaignBiome(depth, world.next()) as RunState['biome'];
   const graphSeed = `${run.seed}:sector:${depth}:${world.nextUint32().toString(16)}`;
-  const graph = generateSectorGraph({ seed: graphSeed, depth, biome });
+  const graph = generateSectorGraph({ seed: graphSeed, depth, biome, wanted: run.wanted });
   run.depth = depth;
   run.biome = biome;
   run.graph = graph;
