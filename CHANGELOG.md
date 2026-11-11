@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Enabled EV19 in generated road maps and applied its signed travel-time effects to exactly the next successfully chosen edge. Effects persist within an active run, clamp total travel time at zero, reset after use, and default to zero when older active saves lack the field.
+- Added tests for EV19 availability, route timing, effect consumption, invalid route preservation, zero-time clamping, and legacy save parsing.
 - Enforced run cargo capacity using the canonical build's cargo stat and item cargo-unit values. The road screen shows used/capacity; SHOP blocks purchases that do not fit; EVENT item grants are rejected atomically when full; CACHE and combat loot keep fitting items in stable order and report discarded overflow; CARGO-module swaps cannot strand the current load above capacity.
 - Added regression coverage for cargo unit totals, base and CARGO_2 capacity, shop/event overflow, combat/cache overflow, and loadout capacity reduction.
 - Added a playable deterministic SHOP road node to regular sectors. Each store shows five seed-stable biome-pool items and exact §19 prices; one-time purchases spend unsecured run credits and add at-risk cargo. Closing the node advances game time by 8 seconds.
