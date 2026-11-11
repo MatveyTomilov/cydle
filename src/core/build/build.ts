@@ -375,8 +375,9 @@ export function resolveBuild(input: BuildLoadout): ResolvedBuild {
   }
 
   for (const skill of skills) {
-    const source = { id: skill.id, name: skill.name, kind: 'skill' as const };
-    for (const [i, effect] of (skill.extraEffects ?? []).entries()) addEffect(effect, source, `${skill.id}:effect:${i}`);
+    // Эффекты активных умений применяются покадрово при касте (пробитие «только
+    // этот удар», баффы длительности, ON_HIT-триггеры), а не как постоянные статы.
+    for (const effect of skill.extraEffects ?? []) effects.push(effect);
   }
   for (const passive of passives) {
     const source = { id: passive.id, name: passive.name, kind: 'passive' as const };

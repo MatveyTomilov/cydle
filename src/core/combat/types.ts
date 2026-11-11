@@ -41,6 +41,7 @@ export interface CastState {
   dangerTag?: string;
   channel: Channel;
   abilityId?: string;
+  resolved?: boolean;
 }
 
 export interface CombatActor {
