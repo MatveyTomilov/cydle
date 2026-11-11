@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Enabled EV17 and EV24 after wiring their `extraHeat` and `shieldBonus` values to the shared combat simulator. Pending values are saved in run state, logged in `COMBAT_START`, consumed after one combat attempt, and default to zero on legacy active saves. Generated events continue to exclude unsupported deferred effects.
+- Added regression coverage for EV17/EV24 choices, map eligibility, combat delivery and consumption, plus legacy route/event/combat commands that omit newer state fields.
 - Enabled EV19 in generated road maps and applied its signed travel-time effects to exactly the next successfully chosen edge. Effects persist within an active run, clamp total travel time at zero, reset after use, and default to zero when older active saves lack the field.
 - Added tests for EV19 availability, route timing, effect consumption, invalid route preservation, zero-time clamping, and legacy save parsing.
 - Enforced run cargo capacity using the canonical build's cargo stat and item cargo-unit values. The road screen shows used/capacity; SHOP blocks purchases that do not fit; EVENT item grants are rejected atomically when full; CACHE and combat loot keep fitting items in stable order and report discarded overflow; CARGO-module swaps cannot strand the current load above capacity.
