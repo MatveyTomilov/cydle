@@ -6,9 +6,9 @@ Last updated: 2026-11-12
 
 The user explicitly resumed autonomous implementation after the earlier audit handoff. Work is now on `development/luna`, created from user-specified base `2e5a59798695aaf7666a8fa13cb709fcdaad9fc7`. The recovery branch remains the untouched source of the handoff.
 
-- Current work: the first persisted sector loop, run-specific loadout, protected garage equipment editor, and secured-item dismantling are committed on the existing deterministic simulator. The road screen exposes risk-aware loadouts; Build edits protected equipment; Inventory lists secured items and cargo risk and dismantles eligible protected items.
-- Checks after the current stage: typecheck, all 156 tests, data validation, and production build pass. Playwright is not installed, so automated E2E is unavailable. Browser smoke from the prior stage only reached the first E01 victory and did not complete a sector.
-- Next task: implement item repair using the master-spec cost rule and owned-item checks, then real craft/calibration operations and other road nodes, campaign outcomes, autopilot/offline, Simulation Lab, and final visuals.
+- Current work: the first persisted sector loop, run-specific loadout, protected garage equipment editor, secured-item dismantling, and protected item repair are committed on the existing deterministic simulator. Inventory lists secured items separately from at-risk cargo and supports repair/salvage with explicit costs.
+- Checks after the current stage: typecheck, all 160 tests, data validation, and production build pass. Playwright is not installed, so automated E2E is unavailable. Browser smoke from the earlier stage only reached the first E01 victory and did not complete a sector.
+- Next task: implement a bounded, visible craft/calibration transaction from the catalog's exact operation rules, then other road nodes, campaign outcomes, autopilot/offline, Simulation Lab, and final visuals.
 - The user requests continued implementation through a playable CYDLE 1.0; the old emergency stop is superseded.
 
 ## Current status
@@ -20,7 +20,7 @@ This is `development/luna`, based on the preserved Qwen snapshot. Combat expansi
 - Working directory: `E:\cydle\project`
 - Remote: `https://github.com/MatveyTomilov/cydle.git`
 - Branch: `development/luna`
-- Latest feature commit: `7c5082098c093ddd7b0ae00b27d44ab3a1e2e487` (`feat: dismantle protected inventory items`)
+- Latest feature commit: `be1a549f08b9f1dcc007d0e51ddd71e50fa5c734` (`feat: repair protected inventory items`)
 - Base: `2e5a59798695aaf7666a8fa13cb709fcdaad9fc7` from `recovery/qwen-snapshot`. Current commit: check `git rev-parse HEAD`.
 - Last fully-verified feature checkpoint before Luna work: `f14bdbc8fda39bc75e277219002194dab61d9061` (stage 2c). Earlier clean core checkpoint: `a06dbbab98581a95ae9b7af72f8a7be29fc659a2` (`feat: resolve validated CYDLE builds`).
 - Preserved original archive: `E:\cydle\workspace.tar.gz` (SHA-256 `5E82E5BDA30D38A0FB551F242E1B14E44E8B75B1D51A874B208AD45E96D24630`). Extracted read-only comparison snapshot: `E:\cydle\recovered-snapshot\cydle`.
@@ -57,6 +57,7 @@ The presence of catalogs and interfaces does not mean those systems are playable
 15. **Run equipment ownership and loadout** (commit `9598e1195c82197081e7ddfa147c1885f9617e64`). `RunState.equipment` tracks the field loadout separately from permanent garage equipment. `resolveRunBuild()` combines secured inventory with unsecured run cargo and passes it to canonical `resolveBuild()`. Equip/unequip commands validate ownership, slot compatibility, duplicate use, phase, and build legality; combat uses this same resolved loadout. EXIT secures cargo and writes the field loadout to permanent equipment; DEFEAT discards unsecured cargo, restores protected gear, and applies durability loss. The road UI exposes slots and labels items `СКЛАД` or `РИСК`. Four tests cover cargo equipment, invalid loadouts, extraction, and defeat settlement. Old active-run snapshots and exports without `run.equipment` inherit `meta.equipment`; legacy raw checksums are verified before the normalized save is returned. This reuses the existing combat simulator.
 16. **Protected garage equipment** (commit `5fa32c3df9b1e9b72f237a30c6035b848580e429`). Garage equip/unequip operations use the canonical `resolveBuild()` through `resolveRunBuild(save, null)`, retain protected items in inventory, reject invalid slot/build changes, and refuse edits during active runs. Terminal runs are synchronized when the garage loadout changes so stored state remains valid. The Build screen now presents the compatible secured inventory for every slot. Four tests cover valid equip, incompatible slot, active-run lock, and mandatory main weapon.
 17. **Protected inventory dismantling** (commit `7c5082098c093ddd7b0ae00b27d44ab3a1e2e487`). `dismantleGarageItem()` checks save validity, secured ownership, active-run lock, item category, and that the item is not equipped; it removes one instance and grants the existing `dismantleValue()` output. Repeated calls cannot grant resources again because the item is no longer owned. The new Inventory screen separates protected items from at-risk run cargo and asks for confirmation with the exact scrap/data output. Tests cover one-time grant, equipped item, unsecured item, and active run.
+18. **Protected item repair** (commit `be1a549f08b9f1dcc007d0e51ddd71e50fa5c734`). `garageRepairCost()` uses the master-spec durability formula capped by the common price for the same base template. `repairGarageItem()` checks secured ownership and active-run state, charges protected scrap, restores exactly one item to 100% durability, and preserves TR. The Inventory screen shows the exact repair price and disables repair when full durability or resources are insufficient. Tests cover exact price, insufficient scrap, full durability, unsecured item, and active run.
 
 ## Systems that currently work
 
@@ -69,29 +70,30 @@ The presence of catalogs and interfaces does not mean those systems are playable
 - Run equipment can be changed at safe points through the road UI. It uses the canonical build resolver and the same combat simulator; unsecured items remain at risk until extraction.
 - Permanent garage equipment can be edited from secured inventory in the Build screen, with canonical slot/build checks and active-run protection.
 - Secured inventory can be dismantled for the catalog-defined salvage value; equipped items, materials, and all dismantling during an active run are blocked. The current stock screen also shows unsecured cargo with its risk status.
+- Damaged secured equipment can be repaired to full durability for protected scrap using the master-spec cost/cap. Repairs do not consume TR and are blocked when the item is unsecured or a run is active.
 
 ## Partial or absent against `CYDLE_MASTER_SPEC.md` v2.0
 
 - **Partial:** typed data/effects catalogs; some item instance creation; build/stat preview boundary; damage and status primitives; combat state/result interfaces; **executable combat transition + headless simulator for auto-attacks, continuous resources, deaths and terminal outcome**; **effective-stat recomputation, status lifecycle/stacking and DoT (BLEED/BURN/VIRUS), expiry, and status-derived combat modifiers** (stage 2a); **main-channel active skill casts (windup/resolve/recovery/cooldown/energy/heat), tactical rule evaluation, targeting selectors, AUTO fallback and rule-failure diagnostics** (stage 2b); **independent reaction channel (shield/EMP/guard/vent/heal/drone-mark), cast interrupts and telegraph event infrastructure** (stage 2c) — all in `src/core/combat/engine.ts`.
-- **Partial:** sector one can be traversed and resolved. Run-specific and garage loadout editing plus secured-item dismantling are implemented; inventory transfer/shipping outside checkpoint, item repair/crafting/calibration, full node variety (SHOP/ANOMALY/EVENT/QUEST/ELITE/BOUNTY), tow/abandon, and complete cargo-capacity/ownership rules remain incomplete. Checkpoint/death settlement is core-tested but not browser-smoke-tested end to end.
+- **Partial:** sector one can be traversed and resolved. Run-specific and garage loadout editing, secured-item dismantling, and protected item repair are implemented; inventory transfer/shipping outside checkpoint, crafting/calibration, full node variety (SHOP/ANOMALY/EVENT/QUEST/ELITE/BOUNTY), tow/abandon, and complete cargo-capacity/ownership rules remain incomplete. Checkpoint/death settlement is core-tested but not browser-smoke-tested end to end.
 - **Absent:** campaign sectors 2–12 through finale/endgame; faction/quest/contract outcomes; full garage/crafting/TechLevel/tree/Build Lab editing; autopilot and exact offline worker; Simulation Lab/balance batches; original game-scene art/animation/assets/audio; CI and E2E setup. Playwright is not installed. The road screen is a styled map/report UI, not the final animated combat presentation.
 - Package script `validate` is now implemented. `sim` and `balance` still refer to missing scripts. `e2e` refers to Playwright, which is not installed in this project.
 
-## Checks after protected inventory stage (current committed code)
+## Checks after repair stage (current committed code)
 
 - `npm run typecheck`: **passes**.
-- `npm test -- --run`: **156 tests pass** across 19 files. Includes 50 combat-AI cases, run graph/state/command/node/combat/checkpoint/loadout/garage-equipment/dismantle tests, active-run save/reload, legacy v1 shape/checksum compatibility (including a pre-loadout active run), and existing Dexie recovery/export tests.
+- `npm test -- --run`: **160 tests pass** across 20 files. Includes 50 combat-AI cases, run graph/state/command/node/combat/checkpoint/loadout/garage-equipment/dismantle/repair tests, active-run save/reload, legacy v1 shape/checksum compatibility (including a pre-loadout active run), and existing Dexie recovery/export tests.
 - `npm run validate`: **passes** current catalog cross-reference and starter-content checks.
-- `npm run build`: **passes**; Vite generates a production bundle (JS 582.86 kB, gzip 183.32 kB).
+- `npm run build`: **passes**; Vite generates a production bundle (JS 584.43 kB, gzip 183.86 kB).
 - Local Vite server responded at `http://127.0.0.1:5173/`. Browser smoke created a temporary profile in the in-app browser, started a run, chose the first combat node, and observed the saved E01 victory with reward/report. No complete sector, mobile viewport, or automated E2E was verified.
 - E2E is unavailable: Playwright and an E2E harness are absent. `npm run e2e` was not rerun for this checkpoint.
 - `npm ci` succeeded during recovery. An earlier `npm audit` reported 7 advisories (3 moderate, 2 high, 2 critical); dependencies were not upgraded during recovery.
 
 ## Exact stop point and next task
 
-Current code checkpoint: branch `development/luna`, feature commit `7c5082098c093ddd7b0ae00b27d44ab3a1e2e487`. Run commands live in `src/core/run/`, garage ownership commands in `src/core/inventory/garage.ts`, build changes use the canonical resolver, and combat uses `simulateCombat()` from `src/core/combat/engine.ts`; UI persistence remains in `src/core/save/storage.ts`. Current checks: typecheck, 156 tests, `npm run validate`, and production build pass. Browser smoke only verified the opening combat; there is no E2E.
+Current code checkpoint: branch `development/luna`, feature commit `be1a549f08b9f1dcc007d0e51ddd71e50fa5c734`. Run commands live in `src/core/run/`, garage ownership/repair/salvage in `src/core/inventory/garage.ts`, build changes use the canonical resolver, and combat uses `simulateCombat()` from `src/core/combat/engine.ts`; UI persistence remains in `src/core/save/storage.ts`. Current checks: typecheck, 160 tests, `npm run validate`, and production build pass. Browser smoke only verified the opening combat; there is no E2E.
 
-Next task: implement repair of owned items according to `CYDLE_MASTER_SPEC.md` §12, including the exact capped scrap cost and zero-cost full durability. Then implement craft/calibration from explicit previews and transactions. Keep UI/storage outside the combat engine; do not duplicate verified math/build/combat rules.
+Next task: implement a bounded craft/calibration transaction for one owned item at a time according to `CYDLE_MASTER_SPEC.md` §12, with a concrete cost and before/after preview. Keep UI/storage outside the combat engine; do not duplicate verified math/build/combat rules.
 
 ## Important implementation decisions
 
