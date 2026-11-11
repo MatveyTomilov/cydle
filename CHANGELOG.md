@@ -8,6 +8,8 @@
 - Added tests for cargo equipment, invalid slot/loadout operations, extraction and defeat ownership settlement, plus legacy active-run checksum compatibility.
 - Added protected garage equip/unequip commands and a loadout editor in the Build screen. Commands use the canonical build resolver, preserve equipped items in the secured inventory, and lock permanent equipment changes during an active run.
 - Added garage equipment tests for valid swaps, incompatible slots, required main weapon, and active-run restrictions.
+- Added the secured inventory screen with a separate at-risk run-cargo list. Players can dismantle one owned, unequipped, non-material item for the existing catalog salvage value; the confirmation shows exact scrap/data yield and the action is blocked during an active run.
+- Added regression tests for one-time dismantling, equipped-item protection, unsecured ownership, and active-run restrictions.
 - Added a deterministic, persisted first-sector run loop with validated route, combat, cache, service, and checkpoint commands; battle resolution reuses the existing simulator. Checkpoint shipment/evacuation, death settlement, item/currency rewards, XP, and six-layer graph state are tested.
 - Connected the road screen to transactional save commits with route selection, combat report/log, cache choice, repair/fuel services, and checkpoint decisions.
 - Kept old schema-v1 saves compatible and verified active-run save/reload without graph reroll.
@@ -16,4 +18,4 @@
 - Added IndexedDB persistence through Dexie with transactional, checksummed snapshots, two-valid-snapshot retention, recovery to a prior valid snapshot, and checked JSON import/export.
 - Added catalog cross-reference validation at app startup and through `npm run validate`.
 - Added four save-boundary tests, including IndexedDB integration through `fake-indexeddb`.
-- Multi-sector campaign, general inventory transfer/salvage/crafting, other road-node systems, later save migrations, CI, browser E2E, and final art/animation remain incomplete.
+- Multi-sector campaign, general inventory transfer, repair/crafting/calibration, other road-node systems, later save migrations, CI, browser E2E, and final art/animation remain incomplete.
