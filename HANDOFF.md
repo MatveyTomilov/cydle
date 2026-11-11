@@ -6,20 +6,21 @@ Last updated: 2026-11-11
 
 The user explicitly resumed autonomous implementation after the earlier audit handoff. Work is now on `development/luna`, created from user-specified base `2e5a59798695aaf7666a8fa13cb709fcdaad9fc7`. The recovery branch remains the untouched source of the handoff.
 
-- Current work: combat expansion 2d and stage 2e drone roles/skills are verified. Timed enemy abilities, boss thresholds/CORE rotation, all six elite modifiers, cataloged enemy event triggers, and all six drone roles execute inside `stepCombat`.
-- Tests: all 102 unit tests and TypeScript typecheck pass. Production build reaches Vite and fails on the absent `src/main.tsx`; E2E remains unavailable because Playwright is absent.
-- Next combat task: catalog-driven trigger chains with authored depth/child-event bounds. The full game still lacks run/persistence systems, UI, campaign, crafting, and Simulation Lab.
+- Current work: combat expansion 2d and stage 2e (drone roles and catalog-driven trigger engine) are committed and verified inside the single `stepCombat` engine.
+- Tests: TypeScript typecheck and all 119 unit tests pass. Production build reaches Vite then fails because `src/main.tsx` is absent; E2E cannot run because Playwright is absent.
+- Next task: start the actual application/save boundary, then complete run, campaign, garage, economy, and Simulation Lab systems. Combat now covers catalog events/actions and bounded trigger chains.
 - The user requests continued implementation through a playable CYDLE 1.0; the old emergency stop is superseded.
 
 ## Current status
 
-This is `development/luna`, based on the preserved Qwen snapshot and implemented combat expansions **2a: effective stats + status lifecycle + DoT**, **2b: active main-channel skills + tactical rules + targeting**, **2c: independent reaction channel + interrupt/telegraph**, **2d: timed enemy abilities, boss phases/rotation, elite modifiers, and cataloged enemy events**, and **2e task 1: all drone roles and droneA skills**. Typecheck and all 102 unit tests pass. General bounded trigger chains remain. The Vite production build still stops at the missing real app entrypoint `src/main.tsx` — no placeholder was added.
+This is `development/luna`, based on the preserved Qwen snapshot and implemented combat expansions **2a: effective stats + status lifecycle + DoT**, **2b: active main-channel skills + tactical rules + targeting**, **2c: independent reaction channel + interrupt/telegraph**, **2d: timed enemy abilities, boss phases/rotation, elite modifiers, and cataloged enemy events**, **2e task 1: all drone roles and droneA skills**, and **2e task 2: bounded catalog-driven trigger/proc execution**. Typecheck and all 119 unit tests pass. The Vite production build still stops at the missing real app entrypoint `src/main.tsx` — no placeholder was added.
 
 ## Repository and checkpoint
 
 - Working directory: `E:\cydle\project`
 - Remote: `https://github.com/MatveyTomilov/cydle.git`
 - Branch: `development/luna`
+- Latest feature checkpoint: `d9a88e77a330d36f023ff292306b1a2535a15f66` (`feat: execute catalog combat triggers`)
 - Base: `2e5a59798695aaf7666a8fa13cb709fcdaad9fc7` from `recovery/qwen-snapshot`. Current commit: check `git rev-parse HEAD`.
 - Last fully-verified feature checkpoint before Luna work: `f14bdbc8fda39bc75e277219002194dab61d9061` (stage 2c). Earlier clean core checkpoint: `a06dbbab98581a95ae9b7af72f8a7be29fc659a2` (`feat: resolve validated CYDLE builds`).
 - Preserved original archive: `E:\cydle\workspace.tar.gz` (SHA-256 `5E82E5BDA30D38A0FB551F242E1B14E44E8B75B1D51A874B208AD45E96D24630`). Extracted read-only comparison snapshot: `E:\cydle\recovered-snapshot\cydle`.
@@ -50,36 +51,38 @@ The presence of catalogs and interfaces does not mean those systems are playable
 11. Combat expansion **2d task 3 — elite modifiers and event hooks** (Luna). Applies the elite ×1.75 HP/×1.25 damage baseline and all six declared modifiers, including EL_PEN's shared armor-penetration path and actual 200 ms basic-attack windup, EL_SPLIT's bounded half-HP no-loot summons, and EL_ANTI_DRONE's telegraphed scheduler entry. Wired E14/E18/E19/E23/E24 event behaviors: third-hit VIRUS, first-hit SHIELD_LEAK, delayed death burst, ally-death BERSERK, and repeated-program JAM. Every effect remains in the single deterministic combat engine.
 12. Combat expansion **2e task 1 — drone combat roles and droneA skills** (Luna). Combat actors retain drone role/pellet definitions; DR_GUN prioritizes DRONE_MARK, DR_ARC applies SHOCK on its fifth landed attack, DR_MED restores up to 18 operator shield every 10 s, DR_EMP runs its 14 s interrupt cycle, DR_BULWARK diverts 10% of incoming raw damage up to 20 per operator hit through the shared defense/shield pipeline, and DR_SWARM fires three 8-damage packets with procWeight 0.25 each. `SK_DRONE_REPAIR` and `SK_DRONE_EMP` resolve on the droneA channel independently of its basic-attack cast slot.
 
+13. Combat expansion **2e task 2 — bounded catalog trigger engine** (Luna). `resolveBuild()` preserves each trigger's source identity; the single combat engine dispatches catalog events/actions, including ON_BEFORE_HIT packet/flag spends, periodic effects, heat transitions, dodge, cast/interrupt/telegraph, status expiry, HP threshold, shield spend/absorb, drone/ally death, combat start/end, and hit/crit/kill. Secondary and status-tick ON_HIT/ON_KILL remain opt-in; DoT can still drive incoming-damage/shield/HP-threshold events. Shared `applyHit()` handles proc damage. Chains cap at depth 8 and 32 triggered children per origin, suppress duplicate source/effect/cause combinations, report `CHAIN_LIMIT`, and prune stale budgets. Target-dependent stat conditions now resolve against the actual attacker/target pair; timed phase stacks, cold streak, scan accuracy, emergency/extra reactions, and U01/U04/U09 effects have runtime behavior. Full unit suite is 119/119.
+
 ## Systems that currently work
 
 - Catalog modules load and the catalog consistency test passes.
 - Deterministic RNG, scalar formulas, stat aggregation/conditions/CalcTrace, damage mitigation, shield/HP partitioning, and stable item-instance creation are implemented and covered by unit tests.
 - Validated build resolution is implemented and covered: canonical starter stats, attribute formulas, item scaling and durability thresholds, equipment/skill/passive/tree/mutation limits and validation, conditions, and neural capacity.
 - The combat kernel runs deterministically: a validated build fights a depth-scaled encounter to VICTORY/DEFEAT/TIMEOUT through one pure 100 ms transition, with reproducible `stateHash` across identical seeds, hit/crit rolls, per-packet mitigation and shield/HP partitioning, continuous energy/heat/shield resources, heat lockout, metrics, and a capped event log. Covered by the three combat tests (tick purity + energy regen, deterministic victory, invalid-build rejection).
-- These are foundations and developer-facing core logic, not a complete game loop. Combat models **auto-attacks, status effects/DoT, main-channel active skills driven by tactical rules** (cast lifecycle, costs, cooldowns, targeting, rule-failure diagnostics), an **independent reaction channel** (shield/EMP/guard/vent/heal/drone-mark), scheduled enemy abilities, boss phases/CORE rotation, all six elite modifiers, and cataloged E14/E18/E19/E23/E24 event triggers inside the single combat transition. General bounded trigger/proc-chain execution remains pending.
+- These are foundations and developer-facing core logic, not a complete game loop. Combat models **auto-attacks, status effects/DoT, main-channel active skills driven by tactical rules** (cast lifecycle, costs, cooldowns, targeting, rule-failure diagnostics), an **independent reaction channel** (shield/EMP/guard/vent/heal/drone-mark), scheduled enemy abilities, boss phases/CORE rotation, all six elite modifiers, all drone roles, enemy event behaviors, and bounded catalog-driven trigger/proc chains inside the single deterministic transition.
 
 ## Partial or absent against `CYDLE_MASTER_SPEC.md` v2.0
 
 - **Partial:** typed data/effects catalogs; some item instance creation; build/stat preview boundary; damage and status primitives; combat state/result interfaces; **executable combat transition + headless simulator for auto-attacks, continuous resources, deaths and terminal outcome**; **effective-stat recomputation, status lifecycle/stacking and DoT (BLEED/BURN/VIRUS), expiry, and status-derived combat modifiers** (stage 2a); **main-channel active skill casts (windup/resolve/recovery/cooldown/energy/heat), tactical rule evaluation, targeting selectors, AUTO fallback and rule-failure diagnostics** (stage 2b); **independent reaction channel (shield/EMP/guard/vent/heal/drone-mark), cast interrupts and telegraph event infrastructure** (stage 2c) — all in `src/core/combat/engine.ts`.
-- **Partial (combat expansion 2d–2e):** combat AI, all six elite effects, all six drone roles, and the two drone active skills are implemented and unit tested; general catalog-driven bounded trigger/proc chains are absent. Encounter orchestration hooks (wanted/reveal deltas, escape, other death effects) remain absent.
+- **Partial (combat expansion 2d–2e):** combat AI, elite/drone behavior, and catalogued combat triggers are executable and unit tested. Combat only exposes wanted/reveal deltas; the run/campaign consumer, encounter rewards, escapes, and persistent death/economy consequences are absent.
 - **Absent (other systems):** campaign map/run/autopilot, economy/rewards/loot/crafting loop, persistence/migrations/atomic save transactions, meta progression/unlocks, garage, player-facing Build Lab, Simulation Lab and balance batches, React app entrypoint and UI/rendering/animation/assets, integrated and end-to-end test setup.
 - `index.html` references `/src/main.tsx`, which is missing. `npm run dev` and production build cannot provide a playable app until the actual application is implemented.
 - Package scripts `validate`, `sim`, and `balance` refer to missing scripts. `e2e` refers to Playwright, which is not installed in this project.
 
-## Checks at this checkpoint (combat kernel + stages 2a–2c + 2d + 2e task 1)
+## Checks at this checkpoint (combat kernel + stages 2a–2c + 2d + 2e tasks 1–2)
 
 - `npm run typecheck`: **passes** (no errors).
-- `npm test`: **102 tests pass** across 9 files — math (11), build (14), combat (3), combat-AI (34), combat-status (7), combat-skills (16), combat-reactions (12), rng (4), catalog (1).
+- `npm test`: **119 tests pass** across 9 files — math (11), build (15), combat (3), combat-AI (50), combat-status (7), combat-skills (16), combat-reactions (12), rng (4), catalog (1).
 - `npm run build`: **passes the TypeScript check, then Vite fails to resolve `/src/main.tsx`** from `index.html`. This is the same pre-existing UI-stage blocker documented at `a06dbba`, not a regression. It clears only when a real app entrypoint is implemented; no placeholder was added.
 - `npm run e2e`: **fails** because the `playwright` executable/dependency is absent.
-- No integration tests exist yet. Unit tests cover exact-tick interrupt order, boss target reacquisition, phase summon-cap saturation, E19 death→telegraph→damage ordering, deterministic transitions without input mutation, and drone role/skill behavior. General trigger-chain limits and app/UI remain unverified.
+- No integration tests exist yet. Unit tests cover exact-tick interrupt order, boss target reacquisition, phase summon-cap saturation, E19 death→telegraph→damage ordering, deterministic transitions without input mutation, drone role/skill behavior, trigger source identity/bounds, packet modifiers, heat/interrupt/telegraph/HP-threshold events, and target-dependent stat conditions. App/UI and end-to-end behavior remain unverified.
 - `npm ci` succeeded during recovery. An earlier `npm audit` reported 7 advisories (3 moderate, 2 high, 2 critical); dependencies were not upgraded during recovery.
 
 ## Exact stop point and next task
 
-Current saved point: branch `development/luna`, combat expansion 2e task 1. Timed enemy abilities, boss thresholds/rotation, elite modifiers, enemy event triggers, all six drone roles and droneA skills, and shield bypass execute in `src/core/combat/engine.ts`. Typecheck and the full unit suite (102/102) pass; production build still stops at missing `src/main.tsx`. The current commit is obtained with `git rev-parse HEAD`.
+Current code checkpoint: branch `development/luna`, feature commit `d9a88e77a330d36f023ff292306b1a2535a15f66`, combat expansion 2e task 2. Timed enemy abilities, boss thresholds/rotation, elite modifiers, drone roles/skills, and catalog event/action triggers execute in `src/core/combat/engine.ts`. Typecheck and the full unit suite (119/119) pass; production build still stops at missing `src/main.tsx`. The current HEAD is available through `git rev-parse HEAD`.
 
-Next task: implement catalog-driven trigger execution with `maxChainDepth=8`, `maxChildEventsPerOrigin=32`, duplicate `(sourceId, trigger, causeId)` suppression, and `CHAIN_LIMIT` diagnostics as defined in `CYDLE_MASTER_SPEC.md` §7. Reuse the current combat event/damage/status pipeline and proc metrics; do not create another simulator. Then continue to missing encounter/world/save/UI systems.
+Next task: implement the real React application entrypoint and a versioned, validated save boundary, keeping combat independent from rendering/storage. Then connect one complete sector/run loop with persisted state, loot, reward grant IDs, checkpoint/evacuation/death, and save/reload. Do not replace the combat engine or redo verified math/build/combat rules.
 
 ## Important implementation decisions
 
@@ -100,8 +103,8 @@ npm test
 npm run build
 ```
 
-The unit suite currently has 102 tests. Implement a real app entrypoint at the UI stage; do not add a placeholder solely to silence Vite.
+The unit suite currently has 119 tests. Implement a real app entrypoint at the UI stage; do not add a placeholder solely to silence Vite.
 
 ## Short continuation prompt
 
-Open `https://github.com/MatveyTomilov/cydle/tree/development/luna` and `E:\cydle\project`. Read `CYDLE_MASTER_SPEC.md`, `HANDOFF.md`, and `docs/ROADMAP.md`; inspect `git status` and recent commits. Combat 2a–2c, 2d, and 2e drone roles/skills are implemented and verified. Implement bounded catalog-driven trigger chains inside the existing engine, then continue the roadmap. Do not redo the math core or build resolver; test and commit each stage.
+Open `https://github.com/MatveyTomilov/cydle/tree/development/luna` and `E:\cydle\project`. Read `CYDLE_MASTER_SPEC.md`, `HANDOFF.md`, and `docs/ROADMAP.md`; inspect `git status` and recent commits. Combat 2a–2e, including bounded catalog-driven triggers, is implemented and verified. Begin the real application/save boundary, then one complete saved sector loop. Reuse the existing math/build/combat cores and commit each verified stage.

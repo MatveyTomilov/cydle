@@ -2,7 +2,7 @@
 
 The normative design source is `CYDLE_MASTER_SPEC.md` v2.0. This roadmap records implementation order and actual completion; catalog entries and interfaces alone are not counted as working gameplay.
 
-## Current verified base (`2e5a597`)
+## Recovered baseline (`2e5a597`)
 
 - Recovered source and data catalogs, deterministic math/CalcTrace, item instances, and validated build resolver.
 - Combat transition with 100 ms deterministic steps, auto-attacks, statuses/DoT, tactical main-channel skills, and reaction-channel defensive skills/interruption.
@@ -22,4 +22,4 @@ The normative design source is `CYDLE_MASTER_SPEC.md` v2.0. This roadmap records
 
 ## Active work
 
-Combat expansion 2d and stage 2e task 1 are implemented and verified on `development/luna`: timed enemy abilities, boss threshold effects/CORE rotation, all six elite modifiers, cataloged enemy event behaviors, all six drone roles, both droneA skills, and adversarial combat checks. Typecheck passes and 102 unit tests pass. General catalog-driven trigger chains remain the next combat task, followed by the application shell and campaign/persistence systems. See `docs/superpowers/plans/2026-11-11-combat-expansion-2d.md` and `HANDOFF.md`. Do not mark a roadmap item complete until its code, tests, and interactions work.
+Combat expansion 2d and stage 2e tasks 1–2 are implemented and verified on `development/luna` at `d9a88e7`: timed enemy abilities, boss thresholds/CORE rotation, all six elite modifiers, enemy event behaviors, all six drone roles, both droneA skills, source-aware catalog triggers, and bounded proc chains. Typecheck passes and all 119 unit tests pass. The next stage is the real application entrypoint and validated versioned save boundary, followed by one persisted playable sector/run loop. Vite build still stops at the missing `src/main.tsx`; E2E is unavailable without Playwright. See `HANDOFF.md`. Do not mark a roadmap item complete until its code, tests, and interactions work.
