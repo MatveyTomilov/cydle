@@ -8,7 +8,7 @@ import { ENEMY_BY_ID, BOSS_BY_ID, ELITE_MODS, enemyTemplate } from '../../data/e
 import { ITEM_BY_ID } from '../../data/items';
 import { SKILL_BY_ID } from '../../data/skills';
 import { UNIQUE_TEMPLATE_BY_ID } from '../../data/uniques';
-import type { BossPhaseTrigger, BossTemplate, EnemyAbility, EnemyTemplate, SkillDef } from '../../data/types';
+import type { BossPhaseTrigger, BossTemplate, EnemyAbility, EnemyTemplate, SkillDef, TriggerAction, TriggerEffect, TriggerEvent } from '../../data/types';
 import type { ResolvedBuild } from '../build/build';
 import { D, H, TICK_MS, attackIntervalMs, clamp, cooldownMs, finite } from '../math/formula';
 import {
@@ -16,7 +16,7 @@ import {
   type DefenseSnapshot, type PenetrationSnapshot,
 } from '../math/damage';
 import {
-  bundle, conditionSignature, emptySheet, mod, resolveStats, sheetOf,
+  bundle, conditionSignature, emptySheet, evalCondition, mod, resolveStats, sheetOf,
   type ActorView, type Modifier, type StatContext, type StatSheet,
 } from '../math/stats';
 import { Rng, hashString, stableStringify, type SerializedRng } from '../rng';
@@ -60,6 +60,7 @@ export interface CombatState {
   enemyWindupMult: number;
   elitePen: number;
   extraEnemyDigitalBonus: number;
+  triggerChains: Record<string, { childEvents: number; seen: Record<string, boolean>; limitReported: boolean; lastAt: number; packetMods: Record<string, { multiplier: number; penOverride?: PenetrationSnapshot }> }>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -165,6 +166,9 @@ function createOperator(build: ResolvedBuild, config: CombatConfig): CombatActor
     nextAttackAt: attackIntervalMs(weapon.intervalMs, sheet.attackSpeed, sheet.moreAttackSpeed),
   });
   actor.flags.lastDamagedAt = -100000;
+  actor.flags.firstAttack = 1;
+  if (weapon.type === 'KINETIC') actor.flags.mainKinetic = 1;
+  if ((weapon.pelletCount ?? weapon.packets?.length ?? 1) > 1) actor.flags.weaponShotgun = 1;
   if (config.initialTempShield && config.initialTempShield > 0) {
     actor.tempShields.push({ sourceId: 'initial', amount: config.initialTempShield, cap: config.initialTempShield, expiresAt: 60000 });
   }
@@ -182,6 +186,7 @@ function createDroneActor(build: ResolvedBuild, index: number, config: CombatCon
   sheet.evasion = 0;
   sheet.accuracy = 100 + owner.droneAccuracy;
   sheet.critChance = 0;
+  sheet.procMultiplier = owner.procMultiplier;
   const hpOverride = config.droneHp?.[drone.itemId];
   const droneName = (UNIQUE_TEMPLATE_BY_ID[drone.templateId] ?? ITEM_BY_ID[drone.templateId])?.name ?? drone.templateId;
   const actor = baseActor({
@@ -201,8 +206,7 @@ function createDroneActor(build: ResolvedBuild, index: number, config: CombatCon
   actor.flags.droneIndex = index;
   actor.droneRole = drone.role;
   actor.dronePellets = drone.pellets ?? 1;
-  if (drone.role === 'medic') actor.abilityNext.droneShield = 10000;
-  if (drone.role === 'emp') actor.abilityNext.droneEMP = 14000;
+  actor.droneItemId = drone.itemId;
   return actor;
 }
 
@@ -250,8 +254,16 @@ export function createCombatState(config: CombatConfig): CombatState {
     enemyWindupMult: config.enemyWindupMult ?? 1,
     elitePen: config.elitePen ?? 0,
     extraEnemyDigitalBonus: extraDigital,
+    triggerChains: {},
   };
-  emit(state, 'COMBAT_START', 'operator', { text: `Бой начался: ${enemies.map((e) => e.name).join(', ')}.` });
+  for (const ref of config.build.triggerEffects ?? []) {
+    if (ref.effect.event !== 'PERIODIC' || !ref.effect.periodMs) continue;
+    const owner = triggerOwner(state, ref.sourceId);
+    owner.abilityNext[triggerScheduleKey(ref)] = ref.effect.periodMs;
+  }
+  const started = emit(state, 'COMBAT_START', 'operator', { text: `Бой начался: ${enemies.map((e) => e.name).join(', ')}.` });
+  dispatchTriggerEvent(state, rng, { event: 'ON_COMBAT_START', actor: operator, actionId: 'combat-start', originActionId: 'combat-start', causeId: started.eventId, chainDepth: 0, direct: false, procWeight: 1 });
+  state.rng = rng.serialize();
   return state;
 }
 
@@ -326,8 +338,8 @@ function actorView(actor: CombatActor): ActorView {
   };
 }
 
-function combatContext(state: CombatState, actor: CombatActor): StatContext {
-  return {
+function combatContext(state: CombatState, actor: CombatActor, target?: CombatActor): StatContext {
+  const context: StatContext = {
     self: actorView(actor),
     enemiesAlive: actor.side === 'player' ? livingEnemies(state).length : livingPlayerSide(state).length,
     dronesAlive: state.drones.filter((d) => d.alive).length,
@@ -335,6 +347,13 @@ function combatContext(state: CombatState, actor: CombatActor): StatContext {
     heatLockout: actor.heatLockout,
     flags: actor.flags,
   };
+  const selectedTarget = target ?? (actor.lastTargetId ? actorById(state, actor.lastTargetId) : undefined);
+  if (selectedTarget) context.target = actorView(selectedTarget);
+  context.uniques = [...new Set(Object.values(state.build.equipment).flatMap((item) => item?.uniqueEffectIds ?? []))];
+  context.otherDroneDead = state.drones.some((drone) => !drone.alive && drone.id !== actor.id);
+  context.bothDronesSameTarget = state.drones.length >= 2 && state.drones.every((drone) => drone.alive)
+    && state.drones[0]!.lastTargetId !== null && state.drones[0]!.lastTargetId === state.drones[1]!.lastTargetId;
+  return context;
 }
 
 /** Статусы, отображаемые в лист характеристик через единый pipeline. */
@@ -363,15 +382,16 @@ function buffMods(actor: CombatActor): Modifier[] {
  * пересчитанные тем же resolveStats с боевым контекстом. Кешируется по
  * fingerprint активных условий/стеков. Без runtime-надстроек — baseSheet.
  */
-function eff(state: CombatState, actor: CombatActor): StatSheet {
-  const hasExtras = actor.runtimeMods.length > 0 || actor.buffs.length > 0 || Object.keys(actor.statuses).length > 0;
+function eff(state: CombatState, actor: CombatActor, target?: CombatActor): StatSheet {
+  const hasExtras = actor.runtimeMods.length > 0 || actor.buffs.length > 0 || Object.keys(actor.statuses).length > 0
+    || actor.baseMods.some((modifier) => modifier.condition !== undefined);
   if (!hasExtras) return actor.baseSheet;
   const mods = [...actor.baseMods, ...actor.runtimeMods, ...buffMods(actor), ...statusMods(actor)];
-  const ctx = combatContext(state, actor);
+  const ctx = combatContext(state, actor, target);
   const statusSig = (Object.keys(actor.statuses) as StatusId[]).sort().map((k) => `${k}:${statusStacks(actor, k)}`).join(',');
   const buffSig = actor.buffs.map((b) => `${b.id}x${b.stacks}`).sort().join(',');
   const rtSig = actor.runtimeMods.map((m) => m.id).sort().join(',');
-  const fingerprint = `${conditionSignature(mods, ctx)}|${statusSig}|${buffSig}|${rtSig}`;
+  const fingerprint = `${target?.id ?? ''}|${conditionSignature(mods, ctx)}|${statusSig}|${buffSig}|${rtSig}`;
   if (actor.effSheet && actor.effFingerprint === fingerprint) return actor.effSheet;
   const sheet = sheetOf(resolveStats(bundle(mods), ctx));
   actor.effSheet = sheet;
@@ -380,33 +400,36 @@ function eff(state: CombatState, actor: CombatActor): StatSheet {
 }
 
 /** Публичный доступ к эффективному листу актора (Build Lab / тесты). */
-export function effectiveSheet(state: CombatState, actor: CombatActor): StatSheet {
-  return eff(state, actor);
+export function effectiveSheet(state: CombatState, actor: CombatActor, target?: CombatActor): StatSheet {
+  return eff(state, actor, target);
 }
 
-function defenseOf(state: CombatState, actor: CombatActor): DefenseSnapshot {
-  const s = eff(state, actor);
+function defenseOf(state: CombatState, actor: CombatActor, target?: CombatActor): DefenseSnapshot {
+  const s = eff(state, actor, target);
   return { armor: s.armor, energyRes: s.energyRes, digitalRes: s.digitalRes };
 }
 
-function penOf(state: CombatState, actor: CombatActor): PenetrationSnapshot {
-  const s = eff(state, actor);
+function penOf(state: CombatState, actor: CombatActor, target?: CombatActor): PenetrationSnapshot {
+  const s = eff(state, actor, target);
+  const owner = actor.kind === 'drone' ? eff(state, state.operator, target) : null;
   return {
-    armorPen: s.armorPen + state.elitePen + (actor.eliteMod === 'EL_PEN' ? 10 : 0), armorPenPercent: s.armorPenPercent,
-    energyPen: s.energyPen, energyPenPercent: s.energyPenPercent,
-    digitalPen: s.digitalPen, digitalPenPercent: s.digitalPenPercent,
+    armorPen: s.armorPen + (owner?.armorPen ?? 0) + state.elitePen + (actor.eliteMod === 'EL_PEN' ? 10 : 0), armorPenPercent: s.armorPenPercent + (owner?.armorPenPercent ?? 0),
+    energyPen: s.energyPen + (owner?.energyPen ?? 0), energyPenPercent: s.energyPenPercent + (owner?.energyPenPercent ?? 0),
+    digitalPen: s.digitalPen + (owner?.digitalPen ?? 0), digitalPenPercent: s.digitalPenPercent + (owner?.digitalPenPercent ?? 0),
   };
 }
 
 /** Множитель исходящего урона оператора/дрона по типу и каналу. */
-function outgoingMultiplier(state: CombatState, actor: CombatActor, type: DamageType, isMain: boolean): number {
-  const s = eff(state, actor);
-  const typeIncreased = type === 'KINETIC' ? s.kineticDamage : type === 'ENERGY' ? s.energyDamage : s.digitalDamage;
-  let mult = (1 + typeIncreased / 100) * (1 + s.allDamage / 100);
+function outgoingMultiplier(state: CombatState, actor: CombatActor, type: DamageType, isMain: boolean, target?: CombatActor): number {
+  const s = eff(state, actor, target);
+  const inherited = actor.kind === 'drone' ? eff(state, state.operator, target) : null;
+  const typeIncreased = (type === 'KINETIC' ? s.kineticDamage : type === 'ENERGY' ? s.energyDamage : s.digitalDamage)
+    + (type === 'KINETIC' ? inherited?.kineticDamage ?? 0 : type === 'ENERGY' ? inherited?.energyDamage ?? 0 : inherited?.digitalDamage ?? 0);
+  let mult = (1 + typeIncreased / 100) * (1 + (s.allDamage + (inherited?.allDamage ?? 0)) / 100);
   if (isMain) mult *= 1 + s.mainDamage / 100;
-  if (actor.kind === 'drone') mult *= (1 + s.droneDamage / 100) * s.moreDrone;
+  if (actor.kind === 'drone') mult *= (1 + (s.droneDamage + (inherited?.droneDamage ?? 0)) / 100) * s.moreDrone * (inherited?.moreDrone ?? 1);
   const typeMore = type === 'KINETIC' ? s.moreKinetic : type === 'ENERGY' ? s.moreEnergy : s.moreDigital;
-  mult *= typeMore * s.moreDirect;
+  mult *= typeMore * s.moreDirect * (inherited?.moreDirect ?? 1);
   if (isMain) mult *= s.moreMain;
   const berserk = statusStacks(actor, 'BERSERK');
   if (berserk > 0) mult *= 1 + 0.15 * berserk;
@@ -415,8 +438,8 @@ function outgoingMultiplier(state: CombatState, actor: CombatActor, type: Damage
   return mult;
 }
 
-function incomingMultiplier(state: CombatState, target: CombatActor, type: DamageType): number {
-  const s = eff(state, target);
+function incomingMultiplier(state: CombatState, target: CombatActor, type: DamageType, source?: CombatActor): number {
+  const s = eff(state, target, source);
   const typeMult = type === 'KINETIC' ? s.incomingKinetic : type === 'ENERGY' ? s.incomingEnergy : s.incomingDigital;
   return s.incomingAll * typeMult;
 }
@@ -473,7 +496,7 @@ export function applyStatus(state: CombatState, source: CombatActor, target: Com
   if (!target.alive) return;
   const def = STATUS_DEFS[statusId];
   if (!def) return;
-  const srcSheet = eff(state, source);
+  const srcSheet = eff(state, source, target);
   const stacks = Math.max(1, Math.floor(opts.stacks ?? 1));
   let duration = opts.durationMs ?? def.durationMs;
   if (def.tickMs) duration *= 1 + (srcSheet.dotDuration + (statusId === 'VIRUS' ? srcSheet.virusDuration : 0)) / 100;
@@ -528,7 +551,7 @@ export function applyStatus(state: CombatState, source: CombatActor, target: Com
 const DOT_IDS: StatusId[] = ['BLEED', 'BURN', 'VIRUS'];
 
 /** Периодический урон статусов: snapshot × доля × стеки, резисты цели на каждом тике, без crit/on-hit. */
-function tickStatuses(state: CombatState): void {
+function tickStatuses(state: CombatState, rng: Rng): void {
   for (const actor of allActors(state)) {
     if (!actor.alive) continue;
     for (const id of DOT_IDS) {
@@ -541,8 +564,10 @@ function tickStatuses(state: CombatState): void {
         entry.nextTickAt += def.tickMs;
         const raw = entry.snapshot * (def.tickFraction ?? 0) * entry.stacks;
         if (raw <= 0) continue;
-        const mitigated = mitigatePacket(raw, def.damageType, defenseOf(state, actor), ZERO_PEN);
-        const incoming = mitigated.afterDefense * incomingMultiplier(state, actor, def.damageType);
+        const source = actorById(state, entry.sourceActorId);
+        const hpBefore = actor.hp;
+        const mitigated = mitigatePacket(raw, def.damageType, defenseOf(state, actor, source), ZERO_PEN);
+        const incoming = mitigated.afterDefense * incomingMultiplier(state, actor, def.damageType, source);
         const partition = partitionDamage(incoming, { hp: actor.hp, shield: actor.shield, temp: actor.tempShields }, 0, eff(state, actor).incomingShield);
         applyPartition(actor, partition);
         restoreEliteShield(state, actor);
@@ -550,7 +575,6 @@ function tickStatuses(state: CombatState): void {
         state.metrics.statusTicks++;
         const dealt = partition.shieldConsumed + partition.hpLost;
         actor.damageTaken += dealt;
-        const source = actorById(state, entry.sourceActorId);
         if (source) source.damageDealt += dealt;
         if (source?.side === 'player') {
           state.metrics.damageDealt += dealt;
@@ -562,24 +586,87 @@ function tickStatuses(state: CombatState): void {
           state.metrics.takenBySource[entry.sourceActorId] = (state.metrics.takenBySource[entry.sourceActorId] ?? 0) + dealt;
           if (actor.kind === 'operator') state.metrics.hpLost += partition.hpLost;
         }
-        emit(state, 'DOT_TICK', entry.sourceActorId, {
-          targetId: actor.id, statusId: id, damageType: def.damageType,
+        const actionId = `dot:${id}:${actor.id}:${state.timeMs}`;
+        const tickEvent = emit(state, 'DOT_TICK', entry.sourceActorId, {
+          targetId: actor.id, actionId, statusId: id, damageType: def.damageType,
           amountBeforeDefense: raw, amountAfterDefense: incoming,
           shieldConsumed: partition.shieldConsumed, hpLost: partition.hpLost,
           text: `${def.name} → ${actor.name}: ${incoming.toFixed(1)} ${def.damageType}.`,
         });
+        const eventActor = source ?? actor;
+        const eventOrigin = actionId;
+        dispatchTriggerEvent(state, rng, {
+          event: 'ON_TAKEN_DAMAGE', actor: eventActor, target: actor, actionId,
+          originActionId: eventOrigin, causeId: tickEvent.eventId, chainDepth: 0,
+          direct: false, procWeight: 1, damageType: def.damageType, amount: incoming,
+          statusId: id, eventSource: 'STATUS_TICK',
+        });
+        if (partition.shieldConsumed > 0) dispatchTriggerEvent(state, rng, {
+          event: 'ON_SHIELD_ABSORB', actor: eventActor, target: actor, actionId,
+          originActionId: eventOrigin, causeId: tickEvent.eventId, chainDepth: 0,
+          direct: false, procWeight: 1, damageType: def.damageType, amount: partition.shieldConsumed,
+          statusId: id, eventSource: 'STATUS_TICK',
+        });
+        if (actor.kind === 'operator' && hpBefore > 0) {
+          const crossed = (state.build.triggerEffects ?? []).some((ref) => ref.effect.event === 'ON_HP_THRESHOLD'
+            && ref.effect.hpThreshold !== undefined
+            && hpBefore / Math.max(1, eff(state, actor).maxHP) > ref.effect.hpThreshold
+            && actor.hp / Math.max(1, eff(state, actor).maxHP) <= ref.effect.hpThreshold);
+          if (crossed) dispatchTriggerEvent(state, rng, {
+            event: 'ON_HP_THRESHOLD', actor, target: eventActor, actionId,
+            originActionId: eventOrigin, causeId: tickEvent.eventId, chainDepth: 0,
+            direct: false, procWeight: 1, damageType: def.damageType, amount: partition.hpLost,
+            statusId: id, eventSource: 'STATUS_TICK',
+          });
+        }
+        if (partition.hpLost > 0 && source) {
+          actor.lastHitById = source.id;
+          actor.lastHitDamageType = def.damageType;
+          actor.lastHitDirect = false;
+          actor.lastHitCanProc = true;
+          actor.lastHitProcWeight = 0;
+          actor.lastHitActionId = actionId;
+          actor.lastHitOriginActionId = actionId;
+          actor.lastHitCauseId = tickEvent.eventId;
+          actor.lastHitChainDepth = 0;
+          actor.lastHitEventSource = 'STATUS_TICK';
+        }
       }
     }
   }
 }
 
 /** Истечение статусов/баффов/временных щитов (шаг 1 порядка событий). */
-function expireStatuses(state: CombatState): void {
+function expireStatuses(state: CombatState, rng: Rng): void {
   for (const actor of allActors(state)) {
+    const tracksPhase = [1, 2, 3].some((slot) => actor.flags[`phaseExpiresAt${slot}`] !== undefined);
+    for (let slot = 1; slot <= 3; slot++) {
+      const expiryKey = `phaseExpiresAt${slot}`;
+      if ((actor.flags[expiryKey] ?? 0) <= state.timeMs) delete actor.flags[expiryKey];
+    }
+    if (tracksPhase) {
+      actor.flags.phase = [1, 2, 3].filter((slot) => (actor.flags[`phaseExpiresAt${slot}`] ?? 0) > state.timeMs).length;
+    }
+    for (const key of Object.keys(actor.flags)) {
+      if (!key.endsWith('ExpiresAt')) continue;
+      const expiresAt = actor.flags[key]!;
+      if (expiresAt > state.timeMs) continue;
+      const flag = key.slice(0, -'ExpiresAt'.length);
+      delete actor.flags[key];
+      delete actor.flags[flag];
+    }
     for (const key of Object.keys(actor.statuses) as StatusId[]) {
       const arr = actor.statuses[key]!;
       const kept = arr.filter((e) => e.expiresAt > state.timeMs);
-      if (kept.length !== arr.length) emit(state, 'STATUS_EXPIRE', actor.id, { statusId: key, text: `${actor.name}: ${STATUS_DEFS[key].name} истёк.` });
+      if (kept.length !== arr.length) {
+        const actionId = `${actor.id}:status-expire:${key}:${state.timeMs}`;
+        const expired = emit(state, 'STATUS_EXPIRE', actor.id, { statusId: key, actionId, text: `${actor.name}: ${STATUS_DEFS[key].name} истёк.` });
+        dispatchTriggerEvent(state, rng, {
+          event: 'ON_STATUS_EXPIRE', actor, target: actor, actionId,
+          originActionId: actionId, causeId: expired.eventId, chainDepth: 0,
+          direct: false, procWeight: 1, statusId: key,
+        });
+      }
       if (kept.length) actor.statuses[key] = kept; else delete actor.statuses[key];
     }
     if (actor.buffs.some((b) => b.expiresAt <= state.timeMs)) actor.buffs = actor.buffs.filter((b) => b.expiresAt > state.timeMs);
@@ -596,7 +683,7 @@ function expireStatuses(state: CombatState): void {
 /* Непрерывные ресурсы (ровно один раз за тик, до событий)             */
 /* ------------------------------------------------------------------ */
 
-function applyContinuous(state: CombatState, dtSec: number): void {
+function applyContinuous(state: CombatState, dtSec: number, rng: Rng): void {
   const op = state.operator;
   if (op.alive) {
     const s = eff(state, op);
@@ -607,14 +694,20 @@ function applyContinuous(state: CombatState, dtSec: number): void {
     const ambient = state.ambientHeatPerSec + bossAmbient;
     const before = op.heat;
     op.heat = clamp(op.heat + (ambient - cooling) * dtSec, 0, s.maxHeat);
+    op.flags.coldStreak = op.heat <= 25 ? (op.flags.coldStreak ?? 0) + dtSec * 1000 : 0;
     if (!op.heatLockout && before < s.maxHeat && op.heat >= s.maxHeat) {
       op.heatLockout = true;
-      state.metrics.heatLockouts++;
-      emit(state, 'HEAT_LOCKOUT', op.id, { text: 'Перегрев: main-канал заблокирован до охлаждения ≤ 80.' });
+      const event = emit(state, 'HEAT', op.id, { text: 'Нагрев достиг максимума.', data: { heat: op.heat, threshold: s.maxHeat } });
+      dispatchTriggerEvent(state, rng, { event: 'ON_HEAT_FULL', actor: op, actionId: `heat-full:${state.timeMs}`, originActionId: `heat-full:${state.timeMs}`, causeId: event.eventId, chainDepth: 0, direct: false, procWeight: 1 });
+      if (op.heatLockout) {
+        state.metrics.heatLockouts++;
+        emit(state, 'HEAT_LOCKOUT', op.id, { text: 'Перегрев: main-канал заблокирован до охлаждения ≤ 80.' });
+      }
     }
     if (op.heatLockout && op.heat <= HEAT_LOCKOUT_RELEASE) {
       op.heatLockout = false;
-      emit(state, 'HEAT_LOCKOUT_END', op.id, { text: 'Перегрев снят.' });
+      const event = emit(state, 'HEAT_LOCKOUT_END', op.id, { text: 'Перегрев снят.' });
+      dispatchTriggerEvent(state, rng, { event: 'ON_HEAT_LOCKOUT_END', actor: op, actionId: `heat-release:${state.timeMs}`, originActionId: `heat-release:${state.timeMs}`, causeId: event.eventId, chainDepth: 0, direct: false, procWeight: 1 });
     }
     if (op.heatLockout) state.metrics.heatLockoutMs += dtSec * 1000;
     const sinceHit = state.timeMs - (op.flags.lastDamagedAt ?? -100000);
@@ -633,20 +726,6 @@ function applyContinuous(state: CombatState, dtSec: number): void {
     if (sinceHit >= SHIELD_REGEN_DELAY_MS && regen > 0 && actor.shield < s.maxShield) {
       actor.shield = clamp(actor.shield + regen * dtSec, 0, s.maxShield);
     }
-  }
-  for (const drone of state.drones) {
-    if (!drone.alive || drone.droneRole !== 'medic' || state.timeMs < (drone.abilityNext.droneShield ?? Number.MAX_SAFE_INTEGER)) continue;
-    drone.abilityNext.droneShield += 10000;
-    const operator = state.operator;
-    if (!operator.alive) continue;
-    const maxShield = eff(state, operator).maxShield;
-    const restored = Math.min(18, Math.max(0, maxShield - operator.shield));
-    if (restored <= 0) continue;
-    operator.shield += restored;
-    emit(state, 'SHIELD_GAIN', drone.id, {
-      targetId: operator.id, text: `${drone.name}: оператору +${restored.toFixed(1)} щита.`,
-      data: { amount: restored, source: 'DR_MED_periodic' },
-    });
   }
 }
 
@@ -691,6 +770,11 @@ interface HitOptions {
   actionId: string;
   isMain: boolean;
   procWeight: number;
+  canProc?: boolean;
+  direct?: boolean;
+  causeId?: number;
+  originActionId?: string;
+  chainDepth?: number;
   skillId?: string;
   penOverride?: PenetrationSnapshot;
   bypassShieldRatio?: number;
@@ -703,8 +787,8 @@ interface HitOptions {
  * попадании и −1 при промахе. Используется и автоатакой, и умениями.
  */
 function applyHit(state: CombatState, rng: Rng, actor: CombatActor, target: CombatActor, baseRaw: number, type: DamageType, opts: HitOptions): number {
-  const as = eff(state, actor);
-  const ds = eff(state, target);
+  const as = eff(state, actor, target);
+  const ds = eff(state, target, actor);
   const skillTag = opts.skillId ? { skillId: opts.skillId } : {};
   let accuracy = as.accuracy;
   if (actor.kind === 'drone' && hasStatus(target, 'DRONE_MARK')) accuracy += 15;
@@ -712,11 +796,22 @@ function applyHit(state: CombatState, rng: Rng, actor: CombatActor, target: Comb
   if (!rng.chance(hitChance)) {
     state.metrics.misses++;
     if (target.kind === 'operator') state.metrics.dodgesTaken++;
-    emit(state, 'MISS', actor.id, { targetId: target.id, actionId: opts.actionId, ...skillTag, damageType: type, text: `${actor.name}: промах по ${target.name}.`, roll: hitChance });
+    const missEvent = emit(state, 'MISS', actor.id, {
+      targetId: target.id, actionId: opts.actionId, ...skillTag, damageType: type,
+      originActionId: opts.originActionId ?? opts.actionId, causeId: opts.causeId, chainDepth: opts.chainDepth ?? 0,
+      text: `${actor.name}: промах по ${target.name}.`, roll: hitChance,
+    });
+    if (target.kind === 'operator') dispatchTriggerEvent(state, rng, {
+      event: 'ON_DODGE', actor, target, actionId: opts.actionId,
+      originActionId: opts.originActionId ?? opts.actionId,
+      causeId: opts.causeId ?? missEvent.eventId, chainDepth: opts.chainDepth ?? 0,
+      direct: opts.direct !== false, procWeight: 1, damageType: type,
+    });
     return -1;
   }
   const crit = rng.chance(pCrit(as.critChance));
-  let raw = baseRaw * outgoingMultiplier(state, actor, type, opts.isMain);
+  if (opts.direct !== false && actor.buffs.some((buff) => buff.consumeOnHit)) actor.flags.consumeHitBuffs = 1;
+  let raw = baseRaw * outgoingMultiplier(state, actor, type, opts.isMain, target);
   if (actor.side === 'enemy' && type === 'DIGITAL') raw *= 1 + state.extraEnemyDigitalBonus;
   if (hasStatus(target, 'SCAN_MARK')) raw *= 1.12;
   if (crit) {
@@ -724,24 +819,56 @@ function applyHit(state: CombatState, rng: Rng, actor: CombatActor, target: Comb
     state.metrics.crits++;
   }
   raw = finite(raw, 0);
+  const originActionId = opts.originActionId ?? opts.actionId;
+  const packetKey = `${opts.actionId}:${target.id}`;
+  const cachedPacketMods = state.triggerChains[originActionId]?.packetMods[packetKey];
+  if (cachedPacketMods) {
+    raw *= cachedPacketMods.multiplier;
+    opts = { ...opts, penOverride: cachedPacketMods.penOverride ?? opts.penOverride };
+  } else {
+    if (type === 'ENERGY' && actor.kind === 'operator' && (actor.flags.u01ExpiresAt ?? 0) >= state.timeMs) {
+      raw *= actor.flags.u01EnergyMultiplier ?? 1;
+      delete actor.flags.u01ExpiresAt;
+      delete actor.flags.u01EnergyMultiplier;
+    }
+    const initialRaw = raw;
+    const beforeHit: TriggerContext = {
+      event: 'ON_BEFORE_HIT', actor, target, actionId: opts.actionId,
+      originActionId, causeId: opts.causeId ?? 0, chainDepth: opts.chainDepth ?? 0,
+      direct: opts.direct !== false, procWeight: opts.procWeight,
+      damageType: type, amount: raw, skillId: opts.skillId, isMain: opts.isMain,
+      packetPenOverride: opts.penOverride,
+    };
+    dispatchTriggerEvent(state, rng, beforeHit);
+    raw = finite(beforeHit.amount ?? raw, 0);
+    opts = { ...opts, penOverride: beforeHit.packetPenOverride ?? opts.penOverride };
+    const budget = state.triggerChains[originActionId];
+    if (budget && initialRaw > 0) budget.packetMods[packetKey] = {
+      multiplier: raw / initialRaw,
+      ...(beforeHit.packetPenOverride ? { penOverride: beforeHit.packetPenOverride } : {}),
+    };
+  }
   if (actor.side === 'enemy' && target.kind === 'operator') {
     const bulwark = state.drones.filter((drone) => drone.alive && drone.droneRole === 'bulwark').sort((a, b) => byId(a.id, b.id))[0];
     if (bulwark) {
       const redirected = Math.min(raw * 0.1, 20);
       const operatorRaw = raw - redirected;
-      applyMitigatedHit(state, actor, target, operatorRaw, type, opts, crit, true);
-      if (redirected > 0) applyMitigatedHit(state, actor, bulwark, redirected, type, opts, crit, false);
+      const damageEvent = applyMitigatedHit(state, rng, actor, target, operatorRaw, type, opts, crit, true);
+      if (redirected > 0) applyMitigatedHit(state, rng, actor, bulwark, redirected, type, opts, crit, false);
       resolveDirectHitTriggers(state, actor, target, opts.actionId, operatorRaw);
+      if (opts.canProc !== false) dispatchHitTriggers(state, rng, actor, target, type, operatorRaw, opts, crit, damageEvent);
       return operatorRaw;
     }
   }
-  applyMitigatedHit(state, actor, target, raw, type, opts, crit, true);
+  const damageEvent = applyMitigatedHit(state, rng, actor, target, raw, type, opts, crit, true);
   resolveDirectHitTriggers(state, actor, target, opts.actionId, raw);
+  if (opts.canProc !== false) dispatchHitTriggers(state, rng, actor, target, type, raw, opts, crit, damageEvent);
   return raw;
 }
 
 function applyMitigatedHit(
   state: CombatState,
+  rng: Rng,
   actor: CombatActor,
   target: CombatActor,
   raw: number,
@@ -749,11 +876,12 @@ function applyMitigatedHit(
   opts: HitOptions,
   crit: boolean,
   countHit: boolean,
-): void {
+): CombatEvent {
   const ds = eff(state, target);
+  const hpBefore = target.hp;
   const skillTag = opts.skillId ? { skillId: opts.skillId } : {};
-  const mitigated = mitigatePacket(raw, type, defenseOf(state, target), opts.penOverride ?? penOf(state, actor));
-  let incoming = mitigated.afterDefense * incomingMultiplier(state, target, type);
+  const mitigated = mitigatePacket(raw, type, defenseOf(state, target, actor), opts.penOverride ?? penOf(state, actor, target));
+  let incoming = mitigated.afterDefense * incomingMultiplier(state, target, type, actor);
   if (hasStatus(target, 'MARK')) {
     incoming *= 1.3;
     delete target.statuses.MARK;
@@ -776,13 +904,541 @@ function applyMitigatedHit(
     state.metrics.takenBySource[actor.id] = (state.metrics.takenBySource[actor.id] ?? 0) + dealt;
     if (target.kind === 'operator') state.metrics.hpLost += partition.hpLost;
   }
-  emit(state, 'DAMAGE', actor.id, {
+  const damageEvent = emit(state, 'DAMAGE', actor.id, {
     targetId: target.id, actionId: opts.actionId, ...skillTag, damageType: type, crit,
+    causeId: opts.causeId, originActionId: opts.originActionId ?? opts.actionId, chainDepth: opts.chainDepth ?? 0,
     amountBeforeDefense: raw, amountAfterDefense: incoming,
     shieldConsumed: partition.shieldConsumed, hpLost: partition.hpLost, bypassed: partition.bypassed,
     text: `${actor.name} → ${target.name}: ${incoming.toFixed(1)} ${type}${crit ? ' (крит)' : ''}, щит −${partition.shieldConsumed.toFixed(1)}, HP −${partition.hpLost.toFixed(1)}.`,
     data: { overkill: partition.overkill, ...(opts.abilityId ? { abilityId: opts.abilityId } : {}) },
   });
+  if (target.kind === 'operator' && hpBefore > 0) {
+    const crossed = (state.build.triggerEffects ?? []).some((ref) => ref.effect.event === 'ON_HP_THRESHOLD'
+      && ref.effect.hpThreshold !== undefined
+      && hpBefore / Math.max(1, ds.maxHP) > ref.effect.hpThreshold
+      && target.hp / Math.max(1, ds.maxHP) <= ref.effect.hpThreshold);
+    if (crossed) dispatchTriggerEvent(state, rng, {
+      event: 'ON_HP_THRESHOLD', actor: target, target: actor, actionId: opts.actionId,
+      originActionId: opts.originActionId ?? opts.actionId, causeId: damageEvent.eventId,
+      chainDepth: opts.chainDepth ?? 0, direct: opts.direct !== false, procWeight: 1,
+      damageType: type, amount: partition.hpLost,
+    });
+  }
+  dispatchTriggerEvent(state, rng, {
+    event: 'ON_TAKEN_DAMAGE', actor, target, actionId: opts.actionId,
+    originActionId: opts.originActionId ?? opts.actionId,
+    causeId: opts.causeId ?? damageEvent.eventId, chainDepth: opts.chainDepth ?? 0,
+    direct: opts.direct !== false, procWeight: 1, damageType: type, amount: incoming,
+    eventSource: opts.direct === false ? 'SECONDARY' : 'DIRECT',
+  });
+  if (partition.shieldConsumed > 0) dispatchTriggerEvent(state, rng, {
+    event: 'ON_SHIELD_ABSORB', actor, target, actionId: opts.actionId,
+    originActionId: opts.originActionId ?? opts.actionId,
+    causeId: opts.causeId ?? damageEvent.eventId, chainDepth: opts.chainDepth ?? 0,
+    direct: opts.direct !== false, procWeight: 1, damageType: type, amount: partition.shieldConsumed,
+    eventSource: opts.direct === false ? 'SECONDARY' : 'DIRECT',
+  });
+  if (partition.hpLost > 0) {
+    target.lastHitById = actor.id;
+    target.lastHitDamageType = type;
+    target.lastHitDirect = opts.direct !== false;
+    target.lastHitCanProc = opts.canProc !== false;
+    target.lastHitProcWeight = opts.procWeight;
+    target.lastHitActionId = opts.actionId;
+    target.lastHitOriginActionId = opts.originActionId ?? opts.actionId;
+    target.lastHitCauseId = opts.causeId ?? damageEvent.eventId;
+    target.lastHitChainDepth = opts.chainDepth ?? 0;
+    target.lastHitEventSource = opts.direct === false ? 'SECONDARY' : 'DIRECT';
+  }
+  return damageEvent;
+}
+
+interface TriggerContext {
+  event: TriggerEvent;
+  actor: CombatActor;
+  target?: CombatActor;
+  actionId: string;
+  originActionId: string;
+  causeId: number;
+  chainDepth: number;
+  direct: boolean;
+  procWeight: number;
+  damageType?: DamageType;
+  amount?: number;
+  isMain?: boolean;
+  packetPenOverride?: PenetrationSnapshot;
+  skillId?: string;
+  attackCounter?: number;
+  statusId?: StatusId;
+  eventSource?: 'DIRECT' | 'SECONDARY' | 'STATUS_TICK' | 'REFLECTED';
+}
+
+function triggerOwner(state: CombatState, sourceId: string): CombatActor {
+  return state.drones.find((drone) => drone.droneItemId === sourceId) ?? state.operator;
+}
+
+function triggerScheduleKey(ref: ResolvedBuild['triggerEffects'][number]): string {
+  return `trigger:${ref.sourceId}:${ref.effect.id}`;
+}
+
+function runPeriodicTriggers(state: CombatState, rng: Rng): void {
+  for (const ref of state.build.triggerEffects ?? []) {
+    const effect = ref.effect;
+    if (effect.event !== 'PERIODIC' || !effect.periodMs) continue;
+    const owner = triggerOwner(state, ref.sourceId);
+    const scheduleKey = triggerScheduleKey(ref);
+    if (!owner.alive || state.timeMs < (owner.abilityNext[scheduleKey] ?? Number.MAX_SAFE_INTEGER)) continue;
+    owner.abilityNext[scheduleKey] += effect.periodMs;
+    const actionId = `${owner.id}:periodic:${effect.id}:${owner.counters[effect.id] = (owner.counters[effect.id] ?? 0) + 1}`;
+    const cause = emit(state, 'TRIGGER', owner.id, {
+      actionId, originActionId: actionId, incomingTags: ['PERIODIC'],
+      text: `${owner.name}: периодический триггер ${effect.id}.`, data: { periodMs: effect.periodMs },
+    });
+    dispatchTriggerEvent(state, rng, {
+      event: 'PERIODIC', actor: owner, target: owner.droneRole === 'medic' ? state.operator : undefined,
+      actionId, originActionId: actionId, causeId: cause.eventId,
+      chainDepth: 0, direct: false, procWeight: 1,
+    });
+  }
+}
+
+function triggerCanObserve(ref: ResolvedBuild['triggerEffects'][number], owner: CombatActor, context: TriggerContext): boolean {
+  if (context.event === 'ON_KILL' && owner.kind === 'operator' && context.actor.side === 'player') return true;
+  if (context.event === 'ON_BEFORE_HIT' && ref.effect.requireDrone && context.actor.kind === 'drone') return true;
+  if (context.event === 'ON_TAKEN_DAMAGE' || context.event === 'ON_SHIELD_ABSORB' || context.event === 'ON_DODGE') {
+    return context.target?.id === owner.id;
+  }
+  if (context.event === 'ON_DRONE_DEATH' || context.event === 'ON_ALLY_DEATH' || context.event === 'ON_COMBAT_START' || context.event === 'ON_COMBAT_END'
+    || context.event === 'ON_ENEMY_TELEGRAPH' || context.event === 'ON_INTERRUPT' || context.event === 'ON_HP_THRESHOLD' || context.event === 'ON_EFFECT_SHIELD_SPENT') {
+    return owner.kind === 'operator';
+  }
+  if (context.event === 'ON_STATUS_EXPIRE') return owner.kind === 'operator' && context.target?.side === 'enemy';
+  return context.actor.id === owner.id;
+}
+
+function triggerStatContext(state: CombatState, owner: CombatActor, target?: CombatActor): StatContext {
+  const context = combatContext(state, owner);
+  if (target) context.target = actorView(target);
+  context.uniques = [...new Set(Object.values(state.build.equipment).flatMap((item) => item?.uniqueEffectIds ?? []))];
+  context.otherDroneDead = state.drones.some((drone) => !drone.alive && drone.id !== owner.id);
+  context.bothDronesSameTarget = state.drones.length >= 2 && state.drones.every((drone) => drone.alive)
+    && state.drones[0]!.lastTargetId !== null && state.drones[0]!.lastTargetId === state.drones[1]!.lastTargetId;
+  return context;
+}
+
+function triggerTargets(state: CombatState, owner: CombatActor, context: TriggerContext, targeting: TargetMode, maxTargets?: number): CombatActor[] {
+  const enemies = livingEnemies(state).sort((a, b) => byId(a.id, b.id));
+  if (targeting === 'allEnemies') return enemies.slice(0, maxTargets ?? enemies.length);
+  if (targeting === 'secondary' || targeting === 'otherEnemy') {
+    const target = enemies.find((enemy) => enemy.id !== context.target?.id && enemy.id !== owner.lastTargetId);
+    return target ? [target] : [];
+  }
+  const selected = selectTarget(state, owner, targeting);
+  return selected && selected.side === 'enemy' ? [selected] : [];
+}
+
+function reportChainLimit(state: CombatState, context: TriggerContext, reason: 'depth' | 'children'): void {
+  const origin = context.originActionId || context.actionId;
+  const budget = state.triggerChains[origin] ?? (state.triggerChains[origin] = { childEvents: 0, seen: {}, limitReported: false, lastAt: state.timeMs, packetMods: {} });
+  budget.lastAt = state.timeMs;
+  if (budget.limitReported) return;
+  budget.limitReported = true;
+  state.metrics.chainLimitHits++;
+  emit(state, 'CHAIN_LIMIT', context.actor.id, {
+    targetId: context.target?.id, actionId: context.actionId, causeId: context.causeId,
+    originActionId: origin, chainDepth: context.chainDepth + 1,
+    reason: reason === 'depth' ? 'max_chain_depth' : 'max_child_events',
+    text: `Цепь эффектов остановлена: превышен лимит ${reason === 'depth' ? 'глубины' : 'дочерних событий'}.`,
+    data: { maxChainDepth: 8, maxChildEventsPerOrigin: 32 },
+  });
+}
+
+function executeTriggerAction(
+  state: CombatState,
+  rng: Rng,
+  owner: CombatActor,
+  context: TriggerContext,
+  triggerEvent: CombatEvent,
+  sourceId: string,
+  sourceKind: ResolvedBuild['triggerEffects'][number]['sourceKind'],
+  action: TriggerAction,
+): void {
+  switch (action.kind) {
+    case 'secondaryDamage': {
+      const ownerSheet = eff(state, owner);
+      let basis = 0;
+      switch (action.basis) {
+        case 'techPower': basis = ownerSheet.techPower; break;
+        case 'mainWeapon': basis = state.build.mainWeapon?.damage ?? 0; break;
+        case 'droneTech': basis = (context.actor.kind === 'drone' ? context.actor.attackDamage : state.drones.find((drone) => drone.alive)?.attackDamage) ?? 0; break;
+        case 'flat': basis = 1; break;
+        case 'consumedShield': basis = context.amount ?? 0; break;
+        case 'virusRemaining': basis = context.target ? statusStacks(context.target, 'VIRUS') : 0; break;
+      }
+      const raw = basis * action.coefficient;
+      const targets = triggerTargets(state, owner, context, action.targeting, action.maxTargets);
+      for (let i = 0; i < targets.length; i++) {
+        applyHit(state, rng, owner, targets[i]!, raw, action.damageType, {
+          actionId: `${triggerEvent.actionId ?? context.actionId}:child:${i + 1}`,
+          originActionId: context.originActionId, causeId: triggerEvent.eventId,
+          chainDepth: triggerEvent.chainDepth, isMain: false,
+          procWeight: action.canProc ? context.procWeight : 0,
+          canProc: action.canProc === true, direct: false,
+        });
+      }
+      return;
+    }
+    case 'applyStatus': {
+      const targets = action.target === 'allEnemies'
+        ? livingEnemies(state).sort((a, b) => byId(a.id, b.id))
+        : action.target === 'self' ? [owner]
+        : action.target === 'otherEnemy' ? triggerTargets(state, owner, context, 'otherEnemy')
+        : context.target ? [context.target] : [];
+      for (const target of targets) applyStatus(state, owner, target, action.status, {
+        stacks: action.stacks, durationMs: action.durationMs, snapshot: context.amount,
+        actionId: triggerEvent.actionId, causeId: triggerEvent.eventId,
+      });
+      return;
+    }
+    case 'restoreShield': {
+      const target = owner.droneRole === 'medic' ? state.operator : owner;
+      const maxShield = eff(state, target).maxShield;
+      const restored = Math.min(action.amount, Math.max(0, maxShield - target.shield));
+      target.shield += restored;
+      if (restored > 0) emit(state, 'SHIELD_GAIN', owner.id, {
+        targetId: target.id, actionId: triggerEvent.actionId, causeId: triggerEvent.eventId,
+        originActionId: context.originActionId, chainDepth: triggerEvent.chainDepth,
+        text: `${owner.name}: +${restored.toFixed(1)} щита.`, data: { amount: restored },
+      });
+      return;
+    }
+    case 'interrupt': {
+      const target = context.target?.cast?.interruptible ? context.target
+        : livingEnemies(state).filter((enemy) => enemy.cast?.interruptible).sort((a, b) => byId(a.id, b.id))[0];
+      if (owner.kind === 'drone' && owner.droneRole === 'emp') {
+        const skill = state.build.skills.find((candidate) => candidate.special === 'DRONE_EMP');
+        if (skill && !owner.reactionCast && (owner.cooldowns[skill.id] ?? 0) <= state.timeMs) {
+          startSkillCast(state, rng, owner, skill, target ?? selectTarget(state, owner, skill.targetMode));
+          return;
+        }
+      }
+      if (target) interruptCast(state, rng, target, owner.id, triggerEvent.actionId ?? context.actionId);
+      return;
+    }
+    case 'flag': {
+      if (action.key === 'longPulse' && state.timeMs - owner.lastMainAttackAt < 1000) return;
+      if (action.key === 'phase' && action.durationMs) {
+        for (let slot = 1; slot <= (action.max ?? 3); slot++) {
+          const expiryKey = `phaseExpiresAt${slot}`;
+          if ((owner.flags[expiryKey] ?? 0) <= state.timeMs) {
+            owner.flags[expiryKey] = state.timeMs + action.durationMs;
+            break;
+          }
+        }
+        owner.flags.phase = Array.from({ length: action.max ?? 3 }, (_, index) => owner.flags[`phaseExpiresAt${index + 1}`] ?? 0)
+          .filter((expiresAt) => expiresAt > state.timeMs).length;
+        return;
+      }
+      const value = (owner.flags[action.key] ?? 0) + action.amount;
+      owner.flags[action.key] = action.max === undefined ? value : Math.min(action.max, value);
+      if (action.durationMs) owner.flags[`${action.key}ExpiresAt`] = state.timeMs + action.durationMs;
+      return;
+    }
+    case 'restoreEnergy': {
+      const bucket = Math.floor(state.timeMs / 1000);
+      if (owner.flags.energyGainSecond !== bucket) {
+        owner.flags.energyGainSecond = bucket;
+        owner.flags.energyGainInSecond = 0;
+      }
+      const cap = action.perSecondCap ?? Number.MAX_SAFE_INTEGER;
+      const amount = Math.min(action.amount, Math.max(0, cap - (owner.flags.energyGainInSecond ?? 0)));
+      const before = owner.energy;
+      owner.energy = clamp(owner.energy + amount, 0, eff(state, owner).maxEnergy);
+      const restored = owner.energy - before;
+      owner.flags.energyGainInSecond = (owner.flags.energyGainInSecond ?? 0) + restored;
+      if (restored > 0) emit(state, 'ENERGY', owner.id, {
+        actionId: triggerEvent.actionId, causeId: triggerEvent.eventId,
+        originActionId: context.originActionId, chainDepth: triggerEvent.chainDepth,
+        text: `${owner.name}: +${restored.toFixed(1)} энергии.`, data: { amount: restored },
+      });
+      return;
+    }
+    case 'reduceCooldown': {
+      const ids = action.skillId ? [action.skillId] : Object.keys(owner.cooldowns).sort(byId);
+      const skillId = ids.find((id) => (owner.cooldowns[id] ?? 0) > state.timeMs);
+      if (skillId) owner.cooldowns[skillId] = Math.max(state.timeMs, owner.cooldowns[skillId]! - action.amountMs);
+      return;
+    }
+    case 'wanted':
+      state.wantedDelta += action.amount;
+      return;
+    case 'revealNodes':
+      state.revealDelta += action.amount;
+      return;
+    case 'heal': {
+      const sheet = eff(state, owner);
+      const raw = action.flat + sheet.maxHP * (action.maxHPFraction ?? 0);
+      const amount = Math.min(raw, action.capFraction === undefined ? Number.MAX_SAFE_INTEGER : sheet.maxHP * action.capFraction);
+      const before = owner.hp;
+      owner.hp = clamp(owner.hp + amount * (1 + sheet.healing / 100), 0, sheet.maxHP);
+      const healed = owner.hp - before;
+      state.metrics.healingDone += healed;
+      if (healed > 0) emit(state, 'HEAL', owner.id, {
+        actionId: triggerEvent.actionId, causeId: triggerEvent.eventId,
+        originActionId: context.originActionId, chainDepth: triggerEvent.chainDepth,
+        text: `${owner.name}: восстановлено ${healed.toFixed(1)} HP.`, data: { amount: healed },
+      });
+      return;
+    }
+    case 'control': {
+      const target = context.target;
+      if (!target) return;
+      if (target.isBoss) applyStatus(state, owner, target, 'JAM', { durationMs: action.bossFallbackJamMs, actionId: triggerEvent.actionId, causeId: triggerEvent.eventId });
+      else if (rng.chance(action.chance)) {
+        target.controlled = true;
+        target.noLoot = true;
+        applyStatus(state, owner, target, 'CONTROLLED', { durationMs: action.durationMs, actionId: triggerEvent.actionId, causeId: triggerEvent.eventId });
+      }
+      return;
+    }
+    case 'transferVirus': {
+      const source = context.target;
+      const destination = triggerTargets(state, owner, context, 'otherEnemy')[0];
+      const stacks = source?.statuses.VIRUS;
+      if (!source || !destination || !stacks?.length) return;
+      const maxStacks = STATUS_DEFS.VIRUS.maxStacks + Math.floor(eff(state, owner).virusStackCap);
+      const capacity = Math.max(0, maxStacks - statusStacks(destination, 'VIRUS'));
+      const count = Math.min(action.stacks, stacks.length, capacity);
+      if (count <= 0) return;
+      const moved = stacks.slice(0, count);
+      source.statuses.VIRUS = stacks.slice(count);
+      if (!source.statuses.VIRUS.length) delete source.statuses.VIRUS;
+      const targetStacks = destination.statuses.VIRUS ?? (destination.statuses.VIRUS = []);
+      for (const stack of moved) targetStacks.push({
+        ...stack, sourceId: `${owner.id}:VIRUS`, sourceActorId: owner.id,
+      });
+      emit(state, 'STATUS_APPLY', owner.id, {
+        targetId: destination.id, actionId: triggerEvent.actionId,
+        causeId: triggerEvent.eventId, originActionId: context.originActionId,
+        chainDepth: triggerEvent.chainDepth, statusId: 'VIRUS',
+        text: `${owner.name}: VIRUS перенесён на ${destination.name}.`,
+        data: { stacks: statusStacks(destination, 'VIRUS'), moved: count },
+      });
+      return;
+    }
+    case 'spendFlagForDamage': {
+      if (action.flag === 'charge') {
+        const amount = owner.flags.charge ?? 0;
+        if (amount <= 0 || !context.target) return;
+        if (action.intervalMs && state.timeMs - (owner.flags.chargeLastUsedAt ?? -action.intervalMs) < action.intervalMs) return;
+        owner.flags.charge = 0;
+        owner.flags.chargeLastUsedAt = state.timeMs;
+        applyHit(state, rng, owner, context.target, amount, 'ENERGY', {
+          actionId: `${triggerEvent.actionId ?? context.actionId}:charge`, originActionId: context.originActionId,
+          causeId: triggerEvent.eventId, chainDepth: triggerEvent.chainDepth,
+          isMain: false, procWeight: 0, canProc: false, direct: false,
+        });
+        return;
+      }
+      const stacks = Math.max(0, Math.floor(owner.flags[action.flag] ?? 0));
+      const used = Math.min(stacks, action.maxStacks);
+      if (used <= 0 || (action.onlyAtMax && used < action.maxStacks)) return;
+      if (action.intervalMs && state.timeMs - (owner.flags[`${action.flag}LastUsedAt`] ?? -action.intervalMs) < action.intervalMs) return;
+      owner.flags[action.flag] = stacks - used;
+      if (action.flag === 'phase') {
+        for (let slot = 1; slot <= 3; slot++) delete owner.flags[`phaseExpiresAt${slot}`];
+      }
+      owner.flags[`${action.flag}LastUsedAt`] = state.timeMs;
+      context.amount = (context.amount ?? 0) * (1 + action.perStack * used);
+      return;
+    }
+    case 'packetMod': {
+      if (action.requireShield !== undefined && owner.shield < action.requireShield) return;
+      if (action.consumeShield) {
+        const spent = Math.min(action.consumeShield, owner.shield);
+        if (spent < (action.requireShield ?? 0)) return;
+        owner.shield -= spent;
+        owner.flags.effectShieldSpent = spent;
+        dispatchTriggerEvent(state, rng, {
+          event: 'ON_EFFECT_SHIELD_SPENT', actor: owner, target: context.target,
+          actionId: triggerEvent.actionId ?? context.actionId, originActionId: context.originActionId,
+          causeId: triggerEvent.eventId, chainDepth: triggerEvent.chainDepth, direct: false, procWeight: 1, amount: spent,
+        });
+        owner.flags.effectShieldSpent = 0;
+      }
+      context.amount = (context.amount ?? 0) * (action.damageMultiplier ?? 1);
+      if (action.penMultiplier !== undefined) {
+        const pen = penOf(state, context.actor, context.target);
+        context.packetPenOverride = { ...pen, armorPen: pen.armorPen * action.penMultiplier, energyPen: pen.energyPen * action.penMultiplier, digitalPen: pen.digitalPen * action.penMultiplier };
+      }
+      return;
+    }
+    case 'consumeShieldForDamage': {
+      const consumed = Math.min(owner.shield, Math.max(owner.shield > 0 ? 1 : 0, owner.shield * action.fraction));
+      if (consumed <= 0) return;
+      owner.shield -= consumed;
+      const multiplier = Math.min(action.maxMultiplier, 1 + consumed * 0.01);
+      owner.flags.u01EnergyMultiplier = multiplier;
+      owner.flags.u01ExpiresAt = state.timeMs + action.windowMs;
+      owner.heatLockout = false;
+      owner.flags.effectShieldSpent = consumed;
+      dispatchTriggerEvent(state, rng, {
+        event: 'ON_EFFECT_SHIELD_SPENT', actor: owner, target: context.target,
+        actionId: triggerEvent.actionId ?? context.actionId, originActionId: context.originActionId,
+        causeId: triggerEvent.eventId, chainDepth: triggerEvent.chainDepth, direct: false, procWeight: 1, amount: consumed,
+      });
+      owner.flags.effectShieldSpent = 0;
+      return;
+    }
+    case 'charge': {
+      const sourceItem = Object.values(state.build.equipment).find((item) => item?.itemId === sourceId);
+      const scale = H(sourceItem?.techLevel ?? state.build.mainWeapon?.techLevel ?? 1);
+      const cap = action.capFormula === 'H(T)' ? 100 * scale : action.capFlat ?? Number.MAX_SAFE_INTEGER;
+      const before = owner.flags.charge ?? 0;
+      owner.flags.charge = Math.min(cap, before + (context.amount ?? 0) * action.amountFromAbsorbed);
+      return;
+    }
+    case 'buff': {
+      const source = { id: sourceId, name: triggerEvent.actionId ?? context.actionId, kind: sourceKind };
+      const mods = action.mods.map((effect, index) => mod(effect.stat, effect.op, effect.value, source, { id: `${source.id}:${effect.stat}:${index}`, condition: effect.condition, stackGroup: effect.stackGroup, synScalable: effect.synScalable }));
+      const effectId = triggerEvent.actionId?.split(':trigger:').pop() ?? sourceId;
+      const buffId = action.flag ?? `${sourceId}:${effectId}`;
+      const existing = owner.buffs.find((buff) => buff.id === buffId);
+      if (existing) {
+        existing.expiresAt = state.timeMs + action.durationMs;
+        existing.stacks = Math.min(action.maxStacks ?? Number.MAX_SAFE_INTEGER, existing.stacks + 1);
+        existing.mods = mods;
+      } else {
+        owner.buffs.push({ id: buffId, sourceId: source.id, name: source.name, mods, expiresAt: state.timeMs + action.durationMs, consumeOnHit: action.consumeOnHit, stacks: 1 });
+      }
+      emit(state, 'BUFF', owner.id, { actionId: triggerEvent.actionId, text: `${owner.name}: получен временный эффект.`, data: { durationMs: action.durationMs, consumeOnHit: action.consumeOnHit ?? false } });
+      return;
+    }
+    case 'tempShield': {
+      const armorTier = state.build.equipment.ARMOR?.techLevel ?? 1;
+      const flagValue = action.fromFlag === 'effectShieldSpent' ? context.amount ?? 0 : owner.flags[action.fromFlag ?? ''] ?? 0;
+      const amount = action.fromFlag ? flagValue * (action.ratio ?? 1) : action.amount * (action.scaleWithArmorT ? D(armorTier) : 1);
+      const effectId = triggerEvent.actionId?.split(':trigger:').pop() ?? sourceId;
+      const shieldSourceId = `trigger:${sourceId}:${effectId}`;
+      const shield = owner.tempShields.find((pool) => pool.sourceId === shieldSourceId);
+      if (shield) { shield.amount = Math.min(action.cap, shield.amount + amount); shield.cap = action.cap; shield.expiresAt = state.timeMs + action.durationMs; }
+      else owner.tempShields.push({ sourceId: shieldSourceId, amount: Math.min(action.cap, amount), cap: action.cap, expiresAt: state.timeMs + action.durationMs });
+      if (action.fromFlag === 'effectShieldSpent') owner.flags.effectShieldSpent = 0;
+      if (amount > 0) emit(state, 'SHIELD_GAIN', owner.id, { actionId: triggerEvent.actionId, text: `${owner.name}: временный щит +${Math.min(action.cap, amount).toFixed(1)}.`, data: { amount: Math.min(action.cap, amount), cap: action.cap, durationMs: action.durationMs } });
+      return;
+    }
+    case 'changeHeat':
+      gainHeat(state, owner, action.amount, rng);
+      if (action.removeLockout && owner.heat <= HEAT_LOCKOUT_RELEASE) owner.heatLockout = false;
+      return;
+    case 'repeatLastDigital': {
+      const previous = owner.lastDigitalSkill;
+      const skill = previous && SKILL_BY_ID[previous.skillId];
+      const target = previous && actorById(state, previous.targetId);
+      if (!skill || !target?.alive || !skill.tags.includes('D')) return;
+      const base = skillBase(state, owner, skill);
+      if (!base) return;
+      const cast: CastState = { actionId: triggerEvent.actionId ?? context.actionId, skillId: skill.id, startedAt: state.timeMs, resolveAt: state.timeMs, endAt: state.timeMs, targetId: target.id, interruptible: false, telegraph: false, channel: skill.channel, resolved: true };
+      applySkillHit(state, rng, owner, target, base, skill.coefficient * action.coefficient, skill, cast, true, { canProc: false, direct: false, procWeight: 0 });
+      return;
+    }
+    case 'extendStatus': {
+      const target = context.target;
+      const entries = target?.statuses[action.status];
+      if (!target || !entries?.length) return;
+      for (const entry of entries.slice(0, action.stacks)) entry.expiresAt += action.ms;
+      return;
+    }
+    case 'extraReaction':
+      owner.flags.extraReactionUntil = state.timeMs + action.windowMs;
+      return;
+  }
+}
+
+function dispatchTriggerEvent(state: CombatState, rng: Rng, context: TriggerContext): void {
+  if (!state.build.triggerEffects?.some((ref) => ref.effect.event === context.event)) return;
+  const origin = context.originActionId || context.actionId;
+  const budget = state.triggerChains[origin] ?? (state.triggerChains[origin] = { childEvents: 0, seen: {}, limitReported: false, lastAt: state.timeMs, packetMods: {} });
+  budget.lastAt = state.timeMs;
+  for (const ref of state.build.triggerEffects ?? []) {
+    const effect = ref.effect;
+    const owner = triggerOwner(state, ref.sourceId);
+    if (effect.event !== context.event || !triggerCanObserve(ref, owner, context)) continue;
+    if (ref.sourceKind === 'skill' && effect.id.startsWith('SK_') && context.skillId !== ref.sourceId) continue;
+    if (ref.sourceKind === 'skill' && context.event === 'ON_HIT') continue;
+    if (effect.skillFilter && (!context.skillId || !effect.skillFilter.includes(context.skillId))) continue;
+    if (effect.statusFilter && (!context.statusId || !effect.statusFilter.includes(context.statusId))) continue;
+    if (effect.requireDirect && !context.direct) continue;
+    if (context.event === 'ON_BEFORE_HIT' && (!context.direct || (!context.isMain && context.actor.kind !== 'drone'))) continue;
+    const procEvent = context.event === 'ON_HIT' || context.event === 'ON_CRIT' || context.event === 'ON_KILL';
+    if (procEvent && context.eventSource === 'STATUS_TICK' && !effect.allowStatusTick) continue;
+    if (procEvent && context.eventSource === 'SECONDARY' && !effect.allowSecondary) continue;
+    if (effect.damageTypeFilter && (!context.damageType || !effect.damageTypeFilter.includes(context.damageType))) continue;
+    if (effect.requireKillType && context.damageType !== effect.requireKillType) continue;
+    if (effect.minAmount !== undefined && (context.amount ?? 0) < effect.minAmount) continue;
+    if (effect.requireDrone && (context.event === 'ON_BEFORE_HIT'
+      ? context.actor.kind !== 'drone'
+      : !state.drones.some((drone) => drone.alive))) continue;
+    if (effect.counterEvery && (context.attackCounter ?? owner.counters.attacks ?? 0) % effect.counterEvery !== 0) continue;
+    if (effect.hpThreshold !== undefined && owner.hp / Math.max(1, eff(state, owner).maxHP) > effect.hpThreshold) continue;
+    if (!evalCondition(effect.condition, triggerStatContext(state, owner, context.target))) continue;
+    const triggerKey = `${ref.sourceId}:${effect.id}`;
+    const visitKey = `${triggerKey}:${context.causeId}`;
+    const instanceKey = effect.oncePerDrone ? `${triggerKey}:${context.actor.id}` : triggerKey;
+    if (budget.seen[visitKey]) continue;
+    if (context.chainDepth >= 8) { reportChainLimit(state, context, 'depth'); continue; }
+    if (budget.childEvents >= 32) { reportChainLimit(state, context, 'children'); continue; }
+    if (effect.oncePerCombat && owner.oncePerCombat[triggerKey]) continue;
+    if (effect.oncePerDrone && owner.oncePerCombat[instanceKey]) continue;
+    if ((owner.icds[instanceKey] ?? 0) > state.timeMs) continue;
+    const chance = clamp((effect.chance ?? 1) * context.procWeight * eff(state, owner).procMultiplier, 0, 1);
+    if (!rng.chance(chance)) continue;
+
+    budget.seen[visitKey] = true;
+    budget.childEvents++;
+    if (effect.oncePerCombat) owner.oncePerCombat[triggerKey] = true;
+    if (effect.oncePerDrone) owner.oncePerCombat[instanceKey] = true;
+    if (effect.icdMs) owner.icds[instanceKey] = state.timeMs + effect.icdMs;
+    const triggerActionId = `${context.actionId}:trigger:${effect.id}`;
+    state.metrics.procsTriggered++;
+    const triggerEvent = emit(state, 'TRIGGER', owner.id, {
+      targetId: context.target?.id, actionId: triggerActionId, causeId: context.causeId,
+      originActionId: origin, chainDepth: context.chainDepth + 1,
+      incomingTags: [context.event], producedTags: actionTags(effect.action),
+      skillId: context.skillId, damageType: context.damageType,
+      text: `${owner.name}: сработал эффект «${effect.id}».`,
+      data: { sourceId: ref.sourceId, procWeight: context.procWeight, chance },
+    });
+    executeTriggerAction(state, rng, owner, context, triggerEvent, ref.sourceId, ref.sourceKind, effect.action);
+  }
+}
+
+function actionTags(action: TriggerAction): string[] {
+  if (action.kind === 'secondaryDamage') return ['SECONDARY', ...(action.tags ?? [])];
+  return [action.kind];
+}
+
+function dispatchHitTriggers(
+  state: CombatState,
+  rng: Rng,
+  actor: CombatActor,
+  target: CombatActor,
+  damageType: DamageType,
+  amount: number,
+  opts: HitOptions,
+  crit: boolean,
+  damageEvent: CombatEvent,
+): void {
+  const context: TriggerContext = {
+    event: 'ON_HIT', actor, target, actionId: opts.actionId,
+    originActionId: opts.originActionId ?? opts.actionId,
+    causeId: opts.causeId ?? damageEvent.eventId,
+    chainDepth: opts.chainDepth ?? 0, direct: opts.direct !== false,
+    procWeight: opts.procWeight, damageType, amount, skillId: opts.skillId,
+    eventSource: opts.direct === false ? 'SECONDARY' : 'DIRECT',
+  };
+  dispatchTriggerEvent(state, rng, context);
+  if (crit) dispatchTriggerEvent(state, rng, { ...context, event: 'ON_CRIT' });
 }
 
 function resolveAttack(state: CombatState, rng: Rng, actor: CombatActor, preparedActionId?: string): void {
@@ -804,12 +1460,12 @@ function resolveAttack(state: CombatState, rng: Rng, actor: CombatActor, prepare
     }
     let heatGain = weapon!.heatPerAttack ?? 0;
     if (hasStatus(actor, 'OVERCLOCK')) heatGain += 5;
-    if (heatGain > 0) actor.heat = clamp(actor.heat + heatGain, 0, as.maxHeat);
+    if (heatGain > 0) gainHeat(state, actor, heatGain, rng);
   }
   if (!preparedActionId) actor.counters.attacks = (actor.counters.attacks ?? 0) + 1;
   const actionId = preparedActionId ?? `${actor.id}:atk:${actor.counters.attacks}`;
   actor.lastMainAttackAt = state.timeMs;
-  emit(state, 'ATTACK', actor.id, { targetId: target.id, actionId, text: `${actor.name} атакует ${target.name}.` });
+  const attackEvent = emit(state, 'ATTACK', actor.id, { targetId: target.id, actionId, text: `${actor.name} атакует ${target.name}.` });
 
   const packets = attackPackets(state, actor);
   const isMain = actor.kind === 'operator';
@@ -820,10 +1476,15 @@ function resolveAttack(state: CombatState, rng: Rng, actor: CombatActor, prepare
     if (!current) return;
     if (applyHit(state, rng, actor, current, packet.amount, packet.type, { actionId, isMain, procWeight: packet.procWeight }) >= 0) landed = true;
   }
-  if (landed && actor.kind === 'drone' && actor.droneRole === 'shock' && (actor.counters.attacks ?? 0) % 5 === 0) {
+  if (isOperator) consumeHitBuffs(actor);
+  if (isOperator) actor.flags.firstAttack = 0;
+  if (landed) {
     const previousTarget = actor.lastTargetId ? actorById(state, actor.lastTargetId) : undefined;
-    const current = previousTarget?.alive ? previousTarget : pickAutoTarget(state, actor);
-    if (current) applyStatus(state, actor, current, 'SHOCK', { stacks: 1, actionId });
+    dispatchTriggerEvent(state, rng, {
+      event: 'ON_ATTACK_COUNTER', actor, target: previousTarget?.alive ? previousTarget : undefined,
+      actionId, originActionId: actionId, causeId: attackEvent.eventId,
+      chainDepth: 0, direct: true, procWeight: 1, attackCounter: actor.counters.attacks,
+    });
   }
 }
 
@@ -836,6 +1497,12 @@ function applyPartition(actor: CombatActor, partition: ReturnType<typeof partiti
   const regularConsumed = partition.shieldConsumed - partition.tempConsumed.reduce((s, c) => s + c.amount, 0);
   actor.shield = Math.max(0, actor.shield - regularConsumed);
   actor.hp = Math.max(0, actor.hp - partition.hpLost);
+}
+
+function consumeHitBuffs(actor: CombatActor): void {
+  if (!actor.flags.consumeHitBuffs) return;
+  actor.buffs = actor.buffs.filter((buff) => !buff.consumeOnHit);
+  delete actor.flags.consumeHitBuffs;
 }
 
 function scheduleNextAttack(state: CombatState, actor: CombatActor): void {
@@ -885,19 +1552,24 @@ function reactionCooldownMs(skill: SkillDef, s: StatSheet): number {
 }
 
 /** Изменение нагрева с проверкой пересечения порога перегрева и снятия lockout. */
-function gainHeat(state: CombatState, actor: CombatActor, amount: number): void {
+function gainHeat(state: CombatState, actor: CombatActor, amount: number, rng: Rng): void {
   if (amount === 0) return;
   const s = eff(state, actor);
   const before = actor.heat;
   actor.heat = clamp(actor.heat + amount, 0, s.maxHeat);
   if (amount > 0 && !actor.heatLockout && before < s.maxHeat && actor.heat >= s.maxHeat) {
     actor.heatLockout = true;
-    state.metrics.heatLockouts++;
-    emit(state, 'HEAT_LOCKOUT', actor.id, { text: 'Перегрев: main-канал заблокирован до охлаждения ≤ 80.' });
+    const event = emit(state, 'HEAT', actor.id, { text: 'Нагрев достиг максимума.', data: { heat: actor.heat, threshold: s.maxHeat } });
+    dispatchTriggerEvent(state, rng, { event: 'ON_HEAT_FULL', actor, actionId: `heat-full:${state.timeMs}`, originActionId: `heat-full:${state.timeMs}`, causeId: event.eventId, chainDepth: 0, direct: false, procWeight: 1 });
+    if (actor.heatLockout) {
+      state.metrics.heatLockouts++;
+      emit(state, 'HEAT_LOCKOUT', actor.id, { text: 'Перегрев: main-канал заблокирован до охлаждения ≤ 80.' });
+    }
   }
   if (actor.heatLockout && actor.heat <= HEAT_LOCKOUT_RELEASE) {
     actor.heatLockout = false;
-    emit(state, 'HEAT_LOCKOUT_END', actor.id, { text: 'Перегрев снят.' });
+    const event = emit(state, 'HEAT_LOCKOUT_END', actor.id, { text: 'Перегрев снят.' });
+    dispatchTriggerEvent(state, rng, { event: 'ON_HEAT_LOCKOUT_END', actor, actionId: `heat-release:${state.timeMs}`, originActionId: `heat-release:${state.timeMs}`, causeId: event.eventId, chainDepth: 0, direct: false, procWeight: 1 });
   }
 }
 
@@ -1030,13 +1702,21 @@ function recordJudgeProgram(state: CombatState, skillId: string | null, actionId
   }
 }
 
-function startSkillCast(state: CombatState, actor: CombatActor, skill: SkillDef, target: CombatActor | undefined): void {
+function startSkillCast(state: CombatState, rng: Rng, actor: CombatActor, skill: SkillDef, target: CombatActor | undefined): void {
   const s = eff(state, actor);
-  const cost = skillEnergyCost(state, actor, skill);
+  const normalCost = skillEnergyCost(state, actor, skill);
+  const emergency = actor.kind === 'operator' && skill.channel === 'reaction'
+    && actor.energy < normalCost && (actor.flags.emergencyReaction ?? 0) > 0;
+  const extraReaction = actor.kind === 'operator' && skill.channel === 'reaction'
+    && (actor.flags.extraReactionUntil ?? 0) >= state.timeMs;
+  const cost = emergency ? 0 : normalCost;
   actor.energy = clamp(actor.energy - cost, 0, s.maxEnergy);
   state.metrics.energySpent += cost;
-  gainHeat(state, actor, skill.heatDelta);
-  const cd = skill.channel === 'reaction' ? reactionCooldownMs(skill, s) : cooldownMs(skill.cooldownMs, s.cooldownRecovery);
+  if (emergency) actor.flags.emergencyReaction = 0;
+  if (extraReaction) actor.flags.extraReactionUntil = 0;
+  gainHeat(state, actor, skill.heatDelta + (emergency ? 20 : 0), rng);
+  const cdBase = skill.channel === 'reaction' ? reactionCooldownMs(skill, s) : cooldownMs(skill.cooldownMs, s.cooldownRecovery);
+  const cd = cdBase + (emergency ? 3000 : 0);
   actor.cooldowns[skill.id] = state.timeMs + cd;
   actor.counters.casts = (actor.counters.casts ?? 0) + 1;
   const actionId = `${actor.id}:skill:${skill.id}:${actor.counters.casts}`;
@@ -1050,11 +1730,14 @@ function startSkillCast(state: CombatState, actor: CombatActor, skill: SkillDef,
   actor.lastSkillId = skill.id;
   if (actor.kind === 'operator') recordJudgeProgram(state, skill.id, actionId);
   if (target) actor.lastTargetId = target.id;
-  if (skill.channel === 'main') actor.nextAttackAt = cast.endAt;
+  if (skill.channel === 'main') {
+    actor.nextAttackAt = cast.endAt;
+    actor.lastMainAttackAt = state.timeMs;
+  }
   emit(state, 'CAST_START', actor.id, {
     skillId: skill.id, targetId: target?.id, actionId,
     text: `${actor.name}: ${skill.name}.`,
-    data: { channel: skill.channel, windupMs: skill.windupMs, recoveryMs: skill.recoveryMs, cooldownMs: cd },
+    data: { channel: skill.channel, windupMs: skill.windupMs, recoveryMs: skill.recoveryMs, cooldownMs: cd, emergency },
   });
   if (cast.telegraph) {
     emit(state, 'TELEGRAPH', actor.id, {
@@ -1098,7 +1781,7 @@ function readyEnemyAbility(state: CombatState, actor: CombatActor): EnemyAbility
     .sort((a, b) => (actor.abilityNext[a.id] ?? 0) - (actor.abilityNext[b.id] ?? 0) || byId(a.id, b.id))[0];
 }
 
-function startEnemyAbility(state: CombatState, actor: CombatActor, ability: EnemyAbility): void {
+function startEnemyAbility(state: CombatState, rng: Rng, actor: CombatActor, ability: EnemyAbility): void {
   const castSpeed = Math.max(0, actor.flags.bossCastSpeedIncrease ?? 0);
   const eliteWindup = actor.eliteMod === 'EL_PEN' ? 200 : 0;
   const windup = Math.max(0, (ability.windupMs * state.enemyWindupMult + eliteWindup) / (1 + castSpeed));
@@ -1120,11 +1803,14 @@ function startEnemyAbility(state: CombatState, actor: CombatActor, ability: Enem
     text: `${actor.name} готовит: ${ability.desc}`,
     data: { abilityId: ability.id, windupMs: windup, interruptible: ability.interruptible },
   });
-  if (cast.telegraph) emit(state, 'TELEGRAPH', actor.id, {
-    targetId: cast.targetId ?? undefined, actionId,
-    text: `${actor.name}: ${ability.desc}`,
-    data: { abilityId: ability.id, dangerTag: ability.kind, windupMs: windup },
-  });
+  if (cast.telegraph) {
+    const telegraph = emit(state, 'TELEGRAPH', actor.id, {
+      targetId: cast.targetId ?? undefined, actionId,
+      text: `${actor.name}: ${ability.desc}`,
+      data: { abilityId: ability.id, dangerTag: ability.kind, windupMs: windup },
+    });
+    dispatchTriggerEvent(state, rng, { event: 'ON_ENEMY_TELEGRAPH', actor, target: state.operator, actionId, originActionId: actionId, causeId: telegraph.eventId, chainDepth: 0, direct: false, procWeight: 1 });
+  }
 }
 
 const MAX_SUMMONED_ENEMIES = 2;
@@ -1281,7 +1967,7 @@ function resolveEnemyAbility(state: CombatState, rng: Rng, actor: CombatActor, c
       const target = playerTarget();
       if (!target) return;
       const amount = ability.amount ?? 0;
-      gainHeat(state, target, amount);
+      gainHeat(state, target, amount, rng);
       emit(state, 'HEAT', actor.id, { targetId: target.id, actionId: cast.actionId, text: `${target.name}: нагрев +${amount}.`, data: { abilityId: ability.id, amount } });
       abilityEvent(`${actor.name}: ${ability.desc}`, target);
       break;
@@ -1339,7 +2025,7 @@ function advanceCasts(state: CombatState, rng: Rng): void {
         resolveAttack(state, rng, actor, cast.actionId);
         scheduleNextAttack(state, actor);
       } else if (cast.abilityId) resolveEnemyAbility(state, rng, actor, cast);
-      else if (cast.skillId) resolveSkillCast(state, rng, actor, cast);
+      else if (cast.skillId) { resolveSkillCast(state, rng, actor, cast); consumeHitBuffs(actor); }
     }
     if (state.timeMs >= cast.endAt) actor.cast = null;
   }
@@ -1357,23 +2043,24 @@ function advanceReactionCasts(state: CombatState, rng: Rng): void {
     }
     if (!cast.resolved && state.timeMs >= cast.resolveAt) {
       cast.resolved = true;
-      if (cast.skillId) resolveSkillCast(state, rng, actor, cast);
+      if (cast.skillId) { resolveSkillCast(state, rng, actor, cast); consumeHitBuffs(actor); }
     }
     if (state.timeMs >= cast.endAt) actor.reactionCast = null;
   }
 }
 
 /** Прерывание прерываемого каста цели. Возвращает true, если каст был сорван. */
-function interruptCast(state: CombatState, target: CombatActor, sourceId: string, actionId: string): boolean {
+function interruptCast(state: CombatState, rng: Rng, target: CombatActor, sourceId: string, actionId: string): boolean {
   const cast = target.cast;
   if (!cast || !cast.interruptible) return false;
   target.cast = null;
   state.metrics.interrupts++;
-  emit(state, 'CAST_INTERRUPT', sourceId, {
+  const interrupted = emit(state, 'CAST_INTERRUPT', sourceId, {
     targetId: target.id, actionId, skillId: cast.skillId ?? undefined,
     text: `${target.name}: каст прерван.`,
     data: { interruptedSkill: cast.skillId ?? '', abilityId: cast.abilityId ?? '' },
   });
+  dispatchTriggerEvent(state, rng, { event: 'ON_INTERRUPT', actor: target, target, actionId, originActionId: actionId, causeId: interrupted.eventId, chainDepth: 0, direct: true, procWeight: 1 });
   return true;
 }
 
@@ -1406,8 +2093,8 @@ function applySkillOnHit(state: CombatState, actor: CombatActor, target: CombatA
   }
 }
 
-function applySkillHit(state: CombatState, rng: Rng, actor: CombatActor, target: CombatActor, baseInfo: { base: number; type: DamageType }, coefficient: number, skill: SkillDef, cast: CastState, isLastHit: boolean): number {
-  const s = eff(state, actor);
+function applySkillHit(state: CombatState, rng: Rng, actor: CombatActor, target: CombatActor, baseInfo: { base: number; type: DamageType }, coefficient: number, skill: SkillDef, cast: CastState, isLastHit: boolean, overrides: { canProc?: boolean; direct?: boolean; procWeight?: number } = {}): number {
+  const s = actor.kind === 'drone' ? eff(state, state.operator, target) : eff(state, actor, target);
   let raw = baseInfo.base * coefficient;
   if (skill.tags.includes('D')) raw *= s.moreSkillDigital;
   if (skill.tags.includes('E')) raw *= s.moreSkillEnergy;
@@ -1415,11 +2102,11 @@ function applySkillHit(state: CombatState, rng: Rng, actor: CombatActor, target:
   if (skill.special === 'CHAIN_HEAT' && actor.heat >= 80) raw *= 1.25;
   const isMain = skill.basis === 'MAIN_K' || skill.basis === 'MAIN_ANY';
   let penOverride: PenetrationSnapshot | undefined;
-  if (skill.id === 'SK_PIERCE') { const p = penOf(state, actor); penOverride = { ...p, armorPen: p.armorPen + 20 }; }
-  const result = applyHit(state, rng, actor, target, raw, baseInfo.type, { actionId: cast.actionId, isMain, procWeight: skill.procWeight, skillId: skill.id, penOverride });
+  if (skill.id === 'SK_PIERCE') { const p = penOf(state, actor, target); penOverride = { ...p, armorPen: p.armorPen + 20 }; }
+  const result = applyHit(state, rng, actor, target, raw, baseInfo.type, { actionId: cast.actionId, isMain, procWeight: overrides.procWeight ?? skill.procWeight, canProc: overrides.canProc, direct: overrides.direct, skillId: skill.id, penOverride });
   if (result >= 0) {
-    applySkillOnHit(state, actor, target, skill, cast, result, isLastHit);
-    if (skill.special === 'LEECH' && hasStatus(target, 'VIRUS')) {
+    if (overrides.canProc !== false) applySkillOnHit(state, actor, target, skill, cast, result, isLastHit);
+    if (overrides.canProc !== false && skill.special === 'LEECH' && hasStatus(target, 'VIRUS')) {
       const before = actor.energy;
       actor.energy = clamp(actor.energy + 8, 0, s.maxEnergy);
       emit(state, 'ENERGY', actor.id, { text: `${actor.name}: +${(actor.energy - before).toFixed(1)} энергии (Паразит).`, data: { amount: actor.energy - before } });
@@ -1466,7 +2153,7 @@ function resolveReaction(state: CombatState, rng: Rng, actor: CombatActor, skill
     case 'EMP': {
       const target = castTarget(state, actor, cast);
       if (!target) return;
-      interruptCast(state, target, actor.id, cast.actionId);
+      interruptCast(state, rng, target, actor.id, cast.actionId);
       const baseInfo = skillBase(state, actor, skill);
       if (baseInfo) applySkillHit(state, rng, actor, target, baseInfo, skill.coefficient, skill, cast, true);
       return;
@@ -1504,7 +2191,19 @@ function resolveSkillCast(state: CombatState, rng: Rng, actor: CombatActor, cast
   if (!skill) return;
   state.metrics.skillUses[skill.id] = (state.metrics.skillUses[skill.id] ?? 0) + 1;
   const isReaction = skill.channel === 'reaction';
-  emit(state, isReaction ? 'REACTION' : 'SKILL_USE', actor.id, { skillId: skill.id, targetId: cast.targetId ?? undefined, actionId: cast.actionId, text: `${actor.name}: ${skill.name}.`, data: { channel: skill.channel } });
+  const triggerTarget = castTarget(state, actor, cast);
+  const castEvent = emit(state, isReaction ? 'REACTION' : 'SKILL_USE', actor.id, {
+    skillId: skill.id, targetId: triggerTarget?.id, actionId: cast.actionId,
+    originActionId: cast.actionId, text: `${actor.name}: ${skill.name}.`, data: { channel: skill.channel },
+  });
+  if (skill.tags.includes('D') && triggerTarget?.side === 'enemy') actor.lastDigitalSkill = { skillId: skill.id, targetId: triggerTarget.id };
+  if (skill.id === 'SK_SCAN') actor.flags.scanActive = 1;
+  if (skill.id === 'SK_SCAN') actor.flags.scanActiveExpiresAt = state.timeMs + 6000 + eff(state, actor).scanMarkBonusMs;
+  dispatchTriggerEvent(state, rng, {
+    event: 'ON_CAST', actor, target: triggerTarget, actionId: cast.actionId,
+    originActionId: cast.actionId, causeId: castEvent.eventId,
+    chainDepth: 0, direct: true, procWeight: skill.procWeight || 1, skillId: skill.id,
+  });
 
   if (isReaction) { resolveReaction(state, rng, actor, skill, cast); return; }
 
@@ -1526,7 +2225,7 @@ function resolveSkillCast(state: CombatState, rng: Rng, actor: CombatActor, cast
   if (skill.special === 'DRONE_EMP' && actor.kind === 'drone') {
     const target = castTarget(state, actor, cast);
     if (!target) return;
-    interruptCast(state, target, actor.id, cast.actionId);
+    interruptCast(state, rng, target, actor.id, cast.actionId);
     applySkillHit(state, rng, actor, target, { base: actor.attackDamage, type: 'DIGITAL' }, skill.coefficient, skill, cast, true);
     applyStatus(state, actor, target, 'JAM', { durationMs: 2000, actionId: cast.actionId });
     return;
@@ -1601,7 +2300,7 @@ function chooseOperatorAction(state: CombatState, rng: Rng, actor: CombatActor):
     return;
   }
   const choice = selectMainRule(state, actor);
-  if (choice.kind === 'skill') startSkillCast(state, actor, choice.skill, choice.target);
+  if (choice.kind === 'skill') startSkillCast(state, rng, actor, choice.skill, choice.target);
   else startAutoAttack(state, rng, actor);
 }
 
@@ -1615,8 +2314,10 @@ function selectReactionRule(state: CombatState, actor: CombatActor): ReactionCho
   for (const rule of rules) {
     const skill = equippedSkill(state, rule.skillId);
     if (!skill) { recordRuleFail(state, rule.id, 'not_equipped'); continue; }
-    if ((actor.cooldowns[skill.id] ?? 0) > state.timeMs) { recordRuleFail(state, rule.id, 'cooldown'); continue; }
-    if (actor.energy < skillEnergyCost(state, actor, skill)) { recordRuleFail(state, rule.id, 'energy'); continue; }
+    const extraReaction = (actor.flags.extraReactionUntil ?? 0) >= state.timeMs;
+    const emergency = actor.energy < skillEnergyCost(state, actor, skill) && (actor.flags.emergencyReaction ?? 0) > 0;
+    if ((actor.cooldowns[skill.id] ?? 0) > state.timeMs && !extraReaction) { recordRuleFail(state, rule.id, 'cooldown'); continue; }
+    if (actor.energy < skillEnergyCost(state, actor, skill) && !emergency) { recordRuleFail(state, rule.id, 'energy'); continue; }
     const target = selectTarget(state, actor, rule.target);
     if (!target && skill.targetMode !== 'self') { recordRuleFail(state, rule.id, 'no_target'); continue; }
     if (skill.special === 'EMP' && (!target || !target.cast || !target.cast.interruptible)) { recordRuleFail(state, rule.id, 'no_interruptible'); continue; }
@@ -1626,25 +2327,37 @@ function selectReactionRule(state: CombatState, actor: CombatActor): ReactionCho
   return { kind: 'none' };
 }
 
-function chooseReaction(state: CombatState, actor: CombatActor): void {
+function chooseReaction(state: CombatState, rng: Rng, actor: CombatActor): void {
   const choice = selectReactionRule(state, actor);
-  if (choice.kind === 'skill') startSkillCast(state, actor, choice.skill, choice.target);
+  if (choice.kind === 'skill') startSkillCast(state, rng, actor, choice.skill, choice.target);
 }
 
 /* ------------------------------------------------------------------ */
 /* Смерти и завершение                                                 */
 /* ------------------------------------------------------------------ */
 
-function resolveDeaths(state: CombatState): void {
+function resolveDeaths(state: CombatState, rng: Rng): void {
   for (const actor of allActors(state)) {
     if (!actor.alive || actor.hp > 0) continue;
     actor.alive = false;
     actor.killedAt = state.timeMs;
     actor.cast = null;
-    emit(state, 'DEATH', actor.id, { text: `${actor.name} уничтожен.` });
+    const deathEvent = emit(state, 'DEATH', actor.id, { text: `${actor.name} уничтожен.` });
     if (actor.side === 'enemy') {
       state.metrics.kills++;
       state.metrics.ttk.push({ enemyId: actor.id, name: actor.name, ms: state.timeMs });
+      const killer = actor.lastHitById ? actorById(state, actor.lastHitById) : undefined;
+      if (killer && actor.lastHitCanProc !== false) dispatchTriggerEvent(state, rng, {
+        event: 'ON_KILL', actor: killer, target: actor,
+        actionId: actor.lastHitActionId ?? `${killer.id}:kill:${actor.id}`,
+        originActionId: actor.lastHitOriginActionId ?? `${killer.id}:kill:${actor.id}`,
+        causeId: actor.lastHitCauseId ?? deathEvent.eventId,
+        chainDepth: actor.lastHitChainDepth ?? 0,
+        direct: actor.lastHitDirect ?? false,
+        procWeight: actor.lastHitEventSource === 'STATUS_TICK' ? 1 : actor.lastHitProcWeight ?? 0,
+        damageType: actor.lastHitDamageType,
+        eventSource: actor.lastHitEventSource,
+      });
       if (actor.eliteMod === 'EL_SPLIT') {
         spawnSummonedEnemy(state, actor, 'E20', 0.5);
         spawnSummonedEnemy(state, actor, 'E20', 0.5);
@@ -1664,21 +2377,45 @@ function resolveDeaths(state: CombatState): void {
           text: `${actor.name}: ${deathBurst.desc}`,
           data: { abilityId: deathBurst.id, windupMs: windup, interruptible: false, deathBurst: true },
         });
-        if (actor.cast.telegraph) emit(state, 'TELEGRAPH', actor.id, {
-          targetId: actor.cast.targetId ?? undefined, actionId,
-          text: `${actor.name}: ${deathBurst.desc}`,
-          data: { abilityId: deathBurst.id, dangerTag: deathBurst.kind, windupMs: windup },
-        });
+        if (actor.cast.telegraph) {
+          const telegraph = emit(state, 'TELEGRAPH', actor.id, {
+            targetId: actor.cast.targetId ?? undefined, actionId,
+            text: `${actor.name}: ${deathBurst.desc}`,
+            data: { abilityId: deathBurst.id, dangerTag: deathBurst.kind, windupMs: windup },
+          });
+          dispatchTriggerEvent(state, rng, { event: 'ON_ENEMY_TELEGRAPH', actor, target: state.operator, actionId, originActionId: actionId, causeId: telegraph.eventId, chainDepth: 0, direct: false, procWeight: 1 });
+        }
       }
       for (const ally of state.enemies.filter((enemy) => enemy.alive && enemy.templateId === 'E23')) {
         applyStatus(state, ally, ally, 'BERSERK', { stacks: 1 });
       }
     }
-    if (actor.kind === 'drone') state.metrics.droneDeaths++;
+    if (actor.kind === 'drone') {
+      state.metrics.droneDeaths++;
+      dispatchTriggerEvent(state, rng, {
+        event: 'ON_DRONE_DEATH', actor, target: state.operator,
+        actionId: actor.lastHitActionId ?? `${actor.id}:death`,
+        originActionId: actor.lastHitOriginActionId ?? `${actor.id}:death`,
+        causeId: actor.lastHitCauseId ?? deathEvent.eventId,
+        chainDepth: actor.lastHitChainDepth ?? 0,
+        direct: actor.lastHitDirect ?? false, procWeight: 1,
+        damageType: actor.lastHitDamageType,
+      });
+    } else if (actor.kind === 'ally') {
+      dispatchTriggerEvent(state, rng, {
+        event: 'ON_ALLY_DEATH', actor, target: state.operator,
+        actionId: actor.lastHitActionId ?? `${actor.id}:death`,
+        originActionId: actor.lastHitOriginActionId ?? `${actor.id}:death`,
+        causeId: actor.lastHitCauseId ?? deathEvent.eventId,
+        chainDepth: actor.lastHitChainDepth ?? 0,
+        direct: actor.lastHitDirect ?? false, procWeight: 1,
+        damageType: actor.lastHitDamageType,
+      });
+    }
   }
 }
 
-function checkTerminal(state: CombatState): void {
+function checkTerminal(state: CombatState, rng: Rng): void {
   if (state.outcome) return;
   if (!state.operator.alive) {
     state.outcome = 'DEFEAT';
@@ -1689,7 +2426,8 @@ function checkTerminal(state: CombatState): void {
     state.outcome = 'TIMEOUT';
   }
   if (state.outcome) {
-    emit(state, 'COMBAT_END', 'operator', { text: `Бой завершён: ${state.outcome}.`, data: { outcome: state.outcome } });
+    const ended = emit(state, 'COMBAT_END', 'operator', { text: `Бой завершён: ${state.outcome}.`, data: { outcome: state.outcome } });
+    dispatchTriggerEvent(state, rng, { event: 'ON_COMBAT_END', actor: state.operator, actionId: `combat-end:${state.timeMs}`, originActionId: `combat-end:${state.timeMs}`, causeId: ended.eventId, chainDepth: 0, direct: false, procWeight: 1 });
   }
 }
 
@@ -1712,16 +2450,20 @@ function cloneState(state: CombatState): CombatState {
 export function stepCombat(state: CombatState): CombatState {
   if (state.outcome) return state;
   const next = cloneState(state);
+  for (const [origin, chain] of Object.entries(next.triggerChains)) {
+    if (next.timeMs - chain.lastAt > 5000) delete next.triggerChains[origin];
+  }
   const rng = Rng.fromSerialized(next.rng);
   const dtSec = TICK_MS / 1000;
   next.timeMs += TICK_MS;
 
-  applyContinuous(next, dtSec);
+  applyContinuous(next, dtSec, rng);
 
   // Периодический урон статусов (включая финальный тик на границе истечения),
   // затем истечение статусов/баффов/временных щитов — до новых действий.
-  tickStatuses(next);
-  expireStatuses(next);
+  tickStatuses(next, rng);
+  expireStatuses(next, rng);
+  runPeriodicTriggers(next, rng);
 
   // Реактивные/interrupt-действия разрешаются раньше обычных кастов (шаг 2), затем main (шаг 3).
   advanceReactionCasts(next, rng);
@@ -1735,39 +2477,22 @@ export function stepCombat(state: CombatState): CombatState {
     if (actor.kind === 'drone' && !actor.reactionCast && actor.droneRole === 'medic') {
       const skill = next.build.skills.find((candidate) => candidate.special === 'DRONE_REPAIR');
       const needsRepair = actor.hp < eff(next, actor).maxHP || next.operator.shield < eff(next, next.operator).maxShield;
-      if (skill && needsRepair && (actor.cooldowns[skill.id] ?? 0) <= next.timeMs) startSkillCast(next, actor, skill, actor);
+      if (skill && needsRepair && (actor.cooldowns[skill.id] ?? 0) <= next.timeMs) startSkillCast(next, rng, actor, skill, actor);
     }
     if (actor.kind === 'operator') {
-      if (!actor.reactionCast) chooseReaction(next, actor);
+      if (!actor.reactionCast) chooseReaction(next, rng, actor);
       if (!actor.cast && actor.nextAttackAt <= next.timeMs) chooseOperatorAction(next, rng, actor);
-    } else if (!actor.cast && !actor.reactionCast && actor.kind === 'drone' && actor.droneRole === 'emp'
-      && actor.abilityNext.droneEMP <= next.timeMs) {
-      actor.abilityNext.droneEMP += 14000;
-      actor.counters.droneEMP = (actor.counters.droneEMP ?? 0) + 1;
-      const target = next.enemies.filter((enemy) => enemy.alive && enemy.cast?.interruptible)
-        .sort((a, b) => byId(a.id, b.id))[0];
-      const skill = next.build.skills.find((candidate) => candidate.special === 'DRONE_EMP');
-      if (skill && !actor.reactionCast) {
-        startSkillCast(next, actor, skill, target ?? selectTarget(next, actor, skill.targetMode));
-      } else {
-        const actionId = `${actor.id}:emp:${actor.counters.droneEMP}`;
-        const interrupted = target ? interruptCast(next, target, actor.id, actionId) : false;
-        emit(next, 'TRIGGER', actor.id, {
-          targetId: target?.id, actionId, text: `${actor.name}: импульс EMP${interrupted ? ', каст прерван' : ''}.`,
-          data: { abilityId: 'DR_EMP_interrupt', interrupted },
-        });
-      }
     } else if (!actor.cast) {
       const ability = actor.side === 'enemy' ? readyEnemyAbility(next, actor) : undefined;
-      if (ability) startEnemyAbility(next, actor, ability);
+      if (ability) startEnemyAbility(next, rng, actor, ability);
       else if (actor.nextAttackAt <= next.timeMs) startAutoAttack(next, rng, actor);
     }
     if (actor.kind === 'drone' && !actor.cast && actor.nextAttackAt <= next.timeMs) startAutoAttack(next, rng, actor);
   }
 
   resolveBossPhases(next);
-  resolveDeaths(next);
-  checkTerminal(next);
+  resolveDeaths(next, rng);
+  checkTerminal(next, rng);
   next.rng = rng.serialize();
   return next;
 }

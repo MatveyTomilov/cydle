@@ -30,6 +30,18 @@ const starterLoadout = (): BuildLoadout & { equipment: NonNullable<BuildLoadout[
 });
 
 describe('resolveBuild', () => {
+  it('preserves trigger source identity for equipped items and active skills', () => {
+    const loadout = starterLoadout();
+    loadout.equipment.DRONE_1 = makeItem('DR_ARC', 'arc-trigger-drone');
+    loadout.skillIds = ['SK_NEURO'];
+    const result = resolveBuild(loadout);
+    const droneTrigger = result.triggerEffects.find((entry) => entry.effect.id === 'DR_ARC_shock');
+    const skillTrigger = result.triggerEffects.find((entry) => entry.effect.id === 'SK_NEURO_virus');
+
+    expect(droneTrigger).toMatchObject({ sourceId: loadout.equipment.DRONE_1!.itemId, sourceKind: 'item' });
+    expect(skillTrigger).toMatchObject({ sourceId: 'SK_NEURO', sourceKind: 'skill' });
+  });
+
   it('resolves the canonical starter equipment and exposes exact combat stats', () => {
     const input = starterLoadout();
     const before = structuredClone(input);

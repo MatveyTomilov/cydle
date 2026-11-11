@@ -109,6 +109,17 @@ export interface CombatActor {
   markBy?: string;
   droneRole?: 'mark' | 'shock' | 'medic' | 'emp' | 'bulwark' | 'swarm';
   dronePellets?: number;
+  droneItemId?: string;
+  lastHitById?: string;
+  lastHitDamageType?: DamageType;
+  lastHitDirect?: boolean;
+  lastHitCanProc?: boolean;
+  lastHitProcWeight?: number;
+  lastHitActionId?: string;
+  lastHitOriginActionId?: string;
+  lastHitCauseId?: number;
+  lastHitChainDepth?: number;
+  lastHitEventSource?: 'DIRECT' | 'SECONDARY' | 'STATUS_TICK' | 'REFLECTED';
 }
 
 export type CombatEventKind =

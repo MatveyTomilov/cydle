@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyStatus, createCombatState, hasStatus, statusStacks, stepCombat, type CombatState } from '../../src/core/combat/engine';
+import { applyStatus, createCombatState, effectiveSheet, hasStatus, statusStacks, stepCombat, type CombatState } from '../../src/core/combat/engine';
 import type { CombatConfig, TacticalProfile } from '../../src/core/combat/types';
 import { resolveBuild } from '../../src/core/build/build';
 import { createItem } from '../../src/core/items/items';
@@ -7,6 +7,7 @@ import { Rng, stateHash } from '../../src/core/rng';
 import { D, H } from '../../src/core/math/formula';
 import { mitigatePacket, ZERO_PEN } from '../../src/core/math/damage';
 import { ENEMY_BY_ID } from '../../src/data/enemies';
+import type { TriggerEffect } from '../../src/data/types';
 
 const makeItem = (grantId: string, templateId = 'PISTOL_K1') => createItem(new Rng('loot', grantId), {
   templateId, techLevel: 1, rarity: 'COMMON', secured: true, originGrantId: grantId, origin: 'test',
@@ -547,5 +548,306 @@ describe('drone combat roles', () => {
     expect(hasStatus(state.enemies[0]!, 'JAM')).toBe(true);
     expect(state.log.some((event) => event.kind === 'DAMAGE' && event.actorId === 'drone:0' && event.skillId === 'SK_DRONE_EMP')).toBe(true);
     expect(state.log.some((event) => event.kind === 'SKILL_USE' && event.skillId === 'SK_DRONE_EMP')).toBe(true);
+  });
+
+  it('bounds recursive secondary-hit procs by depth and child-event budget', () => {
+    let state = createCombatState(config('proc-chain-bounds', ['E01', 'E02', 'E03', 'E04', 'E05', 'E06']));
+    state.enemies.forEach((enemy) => { enemy.hp = 10000; enemy.nextAttackAt = 30000; });
+    state.operator.nextAttackAt = 1000;
+    const recursiveProc: TriggerEffect = {
+      type: 'trigger', id: 'test_recursive_secondary', event: 'ON_HIT', chance: 1, allowSecondary: true,
+      action: { kind: 'secondaryDamage', basis: 'flat', coefficient: 1, damageType: 'DIGITAL', targeting: 'allEnemies', maxTargets: 6, canProc: true },
+      desc: 'test bounded recursive proc',
+    };
+    state.build.triggerEffects.push({ effect: recursiveProc, sourceId: 'test-recursive', sourceName: 'test', sourceKind: 'unique' });
+    state = until(state, (x) => x.metrics.chainLimitHits > 0, 3000);
+
+    const chainEvents = state.log.filter((event) => event.kind === 'TRIGGER' && event.originActionId?.startsWith('operator:atk:'));
+    expect(state.metrics.chainLimitHits).toBeGreaterThan(0);
+    expect(Math.max(...chainEvents.map((event) => event.chainDepth))).toBeLessThanOrEqual(8);
+    expect(chainEvents.length).toBeLessThanOrEqual(32);
+  });
+
+  it('stops sibling proc effects after 32 children from one attack origin', () => {
+    let state = createCombatState(config('proc-child-budget', 'E01'));
+    state.operator.nextAttackAt = 1000;
+    state.enemies[0]!.nextAttackAt = 30000;
+    state.enemies[0]!.baseSheet.evasion = 0;
+    state.enemies[0]!.hp = 10000;
+    for (let i = 0; i < 40; i++) {
+      const effect: TriggerEffect = {
+        type: 'trigger', id: `test_child_${i}`, event: 'ON_HIT', chance: 1,
+        action: { kind: 'flag', key: `child_${i}`, amount: 1 }, desc: `child ${i}`,
+      };
+      state.build.triggerEffects.push({ effect, sourceId: 'test-child-source', sourceName: 'test', sourceKind: 'unique' });
+    }
+    state = until(state, (x) => x.metrics.chainLimitHits > 0, 1500);
+
+    const childEvents = state.log.filter((event) => event.kind === 'TRIGGER' && event.originActionId === 'operator:atk:1');
+    expect(childEvents).toHaveLength(32);
+    expect(state.metrics.chainLimitHits).toBe(1);
+    expect(state.log.find((event) => event.kind === 'CHAIN_LIMIT')?.reason).toBe('max_child_events');
+  });
+
+  it('runs a direct ON_KILL secondary proc after the lethal event', () => {
+    let state = createCombatState(config('kill-trigger-order', ['E01', 'E02']));
+    state.operator.nextAttackAt = 1000;
+    state.enemies[0]!.hp = 1;
+    state.enemies[1]!.hp = 1000;
+    state.enemies[0]!.baseSheet.evasion = 0;
+    state.enemies.forEach((enemy) => { enemy.nextAttackAt = 30000; });
+    const killProc: TriggerEffect = {
+      type: 'trigger', id: 'test_kill_echo', event: 'ON_KILL', requireDirect: true,
+      requireKillType: 'KINETIC', chance: 1,
+      action: { kind: 'secondaryDamage', basis: 'flat', coefficient: 12, damageType: 'DIGITAL', targeting: 'secondary', canProc: false },
+      desc: 'test direct kill echo',
+    };
+    state.build.triggerEffects.push({ effect: killProc, sourceId: 'test-kill-source', sourceName: 'test', sourceKind: 'unique' });
+    state = until(state, (x) => x.log.some((event) => event.kind === 'TRIGGER' && event.text.includes('test_kill_echo')), 1500);
+
+    const killTrigger = state.log.find((event) => event.kind === 'TRIGGER' && event.text.includes('test_kill_echo'))!;
+    const killEcho = state.log.find((event) => ['DAMAGE', 'MISS'].includes(event.kind) && event.actionId?.includes('test_kill_echo'));
+    expect(killEcho?.targetId).toBe('enemy:1');
+    expect(state.log.findIndex((event) => event.kind === 'DEATH' && event.actorId === 'enemy:0')).toBeLessThan(state.log.indexOf(killTrigger));
+  });
+
+  it('dispatches skill-filtered ON_CAST triggers to the road result deltas', () => {
+    let state = createCombatState(config('scan-catalog-triggers', 'E01', ['SK_SCAN'], [{
+      id: 'scan', priority: 1, enabled: true, skillId: 'SK_SCAN', target: 'target', conditions: [], logic: 'AND',
+    }]));
+    state.operator.energy = 100;
+    const trigger = (id: string, action: TriggerEffect['action']): TriggerEffect => ({
+      type: 'trigger', id, event: 'ON_CAST', skillFilter: ['SK_SCAN'], chance: 1, action, desc: id,
+    });
+    state.build.triggerEffects.push(
+      { effect: trigger('test_scan_reveal', { kind: 'revealNodes', amount: 1 }), sourceId: 'test-scan-source', sourceName: 'test', sourceKind: 'unique' },
+      { effect: trigger('test_scan_wanted', { kind: 'wanted', amount: 2 }), sourceId: 'test-scan-source', sourceName: 'test', sourceKind: 'unique' },
+    );
+    state = until(state, (x) => x.revealDelta === 1, 2000);
+
+    expect(state.wantedDelta).toBe(2);
+    expect(state.log.some((event) => event.kind === 'TRIGGER' && event.skillId === 'SK_SCAN')).toBe(true);
+  });
+
+  it('matches status-expiry trigger filters and reduces the named cooldown', () => {
+    let state = createCombatState(config('jam-expiry-trigger', 'E01', ['SK_EMP']));
+    state.operator.cooldowns.SK_EMP = 10000;
+    state.operator.nextAttackAt = 30000;
+    state.enemies[0]!.nextAttackAt = 30000;
+    const effect: TriggerEffect = {
+      type: 'trigger', id: 'test_jam_expiry', event: 'ON_STATUS_EXPIRE', statusFilter: ['JAM'],
+      icdMs: 5000, action: { kind: 'reduceCooldown', skillId: 'SK_EMP', amountMs: 2000 }, desc: 'test JAM expiry',
+    };
+    state.build.triggerEffects.push({ effect, sourceId: 'test-status-source', sourceName: 'test', sourceKind: 'unique' });
+    applyStatus(state, state.operator, state.enemies[0]!, 'JAM', { durationMs: 1000 });
+    state = until(state, (x) => x.enemies[0]!.statuses.JAM === undefined, 1100);
+
+    expect(state.operator.cooldowns.SK_EMP).toBe(8000);
+    expect(state.log.some((event) => event.kind === 'TRIGGER' && event.text.includes('test_jam_expiry'))).toBe(true);
+  });
+
+  it('dispatches ON_DRONE_DEATH to operator equipment and uses the dead drone basis', () => {
+    let state = createCombatState(droneConfig('drone-death-trigger', 'DR_GUN', ['E01', 'E02']));
+    state.drones[0]!.hp = 0;
+    state.operator.nextAttackAt = 30000;
+    state.enemies.forEach((enemy) => { enemy.nextAttackAt = 30000; enemy.baseSheet.evasion = 0; });
+    const effect: TriggerEffect = {
+      type: 'trigger', id: 'test_drone_death_emp', event: 'ON_DRONE_DEATH', oncePerDrone: true,
+      action: { kind: 'secondaryDamage', basis: 'droneTech', coefficient: 0.5, damageType: 'DIGITAL', targeting: 'allEnemies', canProc: false },
+      desc: 'test drone death EMP',
+    };
+    state.build.triggerEffects.push({ effect, sourceId: 'test-drone-unique', sourceName: 'test', sourceKind: 'unique' });
+    state = stepCombat(state);
+
+    expect(state.metrics.droneDeaths).toBe(1);
+    expect(state.log.some((event) => event.kind === 'TRIGGER' && event.text.includes('test_drone_death_emp'))).toBe(true);
+    expect(state.log.filter((event) => event.kind === 'DAMAGE' && event.actorId === 'operator' && event.damageType === 'DIGITAL'))
+      .toHaveLength(2);
+  });
+
+  it('transfers bounded VIRUS stacks on a kill without resetting their remaining ticks', () => {
+    let state = createCombatState(config('virus-kill-transfer', ['E01', 'E02']));
+    state.operator.nextAttackAt = 1000;
+    state.enemies.forEach((enemy) => { enemy.nextAttackAt = 30000; });
+    state.enemies[0]!.hp = 1;
+    state.enemies[0]!.baseSheet.evasion = 0;
+    applyStatus(state, state.operator, state.enemies[0]!, 'VIRUS', { stacks: 2, durationMs: 5000, snapshot: 100 });
+    const originalExpiry = state.enemies[0]!.statuses.VIRUS!.map((entry) => entry.expiresAt);
+    const effect: TriggerEffect = {
+      type: 'trigger', id: 'test_virus_transfer', event: 'ON_KILL', allowStatusTick: true,
+      action: { kind: 'transferVirus', stacks: 2 }, desc: 'test virus transfer',
+    };
+    state.build.triggerEffects.push({ effect, sourceId: 'test-virus-source', sourceName: 'test', sourceKind: 'unique' });
+    state = until(state, (x) => !x.enemies[0]!.alive, 1500);
+
+    expect(statusStacks(state.enemies[1]!, 'VIRUS')).toBe(2);
+    expect(state.enemies[1]!.statuses.VIRUS!.map((entry) => entry.expiresAt)).toEqual(originalExpiry);
+    expect(state.enemies[0]!.statuses.VIRUS).toBeUndefined();
+  });
+
+  it('applies ON_BEFORE_HIT packet modifiers before mitigation', () => {
+    const make = (withProc: boolean) => {
+      let state = createCombatState(config('packet-modifier', 'E01'));
+      state.build = resolveBuild({
+        attributes: { POW: 5, REF: 5, INT: 5, ENG: 5, SYN: 5 },
+        equipment: { MAIN: makeItem('packet-modifier-shotgun', 'SHOTGUN_K5') },
+        attributePointsEarned: 0, unlockedImplantSlots: 4, unlockedDroneSlots: 1,
+      });
+      state.build.mainWeapon!.pelletProcWeight = 1;
+      state.operator = createCombatState({ ...config('packet-modifier-rebuilt', 'E01'), build: state.build }).operator;
+      state.operator.nextAttackAt = 1600;
+      state.enemies[0]!.nextAttackAt = 30000;
+      state.enemies[0]!.baseSheet.evasion = 0;
+      state.enemies[0]!.baseSheet.armor = 0;
+      state.enemies[0]!.hp = 10000;
+      if (withProc) state.build.triggerEffects.push({
+        effect: { type: 'trigger', id: 'test_packet_double', event: 'ON_BEFORE_HIT', requireDirect: true, damageTypeFilter: ['KINETIC'], action: { kind: 'packetMod', damageMultiplier: 2 }, desc: 'test packet modifier' },
+        sourceId: 'test-packet-source', sourceName: 'test', sourceKind: 'unique',
+      });
+      return until(state, (next) => next.log.filter((event) => event.kind === 'DAMAGE' && event.actorId === 'operator').length >= 4, 3000);
+    };
+    const baseline = make(false);
+    const modified = make(true);
+    const raw = (state: CombatState) => state.log.filter((event) => event.kind === 'DAMAGE' && event.actorId === 'operator').slice(0, 4).map((event) => event.amountBeforeDefense!);
+
+    expect(raw(modified)).toHaveLength(4);
+    raw(modified).forEach((amount, index) => expect(amount).toBeCloseTo(raw(baseline)[index]! * 2, 6));
+  });
+
+  it('fires heat-full effects and prevents lockout when shield is discharged', () => {
+    let state = createCombatState(config('heat-full-trigger', 'E01'));
+    state.operator.nextAttackAt = 30000;
+    state.enemies[0]!.nextAttackAt = 30000;
+    state.operator.heat = 99;
+    state.operator.shield = 100;
+    state.ambientHeatPerSec = 1000;
+    state.build.triggerEffects.push({
+      effect: { type: 'trigger', id: 'test_discharge', event: 'ON_HEAT_FULL', action: { kind: 'consumeShieldForDamage', fraction: 0.25, maxMultiplier: 2, windowMs: 5000 }, desc: 'test discharge' },
+      sourceId: 'test-discharge-source', sourceName: 'test', sourceKind: 'unique',
+    });
+    state = stepCombat(state);
+
+    expect(state.operator.shield).toBe(75);
+    expect(state.operator.heatLockout).toBe(false);
+    expect(state.log.some((event) => event.kind === 'HEAT_LOCKOUT')).toBe(false);
+    expect(state.operator.flags.u01EnergyMultiplier).toBeCloseTo(1.25, 6);
+  });
+
+  it('dispatches interrupt triggers and grants a temporary reaction window', () => {
+    let state = createCombatState(config('interrupt-trigger', 'E07', ['SK_EMP'], [{
+      id: 'interrupt-heavy', priority: 10, enabled: true, skillId: 'SK_EMP', target: 'imminentCast', conditions: [], logic: 'AND',
+    }]));
+    state.operator.shield = 0;
+    state.operator.nextAttackAt = 30000;
+    state.enemies[0]!.nextAttackAt = 30000;
+    state.build.triggerEffects.push({
+      effect: { type: 'trigger', id: 'test_interrupt_window', event: 'ON_INTERRUPT', action: { kind: 'extraReaction', windowMs: 2000 }, desc: 'test extra reaction' },
+      sourceId: 'test-interrupt-source', sourceName: 'test', sourceKind: 'unique',
+    });
+    state = until(state, (x) => x.log.some((event) => event.kind === 'CAST_INTERRUPT'));
+
+    expect(state.operator.flags.extraReactionUntil).toBeGreaterThan(0);
+    expect(state.log.some((event) => event.kind === 'TRIGGER' && event.text.includes('test_interrupt_window'))).toBe(true);
+  });
+
+  it('dispatches combat-start triggers before the first simulation tick', () => {
+    const build = makeBuild();
+    build.triggerEffects.push({
+      effect: { type: 'trigger', id: 'test_emergency_start', event: 'ON_COMBAT_START', oncePerCombat: true, action: { kind: 'flag', key: 'emergencyReaction', amount: 1, max: 1 }, desc: 'test combat-start flag' },
+      sourceId: 'test-start-source', sourceName: 'test', sourceKind: 'tree',
+    });
+    const combat = config('combat-start-trigger', 'E01');
+    combat.build = build;
+
+    const state = createCombatState(combat);
+    expect(state.operator.flags.emergencyReaction).toBe(1);
+    expect(state.log.some((event) => event.kind === 'TRIGGER' && event.text.includes('test_emergency_start'))).toBe(true);
+  });
+
+  it('dispatches enemy telegraphs to operator buffs', () => {
+    let state = createCombatState(config('enemy-telegraph-trigger', 'E07'));
+    state.operator.nextAttackAt = 30000;
+    state.enemies[0]!.nextAttackAt = 30000;
+    state.build.triggerEffects.push({
+      effect: { type: 'trigger', id: 'test_telegraph_evasion', event: 'ON_ENEMY_TELEGRAPH', action: { kind: 'buff', mods: [{ type: 'stat', stat: 'evasion', op: 'FLAT', value: 20 }], durationMs: 1000 }, desc: 'test telegraph evasion' },
+      sourceId: 'test-telegraph-source', sourceName: 'test', sourceKind: 'tree',
+    });
+    state = until(state, (next) => next.log.some((event) => event.kind === 'TRIGGER' && event.text.includes('test_telegraph_evasion')), 6000);
+
+    expect(state.operator.buffs.some((buff) => buff.mods.some((modifier) => modifier.stat === 'evasion'))).toBe(true);
+  });
+
+  it('releases accumulated charge as a non-proccing secondary energy packet', () => {
+    let state = createCombatState(config('charge-release', 'E01'));
+    state.operator.nextAttackAt = 1000;
+    state.enemies[0]!.nextAttackAt = 30000;
+    state.enemies[0]!.baseSheet.evasion = 0;
+    state.enemies[0]!.baseSheet.armor = 0;
+    state.enemies[0]!.hp = 10000;
+    state.operator.flags.charge = 25;
+    state.build.triggerEffects.push({
+      effect: { type: 'trigger', id: 'test_charge_release', event: 'ON_BEFORE_HIT', requireDirect: true, action: { kind: 'spendFlagForDamage', flag: 'charge', perStack: 1, maxStacks: 1, intervalMs: 4000 }, desc: 'test charge release' },
+      sourceId: 'test-charge-source', sourceName: 'test', sourceKind: 'unique',
+    });
+    state = until(state, (next) => next.log.some((event) => event.kind === 'DAMAGE' && event.actionId?.includes('test_charge_release:charge')), 1500);
+
+    const chargeHit = state.log.find((event) => event.kind === 'DAMAGE' && event.actionId?.includes('test_charge_release:charge'))!;
+    expect(chargeHit.damageType).toBe('ENERGY');
+    expect(chargeHit.amountBeforeDefense).toBe(25);
+    expect(state.operator.flags.charge).toBe(0);
+  });
+
+  it('repeats the last available DIGITAL program without spending energy or applying its proc effects', () => {
+    let state = createCombatState(config('repeat-digital', 'E01', ['SK_NEURO']));
+    state.operator.lastDigitalSkill = { skillId: 'SK_NEURO', targetId: 'enemy:0' };
+    state.operator.nextAttackAt = 30000;
+    state.enemies[0]!.nextAttackAt = 30000;
+    state.enemies[0]!.baseSheet.evasion = 0;
+    state.enemies[0]!.hp = 10000;
+    const beforeEnergySpent = state.metrics.energySpent;
+    const effect: TriggerEffect = {
+      type: 'trigger', id: 'test_repeat_digital', event: 'PERIODIC', periodMs: 12000,
+      action: { kind: 'repeatLastDigital', coefficient: 0.5 }, desc: 'test repeat digital',
+    };
+    state.build.triggerEffects.push({ effect, sourceId: 'test-repeat-source', sourceName: 'test', sourceKind: 'unique' });
+    state.operator.abilityNext['trigger:test-repeat-source:test_repeat_digital'] = 100;
+    state = stepCombat(state);
+
+    const repeated = state.log.find((event) => event.kind === 'DAMAGE' && event.skillId === 'SK_NEURO');
+    expect(repeated?.amountBeforeDefense).toBeGreaterThan(0);
+    expect(state.metrics.energySpent).toBe(beforeEnergySpent);
+    expect(state.enemies[0]!.statuses.VIRUS).toBeUndefined();
+  });
+
+  it('fires HP-threshold triggers only on crossing the configured boundary', () => {
+    let state = createCombatState(config('hp-threshold-trigger', 'E02'));
+    state.operator.nextAttackAt = 30000;
+    state.operator.shield = 0;
+    state.operator.hp = state.operator.baseSheet.maxHP * 0.3;
+    state.enemies[0]!.nextAttackAt = 30000;
+    state.build.triggerEffects.push({
+      effect: { type: 'trigger', id: 'test_hp_panic', event: 'ON_HP_THRESHOLD', hpThreshold: 0.2, oncePerCombat: true, action: { kind: 'tempShield', amount: 80, cap: 80, durationMs: 5000, scaleWithArmorT: true }, desc: 'test HP threshold' },
+      sourceId: 'test-hp-source', sourceName: 'test', sourceKind: 'tree',
+    });
+    state = until(state, (next) => next.log.some((event) => event.kind === 'TRIGGER' && event.text.includes('test_hp_panic')), 8000);
+
+    expect(state.operator.buffs).toHaveLength(0);
+    expect(state.operator.tempShields.some((shield) => shield.amount > 0)).toBe(true);
+  });
+
+  it('resolves target-status stat conditions against the actual hit target', () => {
+    const combat = config('target-condition', 'E01');
+    combat.build = resolveBuild({
+      attributes: { POW: 5, REF: 5, INT: 5, ENG: 5, SYN: 5 },
+      equipment: { MAIN: makeItem('target-condition-blade', 'BLADE_K4') },
+      attributePointsEarned: 0, unlockedImplantSlots: 4, unlockedDroneSlots: 1,
+    });
+    const state = createCombatState(combat);
+    const target = state.enemies[0]!;
+    const before = effectiveSheet(state, state.operator, target).kineticDamage;
+    applyStatus(state, state.operator, target, 'BLEED', { durationMs: 5000, snapshot: 0 });
+    const after = effectiveSheet(state, state.operator, target).kineticDamage;
+
+    expect(after - before).toBeCloseTo(10, 6);
   });
 });

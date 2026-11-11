@@ -3,7 +3,7 @@ import { ITEM_BY_ID } from '../../data/items';
 import { MUTATION_BY_ID } from '../../data/progression';
 import { PASSIVE_BY_ID, SKILL_BY_ID } from '../../data/skills';
 import { TREE_BY_ID, keystoneCount, nodeLockReason } from '../../data/tree';
-import type { EffectDef, ItemTemplate, PassiveDef, SkillDef, StatEffect, TreeNodeDef, WeaponBlock, DroneBlock } from '../../data/types';
+import type { EffectDef, ItemTemplate, PassiveDef, SkillDef, StatEffect, TreeNodeDef, WeaponBlock, DroneBlock, TriggerEffect } from '../../data/types';
 import { UNIQUE_TEMPLATE_BY_ID } from '../../data/uniques';
 import { D, H, techPower } from '../math/formula';
 import { bundle, mod, resolveStats, sheetOf, type Modifier, type StatContext, type StatResults, type StatSheet } from '../math/stats';
@@ -55,6 +55,13 @@ export interface ResolvedDrone extends Omit<DroneBlock, 'hp' | 'shield' | 'damag
   damage: number;
 }
 
+export interface ResolvedTriggerEffect {
+  effect: TriggerEffect;
+  sourceId: string;
+  sourceName: string;
+  sourceKind: SourceKind;
+}
+
 /**
  * Resolved combat snapshot. `valid` must be checked before starting a fight;
  * `statResults` preserves every exact result and CalcTrace used for `stats`.
@@ -76,6 +83,7 @@ export interface ResolvedBuild {
   treeNodeIds: string[];
   mutationIds: string[];
   effects: EffectDef[];
+  triggerEffects: ResolvedTriggerEffect[];
   modifiers: Modifier[];
   issues: BuildIssue[];
 }
@@ -325,8 +333,10 @@ export function resolveBuild(input: BuildLoadout): ResolvedBuild {
 
   const modifiers: Modifier[] = [];
   const effects: EffectDef[] = [];
+  const triggerEffects: ResolvedTriggerEffect[] = [];
   const addEffect = (effect: EffectDef, source: { id: string; name: string; kind: SourceKind }, id: string, valueOverride?: number) => {
     effects.push(effect);
+    if (effect.type === 'trigger') triggerEffects.push({ effect, sourceId: source.id, sourceName: source.name, sourceKind: source.kind });
     if (effect.type === 'stat') modifiers.push(statModifier(effect, source, valueOverride ?? effect.value, id));
   };
   addAttributeModifiers(attributes, modifiers);
@@ -377,7 +387,10 @@ export function resolveBuild(input: BuildLoadout): ResolvedBuild {
   for (const skill of skills) {
     // Эффекты активных умений применяются покадрово при касте (пробитие «только
     // этот удар», баффы длительности, ON_HIT-триггеры), а не как постоянные статы.
-    for (const effect of skill.extraEffects ?? []) effects.push(effect);
+    for (const effect of skill.extraEffects ?? []) {
+      effects.push(effect);
+      if (effect.type === 'trigger') triggerEffects.push({ effect, sourceId: skill.id, sourceName: skill.name, sourceKind: 'skill' });
+    }
   }
   for (const passive of passives) {
     const source = { id: passive.id, name: passive.name, kind: 'passive' as const };
@@ -428,6 +441,7 @@ export function resolveBuild(input: BuildLoadout): ResolvedBuild {
     treeNodeIds,
     mutationIds,
     effects,
+    triggerEffects,
     modifiers,
     issues,
   };

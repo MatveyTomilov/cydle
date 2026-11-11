@@ -55,11 +55,11 @@ export type TriggerAction =
   | { kind: 'charge'; amountFromAbsorbed: number; capFormula: 'H(T)' | 'flat'; capFlat?: number; intervalMs: number }
   | { kind: 'control'; chance: number; durationMs: number; bossFallbackJamMs: number }
   | { kind: 'extraReaction'; windowMs: number }
-  | { kind: 'flag'; key: string; amount: number; max?: number }
+  | { kind: 'flag'; key: string; amount: number; max?: number; durationMs?: number }
   | { kind: 'wanted'; amount: number }
   | { kind: 'revealNodes'; amount: number }
   | { kind: 'repeatLastDigital'; coefficient: number }
-  | { kind: 'spendFlagForDamage'; flag: string; perStack: number; maxStacks: number; onlyAtMax?: boolean }
+  | { kind: 'spendFlagForDamage'; flag: string; perStack: number; maxStacks: number; onlyAtMax?: boolean; intervalMs?: number }
   | { kind: 'packetMod'; penMultiplier?: number; damageMultiplier?: number; consumeShield?: number; requireShield?: number }
   | { kind: 'extendStatus'; status: StatusId; ms: number; stacks: number };
 
@@ -74,7 +74,10 @@ export interface TriggerEffect {
   counterEvery?: number;
   skillFilter?: string[];
   damageTypeFilter?: DamageType[];
+  statusFilter?: StatusId[];
   requireDirect?: boolean;
+  allowStatusTick?: boolean;
+  allowSecondary?: boolean;
   requireKillType?: DamageType;
   condition?: Condition;
   oncePerCombat?: boolean;

@@ -50,7 +50,7 @@ export const UNIQUES: UniqueDef[] = [
     desc: 'Убийство заражённого врага переносит min(2, остаток стеков VIRUS) на другую цель с исходной остаточной длительностью. ICD 2 с.',
     effects: [
       T({
-        id: 'U03_transfer', event: 'ON_KILL', icdMs: 2000, condition: { kind: 'targetStatus', status: 'VIRUS' },
+        id: 'U03_transfer', event: 'ON_KILL', icdMs: 2000, allowStatusTick: true, condition: { kind: 'targetStatus', status: 'VIRUS' },
         action: { kind: 'transferVirus', stacks: 2 }, desc: 'Перенос заражения.',
       }),
     ],
@@ -60,7 +60,7 @@ export const UNIQUES: UniqueDef[] = [
     desc: '20% реально поглощённого щитом урона копится в заряд (максимум 100×H(T)); каждые 4 с следующий успешный main direct hit добавляет заряд как SECONDARY ENERGY.',
     effects: [
       T({ id: 'U04_charge', event: 'ON_SHIELD_ABSORB', action: { kind: 'charge', amountFromAbsorbed: 0.2, capFormula: 'H(T)', capFlat: 100, intervalMs: 4000 }, desc: 'Накопление заряда из поглощённого щитом урона.' }),
-      T({ id: 'U04_release', event: 'ON_BEFORE_HIT', action: { kind: 'spendFlagForDamage', flag: 'charge', perStack: 1, maxStacks: 1 }, desc: 'Выброс заряда вторичным ENERGY-пакетом.' }),
+      T({ id: 'U04_release', event: 'ON_BEFORE_HIT', requireDirect: true, action: { kind: 'spendFlagForDamage', flag: 'charge', perStack: 1, maxStacks: 1, intervalMs: 4000 }, desc: 'Выброс заряда вторичным ENERGY-пакетом.' }),
     ],
   },
   {
@@ -141,7 +141,7 @@ export const UNIQUES: UniqueDef[] = [
     desc: 'Каждое успешное уклонение даёт стек «фаза» на 8 с (до 3). Следующая main direct атака расходует все стеки: +12% MORE урона за стек.',
     effects: [
       S('attackSpeed', 'INCREASED', 12, { synScalable: true }),
-      T({ id: 'U13_phase', event: 'ON_DODGE', action: { kind: 'flag', key: 'phase', amount: 1, max: 3 }, desc: 'Накопление фазы при уклонении.' }),
+      T({ id: 'U13_phase', event: 'ON_DODGE', action: { kind: 'flag', key: 'phase', amount: 1, max: 3, durationMs: 8000 }, desc: 'Накопление фазы при уклонении.' }),
       T({ id: 'U13_spend', event: 'ON_BEFORE_HIT', action: { kind: 'spendFlagForDamage', flag: 'phase', perStack: 0.12, maxStacks: 3 }, desc: 'Выброс фазы в урон.' }),
     ],
   },
@@ -178,7 +178,7 @@ export const UNIQUES: UniqueDef[] = [
     desc: 'Каждый закончившийся вражеский JAM сокращает CD ближайшего SK_EMP на 2 с (не чаще раза в 5 с). Против цифровых врагов: +10 щита/с на 3 с.',
     effects: [
       S('digitalRes', 'FLAT', 10),
-      T({ id: 'U17_cd', event: 'ON_STATUS_EXPIRE', icdMs: 5000, action: { kind: 'reduceCooldown', skillId: 'SK_EMP', amountMs: 2000 }, desc: 'Сокращение CD перехвата.' }),
+      T({ id: 'U17_cd', event: 'ON_STATUS_EXPIRE', statusFilter: ['JAM'], icdMs: 5000, action: { kind: 'reduceCooldown', skillId: 'SK_EMP', amountMs: 2000 }, desc: 'Сокращение CD перехвата после JAM.' }),
       T({
         id: 'U17_regen', event: 'ON_TAKEN_DAMAGE', damageTypeFilter: ['DIGITAL'],
         action: { kind: 'buff', mods: [S('shieldRegen', 'FLAT', 10)], durationMs: 3000 }, desc: 'Ускоренная регенерация щита против цифры.',
