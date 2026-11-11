@@ -7,6 +7,8 @@
 - Enabled optional ELITE encounters in regular routes and a wanted-gated BOUNTY encounter (at most one per sector at wanted 50+). Both use the existing deterministic combat simulator and their §19 currency/item/core rewards.
 - Applied B02 credit and corporate wanted bonuses and the B04 data bonus to combat rewards. BOUNTY awards no XP because the master spec defines none for that encounter.
 - Added graph and combat integration coverage for elite/bounty generation and reward behavior.
+- Added persistent one-step EVENT nodes from the supported subset of the event catalog. Choices apply run resource/currency/item effects and permanent bounded faction reputation; choices resolve once and event IDs do not repeat during one run.
+- Added save defaults for faction reputation and campaign flags so existing version-1 saves remain readable. Advanced event hooks for reveals, next-combat modifiers, mutations, and quest progression remain unimplemented and are excluded from generated event choices.
 - Added run-specific equipment ownership and loadouts. Secured inventory and unsecured cargo feed the same canonical build resolver; equip/unequip is validated at safe points, combat uses the selected field loadout, extraction secures it, and defeat loses unsecured gear while restoring protected gear with durability loss.
 - Connected the run loadout editor to the road screen with compatible-slot filtering, implant/drone unlock states, and warehouse/risk labels.
 - Kept active run saves created before loadouts readable: they inherit the previous garage equipment on load, and their original snapshot/export checksums remain verifiable.
