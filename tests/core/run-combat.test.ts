@@ -3,6 +3,9 @@ import { createInitialSave } from '../../src/core/save/initial';
 import { createInitialRun } from '../../src/core/run/run';
 import { chooseRunNode } from '../../src/core/run/commands';
 import { resolveCurrentCombat } from '../../src/core/run/combat';
+import { createItem } from '../../src/core/items/items';
+import { Rng } from '../../src/core/rng';
+import { runCargoCapacity, runCargoUnits } from '../../src/core/run/cargo';
 
 function combatSave(saveId: string) {
   const save = createInitialSave({ saveId, now: 100 });
@@ -86,5 +89,28 @@ describe('run combat integration', () => {
     expect(result.save.run).toMatchObject({ phase: 'ROUTE', runWallet: { CREDITS: 35, SCRAP: 5, DATA: 4 } });
     expect(result.save.meta.operator.xp).toBe(0);
     expect(result.save.run!.grantIds).not.toContain(`xp:${bounty.id}`);
+  });
+
+  it('does not exceed the hold when combat loot arrives at full capacity', () => {
+    const save = combatSave('full-cargo-combat');
+    const run = save.run!;
+    const elite = run.graph.layers[0]![0]!;
+    elite.type = 'ELITE';
+    elite.enemies = [{ templateId: 'E01' }];
+    for (let index = 0; index < 10; index++) run.unsecuredCargo.push(createItem(new Rng('loot', `combat-full-${index}`), {
+      templateId: 'RAIL_K6', techLevel: 1, rarity: 'COMMON', secured: false,
+      originGrantId: `combat-full-${index}`, origin: 'test',
+    }));
+    run.currentNodeId = elite.id;
+    run.visitedNodeIds = [elite.id];
+    run.phase = 'NODE';
+    const capacity = runCargoCapacity(save);
+    expect(runCargoUnits(run.unsecuredCargo)).toBe(capacity);
+
+    const result = resolveCurrentCombat(save, 'full-cargo-fight');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(runCargoUnits(result.save.run!.unsecuredCargo)).toBeLessThanOrEqual(capacity);
+    expect(result.save.run!.unsecuredCargo.filter((item) => item.origin === 'combat')).toEqual([]);
   });
 });

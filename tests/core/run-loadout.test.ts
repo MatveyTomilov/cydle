@@ -43,6 +43,25 @@ describe('run equipment ownership', () => {
     expect(result.save).toBe(save);
   });
 
+  it('prevents a run CARGO module swap from shrinking the hold below carried items', () => {
+    const save = saveWithRun('cargo-module-limit');
+    const run = save.run!;
+    run.unsecuredCargo = Array.from({ length: 16 }, (_, index) => createItem(new Rng('loot', `hold-${index}`), {
+      templateId: 'RAIL_K6', techLevel: 1, rarity: 'COMMON', secured: false,
+      originGrantId: `hold:${index}`, origin: 'test',
+    }));
+    const larger = createItem(new Rng('loot', 'large-cargo'), {
+      templateId: 'TR_CARGO_2', techLevel: 1, rarity: 'COMMON', secured: true,
+      originGrantId: 'cargo:large', origin: 'test',
+    });
+    save.meta.inventory.push(larger);
+    run.equipment.CARGO = larger.itemId;
+    const smaller = save.meta.inventory.find((item) => item.templateId === 'TR_CARGO_1')!;
+
+    const result = equipRunItem(save, { id: 'shrink-cargo', itemId: smaller.itemId, slot: 'CARGO' });
+    expect(result).toMatchObject({ ok: false, failureCode: 'CARGO_OVER_CAPACITY', save });
+  });
+
   it('secures the active run loadout during exit without duplicating the item', () => {
     const save = saveWithRun('exit-equipped');
     const cargo = save.run!.unsecuredCargo[0]!;

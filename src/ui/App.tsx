@@ -12,6 +12,7 @@ import { chooseRunNode } from '../core/run/commands';
 import { resolveCurrentCombat } from '../core/run/combat';
 import { getRunShopStock, resolveRunCache, resolveRunEvent, resolveRunService, resolveRunShop, resolveRunShopPurchase } from '../core/run/nodes';
 import { resolveRunCheckpoint, resolveRunEmergency } from '../core/run/checkpoint';
+import { canCarryRunItems, runCargoCapacity, runCargoUnits } from '../core/run/cargo';
 import { equipRunItem, unequipRunSlot } from '../core/run/inventory';
 import { calibrateGarageItem, craftGarageAffix, dismantleGarageItem, equipGarageItem, garageRepairCost, repairGarageItem, unequipGarageSlot } from '../core/inventory/garage';
 import { affixName, calibrationCost, coreGroupForDepth, craftOperationCost, dismantleValue, shopPrice, templateOf } from '../core/items/items';
@@ -257,8 +258,8 @@ function RoadScreen({ save, busy, onResult, onReturn, onNewRun, commandId }: {
     if (result.ok && result.events.length) setCargoSelection([]);
   }
 
-  function actionButton(label: string, onClick: () => void, secondary = false) {
-    return <button className={secondary ? 'secondary-button road-action-secondary' : 'primary-button road-action'} disabled={busy} onClick={onClick}>{label}</button>;
+  function actionButton(label: string, onClick: () => void, secondary = false, blocked = false) {
+    return <button className={secondary ? 'secondary-button road-action-secondary' : 'primary-button road-action'} disabled={busy || blocked} onClick={onClick}>{label}</button>;
   }
 
   return <div className="screen-content road-screen">
@@ -280,7 +281,8 @@ function RoadScreen({ save, busy, onResult, onReturn, onNewRun, commandId }: {
         {current.type === 'FUEL' && actionButton('КУПИТЬ 1 ЕД. ТОПЛИВА · КРЕДИТЫ', () => dispatch(resolveRunService(save, { id: commandId(), choice: 'BUY_FUEL', currency: 'CREDITS', spendProtected })))}
         {current.type === 'SHOP' && <><div className="prototype-grid shop-stock">{getRunShopStock(run).map((entry) => {
           const sold = run.grantIds.includes(entry.grantId);
-          return <article className="route-card prototype-card" key={entry.grantId}><strong>{itemName(entry.item.templateId)}</strong><small>{entry.item.rarity} · T{entry.item.techLevel} · {entry.item.templateId}</small><b>{entry.price} ₡</b>{actionButton(sold ? 'ПРОДАНО' : 'КУПИТЬ', () => dispatch(resolveRunShopPurchase(save, { id: commandId(), stockIndex: entry.index })), true)}</article>;
+          const fits = canCarryRunItems(save, [entry.item]);
+          return <article className="route-card prototype-card" key={entry.grantId}><strong>{itemName(entry.item.templateId)}</strong><small>{entry.item.rarity} · T{entry.item.techLevel} · {entry.item.templateId}</small><b>{entry.price} ₡</b>{actionButton(sold ? 'ПРОДАНО' : fits ? 'КУПИТЬ' : 'НЕТ МЕСТА', () => dispatch(resolveRunShopPurchase(save, { id: commandId(), stockIndex: entry.index })), true, sold || !fits)}</article>;
         })}</div>{actionButton('ЗАВЕРШИТЬ ПОКУПКИ · 8 СЕК', () => dispatch(resolveRunShop(save, commandId())))}</>}
         {current.type === 'EVENT' && current.eventId && EVENT_BY_ID[current.eventId] && <div className="event-choices"><h3>{EVENT_BY_ID[current.eventId].name}</h3><p>{EVENT_BY_ID[current.eventId].text}</p>{EVENT_BY_ID[current.eventId].choices.map((choice) => {
           const specialCost = choice.special === 'greyDealer' ? Math.ceil(shopPrice('PISTOL_K1', run.depth, 'RARE') * 0.6) : choice.special === 'dataForCredits' ? Math.ceil(10 * R(run.depth)) : 0;
@@ -299,7 +301,7 @@ function RoadScreen({ save, busy, onResult, onReturn, onNewRun, commandId }: {
       {run.phase === 'SAFE_ERROR_STOP' && <div className="checkpoint-panel"><h3>Симуляция остановлена безопасно</h3><p>Награды не выданы. Текущее состояние и журнал боя сохранены.</p>{actionButton('В ГАРАЖ', onReturn, true)}</div>}
     </div>
 
-    <aside className="road-side"><div className="panel road-wallet"><span className="eyebrow">НЕЗАКРЕПЛЁННОЕ</span><div className="run-currencies"><span>₡ <b>{Math.floor(run.runWallet.CREDITS)}</b></span><span>▧ <b>{Math.floor(run.runWallet.SCRAP)}</b></span><span>⌘ <b>{Math.floor(run.runWallet.DATA)}</b></span></div><div className="run-cargo-count">ГРУЗ · {run.unsecuredCargo.length} предметов <small>+ {run.shippedCargo.length} уже отправлено</small></div></div>
+    <aside className="road-side"><div className="panel road-wallet"><span className="eyebrow">НЕЗАКРЕПЛЁННОЕ</span><div className="run-currencies"><span>₡ <b>{Math.floor(run.runWallet.CREDITS)}</b></span><span>▧ <b>{Math.floor(run.runWallet.SCRAP)}</b></span><span>⌘ <b>{Math.floor(run.runWallet.DATA)}</b></span></div><div className="run-cargo-count">ГРУЗ · {run.unsecuredCargo.length} предметов · {runCargoUnits(run.unsecuredCargo)} / {runCargoCapacity(save)} ед.<small>+ {run.shippedCargo.length} уже отправлено</small></div></div>
       <div className="panel road-loadout"><div className="panel-head"><div><span className="eyebrow">КОМПЛЕКТ ВЫЕЗДА</span><h2>Экипировка</h2></div><span className="count-chip">{Object.keys(run.equipment).length} СЛОТОВ</span></div><p className="loadout-note">Предметы из груза работают в бою и остаются под риском до эвакуации.</p><div className="run-loadout-list">{RUN_LOADOUT_SLOTS.map(({ id, label }) => {
         const selectedId = run.equipment[id];
         const candidates = availableItems.filter((instance) => {

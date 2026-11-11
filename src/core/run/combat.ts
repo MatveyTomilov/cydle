@@ -7,6 +7,7 @@ import { parseSave, type SaveGame } from '../save/schema';
 import type { CombatResult } from '../combat/types';
 import type { RunCommandResult, RunState } from './types';
 import { resolveRunBuild } from './build';
+import { fitRunCargo } from './cargo';
 
 const zeroWallet = () => ({ CREDITS: 0, SCRAP: 0, DATA: 0 });
 
@@ -168,8 +169,10 @@ export function resolveCurrentCombat(save: SaveGame, commandId: string): RunComm
     SCRAP: nextRun.runWallet.SCRAP + reward.wallet.SCRAP,
     DATA: nextRun.runWallet.DATA + reward.wallet.DATA,
   };
-  nextRun.unsecuredCargo.push(...reward.items);
-  nextRun.grantIds.push(...reward.grantIds);
+  const fitted = fitRunCargo(next, nextRun, reward.items);
+  const acceptedIds = new Set(fitted.accepted.map((item) => item.originGrantId));
+  nextRun.unsecuredCargo.push(...fitted.accepted);
+  nextRun.grantIds.push(...reward.grantIds.filter((grantId) => acceptedIds.has(grantId)));
   nextRun.lootRng = reward.rng.serialize();
   nextRun.clearedNodeIds = [...nextRun.clearedNodeIds, node.id];
   nextRun.phase = node.layer === 5 ? 'CHECKPOINT' : 'ROUTE';
@@ -178,6 +181,6 @@ export function resolveCurrentCombat(save: SaveGame, commandId: string): RunComm
   return {
     ok: true,
     save: checked.data,
-    events: [{ type: 'COMBAT_VICTORY', text: `Бой завершён: +${reward.wallet.CREDITS} кредитов, +${reward.wallet.SCRAP} лома, +${reward.wallet.DATA} данных, +${Math.ceil(rewardForNode(node.type, run.depth).xp)} XP.` }],
+    events: [{ type: 'COMBAT_VICTORY', text: `Бой завершён: +${reward.wallet.CREDITS} кредитов, +${reward.wallet.SCRAP} лома, +${reward.wallet.DATA} данных, +${Math.ceil(rewardForNode(node.type, run.depth).xp)} XP${fitted.rejected.length ? ` · ${fitted.rejected.length} предмет(а) не поместились в груз` : ''}.` }],
   };
 }

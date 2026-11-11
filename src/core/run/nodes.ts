@@ -4,6 +4,7 @@ import { R } from '../math/formula';
 import { Rng } from '../rng';
 import { parseSave, type SaveGame } from '../save/schema';
 import { resolveRunBuild } from './build';
+import { canCarryRunItems, fitRunCargo } from './cargo';
 import type { Currency, FactionId } from '../types';
 import type { RunCommandResult, RunState } from './types';
 
@@ -60,15 +61,17 @@ export function resolveRunCache(save: SaveGame, commandId: string, prototypeId?:
     grants.push(coreGrant);
   }
   nextRun.runWallet = { CREDITS: nextRun.runWallet.CREDITS + Math.ceil(8 * R(run.depth)), SCRAP: nextRun.runWallet.SCRAP + Math.ceil(2 * R(run.depth)), DATA: nextRun.runWallet.DATA };
-  nextRun.unsecuredCargo.push(...items);
-  nextRun.grantIds.push(...grants);
+  const fitted = fitRunCargo(next, nextRun, items);
+  const acceptedIds = new Set(fitted.accepted.map((item) => item.originGrantId));
+  nextRun.unsecuredCargo.push(...fitted.accepted);
+  nextRun.grantIds.push(...grants.filter((grantId) => acceptedIds.has(grantId)));
   nextRun.lootRng = loot.serialize();
   nextRun.clearedNodeIds = [...nextRun.clearedNodeIds, node.id];
   nextRun.resources.gameTimeMs += 5_000;
   nextRun.phase = 'ROUTE';
   const checked = parseSave(next);
   if (!checked.success) return fail(save, 'INVALID_RESULT', checked.error);
-  return { ok: true, save: checked.data, events: [{ type: 'CACHE_RESOLVED', text: `Тайник: +${Math.ceil(8 * R(run.depth))} кредитов, +${Math.ceil(2 * R(run.depth))} лома${prototypeId ? ` · выбран ${prototypeId} (не закреплён)` : ''}.` }] };
+  return { ok: true, save: checked.data, events: [{ type: 'CACHE_RESOLVED', text: `Тайник: +${Math.ceil(8 * R(run.depth))} кредитов, +${Math.ceil(2 * R(run.depth))} лома${prototypeId ? ` · выбран ${prototypeId} (не закреплён)` : ''}${fitted.rejected.length ? ` · ${fitted.rejected.length} предмет(а) не поместились в груз` : ''}.` }] };
 }
 
 export interface RunShopStockEntry {
@@ -108,6 +111,7 @@ export function resolveRunShopPurchase(save: SaveGame, command: { id: string; st
   if (!entry) return fail(save, 'INVALID_STOCK', 'Такого товара нет в ассортименте этого магазина.');
   if (run.grantIds.includes(entry.grantId)) return fail(save, 'STOCK_SOLD', 'Этот товар уже куплен в текущем выезде.');
   if (run.runWallet.CREDITS < entry.price) return fail(save, 'INSUFFICIENT_FUNDS', `Требуется ${entry.price} кредитов из незакреплённого кошелька.`);
+  if (!canCarryRunItems(save, [entry.item])) return fail(save, 'CARGO_CAPACITY', 'Для этого предмета не хватает места в отсеке груза.');
 
   const next = markCommand(save, command.id);
   const nextRun = next.run!;
@@ -201,6 +205,7 @@ export function resolveRunEvent(save: SaveGame, command: { id: string; choiceId:
       grants.push(grantId);
     }
   }
+  if (!canCarryRunItems(save, items)) return fail(save, 'CARGO_CAPACITY', 'Выбор создаст предмет, для которого не хватает места в грузовом отсеке.');
   nextRun.unsecuredCargo.push(...items);
   nextRun.grantIds.push(...grants);
   nextRun.lootRng = loot.serialize();

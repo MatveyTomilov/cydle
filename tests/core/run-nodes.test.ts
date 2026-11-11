@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { createInitialSave } from '../../src/core/save/initial';
 import { createInitialRun } from '../../src/core/run/run';
 import { templateOf } from '../../src/core/items/items';
+import { createItem } from '../../src/core/items/items';
+import { Rng } from '../../src/core/rng';
+import { runCargoCapacity, runCargoUnits } from '../../src/core/run/cargo';
 import { getRunShopStock, resolveRunCache, resolveRunEvent, resolveRunService, resolveRunShop, resolveRunShopPurchase } from '../../src/core/run/nodes';
 
 function nodeSave(type: 'CACHE' | 'REPAIR' | 'FUEL' | 'SHOP', saveId: string) {
@@ -90,6 +93,40 @@ describe('run road nodes', () => {
     if (!closed.ok) return;
     expect(closed.save.run).toMatchObject({ phase: 'ROUTE', clearedNodeIds: [node.id], resources: { gameTimeMs: 8_000 } });
     expect(resolveRunShop(closed.save, 'shop-close')).toMatchObject({ ok: true, save: closed.save, events: [] });
+  });
+
+  it('enforces cargo capacity using weighted item units and the equipped CARGO module', () => {
+    const base = nodeSave('SHOP', 'cargo-capacity');
+    const run = base.run!;
+    const shop = run.graph.layers.flat().find((candidate) => candidate.type === 'SHOP')!;
+    run.currentNodeId = shop.id;
+    run.visitedNodeIds = [shop.id];
+    run.phase = 'NODE';
+    run.runWallet = { CREDITS: 100_000, SCRAP: 0, DATA: 0 };
+    for (let index = 0; index < 10; index++) run.unsecuredCargo.push(createItem(new Rng('loot', `cargo-full-${index}`), {
+      templateId: 'RAIL_K6', techLevel: 1, rarity: 'COMMON', secured: false,
+      originGrantId: `cargo-full-${index}`, origin: 'test',
+    }));
+    const save = { ...base, run };
+    expect(runCargoUnits(run.unsecuredCargo)).toBe(20);
+    expect(runCargoCapacity(save)).toBe(20);
+    const purchase = resolveRunShopPurchase(save, { id: 'cargo-full-buy', stockIndex: 0 });
+    expect(purchase).toMatchObject({ ok: false, failureCode: 'CARGO_CAPACITY', save });
+    shop.type = 'EVENT';
+    shop.eventId = 'EV01';
+    run.runWallet.SCRAP = 5;
+    const eventChoice = resolveRunEvent(save, { id: 'cargo-full-event', choiceId: 'A' });
+    expect(eventChoice).toMatchObject({ ok: false, failureCode: 'CARGO_CAPACITY', save });
+
+    const expanded = createInitialSave({ saveId: 'cargo-expanded', now: 100 });
+    const cargoModule = createItem(new Rng('loot', 'cargo-module'), {
+      templateId: 'TR_CARGO_2', techLevel: 1, rarity: 'COMMON', secured: true,
+      originGrantId: 'cargo-module', origin: 'test',
+    });
+    expanded.meta.inventory.push(cargoModule);
+    expanded.meta.equipment.CARGO = cargoModule.itemId;
+    const expandedRun = createInitialRun(expanded, 'cargo-expanded-seed');
+    expect(runCargoCapacity({ ...expanded, run: expandedRun })).toBe(32);
   });
 
   it('resolves a data event once and persists its wanted and permanent faction reputation changes', () => {

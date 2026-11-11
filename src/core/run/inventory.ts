@@ -1,6 +1,7 @@
 import type { EquipSlotId } from '../types';
 import { parseSave, type SaveGame } from '../save/schema';
 import { resolveRunBuild } from './build';
+import { runCargoUnits } from './cargo';
 import type { RunCommandResult } from './types';
 
 function fail(save: SaveGame, failureCode: string, reason: string): RunCommandResult {
@@ -42,6 +43,7 @@ function commitLoadout(save: SaveGame, id: string, equipment: Partial<Record<Equ
   next.run!.equipment = equipment;
   const build = resolveRunBuild(next);
   if (!build.valid) return fail(save, 'BUILD_INVALID', build.issues.map((issue) => issue.message).join(' '));
+  if (runCargoUnits(next.run!.unsecuredCargo) > Math.floor(build.stats.cargoUnits)) return fail(save, 'CARGO_OVER_CAPACITY', 'Смена модуля CARGO превысит вместимость уже перевозимого груза.');
   const checked = parseSave(next);
   if (!checked.success) return fail(save, 'INVALID_RESULT', checked.error);
   return { ok: true, save: checked.data, events: [{ type: 'LOADOUT_CHANGED', text }] };
