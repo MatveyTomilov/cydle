@@ -11,6 +11,7 @@ import { resolveCurrentCombat } from '../core/run/combat';
 import { resolveRunCache, resolveRunService } from '../core/run/nodes';
 import { resolveRunCheckpoint } from '../core/run/checkpoint';
 import { equipRunItem, unequipRunSlot } from '../core/run/inventory';
+import { equipGarageItem, unequipGarageSlot } from '../core/inventory/garage';
 import { templateOf } from '../core/items/items';
 import type { RunCommandResult, RunState } from '../core/run/types';
 import { IMPLANT_SLOT_TYPES, NODE_TYPE_RU, type EquipSlotId, type ItemCategory } from '../core/types';
@@ -164,7 +165,7 @@ export function App() {
 
         {!save ? <WelcomeState boot={boot} busy={busy} onCreate={() => void createGame()} onImport={() => fileRef.current?.click()} /> : (
           screen === 'garage' ? <GarageScreen save={save} buildValid={!!build?.valid} busy={busy} onStartRun={() => void startRun()} onOpenRoad={() => setScreen('road')} />
-            : screen === 'build' ? <BuildScreen save={save} buildValid={!!build?.valid} />
+            : screen === 'build' ? <BuildScreen save={save} buildValid={!!build?.valid} busy={busy} onResult={(result) => void applyRunResult(result)} />
               : save.run ? <RoadScreen save={save} busy={busy} onResult={(result) => void applyRunResult(result)} onReturn={() => setScreen('garage')} onNewRun={() => void startRun()} commandId={commandId} />
                 : <GarageScreen save={save} buildValid={!!build?.valid} busy={busy} onStartRun={() => void startRun()} onOpenRoad={() => setScreen('road')} />
         )}
@@ -298,11 +299,25 @@ function RoadScreen({ save, busy, onResult, onReturn, onNewRun, commandId }: {
   </div>;
 }
 
-function BuildScreen({ save, buildValid }: { save: SaveGame; buildValid: boolean }) {
+function BuildScreen({ save, buildValid, busy, onResult }: { save: SaveGame; buildValid: boolean; busy: boolean; onResult: (result: RunCommandResult) => void }) {
   const { attributes } = save.meta.operator;
+  const availableItems = save.meta.inventory.filter((item) => item.secured);
+  const runActive = !!save.run && !['EXTRACTED', 'DEFEATED'].includes(save.run.phase);
   return <div className="screen-content"><section className="hero-row"><div><span className="eyebrow">BUILD LAB <i>·</i> ОПЕРАТОР {save.saveId.slice(0, 8).toUpperCase()}</span><h1>Сборка оператора</h1><p>Начальные характеристики и установленные протоколы.</p></div><span className={buildValid ? 'valid-badge' : 'invalid-badge'}>{buildValid ? 'ПРОВЕРКА СБОРКИ ПРОЙДЕНА' : 'ОШИБКА СБОРКИ'}</span></section>
     <section className="content-grid build-grid"><div className="panel"><div className="panel-head"><div><span className="eyebrow">АТРИБУТЫ</span><h2>Уровень {save.meta.operator.level} <small>· {save.meta.operator.xp} XP</small></h2></div><span className="count-chip">ОЧКИ {save.meta.operator.attributePoints}</span></div><div className="attribute-grid">{Object.entries(attributes).map(([id, value]) => <div className="attribute" key={id}><span>{id}</span><strong>{value}</strong><small>{attributeName(id)}</small></div>)}</div><div className="tree-summary"><div><span className="eyebrow">ДЕРЕВО СПЕЦИАЛИЗАЦИИ</span><strong>{save.meta.operator.treePoints} свободных очков</strong></div><small>ПОЛУЧЕНО УЗЛОВ · {save.meta.treeNodeIds.length}</small></div></div>
-      <div className="panel"><div className="panel-head"><div><span className="eyebrow">УСТАНОВЛЕННЫЕ ПРОТОКОЛЫ</span><h2>Активные и пассивные</h2></div></div><div className="protocol-summary">{save.meta.skillIds.map((id) => <Fragment key={id}><span>УМЕНИЕ</span><strong>{id}</strong></Fragment>)}{save.meta.passiveIds.map((id) => <Fragment key={id}><span>ПАССИВ</span><strong>{id}</strong></Fragment>)}</div><div className="build-footnote">Нейроёмкость: 100 · имплантных слотов: {save.meta.unlockedImplantSlots} · слот дрона: {save.meta.unlockedDroneSlots}</div></div></section>
+      <div className="panel"><div className="panel-head"><div><span className="eyebrow">УСТАНОВЛЕННЫЕ ПРОТОКОЛЫ</span><h2>Активные и пассивные</h2></div></div><div className="protocol-summary">{save.meta.skillIds.map((id) => <Fragment key={id}><span>УМЕНИЕ</span><strong>{id}</strong></Fragment>)}{save.meta.passiveIds.map((id) => <Fragment key={id}><span>ПАССИВ</span><strong>{id}</strong></Fragment>)}</div><div className="build-footnote">Нейроёмкость: 100 · имплантных слотов: {save.meta.unlockedImplantSlots} · слот дрона: {save.meta.unlockedDroneSlots}</div></div>
+      <div className="panel garage-loadout"><div className="panel-head"><div><span className="eyebrow">ЗАЩИЩЁННЫЙ СКЛАД</span><h2>Экипировка гаража</h2></div><span className="count-chip">{Object.keys(save.meta.equipment).length} СЛОТОВ</span></div><p className="loadout-note">Комплект будет выдаваться для новых выездов. Во время активного выезда постоянную экипировку менять нельзя.</p><div className="run-loadout-list garage-loadout-list">{RUN_LOADOUT_SLOTS.map(({ id, label }) => {
+        const selectedId = save.meta.equipment[id];
+        const candidates = availableItems.filter((item) => {
+          const occupiedElsewhere = Object.entries(save.meta.equipment).some(([otherSlot, itemId]) => otherSlot !== id && itemId === item.itemId);
+          return (!occupiedElsewhere || item.itemId === selectedId) && itemFitsRunSlot(templateOf(item), id);
+        });
+        const locked = id.startsWith('IMP_') && Number(id.slice(4)) > save.meta.unlockedImplantSlots || id.startsWith('DRONE_') && Number(id.slice(6)) > save.meta.unlockedDroneSlots;
+        return <label className="run-loadout-row" key={id}><span>{label}{locked && <small> · ЗАКРЫТ</small>}</span><select aria-label={`Гараж · ${label}`} value={selectedId ?? ''} disabled={busy || runActive || locked} onChange={(event) => {
+          const itemId = event.target.value;
+          onResult(itemId ? equipGarageItem(save, itemId, id) : unequipGarageSlot(save, id));
+        }}><option value="" disabled={id === 'MAIN'}>{id === 'MAIN' ? 'Обязательный слот' : 'Пусто'}</option>{candidates.map((item) => <option key={item.itemId} value={item.itemId}>{itemName(item.templateId)} · СКЛАД</option>)}</select></label>;
+      })}</div></div></section>
   </div>;
 }
 

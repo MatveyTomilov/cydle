@@ -16,3 +16,7 @@
 @media(max-width:900px){.road-loadout{grid-column:1/-1}.run-loadout-list{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:760px){.road-loadout{padding:15px}.run-loadout-list{grid-template-columns:repeat(2,minmax(0,1fr))}.loadout-note{font-size:8px}}
 @media(max-width:420px){.run-loadout-list{grid-template-columns:1fr}}
+.garage-loadout{grid-column:1/-1;padding:20px}.garage-loadout-list{grid-template-columns:repeat(4,minmax(0,1fr));margin-top:16px}.garage-loadout .loadout-note{font-size:10px}
+@media(max-width:900px){.garage-loadout-list{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:760px){.garage-loadout{padding:15px}.garage-loadout-list{grid-template-columns:repeat(2,minmax(0,1fr))}.garage-loadout .loadout-note{font-size:9px}}
+@media(max-width:420px){.garage-loadout-list{grid-template-columns:1fr}}
