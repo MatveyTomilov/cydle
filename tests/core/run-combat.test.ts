@@ -44,10 +44,41 @@ describe('run combat integration', () => {
   });
 
   it('does not resolve a combat command while the operator is still at a route choice', () => {
-    const save = combatSave('wrong-phase');
+    const base = combatSave('wrong-phase');
+    const save = { ...base, run: { ...base.run!, pendingCombatEffects: { initialTempShield: 20, extraHeat: 10 } } };
     const result = resolveCurrentCombat(save, 'fight');
     expect(result).toMatchObject({ ok: false, failureCode: 'NODE_NOT_COMBAT' });
     expect(result.save).toBe(save);
+    expect(result.save.run!.pendingCombatEffects).toEqual({ initialTempShield: 20, extraHeat: 10 });
+  });
+
+  it('passes pending event effects to the shared combat and consumes them once', () => {
+    const save = combatSave('event-combat-effects');
+    const run = save.run!;
+    const node = run.graph.layers[0]![0]!;
+    node.enemies = [{ templateId: 'E01' }];
+    run.currentNodeId = node.id;
+    run.visitedNodeIds = [node.id];
+    run.phase = 'NODE';
+    run.pendingCombatEffects = { initialTempShield: 20, extraHeat: 10 };
+    const result = resolveCurrentCombat(save, 'event-effect-fight');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.save.run!.combatResult!.log.find((event) => event.kind === 'COMBAT_START')?.data).toMatchObject({ initialTempShield: 20, initialExtraHeat: 10 });
+    expect(result.save.run!.pendingCombatEffects).toEqual({ initialTempShield: 0, extraHeat: 0 });
+  });
+
+  it('runs a legacy active encounter that has no deferred combat-effects field', () => {
+    const base = combatSave('legacy-combat-effects');
+    const run = base.run!;
+    const { pendingCombatEffects: _ignored, ...legacyRun } = run;
+    const node = legacyRun.graph.layers[0]![0]!;
+    legacyRun.currentNodeId = node.id;
+    legacyRun.visitedNodeIds = [node.id];
+    legacyRun.phase = 'NODE';
+    const result = resolveCurrentCombat({ ...base, run: legacyRun } as unknown as typeof base, 'legacy-fight');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.save.run!.pendingCombatEffects).toEqual({ initialTempShield: 0, extraHeat: 0 });
   });
 
   it('applies elite rewards, corporate wanted, and biome wallet bonuses through the shared combat result', () => {

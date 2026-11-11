@@ -69,6 +69,7 @@ export interface RunState {
   wanted: number;
   revealLevel: number;
   pendingTravelDeltaMs: number;
+  pendingCombatEffects: { initialTempShield: number; extraHeat: number };
   combatResult: CombatResult | null;
   lastCommandId: string | null;
   worldRng: import('../rng').SerializedRng;

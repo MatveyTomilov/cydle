@@ -34,11 +34,12 @@ export function chooseRunNode(save: SaveGame, commandId: string, nodeId: string)
 
   const next = markCommand(save, commandId);
   const updatedRun = next.run!;
-  const travelMs = Math.max(0, Math.round(25_000 * (1 - build.stats.travelDurationLess / 100)) + run.pendingTravelDeltaMs);
+  const travelMs = Math.max(0, Math.round(25_000 * (1 - build.stats.travelDurationLess / 100)) + (run.pendingTravelDeltaMs ?? 0));
   updatedRun.currentNodeId = nodeId;
   updatedRun.visitedNodeIds = [...updatedRun.visitedNodeIds, nodeId];
   updatedRun.resources = { ...updatedRun.resources, fuel: updatedRun.resources.fuel - edge.fuelCost, gameTimeMs: updatedRun.resources.gameTimeMs + travelMs };
   updatedRun.pendingTravelDeltaMs = 0;
+  updatedRun.pendingCombatEffects ??= { initialTempShield: 0, extraHeat: 0 };
   updatedRun.phase = node.type === 'CHECKPOINT' ? 'CHECKPOINT' : 'NODE';
 
   const checked = parseSave(next);

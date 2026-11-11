@@ -47,6 +47,7 @@ export function createInitialRun(save: SaveGame, seed: string): RunState {
     wanted: 0,
     revealLevel: 1,
     pendingTravelDeltaMs: 0,
+    pendingCombatEffects: { initialTempShield: 0, extraHeat: 0 },
     resources: {
       fuel: save.meta.transport.fuel,
       maxFuel: save.meta.transport.fuelMax,

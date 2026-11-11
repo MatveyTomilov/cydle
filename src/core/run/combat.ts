@@ -112,6 +112,7 @@ export function resolveCurrentCombat(save: SaveGame, commandId: string): RunComm
   if (!build.valid) return fail(save, 'INVALID_BUILD', build.issues.map((issue) => issue.message).join(' '));
   const tactic = save.meta.tactics.find((profile) => profile.id === save.meta.activeTacticId);
   if (!tactic) return fail(save, 'NO_TACTIC_PROFILE', 'Активный профиль тактики отсутствует.');
+  const pendingCombatEffects = run.pendingCombatEffects ?? { initialTempShield: 0, extraHeat: 0 };
 
   const result = simulateCombat({
     seed: `${run.seed}:${node.id}`,
@@ -125,6 +126,8 @@ export function resolveCurrentCombat(save: SaveGame, commandId: string): RunComm
     startShieldFraction: run.resources.maxShield > 0 ? run.resources.shield / run.resources.maxShield : 1,
     startEnergy: run.resources.energy,
     startHeat: run.resources.heat,
+    initialTempShield: pendingCombatEffects.initialTempShield,
+    initialExtraHeat: pendingCombatEffects.extraHeat,
     wanted: run.wanted,
     extraEnemyDigitalBonus: BIOME_BY_ID[run.biome]?.enemyDigitalBonus ?? 0,
     coolingPenalty: BIOME_BY_ID[run.biome]?.coolingPenalty ?? 0,
@@ -132,6 +135,7 @@ export function resolveCurrentCombat(save: SaveGame, commandId: string): RunComm
 
   const next = structuredClone(save);
   const nextRun = next.run!;
+  nextRun.pendingCombatEffects = { initialTempShield: 0, extraHeat: 0 };
   nextRun.commandIds = [...nextRun.commandIds, commandId].slice(-128);
   nextRun.lastCommandId = commandId;
   nextRun.combatResult = result;

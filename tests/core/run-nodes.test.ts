@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialSave } from '../../src/core/save/initial';
 import { parseSave } from '../../src/core/save/schema';
+import type { SaveGame } from '../../src/core/save/schema';
 import { createInitialRun } from '../../src/core/run/run';
 import { templateOf } from '../../src/core/items/items';
 import { createItem } from '../../src/core/items/items';
@@ -201,10 +202,74 @@ describe('run road nodes', () => {
   it('reads a legacy active run without pending travel time as zero', () => {
     const save = createInitialSave({ saveId: 'event-travel-legacy', now: 100 });
     const run = createInitialRun(save, 'event-travel-legacy-seed');
-    const { pendingTravelDeltaMs: _ignored, ...legacyRun } = run;
+    const { pendingTravelDeltaMs: _ignoredTravel, ...legacyRun } = run;
     const parsed = parseSave({ ...save, run: legacyRun });
     expect(parsed.success).toBe(true);
     if (parsed.success) expect(parsed.data.run!.pendingTravelDeltaMs).toBe(0);
+  });
+
+  it('reads older active runs without deferred combat effects as zeroed', () => {
+    const save = createInitialSave({ saveId: 'event-combat-legacy', now: 100 });
+    const run = createInitialRun(save, 'event-combat-legacy-seed');
+    const { pendingCombatEffects: _ignored, ...legacyRun } = run;
+    const parsed = parseSave({ ...save, run: legacyRun });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.run!.pendingCombatEffects).toEqual({ initialTempShield: 0, extraHeat: 0 });
+  });
+
+  it('continues a legacy active run through route and event commands without new fields', () => {
+    const base = createInitialSave({ saveId: 'event-legacy-commands', now: 100 });
+    const run = createInitialRun(base, 'event-legacy-commands-seed');
+    const { pendingTravelDeltaMs: _ignoredTravel, pendingCombatEffects: _ignoredCombat, ...legacyRun } = run;
+    const routeSave = { ...base, run: legacyRun } as unknown as SaveGame;
+    const startEdge = legacyRun.graph.edges.find((edge) => edge.from === 'START')!;
+    const moved = chooseRunNode(routeSave, 'legacy-move', startEdge.to);
+    expect(moved.ok).toBe(true);
+    if (!moved.ok) return;
+    expect(moved.save.run!.resources.gameTimeMs).toBeGreaterThan(0);
+    expect(moved.save.run!.pendingTravelDeltaMs).toBe(0);
+    expect(moved.save.run!.pendingCombatEffects).toEqual({ initialTempShield: 0, extraHeat: 0 });
+
+    const eventNode = legacyRun.graph.layers[3]![0]!;
+    eventNode.type = 'EVENT';
+    eventNode.eventId = 'EV17';
+    legacyRun.currentNodeId = eventNode.id;
+    legacyRun.visitedNodeIds = [eventNode.id];
+    legacyRun.phase = 'NODE';
+    const eventSave = { ...base, run: legacyRun } as unknown as SaveGame;
+    const event = resolveRunEvent(eventSave, { id: 'legacy-event', choiceId: 'A' });
+    expect(event.ok).toBe(true);
+    if (event.ok) expect(event.save.run!.pendingCombatEffects.extraHeat).toBe(10);
+  });
+
+  it('stores EV17 heat and EV24 shield bonuses as pending combat effects', () => {
+    const base = createInitialSave({ saveId: 'event-combat-effects', now: 100 });
+    const run = createInitialRun(base, 'event-combat-effects-seed');
+    const eventNode = run.graph.layers[3]![0]!;
+    eventNode.type = 'EVENT';
+    eventNode.eventId = 'EV17';
+    run.currentNodeId = eventNode.id;
+    run.visitedNodeIds = [eventNode.id];
+    run.phase = 'NODE';
+    const eventA = resolveRunEvent({ ...base, run }, { id: 'event-extra-heat', choiceId: 'A' });
+    expect(eventA.ok).toBe(true);
+    if (!eventA.ok) return;
+    expect(eventA.save.run!.pendingCombatEffects).toEqual({ initialTempShield: 0, extraHeat: 10 });
+
+    const secondRun = { ...createInitialRun(base, 'event-combat-shield-seed') };
+    const secondNode = secondRun.graph.layers[3]![0]!;
+    secondNode.type = 'EVENT';
+    secondNode.eventId = 'EV24';
+    secondRun.currentNodeId = secondNode.id;
+    secondRun.visitedNodeIds = [secondNode.id];
+    secondRun.phase = 'NODE';
+    const eventB = resolveRunEvent({ ...base, run: secondRun }, { id: 'event-temp-shield', choiceId: 'B' });
+    expect(eventB.ok).toBe(true);
+    if (!eventB.ok) return;
+    expect(eventB.save.run).toMatchObject({
+      pendingTravelDeltaMs: 20_000,
+      pendingCombatEffects: { initialTempShield: 20, extraHeat: 0 },
+    });
   });
 
   it('rejects an unaffordable event choice without mutating the save', () => {
