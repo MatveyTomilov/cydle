@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Enabled EV05's elite contract. Its RARE reward remains pending through ordinary combat and is granted exactly once at the first later ELITE.
+- Added tests for EV05 event eligibility, persistence through an ordinary combat, guaranteed RARE elite reward, and contract consumption.
 - Enabled EV18's allied turret choice: one E08 joins the next combat with 50% HP and damage through the existing ally simulator path. The log records ally count and the saved effect is consumed once.
 - Added tests for EV18 event state, generated map eligibility, ally delivery, and consumption after combat.
 - Enabled EV14 and EV21 forced bounty events. EV14 applies +25% credits; EV21 targets E21 and guarantees one RARE reward roll. Both convert the next selected ordinary COMBAT to BOUNTY and use the existing BOUNTY reward/XP rules.
