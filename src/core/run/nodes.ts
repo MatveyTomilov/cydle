@@ -179,6 +179,10 @@ export function resolveRunEvent(save: SaveGame, command: { id: string; choiceId:
   nextRun.pendingCombatEffects ??= { initialTempShield: 0, extraHeat: 0 };
   if (choice.nextCombat?.shieldBonus) nextRun.pendingCombatEffects.initialTempShield += choice.nextCombat.shieldBonus;
   if (choice.nextCombat?.extraHeat) nextRun.pendingCombatEffects.extraHeat += choice.nextCombat.extraHeat;
+  nextRun.pendingNextCombat ??= { skipOrdinary: false, forceElite: false, extraItemRoll: false };
+  if (choice.nextCombat?.skip) nextRun.pendingNextCombat.skipOrdinary = true;
+  if (choice.nextCombat?.forceElite) nextRun.pendingNextCombat.forceElite = true;
+  if (choice.nextCombat?.extraRareRoll) nextRun.pendingNextCombat.extraItemRoll = true;
   if (choice.fuel) nextRun.resources.fuel = Math.max(0, Math.min(nextRun.resources.maxFuel, nextRun.resources.fuel + choice.fuel));
   if (choice.hull) nextRun.resources.hull = Math.max(0, Math.min(nextRun.resources.maxHull, nextRun.resources.hull + choice.hull));
   if (choice.healMissingFraction) nextRun.resources.hp = Math.min(nextRun.resources.maxHP, nextRun.resources.hp + (nextRun.resources.maxHP - nextRun.resources.hp) * choice.healMissingFraction);

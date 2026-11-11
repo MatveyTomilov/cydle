@@ -211,7 +211,7 @@ describe('run road nodes', () => {
   it('reads older active runs without deferred combat effects as zeroed', () => {
     const save = createInitialSave({ saveId: 'event-combat-legacy', now: 100 });
     const run = createInitialRun(save, 'event-combat-legacy-seed');
-    const { pendingCombatEffects: _ignored, ...legacyRun } = run;
+    const { pendingCombatEffects: _ignored, pendingNextCombat: _ignoredNextCombat, ...legacyRun } = run;
     const parsed = parseSave({ ...save, run: legacyRun });
     expect(parsed.success).toBe(true);
     if (parsed.success) expect(parsed.data.run!.pendingCombatEffects).toEqual({ initialTempShield: 0, extraHeat: 0 });
@@ -270,6 +270,31 @@ describe('run road nodes', () => {
       pendingTravelDeltaMs: 20_000,
       pendingCombatEffects: { initialTempShield: 20, extraHeat: 0 },
     });
+  });
+
+  it('stores EV16 skip or elite and extra-item effects from the selected choice', () => {
+    const base = createInitialSave({ saveId: 'event-encounter-effects', now: 100 });
+    const prepareEventRun = (seed: string) => {
+      const run = createInitialRun(base, seed);
+      const eventNode = run.graph.layers[1]![0]!;
+      eventNode.type = 'EVENT';
+      eventNode.eventId = 'EV16';
+      run.currentNodeId = eventNode.id;
+      run.visitedNodeIds = [eventNode.id];
+      run.phase = 'NODE';
+      run.runWallet.CREDITS = 12;
+      return run;
+    };
+    const skipped = resolveRunEvent({ ...base, run: prepareEventRun('event-skip') }, { id: 'event-skip', choiceId: 'A' });
+    expect(skipped.ok).toBe(true);
+    if (!skipped.ok) return;
+    expect(skipped.save.run!.runWallet.CREDITS).toBe(0);
+    expect(skipped.save.run!.pendingNextCombat).toEqual({ skipOrdinary: true, forceElite: false, extraItemRoll: false });
+
+    const elite = resolveRunEvent({ ...base, run: prepareEventRun('event-force-elite') }, { id: 'event-force-elite', choiceId: 'B' });
+    expect(elite.ok).toBe(true);
+    if (!elite.ok) return;
+    expect(elite.save.run!.pendingNextCombat).toEqual({ skipOrdinary: false, forceElite: true, extraItemRoll: true });
   });
 
   it('rejects an unaffordable event choice without mutating the save', () => {

@@ -34,15 +34,23 @@ export function chooseRunNode(save: SaveGame, commandId: string, nodeId: string)
 
   const next = markCommand(save, commandId);
   const updatedRun = next.run!;
+  updatedRun.pendingNextCombat ??= { skipOrdinary: false, forceElite: false, extraItemRoll: false };
+  const selectedNode = updatedRun.graph.layers.flat().find((candidate) => candidate.id === nodeId)!;
+  if (selectedNode.type === 'COMBAT' && updatedRun.pendingNextCombat.forceElite && selectedNode.enemies.length > 0) {
+    selectedNode.type = 'ELITE';
+    selectedNode.threat = 'high';
+    selectedNode.lootHint = 'элитная добыча';
+    selectedNode.enemies = [{ ...selectedNode.enemies[0]!, elite: selectedNode.enemies[0]!.elite ?? 'EL_PEN' }];
+  }
   const travelMs = Math.max(0, Math.round(25_000 * (1 - build.stats.travelDurationLess / 100)) + (run.pendingTravelDeltaMs ?? 0));
   updatedRun.currentNodeId = nodeId;
   updatedRun.visitedNodeIds = [...updatedRun.visitedNodeIds, nodeId];
   updatedRun.resources = { ...updatedRun.resources, fuel: updatedRun.resources.fuel - edge.fuelCost, gameTimeMs: updatedRun.resources.gameTimeMs + travelMs };
   updatedRun.pendingTravelDeltaMs = 0;
   updatedRun.pendingCombatEffects ??= { initialTempShield: 0, extraHeat: 0 };
-  updatedRun.phase = node.type === 'CHECKPOINT' ? 'CHECKPOINT' : 'NODE';
+  updatedRun.phase = selectedNode.type === 'CHECKPOINT' ? 'CHECKPOINT' : 'NODE';
 
   const checked = parseSave(next);
   if (!checked.success) return fail(save, 'INVALID_RESULT', checked.error);
-  return { ok: true, save: checked.data, events: [{ type: 'NODE_ENTERED', text: `Переезд ${Math.ceil(travelMs / 1000)} с · топливо −${edge.fuelCost} · узел: ${NODE_TYPE_RU[node.type]}.` }] };
+  return { ok: true, save: checked.data, events: [{ type: 'NODE_ENTERED', text: `Переезд ${Math.ceil(travelMs / 1000)} с · топливо −${edge.fuelCost} · узел: ${NODE_TYPE_RU[selectedNode.type]}.` }] };
 }

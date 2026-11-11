@@ -28,11 +28,12 @@ describe('deterministic sector graph', () => {
     expect(eventIds.has('EV19')).toBe(true);
   });
 
-  it('can generate EV17 and EV24 after their modeled combat effects are supported', () => {
+  it('can generate EV16, EV17 and EV24 after their modeled effects are supported', () => {
     const eventIds = new Set(Array.from({ length: 120 }, (_, index) => {
       const graph = generateSectorGraph({ seed: `combat-event-availability-${index}`, depth: 2, biome: 'B03' });
       return graph.layers.flat().find((node) => node.type === 'EVENT')?.eventId;
     }));
+    expect(eventIds.has('EV16')).toBe(true);
     expect(eventIds.has('EV17')).toBe(true);
     expect(eventIds.has('EV24')).toBe(true);
   });

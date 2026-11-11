@@ -3,6 +3,7 @@ import { createInitialSave } from '../../src/core/save/initial';
 import { createInitialRun } from '../../src/core/run/run';
 import { chooseRunNode } from '../../src/core/run/commands';
 import { resolveCurrentCombat } from '../../src/core/run/combat';
+import { resolveRunEvent } from '../../src/core/run/nodes';
 import { createItem } from '../../src/core/items/items';
 import { Rng } from '../../src/core/rng';
 import { runCargoCapacity, runCargoUnits } from '../../src/core/run/cargo';
@@ -79,6 +80,58 @@ describe('run combat integration', () => {
     const result = resolveCurrentCombat({ ...base, run: legacyRun } as unknown as typeof base, 'legacy-fight');
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.save.run!.pendingCombatEffects).toEqual({ initialTempShield: 0, extraHeat: 0 });
+  });
+
+  it('skips the next ordinary combat without XP, currency, or loot after EV16 A', () => {
+    const base = combatSave('event-skip-combat');
+    const run = base.run!;
+    const eventNode = run.graph.layers[1]![0]!;
+    eventNode.type = 'EVENT';
+    eventNode.eventId = 'EV16';
+    run.currentNodeId = eventNode.id;
+    run.visitedNodeIds = [eventNode.id];
+    run.phase = 'NODE';
+    run.runWallet.CREDITS = 12;
+    const choice = resolveRunEvent({ ...base, run }, { id: 'event-skip-choice', choiceId: 'A' });
+    expect(choice.ok).toBe(true);
+    if (!choice.ok) return;
+    const nextCombat = choice.save.run!.graph.layers[2]![0]!;
+    const entered = chooseRunNode(choice.save, 'event-skip-enter', nextCombat.id);
+    expect(entered.ok).toBe(true);
+    if (!entered.ok) return;
+    const skipped = resolveCurrentCombat(entered.save, 'event-skip-resolve');
+    expect(skipped.ok).toBe(true);
+    if (!skipped.ok) return;
+    expect(skipped.events[0]?.type).toBe('COMBAT_SKIPPED');
+    expect(skipped.save.run).toMatchObject({ phase: 'ROUTE', runWallet: { CREDITS: 0, SCRAP: 0, DATA: 0 }, pendingNextCombat: { skipOrdinary: false, forceElite: false, extraItemRoll: false } });
+    expect(skipped.save.run!.clearedNodeIds).toContain(nextCombat.id);
+    expect(skipped.save.run!.unsecuredCargo).toHaveLength(0);
+    expect(skipped.save.meta.operator.xp).toBe(0);
+  });
+
+  it('promotes the next ordinary combat to elite and guarantees one extra item roll after EV16 B', () => {
+    const base = combatSave('event-force-elite');
+    const run = base.run!;
+    const eventNode = run.graph.layers[1]![0]!;
+    eventNode.type = 'EVENT';
+    eventNode.eventId = 'EV16';
+    run.currentNodeId = eventNode.id;
+    run.visitedNodeIds = [eventNode.id];
+    run.phase = 'NODE';
+    const choice = resolveRunEvent({ ...base, run }, { id: 'event-elite-choice', choiceId: 'B' });
+    expect(choice.ok).toBe(true);
+    if (!choice.ok) return;
+    const nextCombat = choice.save.run!.graph.layers[2]![0]!;
+    const entered = chooseRunNode(choice.save, 'event-elite-enter', nextCombat.id);
+    expect(entered.ok).toBe(true);
+    if (!entered.ok) return;
+    expect(entered.save.run!.graph.layers[2]![0]).toMatchObject({ type: 'ELITE', threat: 'high', enemies: [{ elite: 'EL_PEN' }] });
+    const result = resolveCurrentCombat(entered.save, 'event-elite-resolve');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.save.run!.runWallet.CREDITS).toBe(28);
+    expect(result.save.run!.unsecuredCargo.filter((item) => item.origin === 'combat').length).toBeGreaterThanOrEqual(2);
+    expect(result.save.run!.pendingNextCombat).toEqual({ skipOrdinary: false, forceElite: false, extraItemRoll: false });
   });
 
   it('applies elite rewards, corporate wanted, and biome wallet bonuses through the shared combat result', () => {

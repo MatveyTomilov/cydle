@@ -8,7 +8,7 @@ import type { EncounterEnemySpec } from '../combat/types';
 import type { RoadEdge, RoadGraph, RoadNode } from './types';
 
 const BASE_WIDTHS = [1, 2, 3, 3, 2, 1] as const;
-const supportedNextCombatKeys = new Set(['shieldBonus', 'extraHeat']);
+const supportedNextCombatKeys = new Set(['shieldBonus', 'extraHeat', 'skip', 'forceElite', 'extraRareRoll']);
 const ROAD_EVENTS = EVENTS.filter((event) => !event.choices.some((choice) =>
   choice.flag || choice.reveal || choice.grantMutation
   || Object.keys(choice.nextCombat ?? {}).some((key) => !supportedNextCombatKeys.has(key))
