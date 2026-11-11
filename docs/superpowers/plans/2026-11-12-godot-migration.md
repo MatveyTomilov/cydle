@@ -82,8 +82,10 @@
 - Create: `game/scripts/core/persistence/save_validator.gd`
 - Create: save schema resources and round-trip/fault tests.
 
-- [ ] Implement versioned JSON, checksum, temp/validate/promote, two valid backups, export/import validation, and recovery reporting.
-- [ ] Verify repeat writes, interrupted writes, malformed imports, future schema refusal, and unchanged previous snapshot.
+- [x] Implement versioned JSON, checksum, temp/validate/promote, two valid backups, export/import validation, and recovery reporting.
+- [x] Verify repeat writes, interrupted writes, malformed imports, future schema refusal, and unchanged previous snapshot.
+
+The current repository validates the versioned envelope and JSON-safe payload, but payload-specific game-state rules will be added with the typed META/RUN/COMBAT schema port.
 
 ## Stage 3 — deterministic rules port
 

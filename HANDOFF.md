@@ -12,6 +12,14 @@ Last updated: 2026-11-12
 - Float fixtures use an absolute tolerance of `1e-15` for decimal values; uint32 words and serialized states are exact. A few decimal text literals parse one ULP away from the exact `word / 2^32` value, so the integer/state fixtures remain the strict parity proof.
 - Next implementation task: local versioned save repository (temp write, validation, promotion, backups, import/export, and recovery reporting), with round-trip and fault tests before integrating gameplay.
 
+### Godot Task 3 complete — local save repository foundation
+
+- Added `SaveValidator` and `SaveRepository` under `game/scripts/core/persistence/`. The repository stores versioned JSON in a configurable directory (production default `user://saves`), validates a checksum before and after the temp write, rotates two valid snapshots, promotes through a recoverable swap file, and reports when load selected a backup. Slot IDs are restricted to safe ASCII names.
+- Import validates JSON, schema version, JSON-safe payload, and checksum before touching the destination. Export returns a status plus text. Failed promotion leaves the previous valid snapshot recoverable; tests inject failure after moving the main file and verify the swap copy is found.
+- Headless coverage now includes repeated writes, backup rotation, corruption recovery, import/export, malformed import non-mutation, future-schema refusal, non-finite payload rejection, path traversal rejection, ignored interrupted temp files, and interrupted promotion. Current suite: **3 tests, 58 assertions, 0 failures**.
+- Scope boundary: this is the storage envelope and transaction layer. The nested `payload` is currently generic JSON; typed META/RUN/COMBAT validation and application autosave integration are still required as those domain models are ported. This does not yet implement playable save/progression behavior.
+- Next implementation task: port typed scalar/stat formulas and damage rules from the legacy math modules with golden fixtures; later connect their domain state to this repository's payload schema.
+
 The user's latest instruction supersedes the prior web-game continuation. CYDLE 1.0 is now a native 2D Windows game built in Godot 4.x with strictly typed GDScript. Do not implement more React/Vite/PixiJS product features. Preserve the entire existing TypeScript tree and its tests as legacy/reference and as a source for golden outputs.
 
 - Working directory: `E:\cydle\project`.
@@ -23,7 +31,7 @@ The user's latest instruction supersedes the prior web-game continuation. CYDLE 
 - `godot --headless --path game --editor --quit`: passes import/parse. The Godot editor GUI also starts and exits cleanly in a short launch smoke.
 - `godot --headless --path game --script res://tests/run_tests.gd`: 2 tests pass, 33 assertions pass, 0 failures.
 - `godot --headless --path game --export-release "Windows Desktop" build/CYDLE.exe`: passes; exported executable is ignored by Git. A native 5-frame launch smoke exits with code 0.
-- First implementation task after the Godot shell checkpoint (legacy RNG/state hash with golden fixtures) is complete. The next task is the local versioned save repository.
+- First two Godot foundations (legacy RNG/state hash and the generic local save repository) are complete. The next task is typed stat/math and damage porting.
 - Read next: `CYDLE_MASTER_SPEC.md`, `docs/godot/TECHNICAL_ARCHITECTURE.md`, `docs/godot/ART_BIBLE.md`, `docs/godot/ASSET_PIPELINE.md`, `docs/godot/ASSET_MANIFEST.csv`, `docs/superpowers/plans/2026-11-12-godot-migration.md`, and `docs/ROADMAP.md`.
 - Historical shell setup task after the documentation-only commit: obtain/use pinned Godot 4.7.2, create `game/project.godot` and a typed headless test runner, then verify import/parse and Windows launch. That setup and the subsequent RNG task are complete.
 
