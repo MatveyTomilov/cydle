@@ -75,6 +75,8 @@ export interface RunState {
 export type RunCommand =
   | { id: string; type: 'CHOOSE_NODE'; nodeId: string }
   | { id: string; type: 'RESOLVE_COMBAT' }
+  | { id: string; type: 'BUY_SHOP_ITEM'; stockIndex: number }
+  | { id: string; type: 'RESOLVE_SHOP' }
   | { id: string; type: 'CHOOSE_PROTOTYPE'; templateId: string }
   | { id: string; type: 'EQUIP_ITEM'; itemId: string; slot: EquipSlotId }
   | { id: string; type: 'UNEQUIP_ITEM'; slot: EquipSlotId }

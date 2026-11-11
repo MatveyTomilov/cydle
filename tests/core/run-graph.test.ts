@@ -2,6 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { enumerateSectorPaths, generateSectorGraph } from '../../src/core/run/graph';
 
 describe('deterministic sector graph', () => {
+  it('places one shop node in each regular sector', () => {
+    for (const depth of [2, 3, 5, 8, 12]) {
+      const graph = generateSectorGraph({ seed: `shop-route-${depth}`, depth, biome: 'B01' });
+      expect(graph.layers.flat().filter((node) => node.type === 'SHOP')).toHaveLength(1);
+      expect(graph.layers.flat().find((node) => node.type === 'SHOP')?.lootHint).toContain('5 товаров');
+    }
+  });
+
   it('keeps the authored first-sector tutorial sequence on every route', () => {
     const graph = generateSectorGraph({ seed: 'tutorial-pinned', depth: 1, biome: 'B01', tutorial: true });
     expect(graph.layers.map((layer) => layer.length)).toEqual([1, 2, 3, 3, 2, 1]);

@@ -27,7 +27,7 @@ function makeNode(seed: string, depth: number, layer: number, index: number, typ
     threat: threatFor(type),
     enemies,
     revealLevel: 1,
-    lootHint: type === 'COMBAT' || type === 'ELITE' || type === 'BOUNTY' || type === 'BOSS' ? 'добыча после боя' : type === 'CACHE' ? 'три прототипа' : type === 'REPAIR' || type === 'FUEL' ? 'восстановление ресурсов' : 'неизвестно',
+    lootHint: type === 'COMBAT' || type === 'ELITE' || type === 'BOUNTY' || type === 'BOSS' ? 'добыча после боя' : type === 'CACHE' ? 'три прототипа' : type === 'REPAIR' || type === 'FUEL' ? 'восстановление ресурсов' : type === 'SHOP' ? '5 товаров по биому' : 'неизвестно',
     ...extras,
   };
 }
@@ -104,6 +104,7 @@ export function generateSectorGraph(input: { seed: string; depth: number; biome:
     else if (layer === 5) type = input.depth % 4 === 0 ? 'BOSS' : 'CHECKPOINT';
     else if (layer === 0 || layer === 2) { type = 'COMBAT'; fixed = [enemyFor(input.biome, input.depth, rng)]; }
     else if (layer === 4) type = index % 2 === 0 ? 'REPAIR' : 'FUEL';
+    else if (!tutorial && layer === 3 && index === 1) type = 'SHOP';
     else if (tutorial && layer === 3) type = (['REPAIR', 'FUEL', 'COMBAT'] as const)[index]!;
     else if (tutorial && layer === 4) type = index === 0 ? 'FUEL' : 'REPAIR';
     else {

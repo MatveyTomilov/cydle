@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialSave } from '../../src/core/save/initial';
 import { createInitialRun } from '../../src/core/run/run';
-import { resolveRunCache, resolveRunService } from '../../src/core/run/nodes';
+import { templateOf } from '../../src/core/items/items';
+import { getRunShopStock, resolveRunCache, resolveRunService, resolveRunShop, resolveRunShopPurchase } from '../../src/core/run/nodes';
 
-function nodeSave(type: 'CACHE' | 'REPAIR' | 'FUEL', saveId: string) {
+function nodeSave(type: 'CACHE' | 'REPAIR' | 'FUEL' | 'SHOP', saveId: string) {
   const save = createInitialSave({ saveId, now: 100 });
   const run = createInitialRun(save, `node-${saveId}`);
+  if (type === 'SHOP' && !run.graph.layers.flat().some((candidate) => candidate.type === 'SHOP')) run.graph.layers[1]![0]!.type = 'SHOP';
   const node = run.graph.layers.flat().find((candidate) => candidate.type === type)!;
   return { ...save, run: { ...run, currentNodeId: node.id, visitedNodeIds: [node.id], phase: 'NODE' as const } };
 }
@@ -47,5 +49,46 @@ describe('run caches and road services', () => {
     if (!bought.ok) return;
     expect(bought.save.run!.resources.fuel).toBe(1);
     expect(bought.save.meta.protectedBank.CREDITS).toBe(117);
+  });
+});
+
+describe('run shops', () => {
+  it('offers a deterministic five-item biome stock and buys an item into at-risk cargo', () => {
+    const base = nodeSave('SHOP', 'shop-stock');
+    const node = base.run!.graph.layers.flat().find((candidate) => candidate.type === 'SHOP')!;
+    const run = { ...base.run!, currentNodeId: node.id, visitedNodeIds: [node.id], phase: 'NODE' as const, runWallet: { CREDITS: 100_000, SCRAP: 0, DATA: 0 } };
+    const save = { ...base, run };
+    const stock = getRunShopStock(run);
+    expect(stock).toHaveLength(5);
+    expect(stock.map((entry) => entry.item.templateId)).toEqual(getRunShopStock(run).map((entry) => entry.item.templateId));
+    expect(stock.map((entry) => templateOf(entry.item).category)).toEqual(['MAIN', 'MAIN', 'ARMOR', 'IMPLANT', 'DRONE']);
+
+    const purchase = resolveRunShopPurchase(save, { id: 'shop-buy-0', stockIndex: 0 });
+    expect(purchase.ok).toBe(true);
+    if (!purchase.ok) return;
+    expect(purchase.save.run!.runWallet.CREDITS).toBe(100_000 - stock[0]!.price);
+    expect(purchase.save.run!.unsecuredCargo.at(-1)).toMatchObject({
+      itemId: stock[0]!.item.itemId,
+      templateId: stock[0]!.item.templateId,
+      secured: false,
+      origin: 'shop',
+    });
+    expect(purchase.save.meta.inventory).toHaveLength(save.meta.inventory.length);
+    expect(resolveRunShopPurchase(purchase.save, { id: 'shop-buy-0', stockIndex: 0 })).toMatchObject({ ok: true, save: purchase.save, events: [] });
+    expect(resolveRunShopPurchase(purchase.save, { id: 'shop-buy-again', stockIndex: 0 })).toMatchObject({ ok: false, failureCode: 'STOCK_SOLD' });
+  });
+
+  it('does not use protected credits and only closes the shop once', () => {
+    const base = nodeSave('SHOP', 'shop-payment');
+    const node = base.run!.graph.layers.flat().find((candidate) => candidate.type === 'SHOP')!;
+    const save = { ...base, run: { ...base.run!, currentNodeId: node.id, visitedNodeIds: [node.id], phase: 'NODE' as const } };
+    expect(resolveRunShopPurchase(save, { id: 'shop-no-funds', stockIndex: 0 })).toMatchObject({ ok: false, failureCode: 'INSUFFICIENT_FUNDS' });
+    expect(resolveRunShopPurchase(save, { id: 'shop-invalid', stockIndex: 9 })).toMatchObject({ ok: false, failureCode: 'INVALID_STOCK' });
+
+    const closed = resolveRunShop(save, 'shop-close');
+    expect(closed.ok).toBe(true);
+    if (!closed.ok) return;
+    expect(closed.save.run).toMatchObject({ phase: 'ROUTE', clearedNodeIds: [node.id], resources: { gameTimeMs: 8_000 } });
+    expect(resolveRunShop(closed.save, 'shop-close')).toMatchObject({ ok: true, save: closed.save, events: [] });
   });
 });

@@ -1,4 +1,4 @@
-import { createCore, createItem, rollItem } from '../items/items';
+import { createCore, createItem, rollItem, shopPrice, type ItemInstance } from '../items/items';
 import { R } from '../math/formula';
 import { Rng } from '../rng';
 import { parseSave, type SaveGame } from '../save/schema';
@@ -67,6 +67,73 @@ export function resolveRunCache(save: SaveGame, commandId: string, prototypeId?:
   const checked = parseSave(next);
   if (!checked.success) return fail(save, 'INVALID_RESULT', checked.error);
   return { ok: true, save: checked.data, events: [{ type: 'CACHE_RESOLVED', text: `Тайник: +${Math.ceil(8 * R(run.depth))} кредитов, +${Math.ceil(2 * R(run.depth))} лома${prototypeId ? ` · выбран ${prototypeId} (не закреплён)` : ''}.` }] };
+}
+
+export interface RunShopStockEntry {
+  index: number;
+  grantId: string;
+  item: ItemInstance;
+  price: number;
+}
+
+/** Stock is derived from the run seed and stable node ID, so reloads never reroll a shop. */
+export function getRunShopStock(run: RunState): RunShopStockEntry[] {
+  const node = run.graph.layers.flat().find((candidate) => candidate.id === run.currentNodeId);
+  if (!node || node.type !== 'SHOP') return [];
+  const rng = new Rng('shop', `${run.seed}:${node.id}`);
+  const categories = ['MAIN', 'MAIN', 'ARMOR', 'IMPLANT', 'DRONE'] as const;
+  return categories.map((category, index) => {
+    const grantId = `shop:${run.seed}:${node.id}:${index}`;
+    const { item } = rollItem(rng, {
+      depth: run.depth, biome: run.biome, table: 'ORDINARY', secured: false,
+      grantId, origin: 'shop', forceCategory: category,
+    });
+    item.acquiredAt = run.resources.gameTimeMs;
+    return { index, grantId, item, price: shopPrice(item.templateId, item.techLevel, item.rarity) };
+  });
+}
+
+export function resolveRunShopPurchase(save: SaveGame, command: { id: string; stockIndex: number }): RunCommandResult {
+  const parsed = parseSave(save);
+  if (!parsed.success) return fail(save, 'INVALID_SAVE', parsed.error);
+  const run = save.run;
+  if (!run) return fail(save, 'NO_ACTIVE_RUN', 'Нет активного выезда.');
+  if (!command.id.trim()) return fail(save, 'INVALID_COMMAND_ID', 'Команде требуется стабильный идентификатор.');
+  if (run.commandIds.includes(command.id)) return { ok: true, save, events: [] };
+  const node = currentNode(run);
+  if (!node || node.type !== 'SHOP' || run.phase !== 'NODE' || run.clearedNodeIds.includes(node.id)) return fail(save, 'NODE_NOT_SHOP', 'Покупки доступны только в открытом узле SHOP.');
+  const entry = getRunShopStock(run).find((candidate) => candidate.index === command.stockIndex);
+  if (!entry) return fail(save, 'INVALID_STOCK', 'Такого товара нет в ассортименте этого магазина.');
+  if (run.grantIds.includes(entry.grantId)) return fail(save, 'STOCK_SOLD', 'Этот товар уже куплен в текущем выезде.');
+  if (run.runWallet.CREDITS < entry.price) return fail(save, 'INSUFFICIENT_FUNDS', `Требуется ${entry.price} кредитов из незакреплённого кошелька.`);
+
+  const next = markCommand(save, command.id);
+  const nextRun = next.run!;
+  nextRun.runWallet.CREDITS -= entry.price;
+  nextRun.unsecuredCargo.push(entry.item);
+  nextRun.grantIds.push(entry.grantId);
+  const checked = parseSave(next);
+  if (!checked.success) return fail(save, 'INVALID_RESULT', checked.error);
+  return { ok: true, save: checked.data, events: [{ type: 'SHOP_PURCHASED', text: `${entry.item.templateId} добавлен в незакреплённый груз · −${entry.price} кредитов.` }] };
+}
+
+export function resolveRunShop(save: SaveGame, commandId: string): RunCommandResult {
+  const parsed = parseSave(save);
+  if (!parsed.success) return fail(save, 'INVALID_SAVE', parsed.error);
+  const run = save.run;
+  if (!run) return fail(save, 'NO_ACTIVE_RUN', 'Нет активного выезда.');
+  if (!commandId.trim()) return fail(save, 'INVALID_COMMAND_ID', 'Команде требуется стабильный идентификатор.');
+  if (run.commandIds.includes(commandId)) return { ok: true, save, events: [] };
+  const node = currentNode(run);
+  if (!node || node.type !== 'SHOP' || run.phase !== 'NODE' || run.clearedNodeIds.includes(node.id)) return fail(save, 'NODE_NOT_SHOP', 'Закрыть можно только открытый узел SHOP.');
+  const next = markCommand(save, commandId);
+  const nextRun = next.run!;
+  nextRun.clearedNodeIds = [...nextRun.clearedNodeIds, node.id];
+  nextRun.resources.gameTimeMs += 8_000;
+  nextRun.phase = 'ROUTE';
+  const checked = parseSave(next);
+  if (!checked.success) return fail(save, 'INVALID_RESULT', checked.error);
+  return { ok: true, save: checked.data, events: [{ type: 'SHOP_RESOLVED', text: 'Магазин закрыт · потрачено 8 секунд.' }] };
 }
 
 function pay(save: SaveGame, run: RunState, currency: Currency, cost: number, spendProtected: boolean): boolean {

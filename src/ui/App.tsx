@@ -8,7 +8,7 @@ import { validateCatalog } from '../data/validate';
 import { createInitialRun } from '../core/run/run';
 import { chooseRunNode } from '../core/run/commands';
 import { resolveCurrentCombat } from '../core/run/combat';
-import { resolveRunCache, resolveRunService } from '../core/run/nodes';
+import { getRunShopStock, resolveRunCache, resolveRunService, resolveRunShop, resolveRunShopPurchase } from '../core/run/nodes';
 import { resolveRunCheckpoint } from '../core/run/checkpoint';
 import { equipRunItem, unequipRunSlot } from '../core/run/inventory';
 import { calibrateGarageItem, craftGarageAffix, dismantleGarageItem, equipGarageItem, garageRepairCost, repairGarageItem, unequipGarageSlot } from '../core/inventory/garage';
@@ -275,6 +275,10 @@ function RoadScreen({ save, busy, onResult, onReturn, onNewRun, commandId }: {
         {current.type === 'CACHE' && <div className="prototype-grid">{(current.prototypeChoices ?? []).map((templateId) => <button className="route-card prototype-card" key={templateId} disabled={busy} onClick={() => dispatch(resolveRunCache(save, commandId(), templateId))}><strong>{itemName(templateId)}</strong><small>{templateId} · выбор закрепится при отправке или эвакуации</small></button>)}</div>}
         {current.type === 'REPAIR' && <div className="action-row">{actionButton('ВОССТАНОВИТЬ КОРПУС', () => dispatch(resolveRunService(save, { id: commandId(), choice: 'REPAIR_HULL', spendProtected })))}{actionButton('ВОССТАНОВИТЬ HP', () => dispatch(resolveRunService(save, { id: commandId(), choice: 'REPAIR_HP', spendProtected })), true)}</div>}
         {current.type === 'FUEL' && actionButton('КУПИТЬ 1 ЕД. ТОПЛИВА · КРЕДИТЫ', () => dispatch(resolveRunService(save, { id: commandId(), choice: 'BUY_FUEL', currency: 'CREDITS', spendProtected })))}
+        {current.type === 'SHOP' && <><div className="prototype-grid shop-stock">{getRunShopStock(run).map((entry) => {
+          const sold = run.grantIds.includes(entry.grantId);
+          return <article className="route-card prototype-card" key={entry.grantId}><strong>{itemName(entry.item.templateId)}</strong><small>{entry.item.rarity} · T{entry.item.techLevel} · {entry.item.templateId}</small><b>{entry.price} ₡</b>{actionButton(sold ? 'ПРОДАНО' : 'КУПИТЬ', () => dispatch(resolveRunShopPurchase(save, { id: commandId(), stockIndex: entry.index })), true)}</article>;
+        })}</div>{actionButton('ЗАВЕРШИТЬ ПОКУПКИ · 8 СЕК', () => dispatch(resolveRunShop(save, commandId())))}</>}
         {(current.type === 'REPAIR' || current.type === 'FUEL') && <label className="protected-spend"><input type="checkbox" checked={spendProtected} onChange={(event) => setSpendProtected(event.target.checked)} /> разрешить оплату из защищённого банка</label>}
       </div>}
       {run.phase === 'CHECKPOINT' && <div className="checkpoint-panel"><span className="eyebrow">КОНТРОЛЬНЫЙ УЗЕЛ</span><h3>Добыча сектора под защитой решения</h3><p>Эвакуация защищает всё. Отправка стоит {Math.ceil(10 * (1 + 0.06 * (run.depth - 1)) ** 1.4)} кредитов и сохраняет выезд активным. Продолжение открывает следующий сектор.</p>
