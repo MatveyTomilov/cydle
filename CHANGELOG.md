@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Enabled EV16's two encounter choices. Paying skips the next ordinary COMBAT without XP or loot; fighting transforms the next selected ordinary COMBAT into an ELITE and grants one extra item roll. The pending effect persists across service/checkpoint nodes and clears after the next combat encounter.
+- Added regression tests for EV16 currency cost, zero-reward skip, forced elite node/reward behavior, and deterministic generated event availability.
 - Enabled EV17 and EV24 after wiring their `extraHeat` and `shieldBonus` values to the shared combat simulator. Pending values are saved in run state, logged in `COMBAT_START`, consumed after one combat attempt, and default to zero on legacy active saves. Generated events continue to exclude unsupported deferred effects.
 - Added regression coverage for EV17/EV24 choices, map eligibility, combat delivery and consumption, plus legacy route/event/combat commands that omit newer state fields.
 - Enabled EV19 in generated road maps and applied its signed travel-time effects to exactly the next successfully chosen edge. Effects persist within an active run, clamp total travel time at zero, reset after use, and default to zero when older active saves lack the field.
