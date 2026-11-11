@@ -11,9 +11,9 @@ import { resolveCurrentCombat } from '../core/run/combat';
 import { resolveRunCache, resolveRunService } from '../core/run/nodes';
 import { resolveRunCheckpoint } from '../core/run/checkpoint';
 import { equipRunItem, unequipRunSlot } from '../core/run/inventory';
-import { craftGarageAffix, dismantleGarageItem, equipGarageItem, garageRepairCost, repairGarageItem, unequipGarageSlot } from '../core/inventory/garage';
-import { affixName, craftOperationCost, dismantleValue, templateOf } from '../core/items/items';
-import { AFFIX_BY_ID, tierForTech } from '../data/affixes';
+import { calibrateGarageItem, craftGarageAffix, dismantleGarageItem, equipGarageItem, garageRepairCost, repairGarageItem, unequipGarageSlot } from '../core/inventory/garage';
+import { affixName, calibrationCost, coreGroupForDepth, craftOperationCost, dismantleValue, templateOf } from '../core/items/items';
+import { AFFIXES, AFFIX_BY_ID, RARITY_AFFIX_COUNT, tierForTech } from '../data/affixes';
 import type { RunCommandResult, RunState } from '../core/run/types';
 import { IMPLANT_SLOT_TYPES, NODE_TYPE_RU, type EquipSlotId, type ItemCategory } from '../core/types';
 
@@ -327,6 +327,9 @@ function BuildScreen({ save, buildValid, busy, onResult }: { save: SaveGame; bui
 function InventoryScreen({ save, busy, onResult }: { save: SaveGame; busy: boolean; onResult: (result: RunCommandResult) => void }) {
   const equipped = new Map(Object.entries(save.meta.equipment).map(([slot, itemId]) => [itemId, slot]));
   const activeRun = !!save.run && !['EXTRACTED', 'DEFEATED'].includes(save.run.phase);
+  const [replacementIds, setReplacementIds] = useState<Record<string, string>>({});
+  const [addAffixIds, setAddAffixIds] = useState<Record<string, string>>({});
+  const [calibrationTargets, setCalibrationTargets] = useState<Record<string, number>>({});
   function confirmDismantle(item: SaveGame['meta']['inventory'][number]) {
     const template = templateOf(item);
     const value = dismantleValue(item);
@@ -342,7 +345,17 @@ function InventoryScreen({ save, busy, onResult }: { save: SaveGame; busy: boole
       const repairCost = garageRepairCost(item);
       const rerollCost = craftOperationCost('REROLL', item.techLevel);
       const tierCost = craftOperationCost('TIER_UP', item.techLevel);
+      const replaceCost = craftOperationCost('REPLACE', item.techLevel);
+      const addCost = craftOperationCost('ADD', item.techLevel);
       const material = template.category === 'MATERIAL';
+      const maxAffixes = RARITY_AFFIX_COUNT[item.rarity]![1];
+      const freeAffixes = item.affixes.length < maxAffixes ? AFFIXES.filter((definition) => definition.slots.includes(template.category) && !item.affixes.some((affix) => affix.affixId === definition.id)) : [];
+      const selectedAddAffix = addAffixIds[item.itemId] ?? '';
+      const maxTechLevel = Math.max(4, save.meta.unlockedForpost);
+      const requestedTarget = calibrationTargets[item.itemId];
+      const targetTechLevel = requestedTarget && requestedTarget > item.techLevel ? requestedTarget : Math.min(maxTechLevel, item.techLevel + 1);
+      const techCost = targetTechLevel > item.techLevel ? calibrationCost(item, targetTechLevel) : null;
+      const matchingCores = techCost ? save.meta.inventory.filter((candidate) => candidate.secured && templateOf(candidate).category === 'MATERIAL' && candidate.coreGroup === techCost.coreGroup).length : 0;
       const yieldText = [`${value.scrap} металлолома`, ...(value.data ? [`${value.data} данных`] : [])].join(' · ');
       const cannotRepair = busy || activeRun || item.durability >= 100 || save.meta.protectedBank.SCRAP < repairCost;
       return <article className="inventory-item" key={item.itemId}>
@@ -353,11 +366,18 @@ function InventoryScreen({ save, busy, onResult }: { save: SaveGame; busy: boole
           const atTierCap = affix.tier >= tierForTech(item.techLevel);
           const rerollDisabled = busy || activeRun || item.tr < rerollCost.tr || save.meta.protectedBank.SCRAP < rerollCost.scrap || save.meta.protectedBank.DATA < rerollCost.data || fixed;
           const tierDisabled = busy || activeRun || item.tr < tierCost.tr || save.meta.protectedBank.SCRAP < tierCost.scrap || save.meta.protectedBank.DATA < tierCost.data || atTierCap;
+          const replaceChoices = AFFIXES.filter((definition) => definition.slots.includes(template.category) && definition.id !== affix.affixId && !item.affixes.some((other, otherIndex) => otherIndex !== affixIndex && other.affixId === definition.id));
+          const key = `${item.itemId}:${affixIndex}`;
+          const selectedReplacement = replacementIds[key] ?? '';
+          const replaceDisabled = busy || activeRun || item.tr < replaceCost.tr || save.meta.protectedBank.DATA < replaceCost.data || !selectedReplacement;
           return <div className="inventory-affix" key={`${affix.affixId}-${affixIndex}`}><span>{affixName(affix)} <small>{affix.value} · T{affix.tier}{fixed ? ' · ФИКС' : ''}</small></span>
             <button className="craft-mini" disabled={rerollDisabled} title={fixed ? 'Фиксированный аффикс нельзя перекатывать.' : item.tr < rerollCost.tr ? `Нужно ${rerollCost.tr} TR.` : `Цена: ${rerollCost.tr} TR · ${rerollCost.scrap} металлолома.`} onClick={() => onResult(craftGarageAffix(save, { itemId: item.itemId, operation: 'REROLL', affixIndex, seed: globalThis.crypto.randomUUID() }))}>ROLL · {rerollCost.tr} TR / {rerollCost.scrap}▧</button>
             <button className="craft-mini" disabled={tierDisabled} title={atTierCap ? 'Достигнут предел для TechLevel.' : item.tr < tierCost.tr ? `Нужно ${tierCost.tr} TR.` : `Цена: ${tierCost.tr} TR · ${tierCost.scrap} металлолома · ${tierCost.data} данных.`} onClick={() => onResult(craftGarageAffix(save, { itemId: item.itemId, operation: 'TIER_UP', affixIndex, seed: globalThis.crypto.randomUUID() }))}>TIER+ · {tierCost.tr} TR / {tierCost.scrap}▧ / {tierCost.data}⌘</button>
+            <select className="craft-select" aria-label={`Новый аффикс для ${affixName(affix)}`} value={selectedReplacement} disabled={busy || activeRun || !replaceChoices.length} onChange={(event) => setReplacementIds((current) => ({ ...current, [key]: event.target.value }))}><option value="">ЗАМЕНИТЬ · {replaceCost.tr} TR / {replaceCost.data}⌘</option>{replaceChoices.map((definition) => <option key={definition.id} value={definition.id}>{definition.name}</option>)}</select>
+            <button className="craft-mini" disabled={replaceDisabled} title={`Цена: ${replaceCost.tr} TR · ${replaceCost.data} данных.`} onClick={() => { onResult(craftGarageAffix(save, { itemId: item.itemId, operation: 'REPLACE', affixIndex, replacementAffixId: selectedReplacement, seed: globalThis.crypto.randomUUID() })); setReplacementIds((current) => ({ ...current, [key]: '' })); }}>ЗАМЕНИТЬ</button>
           </div>;
-        })}</div>}
+        })}{freeAffixes.length > 0 && <div className="inventory-add-affix"><select className="craft-select" aria-label={`Добавить аффикс · ${template.name}`} value={selectedAddAffix} disabled={busy || activeRun} onChange={(event) => setAddAffixIds((current) => ({ ...current, [item.itemId]: event.target.value }))}><option value="">ДОБАВИТЬ АФФИКС · {addCost.tr} TR / {addCost.scrap}▧ / {addCost.data}⌘</option>{freeAffixes.map((definition) => <option key={definition.id} value={definition.id}>{definition.name}</option>)}</select><button className="craft-mini" disabled={busy || activeRun || !selectedAddAffix || item.tr < addCost.tr || save.meta.protectedBank.SCRAP < addCost.scrap || save.meta.protectedBank.DATA < addCost.data} title={`Цена: ${addCost.tr} TR · ${addCost.scrap} металлолома · ${addCost.data} данных.`} onClick={() => { onResult(craftGarageAffix(save, { itemId: item.itemId, operation: 'ADD', affixId: selectedAddAffix, seed: globalThis.crypto.randomUUID() })); setAddAffixIds((current) => ({ ...current, [item.itemId]: '' })); }}>ДОБАВИТЬ</button></div>}</div>}
+        {!material && item.techLevel < maxTechLevel && techCost && <div className="inventory-calibration"><span>КАЛИБРОВКА · ОТКРЫТО ДО T{maxTechLevel}</span><select className="craft-select" aria-label={`TechLevel калибровки · ${template.name}`} value={targetTechLevel} disabled={busy || activeRun} onChange={(event) => setCalibrationTargets((current) => ({ ...current, [item.itemId]: Number(event.target.value) }))}>{Array.from({ length: maxTechLevel - item.techLevel }, (_, index) => item.techLevel + index + 1).map((target) => <option key={target} value={target}>T{target} · {calibrationCost(item, target).cores} ядро гр. {coreGroupForDepth(target)} · {calibrationCost(item, target).scrap}▧ / {calibrationCost(item, target).data}⌘</option>)}</select><button className="craft-mini" disabled={busy || activeRun || save.meta.protectedBank.SCRAP < techCost.scrap || save.meta.protectedBank.DATA < techCost.data || matchingCores < techCost.cores} title={matchingCores < techCost.cores ? `Нужно ${techCost.cores} ядро группы ${techCost.coreGroup}, доступно ${matchingCores}.` : `Стоимость: ${techCost.cores} ядро группы ${techCost.coreGroup}, ${techCost.scrap} металлолома, ${techCost.data} данных.`} onClick={() => onResult(calibrateGarageItem(save, item.itemId, targetTechLevel))}>ПОДНЯТЬ T{targetTechLevel}</button><small>Ядра группы {techCost.coreGroup}: {matchingCores}</small></div>}
         <div className="inventory-item-action"><small>РЕМОНТ · {repairCost} SCRAP<br/>РАЗБОР · {yieldText}</small><button className="secondary-button" disabled={cannotRepair} title={item.durability >= 100 ? 'Прочность уже полная.' : save.meta.protectedBank.SCRAP < repairCost ? `Нужно ${repairCost} металлолома.` : undefined} onClick={() => onResult(repairGarageItem(save, item.itemId))}>{item.durability >= 100 ? 'ИСПРАВНО' : 'РЕМОНТ'}</button><button className="secondary-button" disabled={busy || activeRun || !!slot || material} title={slot ? 'Сначала снимите предмет в разделе «Сборка».' : material ? 'Материалы нельзя разбирать.' : undefined} onClick={() => confirmDismantle(item)}>{material ? 'МАТЕРИАЛ' : slot ? 'ЭКИПИРОВАНО' : 'РАЗОБРАТЬ'}</button></div>
       </article>;
     })}</div></section>
