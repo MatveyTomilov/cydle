@@ -73,7 +73,10 @@ export interface CombatActor {
   abilityNext: Record<string, number>;
   alive: boolean;
   baseSheet: StatSheet;
+  baseMods: Modifier[];
   runtimeMods: Modifier[];
+  effSheet?: StatSheet;
+  effFingerprint?: string;
   ownerId?: string;
   eliteMod?: string;
   noLoot?: boolean;

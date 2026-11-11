@@ -11,13 +11,17 @@ import type { BossTemplate, EnemyTemplate } from '../../data/types';
 import type { ResolvedBuild } from '../build/build';
 import { D, H, TICK_MS, attackIntervalMs, clamp, finite } from '../math/formula';
 import {
-  mitigatePacket, partitionDamage, pCrit, pHit,
+  mitigatePacket, partitionDamage, pCrit, pHit, ZERO_PEN,
   type DefenseSnapshot, type PenetrationSnapshot,
 } from '../math/damage';
-import { emptySheet, type StatSheet } from '../math/stats';
+import {
+  bundle, conditionSignature, emptySheet, mod, resolveStats, sheetOf,
+  type ActorView, type Modifier, type StatContext, type StatSheet,
+} from '../math/stats';
 import { Rng, hashString, stableStringify, type SerializedRng } from '../rng';
+import { STATUS_DEFS } from './status';
 import type { CombatActor, CombatConfig, CombatEvent, CombatEventKind, CombatMetrics, CombatResult, DeathReport, TacticalProfile } from './types';
-import type { DamageType, NodeType } from '../types';
+import type { DamageType, NodeType, StatusId } from '../types';
 
 export const COMBAT_RULES_VERSION = 'cydle-combat-1.0';
 export const MAX_LOG_EVENTS = 5000;
@@ -83,7 +87,7 @@ function baseActor(partial: Partial<CombatActor> & Pick<CombatActor, 'id' | 'kin
     heatLockout: false, lockoutUntil: 0,
     statuses: {}, buffs: [], cooldowns: {}, cast: null, channelBusy: {},
     nextAttackAt: 0, flags: {}, counters: {}, icds: {}, oncePerCombat: {}, abilityNext: {},
-    alive: true, baseSheet: emptySheet(), runtimeMods: [],
+    alive: true, baseSheet: emptySheet(), baseMods: [], runtimeMods: [],
     damageDealt: 0, damageTaken: 0, threatUnits: 1,
     attackDamage: 0, attackIntervalMs: 1000, attackType: 'KINETIC',
     accuracyBase: 100, procMultiplier: 1,
@@ -109,6 +113,13 @@ function enemySheet(t: EnemyTemplate, depth: number, extraDigitalBonus: number):
   return sheet;
 }
 
+/** Базовый лист врага/дрона как OVERRIDE-модификаторы — чтобы effectiveSheet
+ *  пересчитывался тем же pipeline, что и билд оператора. */
+const OVERRIDE_STATS = ['maxHP', 'maxShield', 'armor', 'energyRes', 'digitalRes', 'evasion', 'accuracy', 'critChance', 'critMultiplier'] as const;
+function sheetOverrideMods(sheet: StatSheet, source: { id: string; name: string; kind: 'enemy' | 'item' }): Modifier[] {
+  return OVERRIDE_STATS.map((stat) => mod(stat, 'OVERRIDE', sheet[stat], source, { id: `${source.id}:base:${stat}` }));
+}
+
 function createEnemyActor(spec: { templateId: string; hpMult?: number; damageMult?: number; summoned?: boolean; noLoot?: boolean; elite?: string }, index: number, depth: number, extraDigitalBonus: number): CombatActor {
   const t = enemyTemplate(spec.templateId);
   if (!t) throw new Error(`Неизвестный шаблон врага: ${spec.templateId}`);
@@ -119,6 +130,7 @@ function createEnemyActor(spec: { templateId: string; hpMult?: number; damageMul
     templateId: t.id, name: t.name, isBoss: t.role === 'boss',
     isMechanical: t.mechanical, isHealer: t.healer,
     hp, shield: sheet.maxShield, baseSheet: sheet,
+    baseMods: sheetOverrideMods(sheet, { id: `enemy:${t.id}`, name: t.name, kind: 'enemy' }),
     attackDamage: t.damage * D(depth) * (spec.damageMult ?? 1),
     attackIntervalMs: t.intervalMs, attackType: t.type,
     accuracyBase: sheet.accuracy, threatUnits: t.threatUnits,
@@ -140,7 +152,7 @@ function createOperator(build: ResolvedBuild, config: CombatConfig): CombatActor
     shield: sheet.maxShield * clamp(config.startShieldFraction ?? 1, 0, 1),
     energy: clamp(config.startEnergy ?? 0, 0, sheet.maxEnergy),
     heat: clamp((config.startHeat ?? 0) + (config.initialExtraHeat ?? 0), 0, sheet.maxHeat),
-    baseSheet: sheet,
+    baseSheet: sheet, baseMods: build.modifiers,
     attackDamage: weapon.damage,
     attackIntervalMs: attackIntervalMs(weapon.intervalMs, sheet.attackSpeed, sheet.moreAttackSpeed),
     attackType: weapon.type,
@@ -172,6 +184,7 @@ function createDroneActor(build: ResolvedBuild, index: number, config: CombatCon
     templateId: drone.templateId, name: droneName,
     hp: clamp(hpOverride ?? sheet.maxHP, 0, sheet.maxHP),
     shield: sheet.maxShield, baseSheet: sheet,
+    baseMods: sheetOverrideMods(sheet, { id: `drone:${drone.templateId}`, name: droneName, kind: 'item' }),
     attackDamage: drone.damage,
     attackIntervalMs: attackIntervalMs(drone.intervalMs, owner.droneAttackSpeed, 1),
     attackType: drone.type,
@@ -276,12 +289,98 @@ function emit(
   return event;
 }
 
-function defenseOf(actor: CombatActor): DefenseSnapshot {
-  return { armor: actor.baseSheet.armor, energyRes: actor.baseSheet.energyRes, digitalRes: actor.baseSheet.digitalRes };
+/* ------------------------------------------------------------------ */
+/* Эффективные характеристики и статусы                                */
+/* ------------------------------------------------------------------ */
+
+export function statusStacks(actor: CombatActor, id: StatusId): number {
+  const arr = actor.statuses[id];
+  if (!arr) return 0;
+  let n = 0;
+  for (const e of arr) n += e.stacks;
+  return n;
 }
 
-function penOf(actor: CombatActor): PenetrationSnapshot {
+export function hasStatus(actor: CombatActor, id: StatusId): boolean {
+  return (actor.statuses[id]?.length ?? 0) > 0;
+}
+
+function actorView(actor: CombatActor): ActorView {
   const s = actor.baseSheet;
+  const statuses: Partial<Record<StatusId, number>> = {};
+  for (const key of Object.keys(actor.statuses) as StatusId[]) statuses[key] = statusStacks(actor, key);
+  return {
+    hp: actor.hp, maxHP: s.maxHP, shield: actor.shield, maxShield: s.maxShield,
+    energy: actor.energy, heat: actor.heat, statuses,
+    isBoss: actor.isBoss, isMechanical: actor.isMechanical, isDrone: actor.kind === 'drone',
+  };
+}
+
+function combatContext(state: CombatState, actor: CombatActor): StatContext {
+  return {
+    self: actorView(actor),
+    enemiesAlive: actor.side === 'player' ? livingEnemies(state).length : livingPlayerSide(state).length,
+    dronesAlive: state.drones.filter((d) => d.alive).length,
+    timeMs: state.timeMs,
+    heatLockout: actor.heatLockout,
+    flags: actor.flags,
+  };
+}
+
+/** Статусы, отображаемые в лист характеристик через единый pipeline. */
+function statusMods(actor: CombatActor): Modifier[] {
+  const out: Modifier[] = [];
+  const src = (id: string, name: string) => ({ id, name, kind: 'status' as const });
+  const ab = statusStacks(actor, 'ARMOR_BREAK');
+  if (ab > 0) out.push(mod('armor', 'FLAT', -10 * ab, src('status:ARMOR_BREAK', 'Разлом брони'), { id: 'status:ARMOR_BREAK:armor' }));
+  if (hasStatus(actor, 'GUARD')) out.push(mod('incomingKinetic', 'LESS', 0.2, src('status:GUARD', 'Дефлектор'), { id: 'status:GUARD:ink' }));
+  const ov = statusStacks(actor, 'OVERCLOCK');
+  if (ov > 0) out.push(mod('attackSpeed', 'INCREASED', 20 * ov, src('status:OVERCLOCK', 'Форсаж'), { id: 'status:OVERCLOCK:as' }));
+  if (hasStatus(actor, 'ACC_BUFF')) out.push(mod('accuracy', 'FLAT', 8, src('status:ACC_BUFF', 'Пристрелка'), { id: 'status:ACC_BUFF:acc' }));
+  if (hasStatus(actor, 'EVASION_BUFF')) out.push(mod('evasion', 'INCREASED', 20, src('status:EVASION_BUFF', 'Предвидение'), { id: 'status:EVASION_BUFF:eva' }));
+  if (hasStatus(actor, 'SHIELD_REGEN_BUFF')) out.push(mod('shieldRegen', 'FLAT', 10, src('status:SHIELD_REGEN_BUFF', 'Щитовой отклик'), { id: 'status:SHIELD_REGEN_BUFF:regen' }));
+  return out;
+}
+
+function buffMods(actor: CombatActor): Modifier[] {
+  const out: Modifier[] = [];
+  for (const b of actor.buffs) for (const m of b.mods) out.push(m);
+  return out;
+}
+
+/**
+ * Эффективный лист: базовые модификаторы + runtime + баффы + статусы,
+ * пересчитанные тем же resolveStats с боевым контекстом. Кешируется по
+ * fingerprint активных условий/стеков. Без runtime-надстроек — baseSheet.
+ */
+function eff(state: CombatState, actor: CombatActor): StatSheet {
+  const hasExtras = actor.runtimeMods.length > 0 || actor.buffs.length > 0 || Object.keys(actor.statuses).length > 0;
+  if (!hasExtras) return actor.baseSheet;
+  const mods = [...actor.baseMods, ...actor.runtimeMods, ...buffMods(actor), ...statusMods(actor)];
+  const ctx = combatContext(state, actor);
+  const statusSig = (Object.keys(actor.statuses) as StatusId[]).sort().map((k) => `${k}:${statusStacks(actor, k)}`).join(',');
+  const buffSig = actor.buffs.map((b) => `${b.id}x${b.stacks}`).sort().join(',');
+  const rtSig = actor.runtimeMods.map((m) => m.id).sort().join(',');
+  const fingerprint = `${conditionSignature(mods, ctx)}|${statusSig}|${buffSig}|${rtSig}`;
+  if (actor.effSheet && actor.effFingerprint === fingerprint) return actor.effSheet;
+  const sheet = sheetOf(resolveStats(bundle(mods), ctx));
+  actor.effSheet = sheet;
+  actor.effFingerprint = fingerprint;
+  return sheet;
+}
+
+/** Публичный доступ к эффективному листу актора (Build Lab / тесты). */
+export function effectiveSheet(state: CombatState, actor: CombatActor): StatSheet {
+  return eff(state, actor);
+}
+
+function defenseOf(state: CombatState, actor: CombatActor): DefenseSnapshot {
+  const s = eff(state, actor);
+  return { armor: s.armor, energyRes: s.energyRes, digitalRes: s.digitalRes };
+}
+
+function penOf(state: CombatState, actor: CombatActor): PenetrationSnapshot {
+  const s = eff(state, actor);
   return {
     armorPen: s.armorPen, armorPenPercent: s.armorPenPercent,
     energyPen: s.energyPen, energyPenPercent: s.energyPenPercent,
@@ -291,7 +390,7 @@ function penOf(actor: CombatActor): PenetrationSnapshot {
 
 /** Множитель исходящего урона оператора/дрона по типу и каналу. */
 function outgoingMultiplier(state: CombatState, actor: CombatActor, type: DamageType, isMain: boolean): number {
-  const s = actor.baseSheet;
+  const s = eff(state, actor);
   const typeIncreased = type === 'KINETIC' ? s.kineticDamage : type === 'ENERGY' ? s.energyDamage : s.digitalDamage;
   let mult = (1 + typeIncreased / 100) * (1 + s.allDamage / 100);
   if (isMain) mult *= 1 + s.mainDamage / 100;
@@ -299,14 +398,156 @@ function outgoingMultiplier(state: CombatState, actor: CombatActor, type: Damage
   const typeMore = type === 'KINETIC' ? s.moreKinetic : type === 'ENERGY' ? s.moreEnergy : s.moreDigital;
   mult *= typeMore * s.moreDirect;
   if (isMain) mult *= s.moreMain;
-  void state;
+  const berserk = statusStacks(actor, 'BERSERK');
+  if (berserk > 0) mult *= 1 + 0.15 * berserk;
+  if (hasStatus(actor, 'CONTROLLED')) mult *= 0.4;
+  if (actor.kind === 'drone' && hasStatus(actor, 'DRONE_JAM')) mult *= 0.5;
   return mult;
 }
 
-function incomingMultiplier(target: CombatActor, type: DamageType): number {
-  const s = target.baseSheet;
+function incomingMultiplier(state: CombatState, target: CombatActor, type: DamageType): number {
+  const s = eff(state, target);
   const typeMult = type === 'KINETIC' ? s.incomingKinetic : type === 'ENERGY' ? s.incomingEnergy : s.incomingDigital;
   return s.incomingAll * typeMult;
+}
+
+/** Скорость действий: SHOCK −30%, DRONE_JAM у дрона −50%. */
+function actionSpeedMult(actor: CombatActor): number {
+  let m = 1;
+  if (hasStatus(actor, 'SHOCK')) m *= 0.7;
+  if (actor.kind === 'drone' && hasStatus(actor, 'DRONE_JAM')) m *= 0.5;
+  return m;
+}
+
+export interface ApplyStatusOpts {
+  stacks?: number;
+  durationMs?: number;
+  snapshot?: number;
+  causeId?: number;
+  actionId?: string;
+}
+
+/** Наложение статуса: snapshot DoT в момент наложения, независимые стеки/refresh, ICD STUN. */
+export function applyStatus(state: CombatState, source: CombatActor, target: CombatActor, statusId: StatusId, opts: ApplyStatusOpts = {}): void {
+  if (!target.alive) return;
+  const def = STATUS_DEFS[statusId];
+  if (!def) return;
+  const srcSheet = eff(state, source);
+  const stacks = Math.max(1, Math.floor(opts.stacks ?? 1));
+  let duration = opts.durationMs ?? def.durationMs;
+  if (def.tickMs) duration *= 1 + (srcSheet.dotDuration + (statusId === 'VIRUS' ? srcSheet.virusDuration : 0)) / 100;
+  if (statusId === 'STUN') {
+    if ((target.icds['STUN'] ?? 0) > state.timeMs) return;
+    target.icds['STUN'] = state.timeMs + 3000;
+    if (target.isBoss) duration *= 0.5;
+  }
+  let snapshot = 0;
+  if (def.snapshotFrom === 'rawDamage') {
+    snapshot = (opts.snapshot ?? 0) * (1 + (srcSheet.statusDamage + (statusId === 'BLEED' ? srcSheet.bleedDamage : 0)) / 100);
+  } else if (def.snapshotFrom === 'techPower') {
+    snapshot = srcSheet.techPower * (1 + srcSheet.statusDamage / 100) * (1 + srcSheet.virusDamage / 100);
+  }
+  let maxStacks = def.maxStacks;
+  if (statusId === 'BLEED') maxStacks += Math.floor(srcSheet.bleedStackCap);
+  if (statusId === 'VIRUS') maxStacks += Math.floor(srcSheet.virusStackCap);
+
+  const arr = target.statuses[statusId] ?? (target.statuses[statusId] = []);
+  if (def.independentStacks) {
+    for (let i = 0; i < stacks; i++) {
+      if (arr.length >= maxStacks) arr.shift();
+      arr.push({
+        sourceId: `${source.id}:${statusId}`, sourceActorId: source.id,
+        expiresAt: state.timeMs + duration, nextTickAt: state.timeMs + (def.tickMs ?? duration),
+        snapshot, stacks: 1,
+      });
+    }
+  } else {
+    const existing = arr[0];
+    if (existing) {
+      existing.stacks = clamp(existing.stacks + stacks, 1, maxStacks);
+      existing.expiresAt = state.timeMs + duration;
+      existing.sourceActorId = source.id;
+      if (def.tickMs) existing.snapshot = snapshot;
+    } else {
+      arr.push({
+        sourceId: `${source.id}:${statusId}`, sourceActorId: source.id,
+        expiresAt: state.timeMs + duration, nextTickAt: state.timeMs + (def.tickMs ?? duration),
+        snapshot, stacks: clamp(stacks, 1, maxStacks),
+      });
+    }
+  }
+  if (statusId === 'MARK') target.markBy = source.id;
+  emit(state, 'STATUS_APPLY', source.id, {
+    targetId: target.id, statusId, causeId: opts.causeId, actionId: opts.actionId,
+    text: `${target.name}: ${def.name}${def.independentStacks ? ` ×${arr.length}` : ''}.`,
+    data: { stacks: statusStacks(target, statusId), snapshot, durationMs: duration },
+  });
+}
+
+const DOT_IDS: StatusId[] = ['BLEED', 'BURN', 'VIRUS'];
+
+/** Периодический урон статусов: snapshot × доля × стеки, резисты цели на каждом тике, без crit/on-hit. */
+function tickStatuses(state: CombatState): void {
+  for (const actor of allActors(state)) {
+    if (!actor.alive) continue;
+    for (const id of DOT_IDS) {
+      const arr = actor.statuses[id];
+      if (!arr) continue;
+      const def = STATUS_DEFS[id];
+      if (!def.tickMs || !def.damageType) continue;
+      for (const entry of arr) {
+        if (entry.nextTickAt > state.timeMs) continue;
+        entry.nextTickAt += def.tickMs;
+        const raw = entry.snapshot * (def.tickFraction ?? 0) * entry.stacks;
+        if (raw <= 0) continue;
+        const mitigated = mitigatePacket(raw, def.damageType, defenseOf(state, actor), ZERO_PEN);
+        const incoming = mitigated.afterDefense * incomingMultiplier(state, actor, def.damageType);
+        const partition = partitionDamage(incoming, { hp: actor.hp, shield: actor.shield, temp: actor.tempShields }, 0, eff(state, actor).incomingShield);
+        applyPartition(actor, partition);
+        actor.flags.lastDamagedAt = state.timeMs;
+        state.metrics.statusTicks++;
+        const dealt = partition.shieldConsumed + partition.hpLost;
+        actor.damageTaken += dealt;
+        const source = actorById(state, entry.sourceActorId);
+        if (source) source.damageDealt += dealt;
+        if (source?.side === 'player') {
+          state.metrics.damageDealt += dealt;
+          state.metrics.damageByType[def.damageType] += incoming;
+          state.metrics.damageBySource[entry.sourceActorId] = (state.metrics.damageBySource[entry.sourceActorId] ?? 0) + dealt;
+          state.metrics.shieldAbsorbed += partition.shieldConsumed;
+        } else {
+          state.metrics.damageTaken += dealt;
+          state.metrics.takenBySource[entry.sourceActorId] = (state.metrics.takenBySource[entry.sourceActorId] ?? 0) + dealt;
+          if (actor.kind === 'operator') state.metrics.hpLost += partition.hpLost;
+        }
+        emit(state, 'DOT_TICK', entry.sourceActorId, {
+          targetId: actor.id, statusId: id, damageType: def.damageType,
+          amountBeforeDefense: raw, amountAfterDefense: incoming,
+          shieldConsumed: partition.shieldConsumed, hpLost: partition.hpLost,
+          text: `${def.name} → ${actor.name}: ${incoming.toFixed(1)} ${def.damageType}.`,
+        });
+      }
+    }
+  }
+}
+
+/** Истечение статусов/баффов/временных щитов (шаг 1 порядка событий). */
+function expireStatuses(state: CombatState): void {
+  for (const actor of allActors(state)) {
+    for (const key of Object.keys(actor.statuses) as StatusId[]) {
+      const arr = actor.statuses[key]!;
+      const kept = arr.filter((e) => e.expiresAt > state.timeMs);
+      if (kept.length !== arr.length) emit(state, 'STATUS_EXPIRE', actor.id, { statusId: key, text: `${actor.name}: ${STATUS_DEFS[key].name} истёк.` });
+      if (kept.length) actor.statuses[key] = kept; else delete actor.statuses[key];
+    }
+    if (actor.buffs.some((b) => b.expiresAt <= state.timeMs)) actor.buffs = actor.buffs.filter((b) => b.expiresAt > state.timeMs);
+    if (actor.tempShields.some((p) => p.expiresAt <= state.timeMs)) {
+      for (const p of actor.tempShields) {
+        if (p.expiresAt <= state.timeMs) emit(state, 'SHIELD_EXPIRE', actor.id, { text: `${actor.name}: временный щит истёк.`, data: { sourceId: p.sourceId, amount: p.amount } });
+      }
+      actor.tempShields = actor.tempShields.filter((p) => p.expiresAt > state.timeMs);
+    }
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -316,7 +557,7 @@ function incomingMultiplier(target: CombatActor, type: DamageType): number {
 function applyContinuous(state: CombatState, dtSec: number): void {
   const op = state.operator;
   if (op.alive) {
-    const s = op.baseSheet;
+    const s = eff(state, op);
     op.energy = clamp(op.energy + s.energyRegen * dtSec, 0, s.maxEnergy);
     const cooling = Math.max(0, s.heatCooling - state.coolingPenalty);
     const ambient = state.ambientHeatPerSec;
@@ -333,17 +574,20 @@ function applyContinuous(state: CombatState, dtSec: number): void {
     }
     if (op.heatLockout) state.metrics.heatLockoutMs += dtSec * 1000;
     const sinceHit = state.timeMs - (op.flags.lastDamagedAt ?? -100000);
-    if (sinceHit >= SHIELD_REGEN_DELAY_MS && s.shieldRegen > 0 && op.shield < s.maxShield) {
-      op.shield = clamp(op.shield + s.shieldRegen * dtSec, 0, s.maxShield);
+    const regen = s.shieldRegen * (hasStatus(op, 'SHIELD_LEAK') ? 0.7 : 1);
+    if (sinceHit >= SHIELD_REGEN_DELAY_MS && regen > 0 && op.shield < s.maxShield) {
+      op.shield = clamp(op.shield + regen * dtSec, 0, s.maxShield);
     }
     if (op.shield <= 0) state.metrics.timeWithoutShieldMs += dtSec * 1000;
     state.metrics.lowestHpFraction = Math.min(state.metrics.lowestHpFraction, op.hp / Math.max(1, s.maxHP));
   }
   for (const actor of [...state.drones, ...state.enemies, ...state.allies]) {
     if (!actor.alive) continue;
+    const s = eff(state, actor);
     const sinceHit = state.timeMs - (actor.flags.lastDamagedAt ?? -100000);
-    if (sinceHit >= SHIELD_REGEN_DELAY_MS && actor.baseSheet.shieldRegen > 0 && actor.shield < actor.baseSheet.maxShield) {
-      actor.shield = clamp(actor.shield + actor.baseSheet.shieldRegen * dtSec, 0, actor.baseSheet.maxShield);
+    const regen = s.shieldRegen * (hasStatus(actor, 'SHIELD_LEAK') ? 0.7 : 1);
+    if (sinceHit >= SHIELD_REGEN_DELAY_MS && regen > 0 && actor.shield < s.maxShield) {
+      actor.shield = clamp(actor.shield + regen * dtSec, 0, s.maxShield);
     }
   }
 }
@@ -383,6 +627,7 @@ function resolveAttack(state: CombatState, rng: Rng, actor: CombatActor): void {
   if (!target) return;
   const isOperator = actor.kind === 'operator';
   const weapon = isOperator ? state.build.mainWeapon! : null;
+  const as = eff(state, actor);
   if (isOperator) {
     if (actor.heatLockout) return;
     const energyCost = weapon!.energyPerAttack ?? 0;
@@ -391,11 +636,12 @@ function resolveAttack(state: CombatState, rng: Rng, actor: CombatActor): void {
       return;
     }
     if (energyCost > 0) {
-      actor.energy = clamp(actor.energy - energyCost, 0, actor.baseSheet.maxEnergy);
+      actor.energy = clamp(actor.energy - energyCost, 0, as.maxEnergy);
       state.metrics.energySpent += energyCost;
     }
-    const heatGain = weapon!.heatPerAttack ?? 0;
-    if (heatGain > 0) actor.heat = clamp(actor.heat + heatGain, 0, actor.baseSheet.maxHeat);
+    let heatGain = weapon!.heatPerAttack ?? 0;
+    if (hasStatus(actor, 'OVERCLOCK')) heatGain += 5;
+    if (heatGain > 0) actor.heat = clamp(actor.heat + heatGain, 0, as.maxHeat);
   }
   actor.counters.attacks = (actor.counters.attacks ?? 0) + 1;
   const actionId = `${actor.id}:atk:${actor.counters.attacks}`;
@@ -407,26 +653,34 @@ function resolveAttack(state: CombatState, rng: Rng, actor: CombatActor): void {
   for (const packet of packets) {
     const current = pickAutoTarget(state, actor);
     if (!current) return;
-    const accuracy = actor.baseSheet.accuracy;
-    const hitChance = pHit(accuracy, current.baseSheet.evasion);
+    const ds = eff(state, current);
+    let accuracy = as.accuracy;
+    if (actor.kind === 'drone' && hasStatus(current, 'DRONE_MARK')) accuracy += 15;
+    const hitChance = pHit(accuracy, ds.evasion);
     if (!rng.chance(hitChance)) {
       state.metrics.misses++;
       if (current.kind === 'operator') state.metrics.dodgesTaken++;
       emit(state, 'MISS', actor.id, { targetId: current.id, actionId, damageType: packet.type, text: `${actor.name}: промах по ${current.name}.`, roll: hitChance });
       continue;
     }
-    const critChance = pCrit(actor.baseSheet.critChance);
+    const critChance = pCrit(as.critChance);
     const crit = rng.chance(critChance);
     let raw = packet.amount * outgoingMultiplier(state, actor, packet.type, isMain);
     if (actor.side === 'enemy' && packet.type === 'DIGITAL') raw *= 1 + state.extraEnemyDigitalBonus;
+    if (hasStatus(current, 'SCAN_MARK')) raw *= 1.12;
     if (crit) {
-      raw *= actor.baseSheet.critMultiplier * actor.baseSheet.moreCritDamage;
+      raw *= as.critMultiplier * as.moreCritDamage;
       state.metrics.crits++;
     }
     raw = finite(raw, 0);
-    const mitigated = mitigatePacket(raw, packet.type, defenseOf(current), penOf(actor));
-    const incoming = mitigated.afterDefense * incomingMultiplier(current, packet.type);
-    const partition = partitionDamage(incoming, { hp: current.hp, shield: current.shield, temp: current.tempShields }, 0, current.baseSheet.incomingShield);
+    const mitigated = mitigatePacket(raw, packet.type, defenseOf(state, current), penOf(state, actor));
+    let incoming = mitigated.afterDefense * incomingMultiplier(state, current, packet.type);
+    if (hasStatus(current, 'MARK')) {
+      incoming *= 1.3;
+      delete current.statuses.MARK;
+      current.markBy = undefined;
+    }
+    const partition = partitionDamage(incoming, { hp: current.hp, shield: current.shield, temp: current.tempShields }, 0, ds.incomingShield);
     applyPartition(current, partition);
     current.flags.lastDamagedAt = state.timeMs;
     state.metrics.hits++;
@@ -467,9 +721,10 @@ function applyPartition(actor: CombatActor, partition: ReturnType<typeof partiti
 function scheduleNextAttack(state: CombatState, actor: CombatActor): void {
   let interval = actor.attackIntervalMs;
   if (actor.kind === 'operator') {
-    const s = actor.baseSheet;
+    const s = eff(state, actor);
     interval = attackIntervalMs(state.build.mainWeapon!.intervalMs, s.attackSpeed, s.moreAttackSpeed);
   }
+  interval /= actionSpeedMult(actor);
   actor.nextAttackAt += interval;
   if (actor.nextAttackAt <= state.timeMs) actor.nextAttackAt = state.timeMs + interval;
 }
@@ -514,6 +769,10 @@ function checkTerminal(state: CombatState): void {
 function cloneState(state: CombatState): CombatState {
   const { build, tactics, log, ...rest } = state;
   const copy = structuredClone(rest);
+  // baseMods статичны на протяжении боя — разделяем по ссылке, не клонируем каждый тик.
+  const src = [state.operator, ...state.drones, ...state.allies, ...state.enemies];
+  const dst = [copy.operator, ...copy.drones, ...copy.allies, ...copy.enemies];
+  for (let i = 0; i < dst.length; i++) dst[i]!.baseMods = src[i]!.baseMods;
   // События неизменяемы после создания; массив копируем поверхностно, чтобы
   // push в новом состоянии не мутировал лог входного состояния.
   return { ...copy, build, tactics, log: [...log] };
@@ -527,6 +786,11 @@ export function stepCombat(state: CombatState): CombatState {
   next.timeMs += TICK_MS;
 
   applyContinuous(next, dtSec);
+
+  // Периодический урон статусов (включая финальный тик на границе истечения),
+  // затем истечение статусов/баффов/временных щитов — до новых действий.
+  tickStatuses(next);
+  expireStatuses(next);
 
   const due = allActors(next)
     .filter((a) => a.alive && a.nextAttackAt <= next.timeMs)

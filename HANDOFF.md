@@ -4,7 +4,7 @@ Last updated: 2026-11-11
 
 ## Current status
 
-This is a recovery branch containing the preserved Qwen snapshot, two completed recovery stages, and a newly implemented **combat kernel**. `src/core/combat/engine.ts` now exists and satisfies the previously-red WIP combat tests. Typecheck passes and all 33 unit tests pass. The kernel resolves deterministic auto-attacks and continuous resources only; active skills, tactical rules, statuses/DoT, reactions, drone/enemy abilities, and boss AI are **not yet implemented** (see expansion notes below). The Vite production build still stops at the missing real app entrypoint `src/main.tsx`, which is a UI-stage task — no placeholder was added to silence it.
+This is a recovery branch containing the preserved Qwen snapshot, two completed recovery stages, an implemented **combat kernel**, and the first combat-expansion sub-stage (**2a: effective stats + status lifecycle + DoT**). `src/core/combat/engine.ts` satisfies the WIP combat tests and now also resolves statuses/DoT through the same pure 100 ms `stepCombat`. Typecheck passes and all 40 unit tests pass. The kernel resolves deterministic auto-attacks, continuous resources, and status effects; active skills, tactical rules, reactions, drone/enemy abilities, and boss AI are **not yet implemented** (stage 2b–2e). The Vite production build still stops at the missing real app entrypoint `src/main.tsx`, a UI-stage task — no placeholder was added to silence it.
 
 ## Repository and checkpoint
 
@@ -32,6 +32,7 @@ The presence of catalogs and interfaces does not mean those systems are playable
 3. Added the build resolver in `a06dbbab98581a95ae9b7af72f8a7be29fc659a2` (`feat: resolve validated CYDLE builds`). `resolveBuild()` validates equipment and allocation and gathers catalog effects through one existing stat resolver, including attribute formulas, item scaling, CalcTrace, and neural capacity checks.
 4. Combat-kernel TDD scaffolding: `docs/superpowers/specs/2026-11-11-combat-kernel-design.md`, `docs/superpowers/plans/2026-11-11-combat-kernel.md`, and `tests/core/combat.test.ts`. The design calls for a single fixed 100 ms transition and a headless runner using existing damage and RNG modules.
 5. Implemented the combat kernel in `src/core/combat/engine.ts` (this checkpoint). Exports `createCombatState`, `stepCombat` (exactly one 100 ms tick, pure — returns a new state, never mutates its input), `simulateCombat` (headless runner), `resultFromState`, `allActors`, plus `COMBAT_RULES_VERSION` and `MAX_LOG_EVENTS`. It builds operator/drone/enemy/ally actors from a validated `ResolvedBuild`, rolls hit/crit via the deterministic `Rng`, routes every packet through `math/damage.ts` (`mitigatePacket` → incoming multiplier → `partitionDamage`) exactly once, applies continuous resources once per tick (energy regen, heat cooling/ambient/lockout at 100→release ≤80, shield regen after 4 s), resolves deaths and terminal outcome (VICTORY/DEFEAT/TIMEOUT), accumulates `CombatMetrics`, and emits an immutable event log capped at 5000. No `Math.random`, wall-clock, or process-global counters touch combat state; `nextTraceId`/CalcTrace nodes are deliberately kept out of events so `stateHash` stays reproducible. The three WIP combat tests pass unmodified.
+6. Combat expansion **2a — effective stats + statuses + DoT** (same `stepCombat`). Added a unified `effectiveSheet` that recomputes an actor's stats through the existing `resolveStats` pipeline from `baseMods + runtimeMods + buffMods + statusMods` with a live combat `StatContext`, cached by a condition/stack fingerprint (operator `baseMods` = `build.modifiers`; enemies/drones use OVERRIDE mods reproducing their baseline). Implemented `applyStatus` (DoT snapshot at application from rawDamage or TechPower × source status multipliers, independent stacks vs refresh, stack caps incl. `bleedStackCap`/`virusStackCap`, duration scaling, STUN boss half-duration + 3 s ICD), periodic `tickStatuses` (BLEED/BURN/VIRUS tick through target resists each tick, no crit/on-hit, final tick lands on the expiry boundary), and `expireStatuses` (statuses/buffs/temp shields). Point-of-use effects wired: ARMOR_BREAK/GUARD/OVERCLOCK/ACC_BUFF/EVASION_BUFF/SHIELD_REGEN_BUFF via the sheet; SHOCK/DRONE_JAM action speed, SHIELD_LEAK regen, MARK (consume +30% next hit), SCAN_MARK (+12% direct), DRONE_MARK (+15 drone accuracy), BERSERK/CONTROLLED outgoing. `cloneState` shares static `baseMods` by reference to avoid per-tick deep clones. Exports `applyStatus`, `statusStacks`, `hasStatus`, `effectiveSheet`. Covered by 7 new tests in `tests/core/combat-status.test.ts`.
 
 ## Systems that currently work
 
@@ -43,19 +44,19 @@ The presence of catalogs and interfaces does not mean those systems are playable
 
 ## Partial or absent against `CYDLE_MASTER_SPEC.md` v2.0
 
-- **Partial:** typed data/effects catalogs; some item instance creation; build/stat preview boundary; damage and status primitives; combat state/result interfaces; **executable combat transition + headless simulator for auto-attacks, continuous resources, deaths and terminal outcome** (`src/core/combat/engine.ts`).
-- **Absent (combat expansion, stage 2):** tactical rule evaluation and targeting, active skill execution (windup/recovery/cooldown/cost), trigger chains with budget, status lifecycle/DoT (BLEED/BURN/VIRUS/SHOCK/etc.), reaction channel, drone active abilities, enemy ability scheduler and boss phases/rotating casts, encounter orchestration hooks (wanted/reveal deltas, escape, death burst).
+- **Partial:** typed data/effects catalogs; some item instance creation; build/stat preview boundary; damage and status primitives; combat state/result interfaces; **executable combat transition + headless simulator for auto-attacks, continuous resources, deaths and terminal outcome**; **effective-stat recomputation, status lifecycle/stacking and DoT (BLEED/BURN/VIRUS), expiry, and status-derived combat modifiers** (`src/core/combat/engine.ts`, stage 2a).
+- **Absent (combat expansion, stages 2b–2e):** tactical rule evaluation and targeting, active skill execution (windup/recovery/cooldown/cost), trigger chains with budget, the reaction channel, drone active abilities, enemy ability scheduler and boss phases/rotating casts, encounter orchestration hooks (wanted/reveal deltas, escape, death burst).
 - **Absent (other systems):** campaign map/run/autopilot, economy/rewards/loot/crafting loop, persistence/migrations/atomic save transactions, meta progression/unlocks, garage, player-facing Build Lab, Simulation Lab and balance batches, React app entrypoint and UI/rendering/animation/assets, integrated and end-to-end test setup.
 - `index.html` references `/src/main.tsx`, which is missing. `npm run dev` and production build cannot provide a playable app until the actual application is implemented.
 - Package scripts `validate`, `sim`, and `balance` refer to missing scripts. `e2e` refers to Playwright, which is not installed in this project.
 
-## Checks at this checkpoint (combat kernel implemented)
+## Checks at this checkpoint (combat kernel + stage 2a)
 
 - `npm run typecheck`: **passes** (no errors).
-- `npm test`: **33 tests pass** across 5 files — math (11), build (14), combat (3), rng (4), catalog (1). The combat suite now loads and passes; the WIP tests were not modified or deleted.
+- `npm test`: **40 tests pass** across 6 files — math (11), build (14), combat (3), combat-status (7), rng (4), catalog (1). The WIP combat tests were not modified or deleted.
 - `npm run build`: **passes the TypeScript check, then Vite fails to resolve `/src/main.tsx`** from `index.html`. This is the same pre-existing UI-stage blocker documented at `a06dbba`, not a regression. It clears only when a real app entrypoint is implemented; no placeholder was added.
 - `npm run e2e`: **fails** because the `playwright` executable/dependency is absent.
-- No integration tests exist yet. No verification is claimed for the absent combat-expansion features or the app/UI.
+- No integration tests exist yet. No verification is claimed for the absent combat-expansion features (2b–2e) or the app/UI.
 - `npm ci` succeeded during recovery. An earlier `npm audit` reported 7 advisories (3 moderate, 2 high, 2 critical); dependencies were not upgraded during recovery.
 
 ## Exact stop point and next task
