@@ -512,3 +512,135 @@ slot type означает совместимый тип посадочного 
 
 Мутация может быть выбрана только при удовлетворении compatibility tags. Если все предложения полностью несовместимы, генератор предложит MUT_SAFE/MUT_FUEL/MUT_REGEN с предупреждением о причинах. Автопилот выбирает по preset preference tags с пользователем явным подтверждением допустимости; если предпочтения нет — PAUSED_FOR_DECISION, а не случайный выбор.
 
+
+## 16. ПРОЦЕДУРНАЯ ДОРОГА, ВРЕМЯ, РИСК И АВТОПИЛОТ
+
+### 16.1. Карта сектора — точная структура
+
+Один сектор = DAG с шестью слоями, базовые ширины [1,2,3,3,2,1], то есть 12 узлов, плюс 0–3 optional side nodes. Оператор посещает ровно один узел каждого из 6 слоёв по выбранному пути; последний узел — checkpoint или sector boss (на d кратном 4). Каждая вершина после первого слоя имеет хотя бы одно входящее ребро; любой узел слоёв 1–5 имеет хотя бы один исходящий путь к финалу. Обычное ребро ведёт только на следующий слой; optional side node может заменить узел слоя, но не создаёт петлю. У каждого игрока 2–4 действительно отличающихся возможности выбора в секторе.
+
+**Генерация:**
+1. По sectorSeed, d, biome, faction/quest state выбрать допустимые encounter role и контракты.
+2. Создать слои, валидные ребра; у одного узла максимум 3 исходящих ребра; старт и финиш достижимы.
+3. Назначить типы узлов с ограничениями: на любом пути минимум 2 боевых и минимум 1 ресурсный/сервисный или безопасный развилочный узел; опасные node не обязаны иметь лёгкую замену, но угрозы/цена должны быть видимы.
+4. Размещать сюжетное продолжение только на достижимом узле; если в данном секторе нет места, перенести флаг на следующую возможность, а не ломать цепочку.
+5. Повторять один и тот же одношаговый event не чаще 1 раза за выезд; многостадийные квесты имеют собственные event IDs.
+6. Присвоить nodeThreat, lootHint, travelFuelCost и revealLevel; проверить отсутствие тупиков.
+7. Сохранить карту и seed до первого выбора; refresh не перегенерирует.
+
+**Типы:** COMBAT, ELITE, BOUNTY, REPAIR, FUEL, SHOP, CACHE, ANOMALY, EVENT, QUEST, BOSS, CHECKPOINT. Последний BOSS только d mod4=0, CHECKPOINT для остальных.
+
+**Время:** проезд ребра 25 секунд game-time; действие узла COMBAT = фактический бой; SHOP/REPAIR/FUEL = 8 секунд; CACHE=5с; EVENT/QUEST=10с после выбранного ответа; CHECKPOINT=8с. Модификатор ENGINE на travel влияет только на 25с, не на боевое время. Активное отображение допускает fast-forward, но при сравнениях idle/активного используются одинаковые game-time события. Если игрок закрывает игру и есть автономный профиль, 12 часов реального elapsed переводятся в до 12 часов game-time. Если профиль остановлен, time не продвигается в получение наград.
+
+### 16.2. Шесть биомов
+
+| id / регион | Механическое условие | Враги | Тег добычи |
+|---|---|---|---|
+| B01 Неоновая магистраль | +10% шанс сервисного узла; обычная погода | налётчики, снайпер, преследователь | оружие/скорость |
+| B02 Корпоративный периметр | +4 розыска за ELITE; +10% награды кредитами | бронетехника, медик, щитовик | armor/shield |
+| B03 Ржавые верфи | −20% ремонт scrap, +10% шанс turret encounter | турели, сборщики, инженеры | drones/craft |
+| B04 Слепая сеть | DIGITAL damage врагов +10%, reward data +20% | netrunner, virus host, AI | digital/virus |
+| B05 Термический пояс | базовое cooling каждого участника −2/сек, floor0; ENERGY item weight +20% | пиромант, реактор, охотник | heat/energy |
+| B06 Нулевая зона | аномальный модификатор встречи из списка; scouting раскрывает на 1 уровень меньше | комбинированные элиты | unique/conversions |
+
+Биом сектора в кампании задан: d1 B01, d2 B03, d3 B02, d4 B01 (первый босс); d5 B04, d6 B03, d7 B05, d8 B04 (второй босс); d9 B06, d10 B02, d11 B05, d12 B06 (финальный). В эндгейме biome seed-weighted, избегать >2 одинаковых подряд (reroll once). Quest/faction constraints могут выбрать тематический biome с явным приоритетом.
+
+### 16.3. Розыск
+
+Wanted ∈[0,100], старт нового выезда 0, но campaign heat в фракциях может изменить старт до +10 при репутации ниже -60 у VANTA. Corporate ordinary encounter +4, elite +7, взлом блокпоста +10, stealth success −4, покупка подкупа −15 за 20×R(d) credits. На 50+ повышается вероятность BOUNTY node/преследования, на 80+ враги получают один дополнительный elite modifier, не более одного extra bounty node за сектор. Не спавнить бесконечного врага в уже начатом бою без лимита. Высокий wanted может повышать специфический loot bounties, а не только вредить.
+
+### 16.4. Дорожные ресурсы, сервисы, аварии
+
+Начало выезда: fuel=24; maxFuel=24 плюс модули; hull=100/maxHull=100; health/shield по экипировке; carry protected equipment. Перемещение по одному ребру = fuel−1 (опасное ребро, помеченное +1, потребляет 2). Нет топлива до движения — невозможен переход; предлагается доступный сервис/abandon, нельзя получать отрицательный fuel. Узлы REPAIR восстанавливают 30 hull за ceil(15×R(d)) credits либо восстанавливают operator HP 30% missing за ceil(10×R(d)) credits; FUEL покупает до maxFuel 1 ед. за ceil(3×R(d)) credits; если нет денег — можно потратить 5 scrap за 1 fuel, capped at 4 fuel per node. SHOP ассортимент (2 оружия, 2 импланта/броня, 1 дрон/расходник), стоимость item = ceil((25+7×T)×rarityMultiplier×R(T)), multipliers COMMON1, MODIFIED1.3, RARE2, LEGENDARY4, UNIQUE10. Shop item выпадает из доступного biome pool и меняется только на новом shopId/новом выезде. Ремонт gear в гараже по разделу 12.
+
+**Нехватка топлива:** if cannot move, select FUEL if reachable from present node without travel (только текущая FUEL node); иначе можно вызвать эвакуационный тягач в явном аварийном событии, стоимость 30 credits×R(d) и потеря 30% unsecured currency и 1 случайного незащищённого предмета; при недостатке денег доступен ABANDON_RUN (весь unsecured loot потерян, permanent items durability−10, возвращение в гараж). Так игра не уходит в безвыходный softlock; нет бесплатного безопасного выхода без последствий.
+
+**Автопилот после срабатывания stop rule** может PAUSE, EXTRACT_AT_CHECKPOINT, REQUEST_TOW or ABANDON only if exact user profile разрешает такие дорогостоящие действия; по умолчанию PAUSE вместо автоматической потери всех предметов. Для долгого idle пользователь может включить правила аварийного выхода осознанно.
+
+### 16.5. Стартовые автопрофили
+
+Score route = 3×normalizedLoot + 2×normalizedXP + 2×questPriority + serviceNeed − riskWeight×predictedDeathRisk − 2×normalizedFuel − normalizedWanted. Все признаки ∈[0,1] и основаны **только на известной информации**; unseen map, hidden rolls, будущие критические попадания не раскрываются автопилоту.
+
+| Профиль | riskWeight | если HP ниже | shield ниже | maxWanted | действие на checkpoint |
+|---|---:|---:|---:|---:|---|
+| Осторожный | 8 | 50% | 25% | 45 | сервис/эвакуация, если нельзя восстановиться |
+| Сбалансированный | 4 | 35% | 15% | 70 | сервис/закрепить ценный груз, дальше при допустимом риске |
+| Агрессивный | 1.5 | 20% | 0% | 95 | продолжать, если fuel/hull/HP достаточны |
+
+Пороги проверяются **до перехода** в следующий узел, не прерывают неизбежное смертельное попадание в текущем бою. Если риск неизвестен, осторожный профиль предпочитает REPAIR/SCOUT, агрессивный допускает ELITE; эвристика не имеет будущего знания. Ничего не набирает/не перенастраивает из инвентаря автоматически, кроме преднастроенного FILTER и ремонта с заранее разрешённым бюджетом.
+
+Параметры пользовательского профиля: objective weights, разрешённые типы узлов, maxWanted, reserveFuel, minHP, minShield, allowElite, allowAnomaly, maxSpendRepair, cargoProtectionPriority, preferMutations (массив ID), chooseQuest (never / pause / match explicit named choice), extraction policy, autoRestartAllowed and maxRuns. Преднастроенные три профиля имеют autoRestartAllowed=false. При явном autoRestart=true: после успешной эвакуации можно начать новый рейд с открытого форпоста, оплатив разрешённый ремонт и не тратя больше maxSpendRepair. После DEFEAT autoRestart=false независимо от политики, пока пользователь явно не включил специальное разрешение с отдельным подтверждением. Нет нового автоматического выезда после достигнутого maxRuns.
+
+**Состояния автопилота:** RUNNING, PAUSED_FOR_DECISION, PAUSED_FOR_RESOURCES, EXTRACTING, EXTRACTED, DEFEATED, OFFLINE_CAPPED, SAFE_ERROR_STOP. У каждого reasonCode и human-readable explanation. Не делать «вышел из AFK» без причины.
+
+### 16.6. Защищённый вывоз и смерть
+
+Каждый CHECKPOINT/BOSS completion открывает:
+- **EXIT:** завершить выезд, доставить весь оставшийся unsecured cargo/currencies, потерять временные мутации;
+- **SHIP:** за ceil(10×R(d)) credits выбрать ≤5 cargo units и ≤50% run-unsecured currencies для постоянного склада; выезд продолжается;
+- **CONTINUE:** двигаться дальше с риском.
+
+Босс победа также открывает FORPOST для d multiple4. Unsecured equipment, даже если оно экипировано в текущем выезде, теряется при DEFEAT. Любая постоянная экипировка возвращается и теряет 20 durability. **Незакреплённые валюты** хранятся отдельно от meta-bank и тоже теряются при DEFEAT; уже отправленные и старые meta-currency защищены. Новые валюты тратятся при дорожной покупке первыми, затем допускается тратить meta-bank только при явном разрешении игрока/политики. Нельзя потерять предмет, уже защищённый отправкой на склад; не дублировать его при эвакуации.
+
+**Смерть:** ранение HP=0, run state→DEFEATED; временные мутации удаляются, незакреплённый груз/валюты удаляются, постоянная экипировка возвращается damaged (−20 durability), герой в гараже восстанавливается до 100% HP/щит после оплаты стандартного медицинского обслуживания 10 credits (при 0 credits базовая бесплатная стабилизация до 50% HP для исключения softlock; дальнейшее лечение стандартным способом). Максимальная глубина и открытый форпост не откатываются.
+
+## 17. ВРАГИ — КАНОНИЧЕСКИЙ КАТАЛОГ 24 ОБЫЧНЫХ ТИПОВ
+
+EnemyTemplate at d=1: hp, shield, armor, K/E/D resistance, evasion, attackDamage, attackInterval, damageType, skill AI. На глубине d: hp × H(d), shield × H(d), damage × D(d); armor/resist/evasion не увеличиваются скрыто с глубиной, только от конкретной elite-модификации и состояния. Accuracy у всех обычных врагов 100, critChance 0 если явно не объявлено, hit formula из раздела 6. В списке «-» сопротивления 0; указанные res — percentage points.
+
+| id / имя | HP / shield / armor | Res E/D, eva | Base attack / ms / type | Осмысленная угроза |
+|---|---|---|---|---|
+| E01 Рейдер | 140/0/3 | 0/0,20 | 19/1100/K | быстрые одиночные атаки |
+| E02 Ночной стрелок | 110/0/2 | 0/0,30 | 29/1800/K | dangerous windup 900ms после 5с |
+| E03 Уличный щитоносец | 230/60/14 | 5/0,10 | 14/1600/K | 1 shield restore 20/8с |
+| E04 Дозорный | 150/20/6 | 0/0,20 | 17/950/K | отмечает героя, следующий hit +30% |
+| E05 Курьер-тень | 95/0/1 | 0/0,60 | 17/650/K | высокая evasion, метка скрытности |
+| E06 Сборщик | 200/0/8 | 0/0,15 | 23/1450/K | if survives 15с escapes carrying 1 unsecured cargo item; recovery quest |
+| E07 Артиллерист | 150/0/5 | 0/0,10 | 39/2500/K | dangerous cast after 2.0с windup, interruptible |
+| E08 Турель | 190/20/10 | 10/0,0 | 17/800/K | stationary, immune to displacement only |
+| E09 Техник | 170/30/4 | 0/10,20 | 13/1500/E | heals lowest HP ally 30 every 8с |
+| E10 Дроновод | 145/20/3 | 0/10,15 | 16/1200/D | deploys small summon once at t=5с (summon cap 2) |
+| E11 Перехватчик | 180/0/6 | 0/0,30 | 21/1100/K | boosts Wanted after battle +3 |
+| E12 Корп. щитовик | 290/95/16 | 15/5,10 | 20/1500/K | protects weakest ally reducing taken 15% |
+| E13 Нейроловец | 175/0/3 | 0/30,25 | 27/1800/D | JAM 3с every 10с |
+| E14 Паразит | 140/10/3 | 0/10,35 | 16/1050/D | one VIRUS stack on every third direct hit |
+| E15 Кодер | 200/20/5 | 5/20,20 | 21/1350/D | DRONE_JAM 2с every 9с |
+| E16 Медик корпорации | 165/35/5 | 0/15,15 | 13/1500/E | +40 HP heal ally each 9с, interruptible |
+| E17 Пиромант | 180/20/3 | 20/0,20 | 22/1300/E | +10 heat to hero every 6с |
+| E18 Тепловой страж | 260/55/12 | 25/0,10 | 22/1750/E | SHIELD_LEAK 4с on first hit |
+| E19 Реактор | 270/40/9 | 35/0,5 | 25/1700/E | at death deals 45 E secondary with 1.2s telegraph |
+| E20 Рой мелких | 75/0/0 | 0/0,40 | 8/550/K | spawn as group 2–4, no endless spawn |
+| E21 Охотник нуль | 280/50/12 | 5/20,20 | 28/1450/D | alternates DRONE_JAM and shield bypass 20% |
+| E22 Хамелеон | 150/0/2 | 0/0,80 | 19/900/K | evasion high, scan reveals weakness |
+| E23 Киберберсерк | 240/0/6 | 0/0,5 | 28/1200/K | +15% MORE attack after ally death, max2 stacks |
+| E24 Архивный судья | 250/80/10 | 10/25,20 | 25/1550/D | using same program 3× consecutively triggers JAM 2s on hero |
+
+**Spawn rule:** обычный combat node enemyBudget = 2 + floor(d/4) threat-units, max 6 simultaneous non-summon; шаблоны имеют threatUnits: E01–E06=1, E07–E16=2, E17–E24=3. In d1 clamp enemies to E01–E06, max2; in d2–4 unlock E07–E12; in d5–8 E13–E20; in d9+ all. Choose theme based biome and role (melee swarm, healer protected, burst telegraph, drone denial); at least один подходящий контрответ доступен с раскрытым оружием и стандартными реакциями. Не выводить 6 E24, если бюджет меньше. Max normal active units 6, summoned units cap2 separately. ELITE: один враг eligible group получает ×1.75 HP, ×1.25 damage, один модификатор из section17.2, всегда раскрытый по иконке.
+
+### 17.2. Шесть элитных модификаторов
+
+- EL_SHIELD: +30% shield и разовый 20 shield restore при HP<50%.
+- EL_FAST: +20% attack speed, −10% HP (tradeoff).
+- EL_VIRUS: every third hit 1 VIRUS stack, resistance DIGITAL +10%.
+- EL_ANTI_DRONE: DRONE_JAM every 8с with 1.2с telegraph.
+- EL_PEN: armor penetration +10 flat и attack windup +200ms.
+- EL_SPLIT: on death two E20 spawn at 50% normal HP with no item drops, max2 per elite death.
+No absolute immunities, no untelegraphed instakill, no proc-loop.
+
+## 18. ШЕСТЬ БОССОВ И 12-Й СЕКТОР
+
+Boss scaling hp × H(d), shields × H(d), damage × D(d); accuracy=110. Boss encounters at d4/8/12 and then every4 in endless; d4 uses BOSS_A; d8 BOSS_B; d12 BOSS_CORE; later deterministically select from six with anti-repeat and biome compatibility. Each boss has 2 phases, except BOSS_CORE 3. Time to kill 45–150 секунд при предметах соответствующего TechLevel — проверяемая целевая метрика, не гарантированная формула.
+
+| id / имя | Base HP / shield / armor | ResE/D | Phase triggers | Dangerous mechanics and available response |
+|---|---|---|---|---|
+| BOSS_A Бастион (d4) | 1250/250/25 | 15/10 | 70%,35% HP | 45 K basic/1.7с; rail shot 125 K with 1.5s telegraph every 12с; at 70% deploy E09 one, at 35% +20% attack speed; shield/probe/interrupt response |
+| BOSS_B Хирург (d8) | 1550/180/18 | 10/20 | 60%,30% | 40 K/1.3с; every 11с 95 D damage bypassShield .25 and SHIELD_LEAK, 1.5s windup interruptible; at 30% cures own status once, counter by timing/defense |
+| BOSS_C Хор-9 | 1350/350/12 | 5/35 | 65%,30% | 45 D/1.6с, summon E14 at 65% and E15 at 30% (cap2), telegraph 1.5с network pulse 75 D every 15с, virus control/interrupt |
+| BOSS_D Огненное сердце | 1650/150/16 | 35/5 | 60%,25% | 48 E/1.7с, ambient heat+2/сек to operator, telegraph heat burst 85 E each 14с, 1.5с; at 25% heat burst interval 10с; cooling/shields/burst race |
+| BOSS_E Патрон | 1500/230/20 | 10/10 | 70%,40% | 40 K/1.4с; E09 technician summons once at 70%, E08 turret once at 40%, heavy attack 100K with 1.6с telegraph each 13с; target priority matters |
+| BOSS_CORE Сердце тракта (d12) | 1900/400/22 | 20/25 | 70%,40%,15% | 45 mixed E/D/1.4с; rotating telegraph every 12s: K rail 115, digital JAM wave 80, drone suppression 2s; at 70% spawn E09, at 40% shield bypass 25% on digital wave, at 15% +20% cast speed; all waves have at least 1.5s telegraph; adaptable tactics necessary |
+
+**Боссовая награда:** минимум 1 item rarity roll по boss distribution, 1 соответствующий CalibrationCore, 1 гарантированная фракционная/сюжетная награда в кампании, если milestone не был выдан. Boss не повторяет campaign one-time rewards при последующих выездах. На d4/8/12 открывается форпост, сюжетная метка и прогресс гарантированно persists до смерти следующего рейда.
+
+**Условие победы:** HP босса 0 и активные опасные призывы уничтожены либо покинули бой после смерти controller; combat end idempotent. Два уникальных ответа на угрозы у каждого босса, нет boss immunity к K/E/D; отдельные эффекты перехвата личности могут вместо захвата накладывать JAM.
+
