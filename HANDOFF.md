@@ -1,5 +1,14 @@
 # CYDLE — Project handoff and development history
 
+## Active checkpoint (2026-11-12; current truth)
+
+- Branch `development/codex`; current gameplay commit `708454d679e08ecdebb7ec21c96aba32928b9f7e` (`fix: refill fuel between sorties`). Documentation below is the remaining local WIP until its documentation-only checkpoint is committed. Do not treat historical WIP labels further down as current.
+- Every new sortie now starts with a full transport tank (`max(24, fuelMax)`); fuel still carries between sectors inside one uninterrupted expedition. This follows Master Spec §16.3's explicit `fuel=24` sortie start and prevents a prior extraction's residual tank from stranding the next sortie. Regression in `game/tests/golden/game_session_test.gd` starts from 3 garage fuel and checks the sortie receives full capacity.
+- `game/tools/campaign_e2e.gd` is an opt-in campaign diagnostic using `GameSession` and the shared 100 ms `CombatSimulator`; it is not in the default test runner. A deterministic fresh profile cleared ordinary encounters through d4, then lost to BOSS_A with the boss and summoned E09 alive. This is an actual uncovered progression/build/route acceptance gap, not a passing full-campaign result. The driver currently permits one attempt and stops at the first boss gate; it emits damage/build telemetry for future diagnosis.
+- Verified after the gameplay commit: Godot 4.7.2 editor import exit 0; 22 headless scripts / 87,465 assertions / 0 failures; `npm run typecheck` exit 0; Windows Desktop export exit 0; exported `CYDLE.exe --headless --quit-after 3` exit 0; `git diff --check` exit 0. Documentation-only edits remain to commit/push.
+- Large product gaps remain: full 12-sector clear from an attainable player build has not been demonstrated; act-level quest/event/faction consequences and ending flow are partial; not all combat rules/AI/passive triggers are ported; offline/autopilot policy and saved reports are partial; the art/audio and Windows release acceptance are not complete. Keep implementing integrated campaign systems; defer Lab presets/report exports and cosmetic work.
+- Immediate continuation: run the diagnostic driver with its damage telemetry and use real garage progression/checkpoint choices to reproduce the intended campaign loop; fix confirmed blockers against Master Spec formulas, then extend the driver toward all 12 sectors. New-sortie fuel refill is regression-tested; `continue_campaign()` intentionally keeps the current run's fuel.
+
 ## Active checkpoint update (2026-11-12; supersedes older test counts and WIP labels below)
 
 - Working tree: `E:\cydle\project`, branch `development/codex`. The previous pushed checkpoint is `be87186f2d6e2e1491a6b1e9377ecb6275b63b0d`; current WIP applies the wanted≥80 elite modifier rule through the shared combat setup. This WIP is not yet committed at the time of this note.

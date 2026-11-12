@@ -6,6 +6,12 @@
 
 The active strategy is **FULL GAME FIRST**: connect every major Master Spec system into a campaign that can be completed, then deepen edge cases, balance, and presentation. The entries below report implementation status; they are not a queue of isolated feature slices. A checkpoint commit is a safety measure, so continue to the next missing campaign-critical system while the session permits. Defer saved Simulation Lab presets, report exports, cosmetic polish, secondary settings, and redundant tests until functional campaign coverage exists.
 
+## Active campaign acceptance finding (2026-11-12)
+
+Current gameplay commit is `708454d679e08ecdebb7ec21c96aba32928b9f7e`; documentation changes are the only local WIP. Every new sortie fills the tank to `max(24, fuelMax)` while `continue_campaign()` preserves fuel between sectors in the same run, matching Master Spec §16.3. Regression coverage starts from a 3-fuel garage state. The standard Godot suite passes (22 scripts / 87,465 assertions); editor import, TypeScript typecheck, Windows export/EXE smoke and `git diff --check` passed after this change.
+
+A local opt-in driver, `game/tools/campaign_e2e.gd`, exercises actual road/combat/session transactions and emits damage/build telemetry. A fresh default profile clears early ordinary nodes but loses at BOSS_A in d4 before permanently unlocking the first outpost. This is a failing diagnostic, not a completed campaign test. Next, use the garage/checkpoint investment loop to reproduce intended progression, then address confirmed blockers against Master Spec §22's starter build and §6/§17/§18 combat math. Do not claim the 12-sector campaign is completable until the same shared engine reaches the ending and sector 13 in an integrated run.
+
 ## Current migration checkpoint (2026-11-12)
 
 ### Latest native delta (changes after commit `95f25e6`)
