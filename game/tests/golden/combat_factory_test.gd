@@ -37,6 +37,19 @@ func run(_tree: SceneTree) -> bool:
 	check(_actors_match(created["operator"], expected.get("operator", {})), "combat_factory: operator initial state differs from legacy oracle")
 	check(_actor_list_matches(created.get("drones", []), expected.get("drones", [])), "combat_factory: drone initial state differs from legacy oracle")
 	check(_actor_list_matches(created.get("enemies", []), expected.get("enemies", [])), "combat_factory: enemy initial state differs from legacy oracle")
+	var state_config: Dictionary = {
+		"seed": fixture.get("seed", ""), "depth": fixture.get("depth", 0), "biome": fixture.get("biome", "B01"),
+		"nodeType": fixture.get("nodeType", "COMBAT"), "build": build, "enemies": enemy_specs,
+		"tactics": fixture.get("tactics", {}),
+	}
+	state_config.merge(fixture.get("options", {}), true)
+	var initialized: Dictionary = CombatSimulator.new().create_state(state_config)
+	if not check(bool(initialized.get("ok", false)), "combat_factory: failed to initialize combat state: %s" % str(initialized.get("error", ""))):
+		return false
+	var state: CombatState = initialized["state"] as CombatState
+	var actual_state: Dictionary = state.to_dictionary()
+	for key: Variant in expected.get("state", {}).keys():
+		check(_json_equivalent(actual_state.get(key), expected["state"][key]), "combat_factory: initial combat state field %s differs from oracle" % str(key))
 	return failure_count == 0
 
 func _read_dictionary(path: String) -> Dictionary:

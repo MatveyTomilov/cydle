@@ -187,11 +187,18 @@ const combatFixtureOutput = resolve('game/tests/fixtures/combat/actor_initializa
 mkdirSync(dirname(combatFixtureOutput), { recursive: true });
 writeFileSync(combatFixtureOutput, `${JSON.stringify({
   seed: combatConfig.seed, depth: combatConfig.depth, biome: combatConfig.biome, nodeType: combatConfig.nodeType,
-  enemies: combatConfig.enemies, options: { startEnergy: combatConfig.startEnergy, startHeat: combatConfig.startHeat, initialExtraHeat: combatConfig.initialExtraHeat, initialTempShield: combatConfig.initialTempShield },
+  enemies: combatConfig.enemies, tactics: combatConfig.tactics,
+  options: { startEnergy: combatConfig.startEnergy, startHeat: combatConfig.startHeat, initialExtraHeat: combatConfig.initialExtraHeat, initialTempShield: combatConfig.initialTempShield },
   expected: {
     operator: combatActorView(combatState.operator),
     drones: combatState.drones.map(combatActorView),
     enemies: combatState.enemies.map(combatActorView),
+    state: {
+      seed: combatState.seed, depth: combatState.depth, biome: combatState.biome, nodeType: combatState.nodeType,
+      timeMs: combatState.timeMs, maxDurationMs: combatState.maxDurationMs, rng: combatState.rng,
+      nextEventId: combatState.nextEventId, log: combatState.log, logTruncated: combatState.logTruncated,
+      metrics: combatState.metrics, rulesHash: combatState.rulesHash,
+    },
   },
 }, null, 2)}\n`, 'utf8');
 console.log(`Exported combat actor initialization oracle to ${combatFixtureOutput}`);

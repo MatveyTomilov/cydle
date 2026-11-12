@@ -11,6 +11,71 @@
       "damageMult": 0.8
     }
   ],
+  "tactics": {
+    "id": "DEFAULT",
+    "name": "Тактика по умолчанию",
+    "rules": [
+      {
+        "id": "starter-shield",
+        "priority": 3,
+        "enabled": true,
+        "skillId": "SK_SHIELD",
+        "target": "self",
+        "conditions": [
+          {
+            "kind": "hpBelow",
+            "value": 45
+          }
+        ],
+        "logic": "AND",
+        "note": "Защита при низком HP"
+      },
+      {
+        "id": "starter-emp",
+        "priority": 2,
+        "enabled": true,
+        "skillId": "SK_EMP",
+        "target": "imminentCast",
+        "conditions": [
+          {
+            "kind": "enemyCasting",
+            "interruptibleOnly": true
+          }
+        ],
+        "logic": "AND",
+        "note": "Прерывание опасного каста"
+      },
+      {
+        "id": "starter-burst",
+        "priority": 1,
+        "enabled": true,
+        "skillId": "SK_BURST",
+        "target": "allEnemies",
+        "conditions": [
+          {
+            "kind": "enemiesAtLeast",
+            "value": 2
+          }
+        ],
+        "logic": "AND",
+        "note": "Очередь по группе"
+      },
+      {
+        "id": "starter-auto",
+        "priority": 0,
+        "enabled": true,
+        "skillId": "AUTO",
+        "target": "nearest",
+        "conditions": [
+          {
+            "kind": "always"
+          }
+        ],
+        "logic": "AND",
+        "note": "Базовая атака"
+      }
+    ]
+  },
   "options": {
     "startEnergy": 30,
     "startHeat": 10,
@@ -384,6 +449,78 @@
         "noLoot": false,
         "summoned": false
       }
-    ]
+    ],
+    "state": {
+      "seed": "combat-actor-golden",
+      "depth": 3,
+      "biome": "B01",
+      "nodeType": "ELITE",
+      "timeMs": 0,
+      "maxDurationMs": 180000,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          2108280336,
+          120043091,
+          2010357359,
+          3488997366
+        ],
+        "calls": 0
+      },
+      "nextEventId": 2,
+      "log": [
+        {
+          "eventId": 1,
+          "timestamp": 0,
+          "kind": "COMBAT_START",
+          "actorId": "operator",
+          "incomingTags": [],
+          "producedTags": [],
+          "chainDepth": 0,
+          "text": "Бой начался: Артиллерист.",
+          "data": {
+            "initialTempShield": 12,
+            "initialExtraHeat": 5,
+            "alliedCount": 0
+          }
+        }
+      ],
+      "logTruncated": false,
+      "metrics": {
+        "damageDealt": 0,
+        "damageTaken": 0,
+        "damageByType": {
+          "KINETIC": 0,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {},
+        "takenBySource": {},
+        "hits": 0,
+        "misses": 0,
+        "crits": 0,
+        "dodgesTaken": 0,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 0,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "rulesHash": "93d17943"
+    }
   }
 }
