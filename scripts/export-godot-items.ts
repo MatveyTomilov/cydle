@@ -265,7 +265,7 @@ writeFileSync(dotFixtureOutput, `${JSON.stringify({
 }, null, 2)}\n`, 'utf8');
 console.log(`Exported ${dotFrames.length} DoT status replay frames to ${dotFixtureOutput}`);
 
-const statusEffectCases = [
+const statusEffectCases: Array<{ id: string; target: string; stacks?: number }> = [
   { id: 'ARMOR_BREAK', target: 'enemy:0' }, { id: 'SHOCK', target: 'operator' },
   { id: 'DRONE_JAM', target: 'drone:0' },
   { id: 'SHIELD_LEAK', target: 'operator' }, { id: 'MARK', target: 'enemy:0' },
@@ -273,6 +273,7 @@ const statusEffectCases = [
   { id: 'CONTROLLED', target: 'enemy:0' }, { id: 'GUARD', target: 'operator' },
   { id: 'OVERCLOCK', target: 'operator' }, { id: 'ACC_BUFF', target: 'operator' },
   { id: 'EVASION_BUFF', target: 'operator' }, { id: 'SHIELD_REGEN_BUFF', target: 'operator' },
+  { id: 'BERSERK', target: 'operator', stacks: 2 },
 ];
 const starterDroneId = initialSaveFixture.meta.equipment.DRONE_1;
 if (!starterDroneId) throw new Error('Starter save is missing its drone.');
@@ -281,7 +282,7 @@ const statusBuild = resolveBuild({
   equipment: { MAIN: starterMain, DRONE_1: starterItemsById.get(starterDroneId)! },
   skillIds: [], passiveIds: [], treeNodeIds: [], attributePointsEarned: 0, treePointsEarned: 0,
 });
-const statusEffectReplays = statusEffectCases.map(({ id, target }) => {
+const statusEffectReplays = statusEffectCases.map(({ id, target, stacks = 1 }) => {
   let replay = createCombatState({ ...basicStateConfig, build: statusBuild });
   const targetActor = target === 'operator' ? replay.operator : target === 'drone:0' ? replay.drones[0]! : replay.enemies[0]!;
   const sourceActor = targetActor.side === 'enemy' ? replay.operator : replay.enemies[0]!;
@@ -289,10 +290,10 @@ const statusEffectReplays = statusEffectCases.map(({ id, target }) => {
     targetActor.shield = Math.max(0, targetActor.baseSheet.maxShield - 20);
     targetActor.flags.lastDamagedAt = -100000;
   }
-  applyStatus(replay, sourceActor, targetActor, id as keyof typeof STATUS_DEFS);
+  applyStatus(replay, sourceActor, targetActor, id as keyof typeof STATUS_DEFS, { stacks });
   for (let tick = 0; tick < 40; tick++) replay = stepCombat(replay);
   return {
-    status: id, target, timeMs: replay.timeMs, rng: replay.rng, nextEventId: replay.nextEventId,
+    status: id, target, stacks, timeMs: replay.timeMs, rng: replay.rng, nextEventId: replay.nextEventId,
     metrics: replay.metrics, outcome: replay.outcome,
     operator: { hp: replay.operator.hp, shield: replay.operator.shield, statuses: replay.operator.statuses, nextAttackAt: replay.operator.nextAttackAt },
     drones: replay.drones.map((actor) => ({ hp: actor.hp, shield: actor.shield, statuses: actor.statuses, nextAttackAt: actor.nextAttackAt, damageTaken: actor.damageTaken })),

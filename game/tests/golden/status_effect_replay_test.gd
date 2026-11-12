@@ -6,7 +6,7 @@ const REPLAY_FIXTURE: String = "res://tests/fixtures/combat/status_effect_replay
 func run(_tree: SceneTree) -> bool:
 	var meta: Dictionary = _read_dictionary(SAVE_FIXTURE).get("meta", {})
 	var cases: Array = _read_array(REPLAY_FIXTURE)
-	if not check(not meta.is_empty() and cases.size() == 13, "status_effect_replay: starter save or replay cases are missing"):
+	if not check(not meta.is_empty() and cases.size() == 14, "status_effect_replay: starter save or replay cases are missing"):
 		return false
 	var items_by_id: Dictionary = {}
 	for item_value: Dictionary in meta.get("inventory", []):
@@ -34,7 +34,7 @@ func run(_tree: SceneTree) -> bool:
 			var regen_target: CombatActorState = state.operator if target_id == "operator" else state.enemies[0]
 			regen_target.shield = maxf(0.0, float(regen_target.base_sheet.get("maxShield", 0.0)) - 20.0)
 			regen_target.flags["lastDamagedAt"] = -100000.0
-		var applied: Dictionary = simulator.apply_status(state, source_id, target_id, str(replay.get("status", "")))
+		var applied: Dictionary = simulator.apply_status(state, source_id, target_id, str(replay.get("status", "")), {"stacks": replay.get("stacks", 1)})
 		if not check(bool(applied.get("ok", false)), "status_effect_replay: status apply failed for %s: %s" % [replay.get("status", "?"), applied.get("error", "")]):
 			return false
 		state = applied["state"] as CombatState
@@ -44,7 +44,7 @@ func run(_tree: SceneTree) -> bool:
 				return false
 			state = stepped["state"] as CombatState
 		var actual: Dictionary = {
-			"status": replay.get("status", ""), "target": target_id, "timeMs": state.time_ms,
+			"status": replay.get("status", ""), "target": target_id, "stacks": int(replay.get("stacks", 1)), "timeMs": state.time_ms,
 			"rng": state.rng, "nextEventId": state.next_event_id, "metrics": state.metrics,
 			"outcome": state.outcome,
 			"operator": {"hp": state.operator.hp, "shield": state.operator.shield, "statuses": state.operator.statuses, "nextAttackAt": state.operator.next_attack_at},

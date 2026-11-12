@@ -7,7 +7,7 @@ const DEFAULT_MAX_DURATION_MS: int = 180000
 const STEP_STATUS_IDS: Array[String] = [
 	"BLEED", "BURN", "VIRUS", "ARMOR_BREAK", "SHOCK", "DRONE_JAM", "SHIELD_LEAK",
 	"MARK", "SCAN_MARK", "DRONE_MARK", "CONTROLLED", "GUARD", "OVERCLOCK",
-	"ACC_BUFF", "EVASION_BUFF", "SHIELD_REGEN_BUFF",
+	"ACC_BUFF", "EVASION_BUFF", "SHIELD_REGEN_BUFF", "BERSERK",
 ]
 const TICK_MS: int = 100
 const SHIELD_REGEN_DELAY_MS: int = 4000
@@ -422,6 +422,9 @@ func _resolve_basic_hit(state: CombatState, rng: DeterministicRng, actor: Combat
 		return {"ok": true, "error": ""}
 	var crit: bool = rng.chance(_damage.crit_probability(float(attacker.get("critChance", 0.0))))
 	var raw: float = raw_base * _outgoing_multiplier(attacker, damage_type, is_main)
+	var berserk_stacks: int = _status_stacks(actor, "BERSERK")
+	if berserk_stacks > 0:
+		raw *= 1.0 + 0.15 * berserk_stacks
 	if _has_status(actor, "CONTROLLED"):
 		raw *= 0.4
 	if actor.kind == "drone" and _has_status(actor, "DRONE_JAM"):

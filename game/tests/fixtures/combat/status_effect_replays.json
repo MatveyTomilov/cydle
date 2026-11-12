@@ -2,6 +2,7 @@
   {
     "status": "ARMOR_BREAK",
     "target": "enemy:0",
+    "stacks": 1,
     "timeMs": 3000,
     "rng": {
       "stream": "combat",
@@ -93,6 +94,7 @@
   {
     "status": "SHOCK",
     "target": "operator",
+    "stacks": 1,
     "timeMs": 3000,
     "rng": {
       "stream": "combat",
@@ -173,6 +175,7 @@
   {
     "status": "DRONE_JAM",
     "target": "drone:0",
+    "stacks": 1,
     "timeMs": 3000,
     "rng": {
       "stream": "combat",
@@ -253,6 +256,7 @@
   {
     "status": "SHIELD_LEAK",
     "target": "operator",
+    "stacks": 1,
     "timeMs": 3000,
     "rng": {
       "stream": "combat",
@@ -344,6 +348,7 @@
   {
     "status": "MARK",
     "target": "enemy:0",
+    "stacks": 1,
     "timeMs": 3000,
     "rng": {
       "stream": "combat",
@@ -424,6 +429,7 @@
   {
     "status": "SCAN_MARK",
     "target": "enemy:0",
+    "stacks": 1,
     "timeMs": 3000,
     "rng": {
       "stream": "combat",
@@ -515,6 +521,7 @@
   {
     "status": "DRONE_MARK",
     "target": "enemy:0",
+    "stacks": 1,
     "timeMs": 3000,
     "rng": {
       "stream": "combat",
@@ -606,6 +613,7 @@
   {
     "status": "CONTROLLED",
     "target": "enemy:0",
+    "stacks": 1,
     "timeMs": 3000,
     "rng": {
       "stream": "combat",
@@ -697,6 +705,7 @@
   {
     "status": "GUARD",
     "target": "operator",
+    "stacks": 1,
     "timeMs": 3000,
     "rng": {
       "stream": "combat",
@@ -777,6 +786,7 @@
   {
     "status": "OVERCLOCK",
     "target": "operator",
+    "stacks": 1,
     "timeMs": 3000,
     "rng": {
       "stream": "combat",
@@ -868,6 +878,7 @@
   {
     "status": "ACC_BUFF",
     "target": "operator",
+    "stacks": 1,
     "timeMs": 3000,
     "rng": {
       "stream": "combat",
@@ -959,6 +970,7 @@
   {
     "status": "EVASION_BUFF",
     "target": "operator",
+    "stacks": 1,
     "timeMs": 3000,
     "rng": {
       "stream": "combat",
@@ -1039,6 +1051,7 @@
   {
     "status": "SHIELD_REGEN_BUFF",
     "target": "operator",
+    "stacks": 1,
     "timeMs": 3000,
     "rng": {
       "stream": "combat",
@@ -1113,6 +1126,98 @@
         "statuses": {},
         "nextAttackAt": 3300,
         "damageTaken": 104.85436893203884
+      }
+    ]
+  },
+  {
+    "status": "BERSERK",
+    "target": "operator",
+    "stacks": 2,
+    "timeMs": 3000,
+    "rng": {
+      "stream": "combat",
+      "state": [
+        145201985,
+        3581415915,
+        3323048370,
+        2752640349
+      ],
+      "calls": 11
+    },
+    "nextEventId": 22,
+    "metrics": {
+      "damageDealt": 124.66019417475728,
+      "damageTaken": 18.095238095238095,
+      "damageByType": {
+        "KINETIC": 124.66019417475728,
+        "ENERGY": 0,
+        "DIGITAL": 0
+      },
+      "damageBySource": {
+        "operator": 85.8252427184466,
+        "drone:0": 38.83495145631068
+      },
+      "takenBySource": {
+        "enemy:0": 18.095238095238095
+      },
+      "hits": 5,
+      "misses": 4,
+      "crits": 0,
+      "dodgesTaken": 1,
+      "kills": 0,
+      "skillUses": {},
+      "ruleFailures": [],
+      "energySpent": 0,
+      "energyStarvedMs": 0,
+      "heatLockouts": 0,
+      "heatLockoutMs": 0,
+      "shieldAbsorbed": 0,
+      "hpLost": 0,
+      "healingDone": 0,
+      "statusTicks": 0,
+      "procsTriggered": 0,
+      "interrupts": 0,
+      "chainLimitHits": 0,
+      "ttk": [],
+      "droneDeaths": 0,
+      "escaped": [],
+      "lowestHpFraction": 1,
+      "timeWithoutShieldMs": 0
+    },
+    "outcome": "TIMEOUT",
+    "operator": {
+      "hp": 300,
+      "shield": 56.904761904761905,
+      "statuses": {
+        "BERSERK": [
+          {
+            "sourceId": "enemy:0:BERSERK",
+            "sourceActorId": "enemy:0",
+            "expiresAt": 999000,
+            "nextTickAt": 999000,
+            "snapshot": 0,
+            "stacks": 2
+          }
+        ]
+      },
+      "nextAttackAt": 3750
+    },
+    "drones": [
+      {
+        "hp": 100,
+        "shield": 0,
+        "statuses": {},
+        "nextAttackAt": 3800,
+        "damageTaken": 0
+      }
+    ],
+    "enemies": [
+      {
+        "hp": 15.339805825242728,
+        "shield": 0,
+        "statuses": {},
+        "nextAttackAt": 3300,
+        "damageTaken": 124.66019417475728
       }
     ]
   }
