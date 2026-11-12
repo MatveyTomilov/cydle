@@ -23,13 +23,14 @@ func _run_campaign() -> void:
 	var gate_farm_counts: Dictionary = {}
 	var secured_boss_depths: Dictionary = {}
 	var processed_nodes: int = 0
+	var endgame_verified: bool = false
 	var seed_index: int = 3 if resume_existing else 0
 	var seed_nonce: String = str(Time.get_ticks_usec())
 	if resume_existing and int(session.state.meta.max_sector_cleared) >= 6:
 		sector_attempts[int(session.state.meta.unlocked_forpost) + 1] = 1
 	if resume_existing and int(session.state.meta.unlocked_forpost) < 4:
 		sector_attempts[1] = 3
-	while int(session.state.meta.unlocked_forpost) < 12 and processed_nodes < MAX_NODE_STEPS:
+	while (not session.state.meta.campaign_flags.has("CAMPAIGN_COMPLETED") or not endgame_verified or (session.state.run != null and session.state.run.depth == 12 and session.state.run.phase == "CHECKPOINT" and not session.state.meta.campaign_flags.has("ENDING_SELECTED"))) and processed_nodes < MAX_NODE_STEPS:
 		if session.state.run == null or ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(session.state.run.phase):
 			var next_depth: int = int(session.state.meta.unlocked_forpost) + 1
 			if session.state.run != null and ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(session.state.run.phase):
@@ -78,6 +79,11 @@ func _run_campaign() -> void:
 				processed_nodes += 1
 			"CHECKPOINT":
 				var depth: int = int(session.state.run.depth)
+				if depth >= 13 and session.state.meta.campaign_flags.has("CAMPAIGN_COMPLETED"):
+					endgame_verified = true
+					print("PASS campaign and endgame E2E: d1–d12 cleared, ending recorded, d13 route and checkpoint played; nodes=%d" % processed_nodes)
+					quit(0)
+					return
 				var boss_depth: int = depth + 1
 				var farm_count: int = int(gate_farm_counts.get(boss_depth, 0))
 				var required_farms: int = 1
@@ -105,9 +111,8 @@ func _run_campaign() -> void:
 					if session.state.run.depth != 13 or not session.state.meta.campaign_flags.has("CAMPAIGN_COMPLETED"):
 						_fail("Кампания не перешла в сектор 13 после финала.")
 						return
-					print("PASS campaign E2E: d1–d12 cleared, ending recorded, d13 unlocked; nodes=%d" % processed_nodes)
-					quit(0)
-					return
+					print("E2E ending recorded; playing the first endgame route through its checkpoint.")
+					continue
 				if not session.continue_campaign():
 					_fail("Не удалось перейти из checkpoint d%d: %s" % [depth, session.last_error])
 					return

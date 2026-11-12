@@ -3,8 +3,8 @@
 ## Unreleased — emergency recovery for no-fuel routes
 
 - Implemented Master Spec §16.4 evacuation tow and ABANDON_RUN through persisted `GameSession` transactions and a route-screen confirmation flow. Tow pays `ceil(30×R(d))` credits, drops one deterministic random unsecured item, loses 30% of remaining unsecured currencies and secures the rest; abandon loses all unsecured cargo/currency and damages permanently equipped gear by 10 durability.
-- Added tow/abandon regressions and taught the campaign E2E driver to invoke these real session actions when it has no affordable outgoing edge. The preserved d12 no-fuel route was recovered by tow; the campaign then cleared d9–d11 and began another d12 gate attempt. Ending and d13 remain unverified.
-- Godot editor import passed; 22 scripts / 87,529 assertions / 0 failures. TypeScript and Windows export were not rerun for this Godot-only WIP.
+- Added tow/abandon regressions and taught the campaign E2E driver to invoke these real session actions when it has no affordable outgoing edge. The saved d12 no-fuel route was recovered by tow; BOSS_CORE was defeated after 192 ticks, the FREE_CORRIDOR ending was selected, and the player continued through d13 combat to its checkpoint. The d13 first sortie also used the real tow, and the next sortie cleared three combats and reached the checkpoint.
+- Corrected the E2E stop condition so `CAMPAIGN_COMPLETED` still permits a pending d12 ending choice; then extended acceptance through the d13 route/checkpoint. Full campaign E2E and, afterward, Godot editor import plus 22 scripts / 87,529 assertions / 0 failures passed. TypeScript and Windows export were not rerun for this Godot-only WIP.
 
 ## Unreleased — high-rarity generated gear remains equipable
 
