@@ -1087,6 +1087,9 @@ func equip_item(slot: String, item_id: String) -> bool:
 		last_error = "Этот предмет нельзя установить в выбранный слот."
 		return false
 	var payload: Dictionary = state.to_payload()
+	for equipped_slot: Variant in payload["meta"]["equipment"].keys():
+		if str(payload["meta"]["equipment"][equipped_slot]) == item_id:
+			payload["meta"]["equipment"].erase(equipped_slot)
 	payload["meta"]["equipment"][slot] = item_id
 	var validation: Dictionary = GameSaveState.new().parse_payload(payload)
 	if not bool(validation.get("ok", false)):
@@ -1097,6 +1100,78 @@ func equip_item(slot: String, item_id: String) -> bool:
 		last_error = "Сборка невалидна: %s" % str(resolved.get("issues", []))
 		return false
 	return _commit(validation["state"] as GameSaveState)
+
+func equipped_slot(item_id: String) -> String:
+	if state == null:
+		return ""
+	for slot_value: Variant in state.meta.equipment.keys():
+		if str(state.meta.equipment[slot_value]) == item_id:
+			return str(slot_value)
+	return ""
+
+func valid_equipment_slots(item_id: String) -> Array[String]:
+	var result: Array[String] = []
+	if state == null:
+		return result
+	var item: Dictionary = {}
+	for inventory_item: Dictionary in state.meta.inventory:
+		if str(inventory_item.get("itemId", "")) == item_id and bool(inventory_item.get("secured", false)):
+			item = inventory_item
+			break
+	if item.is_empty():
+		return result
+	var loaded: Dictionary = _item_catalog.load_catalog()
+	if not bool(loaded.get("ok", false)):
+		return result
+	var template: Dictionary = _item_catalog.get_template(str(item.get("templateId", "")))
+	var category: String = str(template.get("category", ""))
+	var candidates: Array[String] = []
+	match category:
+		"MAIN": candidates = ["MAIN"]
+		"OFFHAND": candidates = ["OFFHAND"]
+		"ARMOR": candidates = ["ARMOR"]
+		"IMPLANT": candidates = ["IMP_1", "IMP_2", "IMP_3", "IMP_4", "IMP_5", "IMP_6"]
+		"DRONE": candidates = ["DRONE_1", "DRONE_2"]
+		"ENGINE": candidates = ["ENGINE"]
+		"CHASSIS": candidates = ["CHASSIS"]
+		"SCANNER": candidates = ["SCANNER"]
+		"SERVICE": candidates = ["SERVICE"]
+		"CARGO": candidates = ["CARGO"]
+		"SUPPORT": candidates = ["SUPPORT"]
+	var payload: Dictionary = state.to_payload()
+	for equipped_slot_value: Variant in payload["meta"]["equipment"].keys():
+		if str(payload["meta"]["equipment"][equipped_slot_value]) == item_id:
+			payload["meta"]["equipment"].erase(equipped_slot_value)
+	for slot: String in candidates:
+		var candidate_payload: Dictionary = payload.duplicate(true)
+		candidate_payload["meta"]["equipment"][slot] = item_id
+		var parsed: Dictionary = GameSaveState.new().parse_payload(candidate_payload)
+		if not bool(parsed.get("ok", false)):
+			continue
+		var build: Dictionary = BuildResolver.new().resolve_build(_build_input(parsed["state"] as GameSaveState))
+		if bool(build.get("valid", false)):
+			result.append(slot)
+	return result
+
+func unequip_item(slot: String) -> bool:
+	if not _garage_action_allowed():
+		last_error = "Постоянное снаряжение меняется в гараже после завершения выезда."
+		return false
+	if not state.meta.equipment.has(slot):
+		last_error = "Слот %s пуст." % slot
+		return false
+	var payload: Dictionary = state.to_payload()
+	payload["meta"]["equipment"].erase(slot)
+	var parsed: Dictionary = GameSaveState.new().parse_payload(payload)
+	if not bool(parsed.get("ok", false)):
+		last_error = str(parsed.get("error", "Снятие предмета не прошло проверку."))
+		return false
+	var candidate: GameSaveState = parsed["state"] as GameSaveState
+	var resolved: Dictionary = BuildResolver.new().resolve_build(_build_input(candidate))
+	if not bool(resolved.get("valid", false)):
+		last_error = "Нельзя снять предмет: сборка станет невалидной (%s)." % str(resolved.get("issues", []))
+		return false
+	return _commit(candidate)
 
 func repair_item(item_id: String) -> bool:
 	if not _garage_action_allowed():

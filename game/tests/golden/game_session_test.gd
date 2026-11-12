@@ -109,6 +109,14 @@ func run(_tree: SceneTree) -> bool:
 		item_ops_payload["meta"]["inventory"][0] = starter_item
 		item_ops_payload["meta"]["protectedBank"]["SCRAP"] = 30.0
 		check(item_ops_session._commit_payload(item_ops_payload), "game_session: item-operation fixture could not be saved: %s" % item_ops_session.last_error)
+		var drone_id: String = str(item_ops_session.state.meta.inventory[5].get("itemId", ""))
+		check(item_ops_session.valid_equipment_slots(drone_id) == ["DRONE_1"], "game_session: locked second drone slot was exposed")
+		var unlock_payload: Dictionary = item_ops_session.state.to_payload()
+		unlock_payload["meta"]["unlockedDroneSlots"] = 2
+		check(item_ops_session._commit_payload(unlock_payload), "game_session: drone-slot fixture could not be saved")
+		check(item_ops_session.valid_equipment_slots(drone_id) == ["DRONE_1", "DRONE_2"], "game_session: valid unlocked drone slots were not enumerated")
+		check(item_ops_session.unequip_item("DRONE_1"), "game_session: equipped drone could not be removed: %s" % item_ops_session.last_error)
+		check(item_ops_session.equip_item("DRONE_2", drone_id) and item_ops_session.equipped_slot(drone_id) == "DRONE_2", "game_session: item could not be moved to the unlocked drone socket")
 		var item_id: String = str(starter_item.get("itemId", ""))
 		check(item_ops_session.repair_item(item_id), "game_session: secured item repair failed: %s" % item_ops_session.last_error)
 		check(is_equal_approx(float(item_ops_session.state.meta.inventory[0].get("durability", 0.0)), 100.0) and is_equal_approx(item_ops_session.state.meta.protected_bank.scrap, 19.0), "game_session: item repair did not restore durability and charge the formula cost")

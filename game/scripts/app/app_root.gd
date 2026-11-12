@@ -408,12 +408,22 @@ func _show_inventory() -> void:
 			var affix_label: Label = _label("%s T%d · %s (%.2f; диапазон %.2f–%.2f)" % [str(affix.get("affixId", "?")), int(affix.get("tier", 1)), str(inventory_catalog.get_affix(str(affix.get("affixId", ""))).get("name", "Аффикс")), float(affix.get("value", 0.0)), float(affix.get("min", 0.0)), float(affix.get("max", 0.0))], 10, COLOR_MUTED)
 			affix_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			item_info.add_child(affix_label)
-		var slot: String = _compatible_slot(str(template.get("category", "")))
-		if not slot.is_empty() and bool(item_value.get("secured", false)):
-			var equip_button: Button = _button("НАДЕТЬ %s" % slot, false)
-			equip_button.disabled = not can_edit_items
-			equip_button.pressed.connect(_on_equip_item.bind(slot, str(item_value.get("itemId", ""))))
-			item_actions.add_child(equip_button)
+		var item_id: String = str(item_value.get("itemId", ""))
+		var active_slot: String = _session.equipped_slot(item_id)
+		if not active_slot.is_empty():
+			item_info.add_child(_label("УСТАНОВЛЕН · %s" % active_slot, 10, COLOR_CYAN))
+			var unequip_button: Button = _button("СНЯТЬ %s" % active_slot, false)
+			unequip_button.disabled = not can_edit_items
+			unequip_button.pressed.connect(_on_unequip_item.bind(active_slot))
+			item_actions.add_child(unequip_button)
+		if bool(item_value.get("secured", false)):
+			for slot: String in _session.valid_equipment_slots(item_id):
+				if slot == active_slot:
+					continue
+				var equip_button: Button = _button("НАДЕТЬ · %s" % slot, false)
+				equip_button.disabled = not can_edit_items
+				equip_button.pressed.connect(_on_equip_item.bind(slot, item_id))
+				item_actions.add_child(equip_button)
 		if bool(item_value.get("secured", false)):
 			if float(item_value.get("durability", 100.0)) < 100.0:
 				var repair_tech: int = int(item_value.get("techLevel", 1))
@@ -771,6 +781,12 @@ func _on_equip_item(slot: String, item_id: String) -> void:
 	else:
 		_footer.text = _session.last_error
 
+func _on_unequip_item(slot: String) -> void:
+	if _session.unequip_item(slot):
+		_show_inventory()
+	else:
+		_footer.text = _session.last_error
+
 func _on_repair_item(item_id: String) -> void:
 	var repaired: bool = _session.repair_item(item_id)
 	_show_inventory()
@@ -780,15 +796,6 @@ func _on_calibrate_item_affix(item_id: String, affix_index: int) -> void:
 	var calibrated: bool = _session.calibrate_item_affix(item_id, affix_index)
 	_show_inventory()
 	_footer.text = "АФФИКС ПЕРЕКАЛИБРОВАН · BUILD LAB ПЕРЕСЧИТАН" if calibrated else _session.last_error
-
-func _compatible_slot(category: String) -> String:
-	match category:
-		"MAIN": return "MAIN"
-		"OFFHAND": return "OFFHAND"
-		"ARMOR": return "ARMOR"
-		"IMPLANT": return "IMP_4"
-		"DRONE": return "DRONE_1"
-	return ""
 
 func _contains_node(nodes: Array[Dictionary], node_id: String) -> bool:
 	for node: Dictionary in nodes:
