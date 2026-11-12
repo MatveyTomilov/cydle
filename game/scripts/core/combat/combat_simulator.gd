@@ -604,7 +604,7 @@ func _ready_enemy_ability(state: CombatState, actor: CombatActorState) -> Dictio
 	for ability: Dictionary in _enemy_ability_definitions(actor):
 		var kind: String = str(ability.get("kind", ""))
 		var scheduled_status: bool = kind == "applyStatus" and (float(ability.get("firstAtMs", 0.0)) > 0.0 or float(ability.get("everyMs", 0.0)) > 0.0)
-		if kind not in ["heavyAttack", "shieldBypass", "heal", "heat", "shieldRestore", "mark"] and not scheduled_status:
+		if kind not in ["heavyAttack", "shieldBypass", "heal", "heat", "shieldRestore", "mark", "escape", "wantedBoost", "protectAlly"] and not scheduled_status:
 			continue
 		if float(actor.ability_next.get(str(ability.get("id", "")), 999999999.0)) <= float(state.time_ms):
 			ready.append(ability)
@@ -718,6 +718,29 @@ func _resolve_enemy_ability(state: CombatState, rng: DeterministicRng, actor: Co
 			var before_shield: float = actor.shield
 			actor.shield = minf(float(_effective_sheet(state, actor).get("maxShield", 0.0)), actor.shield + float(ability.get("amount", 0.0)))
 			_emit(state, "SHIELD_GAIN", actor.id, {"actionId": action_id, "text": "%s: щит +%s." % [actor.display_name, _one_decimal(actor.shield - before_shield)], "data": {"abilityId": ability_id, "amount": actor.shield - before_shield}})
+		"escape":
+			actor.alive = false
+			actor.flags["escaped"] = true
+			var escaped: Array = state.metrics.get("escaped", [])
+			escaped.append({"enemyId": actor.id, "templateId": actor.template_id, "cargoItems": 1, "timeMs": state.time_ms})
+			state.metrics["escaped"] = escaped
+			_emit(state, "ESCAPE", actor.id, {"actionId": action_id, "text": "%s скрылся, прихватив груз." % actor.display_name, "data": {"abilityId": ability_id, "cargoItems": 1}})
+		"wantedBoost":
+			if not bool(actor.flags.get("wantedBoostApplied", false)):
+				actor.flags["wantedBoostApplied"] = true
+				state.wanted_delta += int(ability.get("amount", 0))
+				actor.ability_next[ability_id] = 999999999.0
+				_emit(state, "WANTED", actor.id, {"actionId": action_id, "text": "%s сообщил о вас властям: розыск +%d." % [actor.display_name, int(ability.get("amount", 0))], "data": {"abilityId": ability_id, "amount": int(ability.get("amount", 0))}})
+		"protectAlly":
+			var weakest: CombatActorState = null
+			for ally: CombatActorState in state.enemies:
+				if not ally.alive:
+					continue
+				if weakest == null or ally.hp / maxf(1.0, float(_effective_sheet(state, ally).get("maxHP", 1.0))) < weakest.hp / maxf(1.0, float(_effective_sheet(state, weakest).get("maxHP", 1.0))):
+					weakest = ally
+			if weakest != null:
+				weakest.flags["protectedBy"] = actor.id
+				_emit(state, "GUARD", actor.id, {"targetId": weakest.id, "actionId": action_id, "text": "%s прикрывает %s: получаемый урон −15%%." % [actor.display_name, weakest.display_name], "data": {"abilityId": ability_id, "reduction": 0.15}})
 	_emit(state, "TRIGGER", actor.id, {"targetId": target.id if target != null else "", "actionId": action_id, "text": "%s: %s." % [actor.display_name, str(ability.get("desc", ability_id))], "data": {"abilityId": ability_id, "abilityKind": ability_kind}})
 
 func _resolve_main_skill(state: CombatState, rng: DeterministicRng, actor: CombatActorState, cast: Dictionary) -> void:
@@ -1005,6 +1028,10 @@ func _apply_dot_damage(state: CombatState, target: CombatActorState, source_id: 
 	var defender: Dictionary = _effective_sheet(state, target, source)
 	var mitigation: Dictionary = _damage.mitigate_packet(raw, damage_type, {"armor": defender.get("armor", 0.0), "energyRes": defender.get("energyRes", 0.0), "digitalRes": defender.get("digitalRes", 0.0)}, DamageMath.ZERO_PENETRATION)
 	var incoming: float = float(mitigation["afterDefense"]) * float(defender.get("incomingAll", 1.0)) * float(defender.get("incomingKinetic" if damage_type == "KINETIC" else "incomingEnergy" if damage_type == "ENERGY" else "incomingDigital", 1.0))
+	if target.side == "enemy" and not str(target.flags.get("protectedBy", "")).is_empty():
+		var protector: CombatActorState = _actor_by_id(state, str(target.flags["protectedBy"]))
+		if protector != null and protector.alive and protector.template_id == "E12":
+			incoming *= 0.85
 	var partition: Dictionary = _damage.partition_damage(incoming, {"hp": target.hp, "shield": target.shield, "temp": target.temp_shields}, 0.0, float(defender.get("incomingShield", 1.0)))
 	_apply_partition(target, partition)
 	target.flags["lastDamagedAt"] = float(state.time_ms)
@@ -1287,6 +1314,10 @@ func _resolve_basic_hit(state: CombatState, rng: DeterministicRng, actor: Combat
 		penetration["armorPen"] = float(penetration["armorPen"]) + 20.0
 	var mitigation: Dictionary = _damage.mitigate_packet(raw, damage_type, {"armor": defender.get("armor", 0.0), "energyRes": defender.get("energyRes", 0.0), "digitalRes": defender.get("digitalRes", 0.0)}, penetration)
 	var incoming: float = float(mitigation["afterDefense"]) * float(defender.get("incomingAll", 1.0)) * float(defender.get("incomingKinetic" if damage_type == "KINETIC" else "incomingEnergy" if damage_type == "ENERGY" else "incomingDigital", 1.0))
+	if target.side == "enemy" and not str(target.flags.get("protectedBy", "")).is_empty():
+		var protector: CombatActorState = _actor_by_id(state, str(target.flags["protectedBy"]))
+		if protector != null and protector.alive and protector.template_id == "E12":
+			incoming *= 0.85
 	if _has_status(target, "MARK"):
 		incoming *= 1.3
 		target.statuses.erase("MARK")

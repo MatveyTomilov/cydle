@@ -660,6 +660,15 @@ func resolve_active_combat() -> bool:
 	if _combat.outcome != "VICTORY":
 		last_error = "Бой завершился без победы; безопасное восстановление ещё не реализовано."
 		return false
+	if _combat.wanted_delta != 0:
+		run_payload["wanted"] = clampf(float(run_payload.get("wanted", 0.0)) + float(_combat.wanted_delta), 0.0, 100.0)
+	var escaped_cargo: int = 0
+	for escape_value: Dictionary in _combat.metrics.get("escaped", []):
+		escaped_cargo += int(escape_value.get("cargoItems", 1))
+	var unsecured: Array = run_payload.get("unsecuredCargo", [])
+	for _item_index: int in range(mini(escaped_cargo, unsecured.size())):
+		unsecured.pop_back()
+	run_payload["unsecuredCargo"] = unsecured
 	var reward: Dictionary = _battle_reward(_active_node_type if not _active_node_type.is_empty() else str(node.get("type", "COMBAT")), state.run.depth, state.run.biome, node_id, run_payload, _active_reward_modifiers)
 	var payload: Dictionary = state.to_payload()
 	var wallet: Dictionary = run_payload["runWallet"]

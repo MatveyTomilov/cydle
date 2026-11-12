@@ -13,6 +13,7 @@ func run(_tree: SceneTree) -> bool:
 	_run_boss_threshold_phase()
 	_run_elite_split()
 	_run_main_skill_effects()
+	_run_enemy_escape_wanted_protection()
 	return failure_count == 0
 
 func _run_reaction_shield() -> void:
@@ -215,6 +216,77 @@ func _run_elite_split() -> void:
 		if enemy.template_id == "E20" and enemy.summoned and enemy.no_loot:
 			spawned += 1
 	check(spawned == 2 and state.outcome.is_empty(), "elite_split: death did not produce two no-loot swarm enemies")
+
+func _run_enemy_escape_wanted_protection() -> void:
+	var escape_data: Dictionary = _make_enemy_state([{"templateId": "E06"}], "escape-test")
+	var escape_state: CombatState = escape_data.get("state") as CombatState
+	var escape_simulator: CombatSimulator = escape_data.get("simulator") as CombatSimulator
+	if escape_state != null and escape_simulator != null:
+		escape_state.operator.hp = 100000.0
+		escape_state.operator.next_attack_at = 999999.0
+		while escape_state.time_ms < 16000 and escape_state.outcome.is_empty():
+			var step: Dictionary = escape_simulator.step_combat(escape_state)
+			if not bool(step.get("ok", false)):
+				check(false, "enemy_escape: step failed: %s" % step.get("error", ""))
+				break
+			escape_state = step["state"] as CombatState
+		check(escape_state.outcome == "VICTORY" and escape_state.metrics.get("escaped", []).size() == 1, "enemy_escape: E06 did not escape with one cargo item")
+	var wanted_data: Dictionary = _make_enemy_state([{"templateId": "E11"}], "wanted-test")
+	var wanted_state: CombatState = wanted_data.get("state") as CombatState
+	var wanted_simulator: CombatSimulator = wanted_data.get("simulator") as CombatSimulator
+	if wanted_state != null and wanted_simulator != null:
+		wanted_state.operator.hp = 100000.0
+		wanted_state.operator.next_attack_at = 999999.0
+		while wanted_state.time_ms < 5400:
+			var step: Dictionary = wanted_simulator.step_combat(wanted_state)
+			if not bool(step.get("ok", false)):
+				check(false, "enemy_wanted: step failed: %s" % step.get("error", ""))
+				break
+			wanted_state = step["state"] as CombatState
+		check(wanted_state.wanted_delta == 3, "enemy_wanted: E11 did not add its post-combat wanted")
+	var protect_data: Dictionary = _make_enemy_state([{"templateId": "E12"}, {"templateId": "E01"}], "protect-test")
+	var protect_state: CombatState = protect_data.get("state") as CombatState
+	var protect_simulator: CombatSimulator = protect_data.get("simulator") as CombatSimulator
+	if protect_state != null and protect_simulator != null:
+		protect_state.operator.hp = 100000.0
+		protect_state.operator.next_attack_at = 999999.0
+		protect_state.enemies[1].hp = 1.0
+		while protect_state.time_ms < 5200:
+			var step: Dictionary = protect_simulator.step_combat(protect_state)
+			if not bool(step.get("ok", false)):
+				check(false, "enemy_protect: step failed: %s" % step.get("error", ""))
+				break
+			protect_state = step["state"] as CombatState
+		check(str(protect_state.enemies[1].flags.get("protectedBy", "")) == protect_state.enemies[0].id, "enemy_protect: E12 did not guard the weakest ally")
+		var guarded: CombatState = protect_state.clone()
+		var unguarded: CombatState = protect_state.clone()
+		unguarded.enemies[1].flags.erase("protectedBy")
+		var guarded_rng: DeterministicRng = DeterministicRng.new()
+		var unguarded_rng: DeterministicRng = DeterministicRng.new()
+		guarded_rng.seed("combat", "protect-hit")
+		unguarded_rng.seed("combat", "protect-hit")
+		protect_simulator._resolve_basic_hit(guarded, guarded_rng, guarded.operator, guarded.enemies[1], 100.0, "KINETIC", "protect-check", false)
+		protect_simulator._resolve_basic_hit(unguarded, unguarded_rng, unguarded.operator, unguarded.enemies[1], 100.0, "KINETIC", "protect-check", false)
+		var guarded_hit: Dictionary = guarded.log.back()
+		var unguarded_hit: Dictionary = unguarded.log.back()
+		check(guarded_hit.get("kind", "") == "DAMAGE" and unguarded_hit.get("kind", "") == "DAMAGE", "enemy_protect: comparison hit did not land")
+		if guarded_hit.get("kind", "") == "DAMAGE" and unguarded_hit.get("kind", "") == "DAMAGE":
+			check(is_equal_approx(float(guarded_hit.get("amountAfterDefense", 0.0)), float(unguarded_hit.get("amountAfterDefense", 0.0)) * 0.85), "enemy_protect: guard did not reduce ally damage by 15 percent (%s vs %s; %s)" % [guarded_hit.get("amountAfterDefense", -1), unguarded_hit.get("amountAfterDefense", -1), guarded.enemies[1].flags.get("protectedBy", "")])
+
+func _make_enemy_state(enemy_specs: Array[Dictionary], seed_value: String) -> Dictionary:
+	var meta: Dictionary = _read_dictionary(SAVE_FIXTURE).get("meta", {})
+	var items_by_id: Dictionary = {}
+	for item_value: Dictionary in meta.get("inventory", []):
+		items_by_id[str(item_value["itemId"])] = item_value
+	var main_item: ItemInstance = ItemInstance.new()
+	if not main_item.instantiate_from_dictionary(items_by_id[str(meta["equipment"]["MAIN"])]):
+		return {}
+	var build: Dictionary = BuildResolver.new().resolve_build({"equipment": {"MAIN": main_item}, "attributes": meta["operator"]["attributes"], "skillIds": [], "passiveIds": [], "treeNodeIds": [], "attributePointsEarned": 0, "treePointsEarned": 0})
+	if not bool(build.get("valid", false)):
+		return {}
+	var simulator: CombatSimulator = CombatSimulator.new()
+	var initialized: Dictionary = simulator.create_state({"seed": seed_value, "depth": 1, "biome": "B01", "nodeType": "COMBAT", "build": build, "enemies": enemy_specs, "tactics": {"rules": []}, "startEnergy": 100})
+	return {"simulator": simulator, "state": initialized.get("state")} if bool(initialized.get("ok", false)) else {}
 
 func _run_main_skill_effects() -> void:
 	var blade_data: Dictionary = _make_skill_state("SK_BLADE", "nearest", [{"templateId": "E01"}], "blade-test")
