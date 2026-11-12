@@ -8,6 +8,7 @@ func run(_tree: SceneTree) -> bool:
 	_run_replay("plasma_skill_replay", "SK_PLASMA")
 	_run_reaction_shield()
 	_run_reaction_emp_interrupt()
+	_run_enemy_telegraphed_attack()
 	return failure_count == 0
 
 func _run_reaction_shield() -> void:
@@ -80,6 +81,46 @@ func _run_reaction_emp_interrupt() -> void:
 		state = stepped["state"] as CombatState
 	check(int(state.metrics.get("interrupts", 0)) == 1, "reaction_emp: reaction did not interrupt the imminent cast")
 	check(state.enemies[0].cast == null, "reaction_emp: interrupted cast remained active")
+
+func _run_enemy_telegraphed_attack() -> void:
+	var meta: Dictionary = _read_dictionary(SAVE_FIXTURE).get("meta", {})
+	var fixture: Dictionary = _read_dictionary("res://tests/fixtures/combat/basic_auto_replay.json")
+	var items_by_id: Dictionary = {}
+	for item_value: Dictionary in meta.get("inventory", []):
+		items_by_id[str(item_value["itemId"])] = item_value
+	var main_item: ItemInstance = ItemInstance.new()
+	if not check(main_item.instantiate_from_dictionary(items_by_id[str(meta["equipment"]["MAIN"])]), "enemy_snipe: starter weapon did not parse"):
+		return
+	var build: Dictionary = BuildResolver.new().resolve_build({
+		"equipment": {"MAIN": main_item}, "attributes": meta["operator"]["attributes"],
+		"skillIds": [], "passiveIds": [], "treeNodeIds": [], "attributePointsEarned": 0, "treePointsEarned": 0,
+	})
+	var config: Dictionary = fixture["config"]
+	var initialized: Dictionary = CombatSimulator.new().create_state({
+		"seed": config["seed"], "depth": 1, "biome": "B01", "nodeType": "COMBAT", "build": build,
+		"enemies": [{"templateId": "E02"}], "tactics": {"id": "test", "rules": []},
+		"startEnergy": 100,
+	})
+	if not check(bool(initialized.get("ok", false)), "enemy_snipe: state initialization failed: %s" % initialized.get("error", "")):
+		return
+	var simulator: CombatSimulator = CombatSimulator.new()
+	var state: CombatState = initialized["state"] as CombatState
+	state.operator.next_attack_at = 999999.0
+	var initial_hp: float = state.operator.hp
+	while state.time_ms < 7000 and state.outcome.is_empty():
+		var stepped: Dictionary = simulator.step_combat(state)
+		if not check(bool(stepped.get("ok", false)), "enemy_snipe: step failed at %d: %s" % [state.time_ms + 100, stepped.get("error", "")]):
+			return
+		state = stepped["state"] as CombatState
+	var telegraphed: bool = false
+	var resolved: bool = false
+	for event: Dictionary in state.log:
+		if str(event.get("actionId", "")).contains("E02_snipe"):
+			telegraphed = telegraphed or str(event.get("kind", "")) == "TELEGRAPH"
+			resolved = resolved or str(event.get("kind", "")) in ["DAMAGE", "MISS"]
+	check(telegraphed, "enemy_snipe: enemy ability did not show its telegraph")
+	check(resolved, "enemy_snipe: telegraphed heavy attack did not resolve")
+	check(state.operator.hp <= initial_hp, "enemy_snipe: enemy action unexpectedly healed its target")
 
 func _run_replay(replay_name: String, skill_id: String) -> void:
 	var meta: Dictionary = _read_dictionary(SAVE_FIXTURE).get("meta", {})
