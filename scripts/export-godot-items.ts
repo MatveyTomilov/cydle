@@ -5,6 +5,7 @@ import { AFFIXES, RARITY_AFFIX_COUNT, RARITY_PRICE_MULT, SLOT_GROUP_WEIGHTS, TR_
 import { RARITY_TABLES, createItem, rollItem, rollRarity } from '../src/core/items/items';
 import { Rng } from '../src/core/rng';
 import type { CreateItemOptions, LootRollOptions } from '../src/core/items/items';
+import { resolveBuild } from '../src/core/build/build';
 import { UNIQUE_TEMPLATE_BY_ID } from '../src/data/uniques';
 
 const templates = [...ITEM_TEMPLATES, ...Object.values(UNIQUE_TEMPLATE_BY_ID)];
@@ -57,3 +58,55 @@ writeFileSync(fixtureOutput, `${JSON.stringify({
   lootCases: lootCases.map((entry) => ({ ...entry, expected: rollItem(new Rng(entry.stream, entry.seed), entry.options) })),
 }, null, 2)}\n`, 'utf8');
 console.log(`Exported ${fixtureCases.length} item, ${rarityCases.length} rarity, and ${lootCases.length} loot fixtures to ${fixtureOutput}`);
+
+const buildFixtureCases = [
+  {
+    name: 'attribute-main',
+    seed: 'build-fixture',
+    attributes: { POW: 7, REF: 6, INT: 5, ENG: 5, SYN: 5 },
+    attributePointsEarned: 3,
+    equipment: { MAIN: { templateId: 'PISTOL_K1', techLevel: 5, rarity: 'COMMON' as const, secured: true, originGrantId: 'build-main', origin: 'garage' } },
+  },
+  {
+    name: 'armor-implant-drone',
+    seed: 'build-fixture',
+    attributes: { POW: 5, REF: 5, INT: 5, ENG: 7, SYN: 8 },
+    attributePointsEarned: 5,
+    equipment: {
+      MAIN: { templateId: 'PLASMA_E1', techLevel: 8, rarity: 'RARE' as const, secured: true, originGrantId: 'build-main-2', origin: 'garage', affixCount: 3 },
+      ARMOR: { templateId: 'ARM_HEAVY', techLevel: 5, rarity: 'MODIFIED' as const, secured: true, originGrantId: 'build-armor', origin: 'garage', affixCount: 1 },
+      IMP_2: { templateId: 'IMP_HP', techLevel: 5, rarity: 'COMMON' as const, secured: true, originGrantId: 'build-implant', origin: 'garage' },
+      DRONE_1: { templateId: 'DR_MED', techLevel: 3, rarity: 'COMMON' as const, secured: true, originGrantId: 'build-drone', origin: 'garage' },
+    },
+  },
+];
+const buildFixtureOutput = resolve('game/tests/fixtures/items/build_cases.json');
+const buildFixtureOutputData: Array<Record<string, unknown>> = [];
+for (const entry of buildFixtureCases) {
+  const equipment: Record<string, ReturnType<typeof createItem>> = {};
+  for (const [slot, options] of Object.entries(entry.equipment)) {
+    const item = createItem(new Rng('loot', `${entry.seed}:${slot}`), { ...options, techLevel: options.techLevel, secured: options.secured, originGrantId: options.originGrantId, origin: options.origin });
+    if (slot === 'MAIN' && entry.name === 'armor-implant-drone') item.durability = 20;
+    equipment[slot] = item;
+  }
+  const build = resolveBuild({ attributes: entry.attributes, attributePointsEarned: entry.attributePointsEarned, equipment });
+	buildFixtureOutputData.push({
+		name: entry.name,
+		seed: entry.seed,
+		attributes: entry.attributes,
+		attributePointsEarned: entry.attributePointsEarned,
+		equipment: Object.fromEntries(Object.entries(equipment).map(([slot, item]) => [slot, item])),
+		expected: {
+    valid: build.valid,
+    attributes: build.attributes,
+    stats: build.stats,
+    mainWeapon: build.mainWeapon,
+    sidearm: build.sidearm,
+    drones: build.drones,
+			modifiers: build.modifiers,
+		},
+	});
+}
+mkdirSync(dirname(buildFixtureOutput), { recursive: true });
+writeFileSync(buildFixtureOutput, `${JSON.stringify({ cases: buildFixtureOutputData }, null, 2)}\n`, 'utf8');
+console.log(`Exported ${buildFixtureCases.length} build resolver fixtures to ${buildFixtureOutput}`);
