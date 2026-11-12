@@ -1,6 +1,31 @@
 extends "res://tests/test_case.gd"
 
 func run(_tree: SceneTree) -> bool:
+	var contract_session: GameSession = GameSession.new()
+	contract_session.configure_save_directory("user://test-saves/contracts")
+	if check(contract_session.start_new_game(1762900000100), "game_session: could not create a contract profile"):
+		var offers: Array[Dictionary] = contract_session.available_contract_offers()
+		check(offers.size() == 1 and str(offers[0].get("id", "")) == "CT_HUNT", "game_session: contract offers did not match the current sector biome")
+		check(contract_session.start_expedition("contract-fixed-seed", false, "CT_HUNT"), "game_session: HUNT contract failed to start: %s" % contract_session.last_error)
+		if contract_session.state.run != null:
+			var contract: Dictionary = contract_session.state.run.contract
+			check(str(contract.get("status", "")) == "ACTIVE" and not str(contract.get("targetNodeId", "")).is_empty(), "game_session: HUNT contract did not retain an active target")
+			var found_target: bool = false
+			for layer: Array in contract_session.state.run.graph.get("layers", []):
+				for node: Dictionary in layer:
+					if str(node.get("id", "")) == str(contract.get("targetNodeId", "")):
+						found_target = str(node.get("type", "")) == "ELITE" and not node.get("enemies", []).is_empty() and str(node["enemies"][0].get("templateId", "")) == str(contract.get("targetEnemyId", ""))
+			check(found_target, "game_session: HUNT target did not exist in the generated road graph")
+			var round_trip: Dictionary = GameSaveState.new().parse_payload(contract_session.state.to_payload())
+			check(bool(round_trip.get("ok", false)) and str(round_trip["state"].run.contract.get("instanceId", "")) == str(contract.get("instanceId", "")), "game_session: active contract save did not validate and roundtrip")
+			var payout: Dictionary = contract_session.state.to_payload()
+			var credits_before: float = float(payout["run"]["runWallet"].get("CREDITS", 0.0))
+			check(contract_session._complete_contract(payout, {"CREDITS": 30}, {"rarity": "RARE", "tag": "weapon"}), "game_session: contract reward transaction failed: %s" % contract_session.last_error)
+			check(contract_session._commit_payload(payout), "game_session: contract reward transaction could not be saved: %s" % contract_session.last_error)
+			check(str(contract_session.state.run.contract.get("status", "")) == "COMPLETE" and contract_session.state.run.unsecured_cargo.size() == 1 and is_equal_approx(contract_session.state.run.wallet.credits, credits_before + 30.0), "game_session: contract reward did not grant its item and credits")
+			var repeat_payout: Dictionary = contract_session.state.to_payload()
+			contract_session._complete_contract(repeat_payout, {"CREDITS": 30}, {"rarity": "RARE", "tag": "weapon"})
+			check(contract_session._commit_payload(repeat_payout) and is_equal_approx(contract_session.state.run.wallet.credits, credits_before + 30.0) and contract_session.state.run.unsecured_cargo.size() == 1, "game_session: repeated contract payout duplicated its grant")
 	var session: GameSession = GameSession.new()
 	session.configure_save_directory("user://test-saves/game-session")
 	if not check(session.start_new_game(1762900000000), "game_session: could not create a new game: %s" % session.last_error):

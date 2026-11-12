@@ -366,7 +366,23 @@ func _build_input_with_tree(save_state: GameSaveState, tree_ids: Array[String]) 
 	input["treeNodeIds"] = tree_ids
 	return input
 
-func start_expedition(seed_value: String = "", use_medical_restore: bool = false) -> bool:
+func available_contract_offers() -> Array[Dictionary]:
+	var offers: Array[Dictionary] = []
+	if state == null:
+		return offers
+	var depth: int = maxi(1, state.meta.unlocked_forpost + 1)
+	var seed: String = "%s:sector:%d" % [state.save_id, depth]
+	var biome: String = _generator.campaign_biome(depth, seed)
+	var catalog: QuestCatalog = QuestCatalog.new()
+	if not bool(catalog.load_catalog().get("ok", false)):
+		return offers
+	for id: String in ["CT_HUNT", "CT_TECH", "CT_ESCORT"]:
+		var definition: Dictionary = catalog.get_contract(id)
+		if not definition.is_empty() and str(definition.get("targetBiome", "")) == biome:
+			offers.append(definition)
+	return offers
+
+func start_expedition(seed_value: String = "", use_medical_restore: bool = false, contract_id: String = "") -> bool:
 	if state == null:
 		last_error = "Сначала создайте или загрузите профиль."
 		return false
@@ -398,6 +414,37 @@ func start_expedition(seed_value: String = "", use_medical_restore: bool = false
 	if not bool(generated.get("ok", false)):
 		last_error = str(generated.get("error", "Не удалось создать дорожную карту."))
 		return false
+	var contract: Dictionary = {}
+	if not contract_id.is_empty():
+		var contract_catalog: QuestCatalog = QuestCatalog.new()
+		if not bool(contract_catalog.load_catalog().get("ok", false)):
+			last_error = "Каталог контрактов недоступен."
+			return false
+		contract = contract_catalog.get_contract(contract_id)
+		if contract.is_empty() or str(contract.get("targetBiome", "")) != biome:
+			last_error = "Контракт недоступен для биома текущего сектора."
+			return false
+		var layers: Array = generated["graph"].get("layers", [])
+		if str(contract.get("kind", "")) == "HUNT":
+			var target_node: Dictionary = _force_contract_node(layers, "ELITE", 1)
+			if target_node.is_empty():
+				last_error = "Для контракта охоты не удалось создать узел элиты."
+				return false
+			contract["targetNodeId"] = str(target_node.get("id", ""))
+			var target_enemies: Array = target_node.get("enemies", [])
+			contract["targetEnemyId"] = str(target_enemies[0].get("templateId", "")) if not target_enemies.is_empty() else ""
+		elif str(contract.get("kind", "")) == "TECH":
+			var target_cache: Dictionary = _force_contract_node(layers, "CACHE", 1)
+			if target_cache.is_empty():
+				last_error = "Для технического контракта не удалось создать тайник."
+				return false
+			contract["targetNodeId"] = str(target_cache.get("id", ""))
+		contract["instanceId"] = "contract:%s:%s" % [seed, contract_id]
+		contract["status"] = "ACTIVE"
+		contract["combatNodes"] = 0
+		contract["rewardClaimed"] = false
+		var biome_tags: Dictionary = {"B01": "weapon", "B02": "armor", "B03": "drone", "B04": "digital", "B05": "energy", "B06": "hybrid"}
+		contract["targetTechTag"] = str(contract.get("rewardItem", {}).get("tag", biome_tags.get(biome, "tech")))
 	var world_rng: DeterministicRng = DeterministicRng.new()
 	world_rng.seed("world", seed)
 	var loot_rng: DeterministicRng = DeterministicRng.new()
@@ -426,6 +473,7 @@ func start_expedition(seed_value: String = "", use_medical_restore: bool = false
 		"unsecuredCargo": [], "shippedCargo": [], "grantIds": [], "commandIds": [],
 		"serviceScrapFuelCounts": {}, "shippedCheckpointIds": [], "combatResult": null, "lastCommandId": null,
 		"worldRng": world_rng.serialize(), "lootRng": loot_rng.serialize(), "combatSnapshot": null,
+		"contract": contract,
 	}
 	var payload: Dictionary = state.to_payload()
 	payload["run"] = run_payload
@@ -434,6 +482,38 @@ func start_expedition(seed_value: String = "", use_medical_restore: bool = false
 		run_payload["resources"]["hull"] = run_payload["resources"]["maxHull"]
 		payload["run"] = run_payload
 	return _commit_payload(payload)
+
+func _force_contract_node(layers: Array, type: String, preferred_layer: int) -> Dictionary:
+	if layers.is_empty():
+		return {}
+	var candidates: Array[Dictionary] = []
+	for layer_index: int in range(layers.size()):
+		for node_value: Variant in layers[layer_index]:
+			if node_value is Dictionary:
+				candidates.append(node_value)
+	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var ad: int = absi(int(a.get("layer", 0)) - preferred_layer)
+		var bd: int = absi(int(b.get("layer", 0)) - preferred_layer)
+		return ad < bd if ad != bd else str(a.get("id", "")) < str(b.get("id", "")))
+	if candidates.is_empty():
+		return {}
+	var selected: Dictionary = {}
+	for candidate: Dictionary in candidates:
+		if type != "ELITE" or not candidate.get("enemies", []).is_empty():
+			selected = candidate
+			break
+	if selected.is_empty():
+		return {}
+	selected["type"] = type
+	if type == "ELITE":
+		var enemies: Array = selected.get("enemies", [])
+		enemies[0]["elite"] = "EL_FAST"
+		selected["enemies"] = enemies
+	else:
+		selected.erase("eventId")
+		selected.erase("prototypeChoices")
+		selected["enemies"] = []
+	return selected
 
 func reachable_nodes() -> Array[Dictionary]:
 	if state == null or state.run == null or state.run.phase != "ROUTE":
@@ -520,6 +600,8 @@ func travel_to(node_id: String) -> bool:
 	run_payload["combatResult"] = null
 	var payload: Dictionary = state.to_payload()
 	payload["run"] = run_payload
+	if str(target_node.get("type", "")) == "CHECKPOINT":
+		_settle_escort_contract(payload)
 	return _commit_payload(payload)
 
 func current_node() -> Dictionary:
@@ -1007,6 +1089,9 @@ func resolve_service_node(action: String, prototype_id: String = "") -> bool:
 				run_payload["unsecuredCargo"].append(item_value)
 			run_payload["grantIds"].append(grant_id)
 			run_payload["lootRng"] = rng.serialize()
+		if str(run_payload.get("contract", {}).get("status", "")) == "ACTIVE" and str(run_payload["contract"].get("kind", "")) == "TECH" and str(run_payload["contract"].get("targetNodeId", "")) == node_id:
+			if not _complete_contract(payload, {"DATA": ceili(15.0 * scale)}, {"rarity": "MODIFIED", "tag": str(run_payload["contract"].get("targetTechTag", "tech"))}):
+				return false
 	else:
 		last_error = "Сначала приобретите товар или выйдите из магазина."
 		return false
@@ -1015,6 +1100,60 @@ func resolve_service_node(action: String, prototype_id: String = "") -> bool:
 	resources["gameTimeMs"] = float(resources.get("gameTimeMs", 0.0)) + elapsed
 	run_payload["lastCommandId"] = "node:%s:%s" % [node_id, action]
 	return _commit_payload(payload)
+
+func _settle_escort_contract(payload: Dictionary) -> void:
+	var run_payload: Dictionary = payload["run"]
+	var contract: Dictionary = run_payload.get("contract", {})
+	if str(contract.get("kind", "")) != "ESCORT" or str(contract.get("status", "")) != "ACTIVE":
+		return
+	var resources: Dictionary = run_payload.get("resources", {})
+	if int(contract.get("combatNodes", 0)) >= 2 and float(run_payload.get("wanted", 0.0)) <= 40.0 and float(resources.get("fuel", 0.0)) >= 3.0:
+		var rewards: Dictionary = {"CREDITS": ceili(50.0 * CydleFormula.new().reward_scale(float(run_payload.get("depth", 1))))}
+		_complete_contract(payload, rewards, {}, {"F_RUST": 8})
+	else:
+		contract["status"] = "FAILED"
+
+func _complete_contract(payload: Dictionary, rewards: Dictionary, item_spec: Dictionary, reputation: Dictionary = {}) -> bool:
+	var run_payload: Dictionary = payload["run"]
+	var contract: Dictionary = run_payload.get("contract", {})
+	if contract.is_empty() or str(contract.get("status", "")) != "ACTIVE":
+		return true
+	var completion_id: String = "%s:reward" % str(contract.get("instanceId", ""))
+	if run_payload["grantIds"].has(completion_id):
+		contract["status"] = "COMPLETE"
+		contract["rewardClaimed"] = true
+		return true
+	var scale: float = CydleFormula.new().reward_scale(float(run_payload.get("depth", 1)))
+	for currency: String in rewards.keys():
+		run_payload["runWallet"][currency] = float(run_payload["runWallet"].get(currency, 0.0)) + float(rewards[currency])
+	var paid: Dictionary = {}
+	if not item_spec.is_empty():
+		var loaded: Dictionary = _item_catalog.load_catalog()
+		if not bool(loaded.get("ok", false)):
+			last_error = str(loaded.get("error", "Каталог предметов недоступен для награды контракта."))
+			return false
+		var rng: DeterministicRng = DeterministicRng.new()
+		rng.restore(run_payload["lootRng"])
+		var options: Dictionary = {"depth": int(run_payload["depth"]), "biome": str(run_payload["biome"]), "table": "ELITE" if str(contract.get("kind", "")) == "HUNT" else "ORDINARY", "secured": false, "grantId": completion_id + ":item", "origin": "contract", "acquiredAt": state.updated_at, "forceRarity": str(item_spec.get("rarity", "RARE")), "forceTag": str(item_spec.get("tag", ""))}
+		var rolled: Dictionary = ItemFactory.new().roll_item(rng, _item_catalog, options)
+		if not bool(rolled.get("ok", false)):
+			last_error = str(rolled.get("error", "Награду контракта нельзя создать."))
+			return false
+		paid = (rolled["item"] as ItemInstance).to_dictionary()
+		if not _cargo_fits(run_payload, paid):
+			last_error = "Для гарантированной награды контракта нет места в грузовом отсеке. Освободите место и повторите действие."
+			return false
+		run_payload["unsecuredCargo"].append(paid)
+		run_payload["lootRng"] = rng.serialize()
+	for faction: String in reputation.keys():
+		payload["meta"]["reputation"][faction] = clampi(int(payload["meta"]["reputation"].get(faction, 0)) + int(reputation[faction]), -100, 100)
+	if str(contract.get("kind", "")) == "TECH":
+		var blueprint: String = "contract-blueprint:%s" % str(contract.get("id", ""))
+		if not payload["meta"]["campaignFlags"].has(blueprint): payload["meta"]["campaignFlags"].append(blueprint)
+	run_payload["grantIds"].append(completion_id)
+	contract["status"] = "COMPLETE"
+	contract["rewardClaimed"] = true
+	return true
 
 func continue_campaign() -> bool:
 	if state == null or state.run == null or state.run.phase != "CHECKPOINT":
@@ -1277,6 +1416,15 @@ func resolve_active_combat() -> bool:
 	run_payload["unsecuredCargo"] = unsecured
 	var reward: Dictionary = _battle_reward(_active_node_type if not _active_node_type.is_empty() else str(node.get("type", "COMBAT")), state.run.depth, state.run.biome, node_id, run_payload, _active_reward_modifiers)
 	var payload: Dictionary = state.to_payload()
+	payload["run"] = run_payload
+	var contract: Dictionary = run_payload.get("contract", {})
+	if not contract.is_empty() and str(contract.get("status", "")) == "ACTIVE":
+		if str(contract.get("kind", "")) == "HUNT" and str(contract.get("targetNodeId", "")) == node_id and str(node.get("type", "")) == "ELITE":
+			var target_scale: float = CydleFormula.new().reward_scale(float(state.run.depth))
+			if not _complete_contract(payload, {"CREDITS": ceili(30.0 * target_scale)}, {"rarity": str(contract.get("rewardItem", {}).get("rarity", "RARE")), "tag": str(contract.get("targetTechTag", "weapon"))}):
+				return false
+		elif str(contract.get("kind", "")) in ["ESCORT", "HUNT", "TECH"] and str(node.get("type", "")) in ["COMBAT", "ELITE", "BOUNTY", "BOSS"]:
+			contract["combatNodes"] = int(contract.get("combatNodes", 0)) + 1
 	var wallet: Dictionary = run_payload["runWallet"]
 	for currency: String in ["CREDITS", "SCRAP", "DATA"]:
 		wallet[currency] = float(wallet.get(currency, 0.0)) + float(reward["wallet"].get(currency, 0.0))

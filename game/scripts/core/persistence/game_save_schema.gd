@@ -168,6 +168,8 @@ func _validate_run(value: Variant, meta: Dictionary) -> Dictionary:
 		"alliedTurret": false, "extraRareOnElite": false,
 	})):
 		return _failure("run.pendingNextCombat: неверная структура.")
+	if run.has("contract") and not _validate_contract_instance(run["contract"]):
+		return _failure("run.contract: неверный активный контракт.")
 	if not _validate_count_map(run["serviceScrapFuelCounts"]) or run["lastCommandId"] != null and not _nonempty_string(run["lastCommandId"]):
 		return _failure("run.serviceScrapFuelCounts/lastCommandId: неверные значения.")
 	if run["combatResult"] != null and not run["combatResult"] is Dictionary:
@@ -189,6 +191,20 @@ func _validate_run(value: Variant, meta: Dictionary) -> Dictionary:
 	if not bool(ownership_result.get("ok", false)):
 		return ownership_result
 	return {"ok": true, "error": ""}
+
+func _validate_contract_instance(value: Variant) -> bool:
+	if not value is Dictionary:
+		return false
+	if value.is_empty():
+		return true
+	var contract: Dictionary = value
+	if not _nonempty_string(contract.get("id")) or not _nonempty_string(contract.get("instanceId")) or not _nonempty_string(contract.get("kind")):
+		return false
+	if not ["HUNT", "TECH", "ESCORT"].has(str(contract["kind"])) or not ["ACTIVE", "COMPLETE", "FAILED"].has(str(contract.get("status", ""))):
+		return false
+	if not BIOMES.has(str(contract.get("targetBiome", ""))) or not _is_integer(contract.get("combatNodes", 0)) or int(contract.get("combatNodes", 0)) < 0:
+		return false
+	return true
 
 func _validate_run_ownership(run: Dictionary, meta: Dictionary) -> Dictionary:
 	var catalog: ItemCatalog = ItemCatalog.new()
@@ -307,16 +323,11 @@ func _validate_item_catalog_refs(value: Dictionary, template: Dictionary, catalo
 	var expected_unique: Array = [str(template["uniqueEffectId"])] if template.has("uniqueEffectId") else []
 	if value["uniqueEffectIds"] != expected_unique:
 		return false
-	var groups: Dictionary = {}
 	for affix_value: Variant in value["affixes"]:
 		var affix_id: String = str(affix_value.get("affixId", "")) if affix_value is Dictionary else ""
 		var definition: Dictionary = catalog.get_affix(affix_id)
 		if definition.is_empty() or not (definition.get("slots", []) as Array).has(str(template["category"])):
 			return false
-		var group_id: String = str(definition.get("group", ""))
-		if group_id.is_empty() or groups.has(group_id):
-			return false
-		groups[group_id] = true
 	return true
 
 func _validate_meta_build(meta: Dictionary, items_by_id: Dictionary) -> Dictionary:

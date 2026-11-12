@@ -275,6 +275,11 @@ func _show_garage() -> void:
 	var start_button: Button = _button("НАЧАТЬ ВЫЕЗД", true)
 	start_button.pressed.connect(_on_start_expedition)
 	actions.add_child(start_button)
+	for offer: Dictionary in _session.available_contract_offers():
+		var contract_button: Button = _button("КОНТРАКТ · %s" % str(offer.get("name", offer.get("id", ""))), false)
+		contract_button.tooltip_text = str(offer.get("desc", ""))
+		contract_button.pressed.connect(_on_start_expedition.bind(str(offer.get("id", ""))))
+		actions.add_child(contract_button)
 	var build_button: Button = _button("БИЛДИНГ · 85 ХАРАКТЕРИСТИК", false)
 	build_button.pressed.connect(_show_build)
 	actions.add_child(build_button)
@@ -873,12 +878,20 @@ func _show_road() -> void:
 		var start: Button = _button("НАЧАТЬ ВЫЕЗД", true)
 		start.pressed.connect(_on_start_expedition)
 		_body.add_child(start)
+		for offer: Dictionary in _session.available_contract_offers():
+			var contract_button: Button = _button("ВЫЕЗД ПО КОНТРАКТУ · %s" % str(offer.get("name", offer.get("id", ""))), false)
+			contract_button.tooltip_text = str(offer.get("desc", ""))
+			contract_button.pressed.connect(_on_start_expedition.bind(str(offer.get("id", ""))))
+			_body.add_child(contract_button)
 		return
 	var run: GameSaveState.RunState = _session.state.run
 	_body.add_child(_label("СЕКТОР %02d   /   %s   /   %s" % [run.depth, run.biome, run.phase], 12, COLOR_CYAN))
 	_body.add_child(_label("Маршрут", 27, COLOR_TEXT))
 	var resources: Dictionary = run.resources
 	_body.add_child(_label("ТОПЛИВО %d/%d   ·   КОРПУС %d/%d   ·   РОЗЫСК %d" % [int(resources.get("fuel", 0)), int(resources.get("maxFuel", 0)), int(resources.get("hull", 0)), int(resources.get("maxHull", 0)), int(run.wanted)], 13, COLOR_AMBER))
+	var active_contract: Dictionary = run.contract
+	if not active_contract.is_empty():
+		_body.add_child(_label("КОНТРАКТ %s · %s · БОЕВЫХ УЗЛОВ %d" % [str(active_contract.get("id", "")), str(active_contract.get("status", "")), int(active_contract.get("combatNodes", 0))], 12, COLOR_CYAN))
 	if run.phase == "NODE":
 		_show_current_node(run)
 	elif run.phase == "CHECKPOINT":
@@ -1107,8 +1120,8 @@ func _on_continue() -> void:
 	else:
 		_show_garage()
 
-func _on_start_expedition() -> void:
-	if _session.start_expedition("", _medical_restore_next_run):
+func _on_start_expedition(contract_id: String = "") -> void:
+	if _session.start_expedition("", _medical_restore_next_run, contract_id):
 		_medical_restore_next_run = false
 		_show_road()
 	else:

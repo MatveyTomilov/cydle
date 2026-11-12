@@ -87,6 +87,7 @@ class RunState:
 		"bountyCreditsBonus": 0.0, "bountyEnemyId": null, "extraRareItemRoll": false,
 		"alliedTurret": false, "extraRareOnElite": false,
 	}
+	var contract: Dictionary = {}
 	var combat_result: Variant = null
 	var last_command_id: Variant = null
 	var world_rng: Dictionary = {}
@@ -125,6 +126,8 @@ class RunState:
 			"lootRng": loot_rng.duplicate(true),
 			"combatSnapshot": null,
 		}
+		if not contract.is_empty():
+			result["contract"] = contract.duplicate(true)
 		if combat_snapshot != null:
 			result["combatSnapshot"] = combat_snapshot.to_dictionary()
 		return result
@@ -291,6 +294,7 @@ func _run_from_dictionary(value: Dictionary) -> RunState:
 		"bountyCreditsBonus": 0.0, "bountyEnemyId": null, "extraRareItemRoll": false,
 		"alliedTurret": false, "extraRareOnElite": false,
 	}).duplicate(true)
+	result.contract = value.get("contract", {}).duplicate(true)
 	result.combat_result = value.get("combatResult")
 	result.last_command_id = value.get("lastCommandId")
 	result.world_rng = value["worldRng"].duplicate(true)
