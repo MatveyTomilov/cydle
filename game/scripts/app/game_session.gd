@@ -492,6 +492,22 @@ func _campaign_controlled_faction() -> String:
 func _faction_reward_tag(faction_id: String) -> String:
 	return {"F_VANTA": "weapon", "F_RUST": "drone", "F_CHOIR": "digital", "F_ECHO": "digital"}.get(faction_id, "weapon")
 
+func _apply_wanted_elite_modifiers(enemy_specs: Array, seed_value: String, node_id: String, wanted: float) -> Array:
+	var result: Array = enemy_specs.duplicate(true)
+	if wanted < 80.0:
+		return result
+	var rng: DeterministicRng = DeterministicRng.new()
+	rng.seed("wanted:elite", "%s:%s" % [seed_value, node_id])
+	var modifiers: Array[String] = ["EL_SHIELD", "EL_FAST", "EL_VIRUS", "EL_ANTI_DRONE", "EL_PEN", "EL_SPLIT"]
+	for index: int in range(result.size()):
+		if not result[index] is Dictionary:
+			continue
+		var spec: Dictionary = result[index]
+		if str(spec.get("elite", "")).is_empty():
+			spec["elite"] = str(rng.pick(modifiers))
+		result[index] = spec
+	return result
+
 func _world_faction(seed_value: String, key: String) -> String:
 	var rng: DeterministicRng = DeterministicRng.new()
 	rng.seed("world-faction", "%s:%s" % [seed_value, key])
@@ -1962,7 +1978,7 @@ func begin_combat() -> bool:
 	var resources: Dictionary = state.run.resources
 	var pending_next: Dictionary = state.run.pending_next_combat
 	var effective_type: String = str(node.get("type", "COMBAT"))
-	var enemy_specs: Array = node.get("enemies", []).duplicate(true)
+	var enemy_specs: Array = _apply_wanted_elite_modifiers(node.get("enemies", []), state.run.seed, state.run.current_node_id, float(state.run.wanted))
 	if effective_type == "COMBAT" and bool(pending_next.get("skipOrdinary", false)):
 		var skipped_payload: Dictionary = state.to_payload()
 		var skipped_run: Dictionary = skipped_payload["run"]

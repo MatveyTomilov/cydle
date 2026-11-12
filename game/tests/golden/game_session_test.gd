@@ -100,6 +100,20 @@ func run(_tree: SceneTree) -> bool:
 		check(wanted_start_session._commit_payload(wanted_start_payload), "game_session: could not set VANTA hostility")
 		if check(wanted_start_session.start_expedition("vanta-start-wanted"), "game_session: VANTA hostility expedition could not start: %s" % wanted_start_session.last_error):
 			check(is_equal_approx(wanted_start_session.state.run.wanted, 10.0), "game_session: VANTA reputation below -60 did not add 10 starting wanted")
+	var wanted_elite_session: GameSession = GameSession.new()
+	wanted_elite_session.configure_save_directory("user://test-saves/high-wanted-elite")
+	if check(wanted_elite_session.start_new_game(1762900000113), "game_session: could not create a high wanted profile"):
+		if check(wanted_elite_session.start_expedition("high-wanted-elite"), "game_session: high wanted route could not start: %s" % wanted_elite_session.last_error):
+			var wanted_route: Array[Dictionary] = wanted_elite_session.reachable_nodes()
+			if not wanted_route.is_empty() and check(wanted_elite_session.travel_to(str(wanted_route[0].get("id", ""))), "game_session: high wanted route could not enter combat"):
+				var wanted_payload: Dictionary = wanted_elite_session.state.to_payload()
+				wanted_payload["run"]["wanted"] = 80.0
+				check(wanted_elite_session._commit_payload(wanted_payload), "game_session: could not prepare high wanted combat")
+				if check(wanted_elite_session.begin_combat(), "game_session: high wanted combat failed to initialize: %s" % wanted_elite_session.last_error):
+					var all_high_wanted_elite: bool = not wanted_elite_session.combat_state().enemies.is_empty()
+					for enemy: CombatActorState in wanted_elite_session.combat_state().enemies:
+						all_high_wanted_elite = all_high_wanted_elite and not enemy.elite_mod.is_empty()
+					check(all_high_wanted_elite, "game_session: 80+ wanted did not add a catalogued elite modifier to each ordinary enemy")
 	var shop_session: GameSession = GameSession.new()
 	shop_session.configure_save_directory("user://test-saves/faction-shop-discount")
 	if check(shop_session.start_new_game(1762900000111), "game_session: could not create a faction shop profile"):
