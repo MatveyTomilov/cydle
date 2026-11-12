@@ -566,12 +566,24 @@ func begin_combat() -> bool:
 		last_error = "Активный профиль тактики не найден."
 		return false
 	combat_notice = ""
-	var effective_tactic: Dictionary = tactic
-	if not _supports_current_tactics(tactic):
-		effective_tactic = {"id": "BASIC_AUTO", "name": "Базовый автопилот", "rules": [
-			{"id": "basic-auto", "priority": 0, "enabled": true, "skillId": "AUTO", "target": "nearest", "conditions": []},
-		]}
-		combat_notice = "Профиль «%s» содержит ещё не подключённые условия/умения. Этот бой использует только автоатаку; сохранённый профиль не изменён." % str(tactic.get("name", tactic.get("id", "")))
+	var compatible_rules: Array[Dictionary] = []
+	var omitted_rules: Array[String] = []
+	for rule_value: Variant in tactic.get("rules", []):
+		if not rule_value is Dictionary or not bool(rule_value.get("enabled", false)):
+			continue
+		var skill_id: String = str(rule_value.get("skillId", "AUTO"))
+		if skill_id in ["AUTO", "SK_BURST", "SK_PIERCE", "SK_EXEC", "SK_PLASMA"]:
+			var compatible_rule: Dictionary = rule_value.duplicate(true)
+			if skill_id == "SK_BURST" and str(compatible_rule.get("target", "")) == "allEnemies":
+				compatible_rule["target"] = "nearest"
+			compatible_rules.append(compatible_rule)
+		else:
+			omitted_rules.append(skill_id)
+	if compatible_rules.is_empty():
+		compatible_rules.append({"id": "basic-auto", "priority": -999, "enabled": true, "skillId": "AUTO", "target": "nearest", "conditions": []})
+	var effective_tactic: Dictionary = {"id": str(tactic.get("id", "DEFAULT")), "name": str(tactic.get("name", "Тактика")), "rules": compatible_rules}
+	if not omitted_rules.is_empty():
+		combat_notice = "Пока не поддерживаются реакции/умения: %s. Остальные правила и условия работают; исходный профиль сохранён." % ", ".join(omitted_rules)
 	var resources: Dictionary = state.run.resources
 	var pending_next: Dictionary = state.run.pending_next_combat
 	var effective_type: String = str(node.get("type", "COMBAT"))
@@ -610,16 +622,6 @@ func begin_combat() -> bool:
 	_active_node_type = effective_type
 	_active_reward_modifiers = pending_next.duplicate(true)
 	last_error = ""
-	return true
-
-func _supports_current_tactics(tactic: Dictionary) -> bool:
-	for rule_value: Variant in tactic.get("rules", []):
-		if not rule_value is Dictionary or not bool(rule_value.get("enabled", false)):
-			continue
-		if str(rule_value.get("skillId", "AUTO")) not in ["AUTO", "SK_BURST", "SK_PIERCE", "SK_EXEC", "SK_PLASMA"]:
-			return false
-		if not rule_value.get("conditions", []).is_empty():
-			return false
 	return true
 
 func has_active_combat() -> bool:

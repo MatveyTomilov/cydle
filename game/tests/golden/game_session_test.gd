@@ -14,18 +14,24 @@ func run(_tree: SceneTree) -> bool:
 	check(choices.size() == 1, "game_session: starting route does not expose its connected node")
 	if choices.is_empty():
 		return false
+	var battle_payload: Dictionary = session.state.to_payload()
+	battle_payload["run"]["graph"]["layers"][0][0]["enemies"] = [{"templateId": "E01"}, {"templateId": "E01"}]
+	check(session._commit_payload(battle_payload), "game_session: could not install the tactical-rule test encounter")
 	if not check(session.travel_to(str(choices[0]["id"])), "game_session: reachable node travel failed: %s" % session.last_error):
 		return false
 	check(session.state.run.phase == "NODE", "game_session: travel did not enter the node")
 	if not check(session.begin_combat(), "game_session: first combat could not start: %s" % session.last_error):
 		return false
-	check(not session.combat_notice.is_empty(), "game_session: unsupported saved tactics were not disclosed when the compatible auto profile was used")
+	check(not session.combat_notice.is_empty(), "game_session: omitted reaction rules were not disclosed")
 	var ticks: int = 0
+	var used_burst: bool = false
 	while session.combat_state() != null and session.combat_state().outcome.is_empty() and ticks < 1800:
 		if not session.advance_combat_step():
 			check(false, "game_session: combat step failed: %s" % session.last_error)
 			return false
+		used_burst = used_burst or int(session.combat_state().metrics.get("skillUses", {}).get("SK_BURST", 0)) > 0
 		ticks += 1
+	check(used_burst, "game_session: supported conditional SK_BURST rule never fired on the two-enemy encounter")
 	check(session.combat_state() != null and not session.combat_state().outcome.is_empty(), "game_session: combat did not resolve within its simulation limit")
 	if session.combat_state() != null and not session.combat_state().outcome.is_empty():
 		check(session.resolve_active_combat(), "game_session: combat reward/defeat transaction failed: %s" % session.last_error)

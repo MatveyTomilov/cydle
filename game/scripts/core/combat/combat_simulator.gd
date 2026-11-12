@@ -118,7 +118,7 @@ func _supports_basic_auto_step(state: CombatState) -> bool:
 	for rule_value: Variant in state.tactics.get("rules", []):
 		if not rule_value is Dictionary or not bool(rule_value.get("enabled", false)):
 			continue
-		if str(rule_value.get("skillId", "AUTO")) not in ["AUTO", "SK_BURST", "SK_PIERCE", "SK_EXEC", "SK_PLASMA"] or not rule_value.get("conditions", []).is_empty():
+		if str(rule_value.get("skillId", "AUTO")) not in ["AUTO", "SK_BURST", "SK_PIERCE", "SK_EXEC", "SK_PLASMA"]:
 			return false
 		if str(rule_value.get("skillId", "AUTO")) == "SK_BURST" and str(rule_value.get("target", "nearest")) not in ["nearest", "lowestHPPercent"]:
 			return false
@@ -148,7 +148,10 @@ func _choose_main_skill(state: CombatState, _rng: DeterministicRng, actor: Comba
 	for rule: Dictionary in rules:
 		var skill_id: String = str(rule.get("skillId", "AUTO"))
 		if skill_id == "AUTO":
-			return {"started": false}
+			if _rule_conditions_pass(state, actor, rule, null):
+				return {"started": false}
+			_record_rule_failure(state, str(rule.get("id", "")), "conditions")
+			continue
 		var skill: Dictionary = _equipped_skill(state, skill_id)
 		var rule_id: String = str(rule.get("id", ""))
 		if skill.is_empty():
@@ -168,9 +171,79 @@ func _choose_main_skill(state: CombatState, _rng: DeterministicRng, actor: Comba
 		if skill.get("requires", []).has("VIRUS") and (target == null or not _has_status(target, "VIRUS")):
 			_record_rule_failure(state, rule_id, "requirement")
 			continue
+		if not _rule_conditions_pass(state, actor, rule, target):
+			_record_rule_failure(state, rule_id, "conditions")
+			continue
 		_start_main_skill(state, actor, skill, target)
 		return {"started": true}
 	return {"started": false}
+
+func _rule_conditions_pass(state: CombatState, actor: CombatActorState, rule: Dictionary, target: CombatActorState) -> bool:
+	var conditions: Array = rule.get("conditions", [])
+	if conditions.is_empty():
+		return true
+	var logic: String = str(rule.get("logic", "AND"))
+	for condition_value: Variant in conditions:
+		var passed: bool = condition_value is Dictionary and _eval_tactic_condition(state, actor, condition_value, target)
+		if logic == "OR" and passed:
+			return true
+		if logic != "OR" and not passed:
+			return false
+	return logic == "OR" if logic == "OR" else true
+
+func _eval_tactic_condition(state: CombatState, actor: CombatActorState, condition: Dictionary, target: CombatActorState) -> bool:
+	var kind: String = str(condition.get("kind", "always"))
+	var value: float = float(condition.get("value", 0.0))
+	var max_hp: float = maxf(1.0, float(actor.base_sheet.get("maxHP", 1.0)))
+	var max_shield: float = float(actor.base_sheet.get("maxShield", 0.0))
+	var living: Array[CombatActorState] = []
+	for enemy: CombatActorState in state.enemies:
+		if enemy.alive:
+			living.append(enemy)
+	match kind:
+		"always": return true
+		"hpBelow": return actor.hp / max_hp < value
+		"hpAbove": return actor.hp / max_hp > value
+		"shieldBelow": return max_shield <= 0.0 or actor.shield / max_shield < value
+		"energyAtLeast": return actor.energy >= value
+		"energyBelow": return actor.energy < value
+		"heatAtLeast": return actor.heat >= value
+		"heatBelow": return actor.heat < value
+		"heatLocked": return actor.heat_lockout
+		"enemiesAtLeast": return living.size() >= int(value)
+		"enemiesAtMost": return living.size() <= int(value)
+		"enemyCasting":
+			for enemy: CombatActorState in living:
+				if enemy.cast != null and (not bool(condition.get("interruptibleOnly", false)) or bool(enemy.cast.get("interruptible", false))):
+					return true
+			return false
+		"enemyType":
+			for enemy: CombatActorState in living:
+				match str(condition.get("value", "")):
+					"boss": if enemy.is_boss: return true
+					"healer": if enemy.is_healer: return true
+					"mechanical": if enemy.is_mechanical: return true
+					"elite": if not enemy.elite_mod.is_empty(): return true
+			return false
+		"targetStatus": return target != null and int(target.statuses.get(str(condition.get("status", "")), {}).get("stacks", 0)) >= int(condition.get("minStacks", 1))
+		"droneAlive":
+			var alive_count: int = 0
+			for drone: CombatActorState in state.drones:
+				if drone.alive: alive_count += 1
+			return alive_count >= int(value)
+		"cooldownReady": return float(actor.cooldowns.get(str(condition.get("skillId", "")), 0.0)) <= float(state.time_ms)
+		"effectUptime": return actor.statuses.has(str(condition.get("status", "")))
+		"timeAtLeast": return float(state.time_ms) >= value
+		"not": return not _eval_tactic_condition(state, actor, condition.get("inner", {}), target)
+		"any":
+			for inner: Variant in condition.get("inner", []):
+				if inner is Dictionary and _eval_tactic_condition(state, actor, inner, target): return true
+			return false
+		"all":
+			for inner: Variant in condition.get("inner", []):
+				if inner is Dictionary and not _eval_tactic_condition(state, actor, inner, target): return false
+			return true
+	return false
 
 func _equipped_skill(state: CombatState, skill_id: String) -> Dictionary:
 	for skill: Variant in state.build.get("skills", []):
