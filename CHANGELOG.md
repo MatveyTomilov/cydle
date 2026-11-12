@@ -9,6 +9,7 @@
 ## Unreleased — bounded autopilot restart
 
 - Added the policy editor controls for explicitly opting into a follow-up outing and setting `maxRuns` (1–100). After extraction only, the shared autopilot may repair the transport at the existing checkpoint service within `maxSpendRepair`, then starts a new sortie from the open outpost. It pauses the restart if repair cannot be paid for or exceeds the policy budget. Defeat never auto-restarts.
+- Legacy RUN saves without `autopilotRunCount` begin the current chain at 1 before a restart; the first follow-up is counted as run 2 instead of resetting the maximum-run limit.
 - Persisted the outing count across save/load, preserved the active offline autopilot for restarted runs, and accounted for game-time across sortie boundaries. Reports expose `runsStarted` and give a specific stop reason for time, max runs, restart rejection, or repair limits.
 - Checks: Godot 4.7.2 editor import exit 0; 22 scripts / 87,587 assertions / 0 failures; Windows Desktop export exit 0; exported EXE `--headless --quit-after 3` smoke exit 0; `git diff --check` exit 0. Tests verify the persisted outing count and that the simulator stops before starting run 3 after `maxRuns=2`.
 

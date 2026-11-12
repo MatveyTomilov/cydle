@@ -146,6 +146,7 @@ func run(_tree: SceneTree) -> bool:
 		var restart_checkpoint: Dictionary = restart_session.state.to_payload()
 		restart_checkpoint["run"]["phase"] = "CHECKPOINT"
 		restart_checkpoint["run"]["autopilotEnabled"] = true
+		restart_checkpoint["run"].erase("autopilotRunCount")
 		check(restart_session._commit_payload(restart_checkpoint), "game_session: could not prepare the restart checkpoint: %s" % restart_session.last_error)
 		var restart_report: Dictionary = restart_session.simulate_autopilot(1000)
 		check(restart_session.state.run.autopilot_run_count == 2 and restart_session.state.run.phase == "ROUTE" and str(restart_report.get("reasonCode", "")) == "TIME_BUDGET", "game_session: opted-in auto-restart did not begin exactly one bounded follow-up outing: %s" % restart_report)

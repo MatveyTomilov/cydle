@@ -763,7 +763,7 @@ func start_expedition(seed_value: String = "", use_medical_restore: bool = false
 		"serviceScrapFuelCounts": {}, "shippedCheckpointIds": [], "combatResult": null, "lastCommandId": null,
 		"worldRng": world_rng.serialize(), "lootRng": loot_rng.serialize(), "combatSnapshot": null,
 		"contract": contract,
-		"autopilotRunCount": (state.run.autopilot_run_count + 1) if autopilot_restart and state.run != null else 1,
+		"autopilotRunCount": (maxi(1, state.run.autopilot_run_count) + 1) if autopilot_restart and state.run != null else 1,
 	}
 	if autopilot_restart:
 		run_payload["autopilotEnabled"] = true

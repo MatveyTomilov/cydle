@@ -10,6 +10,12 @@
 - Next action: continue the event/quest audit for catalog-backed effects or narrative state that still has no player-visible consequence. Do not claim all 24 events or quest story behavior complete based on these two effects.
 - Preserve the external campaign E2E profile and safety copy below; continue full-game coverage without Lab presets, report exports, or polish.
 
+### Active compatibility fix (same date)
+
+- Base is pushed commit `2fca2ccf5ae21aa2b0239d39277e04fb1881665c`. Current local WIP fixes bounded auto-restart migration for legacy RUN saves that lack `autopilotRunCount`: treat the active outing as run 1, so the next sortie increments to run 2 and cannot exceed `maxRuns`.
+- Checks: editor import exit 0; 22 scripts / 87,592 assertions / 0 failures; Windows Desktop export and EXE headless smoke exit 0; `git diff --check` exit 0.
+- Next: commit/push this compatibility correction and continue the event/quest interaction audit.
+
 ### Previous continuation: bounded auto-restart
 
 - This continuation was committed as `a99510bc5b07e087052c0846e090d7ad7bf946cc` on `development/codex`.
