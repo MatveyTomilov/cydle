@@ -1,4 +1,4 @@
-# CYDLE — Qwen4 emergency handoff
+# CYDLE — Qwen4 development handoff
 
 Last updated: 2026-11-12
 
@@ -8,18 +8,18 @@ This section is the authoritative current checkpoint. Sections below “Frozen l
 
 - Repository: `https://github.com/MatveyTomilov/cydle.git`
 - Working directory: `E:\cydle\project` (repository root).
-- Branch: `development/luna`, based on `recovery/qwen-snapshot` at `2e5a59798695aaf7666a8fa13cb709fcdaad9fc7`.
-- Code/WIP checkpoint before this handoff-document commit: `320de7cce39346c6cad283986243c51fe75c4725` (`wip: save stat resolver handoff checkpoint`). This commit contains the latest in-progress stat port.
-- At handoff preparation, `origin/development/luna` did not exist. `origin/main` was `8f7f3c7adaaaff127963b100145c5a5d4f15cc2a`; `origin/recovery/qwen-snapshot` was `2e5a59798695aaf7666a8fa13cb709fcdaad9fc7`. The final transfer commit and pushed remote SHA are reported with the handoff; verify they match using `git rev-parse HEAD` and `git ls-remote origin refs/heads/development/luna`.
-- The working tree was clean after committing the WIP and before this document edit. No files were deleted. The recovery branch was not modified.
-- Recent commits, newest first:
-  - `320de7c` — WIP stat resolver checkpoint.
+- Active branch: `development/qwen`, created from the Luna handoff SHA `1840872f692c2855abdd575f187e9ae1d3c8eea1` (`development/luna`) and pushed to `origin/development/qwen`.
+- Protected refs unchanged: `main` `8f7f3c7adaaaff127963b100145c5a5d4f15cc2a`; `recovery/qwen-snapshot` `2e5a59798695aaf7666a8fa13cb709fcdaad9fc7`; `development/luna` `1840872f692c2855abdd575f187e9ae1d3c8eea1`. No force push; no historical work deleted.
+- Recent commits on `development/qwen`, newest first:
+  - `2d185a5` — differential coverage of the CalcTrace computational contract (stat + damage traces).
+  - `d2e22f1` — math differential harness (1628 oracle cases) and `condition_text` parity fixes.
+  - `1840872` — Luna handoff document (branch base).
+  - `320de7c` — WIP stat resolver checkpoint (Luna).
   - `c1cb4f5` — scalar formulas, CalcTrace foundation, damage math and golden fixtures.
-  - `3d43a11` — Godot test script UID files.
   - `973825a` — versioned local save repository foundation.
   - `aef9282` — deterministic RNG and state hashing.
   - `70450f8` — native Godot project shell.
-  - `cf91527` — Godot migration documents and master-spec corrections.
+- The working tree is clean after each commit. Verify with `git rev-parse HEAD` and `git ls-remote origin refs/heads/development/qwen`; they matched at `2d185a5` when this section was written.
 
 ## B. Implemented systems and actual files
 
@@ -37,12 +37,14 @@ This section is the authoritative current checkpoint. Sections below “Frozen l
 - `game/scripts/core/math/formula.gd`, `trace.gd`, `damage.gd`: scalar formulas, trace-node foundation, hit/crit probability, defense penetration/mitigation, shields/HP partition and simple EHP.
 - `game/tests/golden/rng_golden_test.gd`, `save_repository_test.gd`, `math_golden_test.gd` provide TypeScript-derived fixtures and storage fault tests.
 
-### Current WIP committed at `320de7c`
+### Math core — differential parity verified on `development/qwen`
 
 - `game/data/core/stat_registry.json` was generated from the legacy 85-entry `STAT_REGISTRY`.
-- `game/scripts/core/math/stats.gd` implements stat definitions, modifiers, condition text/evaluation, aggregation, conversion ordering, clamps, sheets and trace output using typed GDScript entry points and Dictionary data.
-- `game/tests/golden/stats_golden_test.gd` checks registry size and representative legacy values for aggregation, percentage-valued stats, independent groups, conditions and conversion.
-- The current combined Godot runner passed **5 test scripts / 93 assertions / 0 failures** in the last run immediately before the stop instruction. The stat port remains WIP: the green subset is not proof of full parity across all 85 stats, all condition forms, conversions or CalcTrace details.
+- `game/scripts/core/math/stats.gd` implements stat definitions, modifiers, condition text/evaluation, aggregation, conversion ordering, clamps, sheets and CalcTrace output using typed GDScript entry points and Dictionary data.
+- `scripts/gen-math-fixtures.ts` (run with `npx tsx scripts/gen-math-fixtures.ts`) derives **1628 fixtures** from the frozen TypeScript oracle: 194 condition, 944 stat, 26 conversion, 76 formula and 388 damage cases, written to `game/tests/fixtures/math/`. Every expected value comes from the oracle, never from the port.
+- `game/tests/golden/math_differential_test.gd` replays every fixture: condition eval+text, all 85 stat values **and full computational CalcTrace trees** (operation/stage/exactValue/inputs/source/unit/children/flags), conversion order/sheets/empty sheet, all scalar formulas, and damage results **and traces**. Volatile trace IDs are stripped (per-instance vs process-global) and non-finite clamp bounds are sentinel-encoded so they survive JSON.
+- Combined Godot runner: **6 test scripts / 85611 assertions / 0 failures**, exit 0; headless editor import exit 0 with no errors/warnings.
+- Known cosmetic gap: trace `localizedExplanation` text is excluded from the differential because Godot `str(float)` rounds to 6 decimals while JS uses shortest round-trip (e.g. `344.66` vs `344.65999999999997`). Exact explanation-text parity is deferred to the Build/Simulation Lab UI stage. All gameplay-affecting values and the computational trace contract match the oracle.
 
 ### Frozen web reference
 
@@ -52,7 +54,7 @@ This section is the authoritative current checkpoint. Sections below “Frozen l
 ## C. Incomplete work, known limitations and risks
 
 - **No playable native game:** no garage/road/combat scene loop, no rendered characters/enemies/drones, no art/audio assets, no game progression, no player profile integration.
-- **Math port is incomplete:** `StatMath` is a committed WIP. It needs broader fixture coverage for all 85 definitions, every condition kind, CAP/FLOOR/OVERRIDE/additive-only/multiplier behavior, conversion cycles/order, finite/clamp edge cases, and CalcTrace tree/text parity against TypeScript.
+- **Math core parity verified (values + computational traces):** all 85 stats, every condition kind, aggregation/independent groups, conversions/cycles/order, CAP/FLOOR/OVERRIDE/additive-only/multiplier behavior, clamps, scalar formulas and damage match the oracle across 1628 differential cases (85611 assertions). Remaining math work is cosmetic trace `localizedExplanation` text parity, which needs a JS-compatible shortest-round-trip float formatter and is deferred to the Lab UI stage.
 - **Trace IDs differ in scope:** the native `CalcTrace` counter is per instance while legacy TypeScript uses a process-global counter. Confirm trace IDs are excluded from canonical gameplay hashes and define deterministic uniqueness before exposing CalcTrace in UI/replay.
 - **Save payload is generic JSON:** `SaveRepository` does not yet validate CYDLE META/RUN/COMBAT domain schemas, provide schema migrations, autosave gameplay, or import legacy IndexedDB saves. No compatibility converter exists.
 - **No UI integration** for save, math, inventory, loadouts, gameplay, settings or accessibility.
@@ -62,11 +64,12 @@ This section is the authoritative current checkpoint. Sections below “Frozen l
 
 ## D. Checks actually run
 
-Latest native check on the code checkpoint (`320de7c`) before the handoff-document edit:
+Latest native checks on `development/qwen` at `2d185a5` (run by Qwen; exit codes verified, not inferred from logs):
 
-- `& $godot --headless --path game --editor --quit` — import/parse passed, exit code 0.
-- `& $godot --headless --path game --script res://tests/run_tests.gd` — 5 scripts, 93 assertions, 0 failures, exit code 0.
-- `git diff --check` — passed before WIP commit; the working tree was clean immediately after commit `320de7c`.
+- `godot --headless --path game --editor --quit` — import/parse passed, exit 0, no errors/warnings.
+- `godot --headless --path game --script res://tests/run_tests.gd` — 6 scripts, 85611 assertions, 0 failures, 0 script errors, exit 0.
+- `npx tsx scripts/gen-math-fixtures.ts` — regenerated 1628 oracle fixtures; condition/conversion/formula fixtures are byte-identical across runs (PRNG sequence preserved).
+- `git diff --check` — clean; working tree clean after each commit; local HEAD equals `origin/development/qwen`.
 
 Legacy checks previously run after the RNG/save work, with no later changes to root TypeScript source:
 
@@ -75,7 +78,7 @@ Legacy checks previously run after the RNG/save work, with no later changes to r
 - `npm run validate` — passed, exit code 0.
 - `npm run build` — passed at the earlier legacy baseline; no web source was modified during the Godot port.
 
-Godot Windows export and executable smoke passed before the current math/stat WIP. Do not report the old export as a verified build of the current HEAD. No browser E2E, GdUnit4 suite, full gameplay test, or full stat differential test has run.
+Godot Windows export and executable smoke passed at the earlier shell/save checkpoint, before the math/stat port. Do not report that old export as a verified build of the current HEAD; re-run export at the next release gate. The full math differential suite (1628 cases, including computational CalcTrace trees) now runs and passes. No browser E2E, GdUnit4 suite, or full gameplay test has run yet.
 
 ## E. Architecture and tooling
 
@@ -88,10 +91,10 @@ Godot Windows export and executable smoke passed before the current math/stat WI
 
 ## F. Exact continuation steps for Qwen4
 
-1. Open `E:\cydle\project` or clone `https://github.com/MatveyTomilov/cydle.git`; check out `development/luna` and verify `git status`, `git rev-parse HEAD`, and remote equality. Do not switch to or alter `recovery/qwen-snapshot`.
+1. Open `E:\cydle\project` or clone `https://github.com/MatveyTomilov/cydle.git`; check out `development/qwen` (continue from `2d185a5`) and verify `git status`, `git rev-parse HEAD`, and remote equality. Do not switch to or alter `main`, `recovery/qwen-snapshot`, or `development/luna`.
 2. Read `CYDLE_MASTER_SPEC.md`, this handoff, `docs/godot/TECHNICAL_ARCHITECTURE.md`, `docs/godot/ART_BIBLE.md`, `docs/godot/ASSET_PIPELINE.md`, `docs/godot/ASSET_MANIFEST.csv`, the migration plan, and `game/README.md`.
 3. Independently verify/install Godot 4.7.2 Stable and Windows export templates in Qwen's environment. Check Context7 and Godot AI MCP setup for Qwen Code there; do not assume this machine's installation/settings transfer.
-4. Run the documented headless import and test commands. Inspect `stats.gd` against `src/core/math/stats.ts` and the original tests before extending it. Finish parity fixtures and known trace-ID scope before treating Task 4 as complete.
+4. Math core parity is achieved and verified (1628 differential cases, 85611 assertions). To extend coverage, add cases to `scripts/gen-math-fixtures.ts`, regenerate with `npx tsx`, and replay via `math_differential_test.gd`; never hand-write expected values. The remaining math refinement is cosmetic trace `localizedExplanation` text parity (JS-compatible float formatting), to be done with the Lab UI.
 5. Continue with typed domain save schemas and then item/build porting; connect existing generic persistence only when the schema is concrete. Keep a single deterministic GDScript engine for combat, offline work and labs.
 6. Check GdUnit4 compatibility as an independent tooling decision. The current self-contained runner already passes; do not replace it unless the new setup proves reliable.
 7. Plan the first playable slice (garage, road, arena, operator, drone, three enemies, boss and reward return) only after the math/build/combat core can support real play.
@@ -120,7 +123,7 @@ npm run validate
 npm run build
 ```
 
-At handoff, the first two commands passed on the current code/WIP checkpoint. Re-run export after the stat WIP. The npm commands check only legacy/reference code.
+On `development/qwen` at `2d185a5`, the import and headless test commands pass (6 scripts / 85611 assertions / 0 failures, exit 0). Re-run the Windows export at the next release gate; it has not been re-run since the math port. The npm commands check only the frozen legacy/reference code.
 
 ---
 

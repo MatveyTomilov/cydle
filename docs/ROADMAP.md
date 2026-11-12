@@ -6,18 +6,18 @@
 
 - Product direction changed to standalone Godot 4.x Windows game on 2026-11-12. Current engine pin: Godot 4.7.2 stable.
 - Root TypeScript/React/Vite project is frozen legacy/reference source for rules, catalog values, and golden fixtures. Do not continue it as the product and do not delete it.
-- Documentation checkpoint is committed as `cf915277b5002a64e2558aed7a8f674bd195b5f5` on `development/luna`, whose code history descends from the preserved Qwen SHA `2e5a59798695aaf7666a8fa13cb709fcdaad9fc7`.
-- The native shell now has `game/project.godot`, one startup scene, typed app root, headless runner, and a Windows export preset. Gameplay logic and art have not been migrated.
+- Active development branch: `development/qwen`, created from the Luna handoff `1840872f692c2855abdd575f187e9ae1d3c8eea1` and pushed to origin. `main`, `recovery/qwen-snapshot` and `development/luna` are preserved unchanged.
+- The native shell has `game/project.godot`, one startup scene, typed app root, headless runner, and a Windows export preset. The deterministic math core (RNG, scalar formulas, damage/mitigation, 85-stat resolver, CalcTrace) and the versioned save repository are ported; gameplay scenes, the combat loop and art are not yet migrated.
 - Godot 4.7.2 stable and Windows x86_64 export templates are installed in the current user profile for local verification; they are not vendored into the repository.
-- Current shell checks: import/parse passes; 1 headless test and 10 assertions pass; Windows release export succeeds; exported app and editor GUI both start/exit cleanly in short smoke runs.
-- Legacy baseline freshly verified before this documentation update: typecheck pass; 206/206 tests pass; content validation pass; Vite build pass (611.46 kB JS, 192.24 kB gzip). These checks do not verify the future Godot game.
+- Current native checks on `development/qwen` at `2d185a5`: headless import/parse exit 0; **6 headless test scripts / 85611 assertions / 0 failures**, including a 1628-case differential suite that replays the frozen TypeScript math oracle (condition eval/text, all 85 stats plus computational CalcTrace trees, conversion order/sheets, scalar formulas, damage results and traces). Windows export was last verified at the earlier shell/save checkpoint and must be re-run at the next release gate.
+- Legacy baseline (frozen reference, not the product): typecheck pass; 206/206 tests pass; content validation pass; Vite build pass. These verify the oracle, not the future Godot game.
 
 ## Delivery sequence
 
 1. **Engine and production documentation:** update the master spec to remove browser stack constraints while preserving game rules; document Godot architecture, Art Bible, Asset Pipeline, and initial Asset Manifest. Commit these documents before runtime code.
 2. **Godot foundation:** project config, typed app shell, controller/keyboard focus, headless runner, and Windows export preset are implemented. Next add the local versioned save repository and validation.
-3. **Golden port harness:** port the existing deterministic RNG exactly; pin seed streams, serialized state, hashes, and event fixtures against the legacy TypeScript reference.
-4. **Math and build core:** port stats, modifiers, formulas, CalcTrace, mitigation, damage partition, item instances, and build resolution without balance changes. Compare golden outputs at each boundary.
+3. **Golden port harness:** port the existing deterministic RNG exactly; pin seed streams, serialized state, hashes, and event fixtures against the legacy TypeScript reference. *(RNG/save golden tests done; a 1628-case math differential harness now replays the oracle.)*
+4. **Math and build core:** port stats, modifiers, formulas, CalcTrace, mitigation, damage partition, item instances, and build resolution without balance changes. Compare golden outputs at each boundary. *(Math core done and differentially verified — values plus computational CalcTrace trees; cosmetic trace explanation text deferred to the Lab UI. Item instances and build resolution remain.)*
 5. **Combat core:** port the existing single 100 ms simulation including statuses/DoT, skills/reactions, AI, boss phases, elite modifiers, drones, interrupts, and bounded procs. Same seeded input must match legacy expected results.
 6. **First illustrated vertical slice:** garage, one road, one arena, operator, one drone, three enemy types, one boss, several items, rewards, extraction/death, save recovery, readable timeline and real original assets. Run in Godot, not in a browser.
 7. **Full game systems:** port catalog, equipment/crafting/tree, events/contracts/quests/factions, all biomes/enemies/bosses, sectors 1–12 and endings, then depth-13+ progression.
