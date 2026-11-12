@@ -293,7 +293,7 @@ func _build_input_with_tree(save_state: GameSaveState, tree_ids: Array[String]) 
 	input["treeNodeIds"] = tree_ids
 	return input
 
-func start_expedition(seed_value: String = "") -> bool:
+func start_expedition(seed_value: String = "", use_medical_restore: bool = false) -> bool:
 	if state == null:
 		last_error = "Сначала создайте или загрузите профиль."
 		return false
@@ -305,6 +305,14 @@ func start_expedition(seed_value: String = "") -> bool:
 		last_error = "Сборка не готова к выезду."
 		return false
 	var depth: int = maxi(1, state.meta.unlocked_forpost + 1)
+	var medical_cost: int = ceili(8.0 * CydleFormula.new().reward_scale(float(depth))) if use_medical_restore else 0
+	if use_medical_restore:
+		if garage_level("GARAGE_MED") < 3:
+			last_error = "Полное восстановление перед выездом требует GARAGE_MED уровня 3."
+			return false
+		if state.meta.protected_bank.credits < float(medical_cost):
+			last_error = "Полное восстановление требует %d защищённых кредитов." % medical_cost
+			return false
 	var seed: String = seed_value.strip_edges()
 	if seed.is_empty():
 		seed = "%s:run:%d" % [state.save_id, int(Time.get_ticks_usec())]
@@ -348,6 +356,10 @@ func start_expedition(seed_value: String = "") -> bool:
 	}
 	var payload: Dictionary = state.to_payload()
 	payload["run"] = run_payload
+	if use_medical_restore:
+		payload["meta"]["protectedBank"]["CREDITS"] = float(payload["meta"]["protectedBank"].get("CREDITS", 0.0)) - float(medical_cost)
+		run_payload["resources"]["hull"] = run_payload["resources"]["maxHull"]
+		payload["run"] = run_payload
 	return _commit_payload(payload)
 
 func reachable_nodes() -> Array[Dictionary]:
@@ -1044,9 +1056,10 @@ func _resolve_combat_defeat(run_payload: Dictionary, node_id: String) -> bool:
 		if equipped_ids.has(str(item.get("itemId", ""))):
 			item["durability"] = maxf(0.0, float(item.get("durability", 100.0)) - 20.0)
 		meta["inventory"][index] = item
-	var paid: bool = float(meta["protectedBank"].get("CREDITS", 0.0)) >= 10.0
+	var revive_cost: int = 5 if int(meta.get("garage", {}).get("GARAGE_MED", 1)) >= 2 else 10
+	var paid: bool = float(meta["protectedBank"].get("CREDITS", 0.0)) >= float(revive_cost)
 	if paid:
-		meta["protectedBank"]["CREDITS"] = float(meta["protectedBank"]["CREDITS"]) - 10.0
+		meta["protectedBank"]["CREDITS"] = float(meta["protectedBank"]["CREDITS"]) - float(revive_cost)
 	var build: Dictionary = build_preview()
 	var stats: Dictionary = build.get("stats", {})
 	var resources: Dictionary = run_payload["resources"]

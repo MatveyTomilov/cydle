@@ -198,6 +198,27 @@ func run(_tree: SceneTree) -> bool:
 		check(garage_session.upgrade_garage_object("NEUROLAB") and garage_session.state.meta.unlocked_implant_slots == 5, "game_session: NEUROLAB L2 did not unlock implant socket five")
 		check(garage_session.upgrade_garage_object("HANGAR") and garage_session.state.meta.unlocked_drone_slots == 2, "game_session: HANGAR L2 did not unlock drone socket two")
 		check(garage_session.state.meta.protected_bank.credits < 500.0 and garage_session.state.meta.protected_bank.scrap < 200.0, "game_session: garage upgrades did not spend protected resources")
+	var medical_session: GameSession = GameSession.new()
+	medical_session.configure_save_directory("user://test-saves/garage-medical")
+	if check(medical_session.start_new_game(1762900000700), "game_session: could not create a medical-bay profile"):
+		var medical_payload: Dictionary = medical_session.state.to_payload()
+		medical_payload["meta"]["garage"]["GARAGE_MED"] = 2
+		medical_payload["meta"]["protectedBank"]["CREDITS"] = 5.0
+		check(medical_session._commit_payload(medical_payload), "game_session: medical revive fixture could not be saved")
+		check(medical_session.start_expedition("medical-revive"), "game_session: could not start medical revive scenario")
+		var defeated_run: Dictionary = medical_session.state.run.to_dictionary()
+		check(medical_session._resolve_combat_defeat(defeated_run, "medical-test-node"), "game_session: L2 medical bay defeat transaction failed: %s" % medical_session.last_error)
+		check(is_zero_approx(medical_session.state.meta.protected_bank.credits) and medical_session.state.run.phase == "DEFEATED", "game_session: L2 medical bay did not apply the discounted 5-credit revive")
+	var medical_restore_session: GameSession = GameSession.new()
+	medical_restore_session.configure_save_directory("user://test-saves/garage-medical-restore")
+	if check(medical_restore_session.start_new_game(1762900000800), "game_session: could not create a medical-restore profile"):
+		var restore_payload: Dictionary = medical_restore_session.state.to_payload()
+		restore_payload["meta"]["garage"]["GARAGE_MED"] = 3
+		restore_payload["meta"]["transport"]["hull"] = 40.0
+		restore_payload["meta"]["protectedBank"]["CREDITS"] = 50.0
+		check(medical_restore_session._commit_payload(restore_payload), "game_session: medical-restore fixture could not be saved")
+		check(medical_restore_session.start_expedition("paid-medical-restore", true), "game_session: paid medical restoration did not start: %s" % medical_restore_session.last_error)
+		check(is_equal_approx(float(medical_restore_session.state.run.resources.get("hull", 0.0)), float(medical_restore_session.state.run.resources.get("maxHull", 0.0))) and is_equal_approx(medical_restore_session.state.meta.protected_bank.credits, 42.0), "game_session: medical restore did not restore hull and charge ceil(8 × R(depth))")
 	var resumed: GameSession = GameSession.new()
 	resumed.configure_save_directory("user://test-saves/game-session")
 	check(resumed.load_saved_game(), "game_session: persisted state did not reload: %s" % resumed.last_error)

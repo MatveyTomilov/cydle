@@ -18,6 +18,7 @@ var _combat_timer: Timer
 var _settings: ConfigFile = ConfigFile.new()
 var _muted: bool = false
 var _reduced_motion: bool = false
+var _medical_restore_next_run: bool = false
 
 func _ready() -> void:
 	_session.load_saved_game()
@@ -258,6 +259,15 @@ func _show_garage() -> void:
 	actions.add_theme_constant_override("h_separation", 8)
 	actions.add_theme_constant_override("v_separation", 8)
 	_body.add_child(actions)
+	if _session.garage_level("GARAGE_MED") >= 3:
+		var start_depth: int = maxi(1, meta.unlocked_forpost + 1)
+		var medical_cost: int = ceili(8.0 * CydleFormula.new().reward_scale(float(start_depth)))
+		var medical_toggle: CheckButton = CheckButton.new()
+		medical_toggle.text = "Медблок · полное восстановление перед выездом · %d ¤" % medical_cost
+		medical_toggle.button_pressed = _medical_restore_next_run
+		medical_toggle.disabled = meta.protected_bank.credits < float(medical_cost)
+		medical_toggle.toggled.connect(func(value: bool) -> void: _medical_restore_next_run = value)
+		_body.add_child(medical_toggle)
 	var start_button: Button = _button("НАЧАТЬ ВЫЕЗД", true)
 	start_button.pressed.connect(_on_start_expedition)
 	actions.add_child(start_button)
@@ -738,7 +748,8 @@ func _on_continue() -> void:
 		_show_garage()
 
 func _on_start_expedition() -> void:
-	if _session.start_expedition():
+	if _session.start_expedition("", _medical_restore_next_run):
+		_medical_restore_next_run = false
 		_show_road()
 	else:
 		_footer.text = _session.last_error
