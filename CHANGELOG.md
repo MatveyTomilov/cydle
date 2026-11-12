@@ -4,7 +4,8 @@
 
 - Added an initial typed native game-save model and structural validator around `SaveRepository`, including typed repository roundtrip coverage. This is groundwork only: active-run field parity and full legacy schema validation remain incomplete, and gameplay does not yet consume the typed state.
 - Extended the native run-save model for events, service/checkpoint counters, deferred travel/combat effects, and command/result fields, with active-run roundtrip and range checks. Nested item, graph, and combat-result validation still needs parity with the reference schema.
-- Exported all 73 ordinary and unique item templates from the frozen TypeScript catalog into native JSON, with a Godot loader that checks top-level structure and returns immutable-by-copy definitions. Item instances, affixes, and build resolution are still pending.
+- Exported all 73 ordinary and unique item templates from the frozen TypeScript catalog into native JSON, with a Godot loader that checks top-level structure and returns immutable-by-copy definitions.
+- Exported all 30 affix definitions and item roll tables; added typed item instances plus deterministic rarity, affix, and biome loot generation. Nine golden cases match the TypeScript oracle for common/rare/unique creation, rarity shifts, biome selection, unique drops, and unique fallback.
 - Added a native asset-manifest validator and a Windows GitHub Actions workflow for Godot import/tests/export plus the frozen reference checks.
 - Added root agent instructions for the Godot-only product boundary, protected branches, deterministic core, asset provenance, and local verification commands.
 - Fixed TypeScript 5.9 readonly-array typing in the math fixture generator without changing fixture values.

@@ -13,6 +13,8 @@ func run(_tree: SceneTree) -> bool:
 	check(int(loaded.get("count", 0)) == 73, "item_catalog: unexpected template count")
 	check(bool(catalog.call("has_template", "PISTOL_K1")), "item_catalog: ordinary item is missing")
 	check(bool(catalog.call("has_template", "U01")), "item_catalog: unique item is missing")
+	check(bool(catalog.call("has_affix", "AF_HP")), "item_catalog: affix definitions are missing")
+	check(catalog.call("get_rules").get("affixes", []).size() == 30, "item_catalog: affix count differs from source data")
 	check(not bool(catalog.call("has_template", "UNKNOWN_ITEM")), "item_catalog: unknown item was reported present")
 	var template: Dictionary = catalog.call("get_template", "PISTOL_K1")
 	check(template.get("category") == "MAIN", "item_catalog: pistol category differs from source data")

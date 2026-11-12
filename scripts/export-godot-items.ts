@@ -1,10 +1,13 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { ITEM_TEMPLATES } from '../src/data/items';
+import { AFFIXES, RARITY_AFFIX_COUNT, RARITY_PRICE_MULT, SLOT_GROUP_WEIGHTS, TR_RANGES } from '../src/data/affixes';
+import { RARITY_TABLES, createItem, rollItem, rollRarity } from '../src/core/items/items';
+import { Rng } from '../src/core/rng';
+import type { CreateItemOptions, LootRollOptions } from '../src/core/items/items';
 import { UNIQUE_TEMPLATE_BY_ID } from '../src/data/uniques';
 
-const templates = [...ITEM_TEMPLATES, ...Object.values(UNIQUE_TEMPLATE_BY_ID)]
-  .sort((left, right) => left.id.localeCompare(right.id));
+const templates = [...ITEM_TEMPLATES, ...Object.values(UNIQUE_TEMPLATE_BY_ID)];
 const ids = new Set(templates.map((template) => template.id));
 if (ids.size !== templates.length) throw new Error('Duplicate item template ID in export.');
 
@@ -12,3 +15,45 @@ const output = resolve('game/data/catalog/item_templates.json');
 mkdirSync(dirname(output), { recursive: true });
 writeFileSync(output, `${JSON.stringify({ schemaVersion: 1, templates }, null, 2)}\n`, 'utf8');
 console.log(`Exported ${templates.length} item templates to ${output}`);
+
+const rulesOutput = resolve('game/data/catalog/item_rules.json');
+writeFileSync(rulesOutput, `${JSON.stringify({
+  schemaVersion: 1,
+  affixes: AFFIXES,
+  rarityAffixCount: RARITY_AFFIX_COUNT,
+  trRanges: TR_RANGES,
+  rarityPriceMultipliers: RARITY_PRICE_MULT,
+  rarityTables: RARITY_TABLES,
+  slotGroupWeights: SLOT_GROUP_WEIGHTS,
+}, null, 2)}\n`, 'utf8');
+console.log(`Exported ${AFFIXES.length} affix definitions to ${rulesOutput}`);
+
+const fixtureCases: Array<{ name: string; seed: string; stream: string; options: CreateItemOptions }> = [
+  { name: 'common', seed: 'item-factory-golden', stream: 'loot', options: { templateId: 'PISTOL_K1', techLevel: 1, rarity: 'COMMON', secured: true, originGrantId: 'grant-common', origin: 'cache' } },
+  { name: 'rare', seed: 'item-factory-golden', stream: 'loot', options: { templateId: 'ARM_CLOTH', techLevel: 7, rarity: 'RARE', secured: false, originGrantId: 'grant-rare', origin: 'combat', affixCount: 4, acquiredAt: 12345 } },
+  { name: 'unique', seed: 'item-factory-golden', stream: 'loot', options: { templateId: 'U01', techLevel: 13, rarity: 'UNIQUE', secured: true, originGrantId: 'grant-unique', origin: 'boss', affixCount: 2 } },
+];
+const fixtureOutput = resolve('game/tests/fixtures/items/create_item_cases.json');
+mkdirSync(dirname(fixtureOutput), { recursive: true });
+const rarityCases: Array<{ name: string; seed: string; stream: string; table: 'ORDINARY' | 'ELITE' | 'BOSS'; rareShift: number }> = [
+  { name: 'ordinary', seed: 'rarity-golden', stream: 'loot', table: 'ORDINARY', rareShift: 0 },
+  { name: 'elite-shifted', seed: 'rarity-golden', stream: 'loot', table: 'ELITE', rareShift: 0.35 },
+  { name: 'boss', seed: 'rarity-golden', stream: 'loot', table: 'BOSS', rareShift: 0 },
+];
+const lootCases: Array<{ name: string; seed: string; stream: string; options: LootRollOptions }> = [
+  { name: 'ordinary-pool', seed: 'loot-golden', stream: 'loot', options: { depth: 5, biome: 'B01', table: 'ORDINARY', secured: false, grantId: 'loot-normal', origin: 'combat' } },
+  { name: 'unique-biome', seed: 'loot-golden', stream: 'loot', options: { depth: 10, biome: 'B05', table: 'BOSS', secured: true, grantId: 'loot-unique', origin: 'boss', forceRarity: 'UNIQUE' } },
+  { name: 'unique-fallback', seed: 'loot-golden', stream: 'loot', options: { depth: 2, biome: 'B01', table: 'ELITE', secured: false, grantId: 'loot-fallback', origin: 'elite', forceRarity: 'UNIQUE', forceTag: 'no-such-tag' } },
+];
+writeFileSync(fixtureOutput, `${JSON.stringify({
+  cases: fixtureCases.map((entry) => ({
+  name: entry.name,
+  stream: entry.stream,
+  seed: entry.seed,
+  options: entry.options,
+  expected: createItem(new Rng(entry.stream, entry.seed), entry.options),
+  })),
+  rarityCases: rarityCases.map((entry) => ({ ...entry, expected: rollRarity(new Rng(entry.stream, entry.seed), entry.table, entry.rareShift) })),
+  lootCases: lootCases.map((entry) => ({ ...entry, expected: rollItem(new Rng(entry.stream, entry.seed), entry.options) })),
+}, null, 2)}\n`, 'utf8');
+console.log(`Exported ${fixtureCases.length} item, ${rarityCases.length} rarity, and ${lootCases.length} loot fixtures to ${fixtureOutput}`);
