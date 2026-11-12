@@ -12,7 +12,8 @@ import { MUTATIONS } from '../src/data/progression';
 import { createInitialSave } from '../src/core/save/initial';
 import { UNIQUE_TEMPLATE_BY_ID } from '../src/data/uniques';
 import { BOSSES, ELITE_MODS, ENEMIES } from '../src/data/enemies';
-import { createCombatState, stepCombat } from '../src/core/combat/engine';
+import { applyStatus, createCombatState, stepCombat } from '../src/core/combat/engine';
+import { STATUS_DEFS } from '../src/core/combat/status';
 import type { TacticalProfile } from '../src/core/combat/types';
 
 const templates = [...ITEM_TEMPLATES, ...Object.values(UNIQUE_TEMPLATE_BY_ID)];
@@ -156,6 +157,10 @@ mkdirSync(dirname(enemyCatalogOutput), { recursive: true });
 writeFileSync(enemyCatalogOutput, `${JSON.stringify({ schemaVersion: 1, enemies: ENEMIES, bosses: BOSSES, eliteMods: ELITE_MODS }, null, 2)}\n`, 'utf8');
 console.log(`Exported ${ENEMIES.length} enemies, ${BOSSES.length} bosses, and ${ELITE_MODS.length} elite modifiers to ${enemyCatalogOutput}`);
 
+const statusCatalogOutput = resolve('game/data/catalog/status_definitions.json');
+writeFileSync(statusCatalogOutput, `${JSON.stringify({ schemaVersion: 1, statuses: Object.values(STATUS_DEFS) }, null, 2)}\n`, 'utf8');
+console.log(`Exported ${Object.keys(STATUS_DEFS).length} status definitions to ${statusCatalogOutput}`);
+
 const starterItemsById = new Map(initialSaveFixture.meta.inventory.map((item) => [item.itemId, item]));
 const starterEquipment = Object.fromEntries(Object.entries(initialSaveFixture.meta.equipment).map(([slot, itemId]) => [slot, starterItemsById.get(itemId)!]));
 const starterBuild = resolveBuild({
@@ -238,3 +243,24 @@ const basicAutoFixtureOutput = resolve('game/tests/fixtures/combat/basic_auto_re
 mkdirSync(dirname(basicAutoFixtureOutput), { recursive: true });
 writeFileSync(basicAutoFixtureOutput, `${JSON.stringify({ config: { seed: basicStateConfig.seed, depth: basicStateConfig.depth, biome: basicStateConfig.biome, nodeType: basicStateConfig.nodeType, enemy: basicStateConfig.enemies[0], tactics: basicTactics, maxDurationMs: basicStateConfig.maxDurationMs }, frames: basicAutoFrames }, null, 2)}\n`, 'utf8');
 console.log(`Exported ${basicAutoFrames.length} basic-auto combat replay frames to ${basicAutoFixtureOutput}`);
+
+let dotState = createCombatState(basicStateConfig);
+applyStatus(dotState, dotState.operator, dotState.enemies[0]!, 'BLEED', { snapshot: 100 });
+const dotFrames = [];
+for (let tick = 0; tick < 40; tick++) {
+  const previousLogLength = dotState.log.length;
+  dotState = stepCombat(dotState);
+  dotFrames.push({
+    timeMs: dotState.timeMs, rng: dotState.rng, nextEventId: dotState.nextEventId,
+    metrics: dotState.metrics, outcome: dotState.outcome,
+    operator: { hp: dotState.operator.hp, shield: dotState.operator.shield, statuses: dotState.operator.statuses },
+    enemies: dotState.enemies.map((actor) => ({ hp: actor.hp, shield: actor.shield, statuses: actor.statuses, damageTaken: actor.damageTaken })),
+    events: dotState.log.slice(previousLogLength),
+  });
+}
+const dotFixtureOutput = resolve('game/tests/fixtures/combat/dot_replay.json');
+writeFileSync(dotFixtureOutput, `${JSON.stringify({
+  config: { seed: basicStateConfig.seed, depth: basicStateConfig.depth, biome: basicStateConfig.biome, nodeType: basicStateConfig.nodeType, enemy: basicStateConfig.enemies[0], tactics: basicTactics, maxDurationMs: basicStateConfig.maxDurationMs },
+  status: { id: 'BLEED', snapshot: 100 }, appliedEvent: dotState.log.find((event) => event.kind === 'STATUS_APPLY'), frames: dotFrames,
+}, null, 2)}\n`, 'utf8');
+console.log(`Exported ${dotFrames.length} DoT status replay frames to ${dotFixtureOutput}`);

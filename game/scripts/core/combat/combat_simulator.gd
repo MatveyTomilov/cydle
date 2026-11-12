@@ -11,6 +11,9 @@ var _factory: CombatFactory = CombatFactory.new()
 var _hash: StateHash = StateHash.new()
 var _damage: DamageMath = DamageMath.new()
 var _formula: CydleFormula = CydleFormula.new()
+var _status_catalog: StatusCatalog = StatusCatalog.new()
+var _status_catalog_loaded: bool = false
+var _status_catalog_error: String = ""
 
 func create_state(config: Dictionary) -> Dictionary:
 	var seed_value: Variant = config.get("seed", "")
@@ -77,6 +80,8 @@ func step_combat(state: CombatState) -> Dictionary:
 		return _failure("Состояние боевого RNG повреждено.")
 	next.time_ms += TICK_MS
 	_apply_basic_continuous(next)
+	_tick_dot_statuses(next)
+	_expire_dot_statuses(next)
 	var ready: Array[CombatActorState] = next.all_actors()
 	ready.sort_custom(func(left: CombatActorState, right: CombatActorState) -> bool: return left.id < right.id)
 	for actor: CombatActorState in ready:
@@ -101,12 +106,182 @@ func _supports_basic_auto_step(state: CombatState) -> bool:
 		return false
 	for actor: CombatActorState in state.all_actors():
 		if not actor.elite_mod.is_empty() or not actor.ability_next.is_empty() or not actor.statuses.is_empty() or not actor.buffs.is_empty() or actor.cast != null or actor.reaction_cast != null:
-			return false
+			for status_id: Variant in actor.statuses.keys():
+				if not ["BLEED", "BURN", "VIRUS"].has(str(status_id)):
+					return false
+			if not actor.elite_mod.is_empty() or not actor.ability_next.is_empty() or not actor.buffs.is_empty() or actor.cast != null or actor.reaction_cast != null:
+				return false
 		if actor.side == "enemy":
 			var template: Dictionary = _factory._enemy_catalog.get_template(actor.template_id)
 			if not template.get("passives", []).is_empty() or not template.get("rotating", []).is_empty():
 				return false
 	return true
+
+func apply_status(state: CombatState, source_id: String, target_id: String, status_id: String, options: Dictionary = {}) -> Dictionary:
+	if state == null:
+		return _failure("Для наложения статуса требуется состояние боя.")
+	if not _status_catalog_loaded:
+		var loaded: Dictionary = _status_catalog.load_catalog()
+		_status_catalog_loaded = true
+		_status_catalog_error = str(loaded.get("error", "")) if not bool(loaded.get("ok", false)) else ""
+	if not _status_catalog_error.is_empty():
+		return _failure("Каталог статусов недоступен: %s" % _status_catalog_error)
+	if not ["BLEED", "BURN", "VIRUS"].has(status_id):
+		return _failure("Пока доступны только DoT-статусы BLEED, BURN и VIRUS.")
+	var source: CombatActorState = _actor_by_id(state, source_id)
+	var target: CombatActorState = _actor_by_id(state, target_id)
+	if source == null or target == null or not target.alive:
+		return _failure("Источник или активная цель статуса не найдены.")
+	var definition: Dictionary = _status_catalog.get_definition(status_id)
+	if definition.is_empty():
+		return _failure("Неизвестный статус %s." % status_id)
+	var next: CombatState = state.clone()
+	var next_source: CombatActorState = _actor_by_id(next, source_id)
+	var next_target: CombatActorState = _actor_by_id(next, target_id)
+	if next_source == null or next_target == null:
+		return _failure("Источник или цель статуса отсутствуют в копии состояния.")
+	var stacks: int = maxi(1, int(options.get("stacks", 1)))
+	var source_sheet: Dictionary = next_source.base_sheet
+	var duration: float = float(options.get("durationMs", definition["durationMs"]))
+	if definition.has("tickMs"):
+		duration *= 1.0 + (float(source_sheet.get("dotDuration", 0.0)) + (float(source_sheet.get("virusDuration", 0.0)) if status_id == "VIRUS" else 0.0)) / 100.0
+	var snapshot: float = 0.0
+	match str(definition["snapshotFrom"]):
+		"rawDamage":
+			snapshot = float(options.get("snapshot", 0.0)) * (1.0 + (float(source_sheet.get("statusDamage", 0.0)) + (float(source_sheet.get("bleedDamage", 0.0)) if status_id == "BLEED" else 0.0)) / 100.0)
+		"techPower":
+			snapshot = float(source_sheet.get("techPower", 0.0)) * (1.0 + float(source_sheet.get("statusDamage", 0.0)) / 100.0) * (1.0 + float(source_sheet.get("virusDamage", 0.0)) / 100.0)
+	var max_stacks: int = int(definition["maxStacks"])
+	if status_id == "BLEED":
+		max_stacks += floori(float(source_sheet.get("bleedStackCap", 0.0)))
+	elif status_id == "VIRUS":
+		max_stacks += floori(float(source_sheet.get("virusStackCap", 0.0)))
+	var entries: Array = next_target.statuses.get(status_id, [])
+	if bool(definition["independentStacks"]):
+		for _index: int in range(stacks):
+			if entries.size() >= max_stacks:
+				entries.pop_front()
+			entries.append({
+				"sourceId": "%s:%s" % [source.id, status_id], "sourceActorId": source.id,
+				"expiresAt": float(next.time_ms) + duration,
+				"nextTickAt": float(next.time_ms) + float(definition.get("tickMs", duration)),
+				"snapshot": snapshot, "stacks": 1,
+			})
+	else:
+		var existing: Dictionary = entries[0] if not entries.is_empty() else {}
+		if not existing.is_empty():
+			existing["stacks"] = clampi(int(existing.get("stacks", 1)) + stacks, 1, max_stacks)
+			existing["expiresAt"] = float(next.time_ms) + duration
+			existing["sourceActorId"] = source.id
+			if definition.has("tickMs"):
+				existing["snapshot"] = snapshot
+		else:
+			entries.append({
+				"sourceId": "%s:%s" % [source.id, status_id], "sourceActorId": source.id,
+				"expiresAt": float(next.time_ms) + duration,
+				"nextTickAt": float(next.time_ms) + float(definition.get("tickMs", duration)),
+				"snapshot": snapshot, "stacks": clampi(stacks, 1, max_stacks),
+			})
+	next_target.statuses[status_id] = entries
+	_emit(next, "STATUS_APPLY", source.id, {
+		"targetId": target.id, "statusId": status_id,
+		"text": "%s: %s%s." % [target.display_name, str(definition["name"]), " ×%d" % entries.size() if bool(definition["independentStacks"]) else ""],
+		"data": {"stacks": _status_stack_count(entries), "snapshot": snapshot, "durationMs": duration},
+	})
+	return {"ok": true, "state": next, "error": ""}
+
+func _tick_dot_statuses(state: CombatState) -> void:
+	if not _status_catalog_loaded:
+		var loaded: Dictionary = _status_catalog.load_catalog()
+		_status_catalog_loaded = true
+		_status_catalog_error = str(loaded.get("error", "")) if not bool(loaded.get("ok", false)) else ""
+	if not _status_catalog_error.is_empty():
+		return
+	for target: CombatActorState in state.all_actors():
+		if not target.alive:
+			continue
+		for status_id: String in ["BLEED", "BURN", "VIRUS"]:
+			var entries: Array = target.statuses.get(status_id, [])
+			var definition: Dictionary = _status_catalog.get_definition(status_id)
+			if entries.is_empty() or definition.is_empty():
+				continue
+			for entry: Dictionary in entries:
+				if float(entry.get("nextTickAt", 0.0)) > float(state.time_ms):
+					continue
+				entry["nextTickAt"] = float(entry.get("nextTickAt", 0.0)) + float(definition["tickMs"])
+				var raw: float = float(entry.get("snapshot", 0.0)) * float(definition.get("tickFraction", 0.0)) * float(entry.get("stacks", 1))
+				if raw <= 0.0:
+					continue
+				_apply_dot_damage(state, target, str(entry.get("sourceActorId", "")), status_id, raw, str(definition["damageType"]), str(definition["name"]))
+
+func _apply_dot_damage(state: CombatState, target: CombatActorState, source_id: String, status_id: String, raw: float, damage_type: String, status_name: String) -> void:
+	var source: CombatActorState = _actor_by_id(state, source_id)
+	var defender: Dictionary = target.base_sheet
+	var mitigation: Dictionary = _damage.mitigate_packet(raw, damage_type, {"armor": defender.get("armor", 0.0), "energyRes": defender.get("energyRes", 0.0), "digitalRes": defender.get("digitalRes", 0.0)}, DamageMath.ZERO_PENETRATION)
+	var incoming: float = float(mitigation["afterDefense"]) * float(defender.get("incomingAll", 1.0)) * float(defender.get("incomingKinetic" if damage_type == "KINETIC" else "incomingEnergy" if damage_type == "ENERGY" else "incomingDigital", 1.0))
+	var partition: Dictionary = _damage.partition_damage(incoming, {"hp": target.hp, "shield": target.shield, "temp": target.temp_shields}, 0.0, float(defender.get("incomingShield", 1.0)))
+	_apply_partition(target, partition)
+	target.flags["lastDamagedAt"] = float(state.time_ms)
+	state.metrics["statusTicks"] = int(state.metrics.get("statusTicks", 0)) + 1
+	var dealt: float = float(partition["shieldConsumed"]) + float(partition["hpLost"])
+	target.damage_taken += dealt
+	if source != null:
+		source.damage_dealt += dealt
+	if source != null and source.side == "player":
+		state.metrics["damageDealt"] = float(state.metrics.get("damageDealt", 0.0)) + dealt
+		var by_type: Dictionary = state.metrics["damageByType"]
+		by_type[damage_type] = float(by_type.get(damage_type, 0.0)) + incoming
+		var by_source: Dictionary = state.metrics["damageBySource"]
+		by_source[source_id] = float(by_source.get(source_id, 0.0)) + dealt
+		state.metrics["shieldAbsorbed"] = float(state.metrics.get("shieldAbsorbed", 0.0)) + float(partition["shieldConsumed"])
+	else:
+		state.metrics["damageTaken"] = float(state.metrics.get("damageTaken", 0.0)) + dealt
+		var by_source: Dictionary = state.metrics["takenBySource"]
+		by_source[source_id] = float(by_source.get(source_id, 0.0)) + dealt
+		if target.kind == "operator":
+			state.metrics["hpLost"] = float(state.metrics.get("hpLost", 0.0)) + float(partition["hpLost"])
+	_emit(state, "DOT_TICK", source_id, {
+		"targetId": target.id, "actionId": "dot:%s:%s:%d" % [status_id, target.id, state.time_ms],
+		"statusId": status_id, "damageType": damage_type,
+		"amountBeforeDefense": raw, "amountAfterDefense": incoming,
+		"shieldConsumed": partition["shieldConsumed"], "hpLost": partition["hpLost"],
+		"text": "%s → %s: %s %s." % [status_name, target.display_name, _one_decimal(incoming), damage_type],
+	})
+
+func _expire_dot_statuses(state: CombatState) -> void:
+	if not _status_catalog_loaded:
+		return
+	for actor: CombatActorState in state.all_actors():
+		for status_id: String in ["BLEED", "BURN", "VIRUS"]:
+			var entries: Array = actor.statuses.get(status_id, [])
+			if entries.is_empty():
+				continue
+			var kept: Array = []
+			for entry: Dictionary in entries:
+				if float(entry.get("expiresAt", 0.0)) > float(state.time_ms):
+					kept.append(entry)
+			if kept.size() != entries.size():
+				_emit(state, "STATUS_EXPIRE", actor.id, {
+					"statusId": status_id,
+					"actionId": "%s:status-expire:%s:%d" % [actor.id, status_id, state.time_ms],
+					"text": "%s: %s истёк." % [actor.display_name, str(_status_catalog.get_definition(status_id).get("name", status_id))],
+				})
+			if kept.is_empty():
+				actor.statuses.erase(status_id)
+			else:
+				actor.statuses[status_id] = kept
+
+func _actor_by_id(state: CombatState, actor_id: String) -> CombatActorState:
+	for actor: CombatActorState in state.all_actors():
+		if actor.id == actor_id:
+			return actor
+	return null
+
+func _status_stack_count(entries: Array) -> int:
+	var count: int = 0
+	for entry: Dictionary in entries:
+		count += int(entry.get("stacks", 0))
+	return count
 
 func _apply_basic_continuous(state: CombatState) -> void:
 	var operator: CombatActorState = state.operator
