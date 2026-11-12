@@ -1812,7 +1812,8 @@ func resolve_quest_choice(quest_id: String, choice_id: String) -> bool:
 	if special == "questPause":
 		progress["status"] = "PAUSED"
 	else:
-		if not progress["completedStages"].has("S%d" % int(progress.get("stage", 1))): progress["completedStages"].append("S%d" % int(progress.get("stage", 1)))
+		var stage_key: String = "S%d" % int(progress.get("stage", 1))
+		if not progress["completedStages"].has(stage_key): progress["completedStages"].append(stage_key)
 		if bool(choice.get("questAdvance", false)):
 			progress["stage"] = int(progress.get("stage", 1)) + 1
 			progress["stageStartedDepth"] = state.run.depth
@@ -1821,6 +1822,10 @@ func resolve_quest_choice(quest_id: String, choice_id: String) -> bool:
 			if progress["status"] == "ACTIVE":
 				progress["stage"] = int(progress.get("stage", 1)) + 1
 				progress["stageStartedDepth"] = state.run.depth
+		var xp_milestone_flag: String = "xp-milestone:%s" % stage_key
+		if not progress["flags"].has(xp_milestone_flag):
+			_grant_experience(meta["operator"], ceili(60.0 * scale))
+			progress["flags"].append(xp_milestone_flag)
 	var all_progress: Dictionary = meta.get("questProgress", {})
 	all_progress[quest_id] = progress
 	meta["questProgress"] = all_progress

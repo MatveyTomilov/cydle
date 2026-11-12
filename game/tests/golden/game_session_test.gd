@@ -1001,6 +1001,19 @@ func run(_tree: SceneTree) -> bool:
 	resumed.configure_save_directory("user://test-saves/game-session")
 	check(resumed.load_saved_game(), "game_session: persisted state did not reload: %s" % resumed.last_error)
 	check(resumed.state.run.current_node_id == session.state.run.current_node_id, "game_session: route position changed after reload")
+	var quest_xp_session: GameSession = GameSession.new()
+	quest_xp_session.configure_save_directory("user://test-saves/quest-xp-milestone")
+	if check(quest_xp_session.start_new_game(1762900000100), "game_session: could not create a quest-XP profile") and check(quest_xp_session.start_expedition("quest-xp-milestone"), "game_session: could not start quest-XP run"):
+		var quest_xp_payload: Dictionary = quest_xp_session.state.to_payload()
+		quest_xp_payload["meta"]["questProgress"] = {"Q02": {"status": "ACTIVE", "stage": 1, "startedDepth": 1, "stageStartedDepth": 1, "completedStages": [], "choiceHistory": [], "flags": []}}
+		quest_xp_payload["run"]["graph"] = {"layers": [[{"id": "quest-xp-event", "layer": 0, "type": "EVENT", "eventId": "EV02", "threat": "medium", "enemies": [], "revealLevel": 1, "lootHint": "event"}]], "edges": [{"from": "START", "to": "quest-xp-event", "fromLayer": -1, "toLayer": 0, "fuelCost": 1}]}
+		check(quest_xp_session._commit_payload(quest_xp_payload) and quest_xp_session.travel_to("quest-xp-event"), "game_session: Q02 XP milestone event could not be prepared: %s" % quest_xp_session.last_error)
+		var xp_before_milestone: int = quest_xp_session.state.meta.operator.xp
+		var expected_quest_xp: int = ceili(60.0 * CydleFormula.new().reward_scale(float(quest_xp_session.state.run.depth)))
+		check(quest_xp_session.resolve_quest_choice("Q02", "A"), "game_session: Q02 stage-one choice did not resolve: %s" % quest_xp_session.last_error)
+		var xp_after_milestone: int = quest_xp_session.state.meta.operator.xp
+		check(xp_after_milestone == xp_before_milestone + expected_quest_xp and quest_xp_session.state.meta.quest_progress["Q02"]["flags"].has("xp-milestone:S1"), "game_session: completed quest stage did not award its single authored XP milestone")
+		check(not quest_xp_session.resolve_quest_choice("Q02", "A") and quest_xp_session.state.meta.operator.xp == xp_after_milestone, "game_session: quest XP milestone could be claimed twice")
 	var event_session: GameSession = GameSession.new()
 	event_session.configure_save_directory("user://test-saves/game-session-events")
 	if check(event_session.start_new_game(1762900000100), "game_session: could not create an event-test profile") and check(event_session.start_expedition("fixed-event-seed"), "game_session: could not start event-test run"):

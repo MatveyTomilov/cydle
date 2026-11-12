@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — quest milestone progression
+
+- Completed quest stages now grant permanent `ceil(60 × R(depth))` XP. The XP milestone is marked in the existing quest flags and paid once; alternate completion counts, while a paused Q06 evacuation does not.
+- `game_session_test.gd` checks the stage reward value and duplicate-claim prevention. Godot editor import, 22 headless scripts / 87,630 assertions, Windows Desktop export, exported EXE smoke, and `git diff --check` passed. TypeScript not run (native Godot-only changes).
+
 ## Unreleased — event consequence integration
 
 - EV18 now contributes an E08 50%-strength allied turret to the next deterministic combat; the shared combat state saves the ally and it performs real attacks. EV05's extra RARE reward is now elite-only.
