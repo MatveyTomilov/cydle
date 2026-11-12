@@ -263,7 +263,22 @@ func run(_tree: SceneTree) -> bool:
 			check(bool(dismantle_quote.get("valid", false)) and int(dismantle_quote.get("scrap", 0)) > 0 and int(dismantle_quote.get("data", 0)) == 1, "game_session: digital-item dismantle preview did not include capped materials")
 			check(disposal_session.dismantle_item(str(dismantle_item["itemId"])), "game_session: dismantle transaction failed: %s" % disposal_session.last_error)
 			check(is_equal_approx(disposal_session.state.meta.protected_bank.scrap, scrap_before_dismantle + float(dismantle_quote["scrap"])) and is_equal_approx(disposal_session.state.meta.protected_bank.data, data_before_dismantle + 1.0) and disposal_session._secured_inventory_item(str(dismantle_item["itemId"])).is_empty(), "game_session: dismantling did not return capped scrap/data and consume its item")
-			check(not disposal_session.dismantle_item(str(dismantle_item["itemId"])), "game_session: a dismantled item granted materials more than once")
+			check(disposal_session.state.meta.disassembly_history.size() == 1 and disposal_session.can_undo_last_dismantle(), "game_session: dismantle history or immediate undo was not persisted")
+			var dismantle_roundtrip: Dictionary = GameSaveState.new().parse_payload(disposal_session.state.to_payload())
+			check(bool(dismantle_roundtrip.get("ok", false)) and dismantle_roundtrip["state"].meta.disassembly_history.size() == 1, "game_session: dismantle history did not survive save-schema roundtrip")
+			check(disposal_session.undo_last_dismantle(), "game_session: immediate dismantle undo failed: %s" % disposal_session.last_error)
+			check(not disposal_session.can_undo_last_dismantle() and not disposal_session._secured_inventory_item(str(dismantle_item["itemId"])).is_empty() and is_equal_approx(disposal_session.state.meta.protected_bank.scrap, scrap_before_dismantle) and is_equal_approx(disposal_session.state.meta.protected_bank.data, data_before_dismantle), "game_session: undo did not restore the same item and reverse the material grant")
+			check(bool(disposal_session.state.meta.disassembly_history[0].get("undone", false)), "game_session: historical entry was not updated as undone")
+			check(disposal_session.dismantle_item(str(dismantle_item["itemId"])), "game_session: restored item could not be dismantled again")
+			check(disposal_session.start_expedition("dismantle-undo-boundary"), "game_session: undo boundary test expedition could not start")
+			check(disposal_session.can_undo_last_dismantle(), "game_session: disassembly undo expired before the next route node")
+			var first_route_node: String = ""
+			for edge: Dictionary in disposal_session.state.run.graph.get("edges", []):
+				if str(edge.get("from", "")) == "START":
+					first_route_node = str(edge.get("to", ""))
+					break
+			check(not first_route_node.is_empty() and disposal_session.travel_to(first_route_node), "game_session: undo boundary could not enter the first route node")
+			check(not disposal_session.can_undo_last_dismantle() and disposal_session.state.meta.disassembly_undo.is_empty(), "game_session: entering the next node did not expire dismantle undo")
 	var tech_calibration_session: GameSession = GameSession.new()
 	tech_calibration_session.configure_save_directory("user://test-saves/tech-calibration")
 	if check(tech_calibration_session.start_new_game(1762900000400), "game_session: could not create a TechLevel-calibration profile"):

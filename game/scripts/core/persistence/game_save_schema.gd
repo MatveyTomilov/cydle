@@ -44,10 +44,16 @@ func _validate_meta(value: Variant) -> Dictionary:
 	var keys: Array[String] = ["operator", "tutorial", "reputation", "campaignFlags", "transport", "protectedBank", "unsecuredWallet", "inventory", "equipment", "garage", "unlockedForpost", "maxSectorCleared", "unlockedBiomes", "skillIds", "passiveIds", "treeNodeIds", "unlockedImplantSlots", "unlockedDroneSlots", "tactics", "activeTacticId", "autopilotProfiles"]
 	var meta_allowed: Array[String] = keys.duplicate()
 	meta_allowed.append("questProgress")
+	meta_allowed.append("disassemblyHistory")
+	meta_allowed.append("disassemblyUndo")
 	if not _has_keys(meta, keys) or not _has_only_keys(meta, meta_allowed):
 		return _failure("meta: отсутствуют обязательные поля или есть неизвестные поля.")
 	if meta.has("questProgress") and not _validate_quest_progress(meta["questProgress"]):
 		return _failure("meta.questProgress: состояние заданий повреждено.")
+	if meta.has("disassemblyHistory") and not _validate_disassembly_history(meta["disassemblyHistory"]):
+		return _failure("meta.disassemblyHistory: история разбора повреждена.")
+	if meta.has("disassemblyUndo") and not _validate_disassembly_undo(meta["disassemblyUndo"]):
+		return _failure("meta.disassemblyUndo: запись отмены разбора повреждена.")
 	var operator_value: Variant = meta["operator"]
 	if not operator_value is Dictionary or not _has_exact_keys(operator_value, ["level", "xp", "attributes", "attributePoints", "treePoints"]):
 		return _failure("meta.operator: неверная структура.")
@@ -397,6 +403,33 @@ func _validate_quest_progress(value: Variant) -> bool:
 		for choice: Variant in progress["choiceHistory"]:
 			if not choice is Dictionary or not _has_exact_keys(choice, ["stage", "choiceId", "nodeId"]) or not _is_integer(choice["stage"]) or int(choice["stage"]) < 1 or int(choice["stage"]) > 3 or not _nonempty_string(choice["choiceId"]) or not _nonempty_string(choice["nodeId"]):
 				return false
+	return true
+
+func _validate_disassembly_history(value: Variant) -> bool:
+	if not value is Array or value.size() > 100:
+		return false
+	for entry: Variant in value:
+		if not entry is Dictionary or not _has_exact_keys(entry, ["itemId", "templateId", "seed", "reason", "scrap", "data", "createdAt", "undone"]):
+			return false
+		if not _nonempty_string(entry["itemId"]) or not _nonempty_string(entry["templateId"]) or not entry["seed"] is String or not _nonempty_string(entry["reason"]):
+			return false
+		for key: String in ["scrap", "data", "createdAt"]:
+			if not _is_finite_number(entry[key]) or float(entry[key]) < 0.0:
+				return false
+		if not entry["undone"] is bool:
+			return false
+	return true
+
+func _validate_disassembly_undo(value: Variant) -> bool:
+	if not value is Dictionary or not _has_exact_keys(value, ["item", "scrap", "data", "createdAt"]):
+		return false
+	if not value["item"] is Dictionary or not _validate_item(value["item"]):
+		return false
+	if not bool(value["item"].get("secured", false)):
+		return false
+	for key: String in ["scrap", "data", "createdAt"]:
+		if not _is_finite_number(value[key]) or float(value[key]) < 0.0:
+			return false
 	return true
 
 func _is_number_map(value: Variant, expected_keys: Array[String], minimum: float, maximum: float, must_be_int: bool) -> bool:

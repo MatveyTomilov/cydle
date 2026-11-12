@@ -819,6 +819,7 @@ func travel_to(node_id: String) -> bool:
 	run_payload["combatResult"] = null
 	var payload: Dictionary = state.to_payload()
 	payload["run"] = run_payload
+	payload["meta"].erase("disassemblyUndo")
 	if str(target_node.get("type", "")) == "CHECKPOINT":
 		_settle_escort_contract(payload)
 	return _commit_payload(payload)
@@ -1979,6 +1980,44 @@ func sell_item(item_id: String) -> bool:
 func dismantle_item(item_id: String) -> bool:
 	return _dispose_secured_item(item_id, "DISMANTLE")
 
+func can_undo_last_dismantle() -> bool:
+	if state == null or state.meta.disassembly_undo.is_empty():
+		return false
+	if state.run != null and not ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(state.run.phase):
+		if state.run.phase != "ROUTE" or not state.run.visited_node_ids.is_empty():
+			return false
+	var undo_item: Dictionary = state.meta.disassembly_undo.get("item", {})
+	return not undo_item.is_empty() and _secured_inventory_item(str(undo_item.get("itemId", ""))).is_empty()
+
+func undo_last_dismantle() -> bool:
+	if not can_undo_last_dismantle():
+		last_error = "Отмена разбора доступна до входа в следующий дорожный узел."
+		return false
+	var payload: Dictionary = state.to_payload()
+	var undo: Dictionary = payload["meta"].get("disassemblyUndo", {}).duplicate(true)
+	var item: Dictionary = undo.get("item", {}).duplicate(true)
+	if item.is_empty() or _inventory_has(payload["meta"]["inventory"], str(item.get("itemId", ""))):
+		last_error = "Предмет разбора уже присутствует в профиле."
+		return false
+	var scrap: float = float(undo.get("scrap", 0.0))
+	var data: float = float(undo.get("data", 0.0))
+	var bank: Dictionary = payload["meta"]["protectedBank"]
+	if float(bank.get("SCRAP", 0.0)) < scrap or float(bank.get("DATA", 0.0)) < data:
+		last_error = "Ресурсы разбора уже потрачены; отмена не может создать отрицательный баланс."
+		return false
+	bank["SCRAP"] = float(bank.get("SCRAP", 0.0)) - scrap
+	bank["DATA"] = float(bank.get("DATA", 0.0)) - data
+	payload["meta"]["inventory"].append(item)
+	payload["meta"]["protectedBank"] = bank
+	var history: Array = payload["meta"].get("disassemblyHistory", [])
+	for index: int in range(history.size() - 1, -1, -1):
+		if str(history[index].get("itemId", "")) == str(item.get("itemId", "")) and not bool(history[index].get("undone", false)):
+			history[index]["undone"] = true
+			break
+	payload["meta"]["disassemblyHistory"] = history
+	payload["meta"].erase("disassemblyUndo")
+	return _commit_payload(payload)
+
 func _dispose_secured_item(item_id: String, method: String) -> bool:
 	var quote: Dictionary = item_disposal_quote(item_id, method)
 	if not bool(quote.get("valid", false)):
@@ -1987,9 +2026,11 @@ func _dispose_secured_item(item_id: String, method: String) -> bool:
 	var payload: Dictionary = state.to_payload()
 	var inventory: Array = payload["meta"]["inventory"]
 	var item_found: bool = false
+	var disposed_item: Dictionary = {}
 	for index: int in range(inventory.size()):
 		var item: Dictionary = inventory[index]
 		if str(item.get("itemId", "")) == item_id and bool(item.get("secured", false)):
+			disposed_item = item.duplicate(true)
 			inventory.remove_at(index)
 			item_found = true
 			break
@@ -1997,6 +2038,13 @@ func _dispose_secured_item(item_id: String, method: String) -> bool:
 		last_error = "Предмет уже потрачен или отсутствует в профиле."
 		return false
 	payload["meta"]["inventory"] = inventory
+	if method == "DISMANTLE":
+		var history: Array = payload["meta"].get("disassemblyHistory", [])
+		history.append({"itemId": item_id, "templateId": str(disposed_item.get("templateId", "")), "seed": str(disposed_item.get("rollSeed", "")), "reason": "MANUAL", "scrap": int(quote.get("scrap", 0)), "data": int(quote.get("data", 0)), "createdAt": int(Time.get_unix_time_from_system()), "undone": false})
+		while history.size() > 100:
+			history.pop_front()
+		payload["meta"]["disassemblyHistory"] = history
+		payload["meta"]["disassemblyUndo"] = {"item": disposed_item, "scrap": float(quote.get("scrap", 0)), "data": float(quote.get("data", 0)), "createdAt": int(Time.get_unix_time_from_system())}
 	var currency: String = "CREDITS" if method == "SELL" else "SCRAP"
 	payload["meta"]["protectedBank"][currency] = float(payload["meta"]["protectedBank"].get(currency, 0.0)) + float(quote.get("credits" if method == "SELL" else "scrap", 0))
 	if method == "DISMANTLE":

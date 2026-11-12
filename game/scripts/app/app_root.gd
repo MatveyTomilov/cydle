@@ -899,6 +899,17 @@ func _show_inventory() -> void:
 				tech_button.tooltip_text = str(quote.get("error", "CalibrationCore group %d" % int(quote["coreGroup"])))
 				tech_button.pressed.connect(_on_calibrate_item_tech.bind(item_id, target_tech))
 				item_actions.add_child(tech_button)
+	if not _session.state.meta.disassembly_history.is_empty():
+		_body.add_child(_label("ИСТОРИЯ РАЗБОРА · %d / 100" % _session.state.meta.disassembly_history.size(), 12, COLOR_CYAN))
+		if _session.can_undo_last_dismantle():
+			var undo: Button = _button("ОТМЕНИТЬ ПОСЛЕДНИЙ РАЗБОР", true)
+			undo.tooltip_text = "Вернёт тот же предмет и спишет полученные материалы. Доступно до входа в следующий узел."
+			undo.pressed.connect(_on_undo_last_dismantle)
+			_body.add_child(undo)
+		var history: Array = _session.state.meta.disassembly_history.duplicate(true)
+		history.reverse()
+		for record: Dictionary in history:
+			_body.add_child(_label("%s · %s · %s · +%d SCR / +%d DATA · seed %s" % [str(record.get("itemId", "")), str(record.get("reason", "MANUAL")), "ОТМЕНЕНО" if bool(record.get("undone", false)) else "РАЗОБРАН", int(record.get("scrap", 0)), int(record.get("data", 0)), str(record.get("seed", "—"))], 10, COLOR_MUTED))
 	var back: Button = _button("НАЗАД В ГАРАЖ", false)
 	back.pressed.connect(_show_garage)
 	_body.add_child(back)
@@ -1340,6 +1351,11 @@ func _on_confirm_item_disposal(item_id: String, method: String) -> void:
 	var disposed: bool = _session.sell_item(item_id) if method == "SELL" else _session.dismantle_item(item_id)
 	_show_inventory()
 	_footer.text = "ПРЕДМЕТ %s · ПРОФИЛЬ СОХРАНЁН" % ("ПРОДАН" if method == "SELL" else "РАЗОБРАН") if disposed else _session.last_error
+
+func _on_undo_last_dismantle() -> void:
+	var restored: bool = _session.undo_last_dismantle()
+	_show_inventory()
+	_footer.text = "РАЗБОР ОТМЕНЁН · ПРЕДМЕТ ВОССТАНОВЛЕН" if restored else _session.last_error
 
 func _on_calibrate_item_affix(item_id: String, affix_index: int) -> void:
 	var calibrated: bool = _session.calibrate_item_affix(item_id, affix_index)
