@@ -16,6 +16,7 @@ func run(_tree: SceneTree) -> bool:
 	for depth: int in [4, 8, 12]:
 		var boss_graph: Dictionary = generator.generate("boss-seed-%d" % depth, depth, generator.campaign_biome(depth, "boss"), false)["graph"]
 		check(str(boss_graph["layers"][5][0]["type"]) == "BOSS", "sector_generator: depth %d has no boss endpoint" % depth)
+	check(generator.campaign_biome(13, "endgame-repeat-seed", ["B06", "B06"]) != "B06", "sector_generator: endgame allowed three identical biomes in sequence")
 	var campaign_graph: Dictionary = generator.generate("event-seed", 2, "B03", false)["graph"]
 	var event_node: Dictionary = campaign_graph["layers"][3][0]
 	check(str(event_node.get("type", "")) == "EVENT", "sector_generator: canonical layer-three event node is missing")

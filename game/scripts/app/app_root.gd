@@ -168,6 +168,16 @@ func _show_garage() -> void:
 	var meta: GameSaveState.MetaState = state.meta
 	var act: int = 1 if meta.max_sector_cleared < 4 else 2 if meta.max_sector_cleared < 8 else 3
 	_body.add_child(_label("ГАРАЖ   /   АКТ %d · %s" % [act, ["Прорыв", "Перехват", "Сердце"][act - 1]], 12, COLOR_CYAN))
+	if meta.campaign_flags.has("ACT_I_ARCHIVE"):
+		_body.add_child(_label("АРХИВ ПЕРВОГО КОРИДОРА ДОСТУПЕН", 11, COLOR_MUTED))
+	if meta.campaign_flags.has("ACT_II_DRONE_LINE"):
+		_body.add_child(_label("ЛИНИЯ УСИЛЕННЫХ ДРОНОВ · ИНСТРУМЕНТЫ ЦЕЛЕВОЙ ОХОТЫ ОТКРЫТЫ", 11, COLOR_CYAN))
+	if meta.campaign_flags.has("ENDING_SELECTED"):
+		var ending_label: String = "СВОБОДНЫЙ КОРИДОР" if meta.campaign_flags.has("ENDING_FREE_CORRIDOR") else "КОНТРОЛЬ ФРАКЦИИ"
+		for campaign_flag: String in meta.campaign_flags:
+			if campaign_flag.begins_with("ENDING_FACTION:"):
+				ending_label = "КОНТРОЛЬ %s" % campaign_flag.trim_prefix("ENDING_FACTION:")
+		_body.add_child(_label("ФИНАЛ · %s" % ending_label, 11, COLOR_AMBER))
 	_body.add_child(_label("Цель оператора", 28, COLOR_TEXT))
 	var hero_row: HBoxContainer = HBoxContainer.new()
 	hero_row.add_theme_constant_override("separation", 18)
@@ -1022,6 +1032,16 @@ func _show_current_node(run: GameSaveState.RunState) -> void:
 func _show_checkpoint(_run: GameSaveState.RunState) -> void:
 	var completed: bool = _session.state.meta.campaign_flags.has("CAMPAIGN_COMPLETED")
 	_body.add_child(_label("КАМПАНИЯ ПРОЙДЕНА" if completed else "КОНТРОЛЬНЫЙ УЗЕЛ", 20, COLOR_CYAN if completed else COLOR_TEXT))
+	if completed and not _session.state.meta.campaign_flags.has("ENDING_SELECTED"):
+		_body.add_child(_label("Коридор свободных поселений останется нейтральным — или выбранная фракция получит контроль, не закрывая доступ к другим.", 14, COLOR_MUTED))
+		var free_ending: Button = _button("СОЗДАТЬ СВОБОДНЫЙ КОРИДОР", true)
+		free_ending.pressed.connect(_on_campaign_ending.bind("FREE_CORRIDOR", ""))
+		_body.add_child(free_ending)
+		for faction_id: String in ["F_VANTA", "F_RUST", "F_CHOIR", "F_ECHO"]:
+			var faction_ending: Button = _button("ПЕРЕДАТЬ КОНТРОЛЬ · %s" % faction_id, false)
+			faction_ending.pressed.connect(_on_campaign_ending.bind("FACTION_CONTROL", faction_id))
+			_body.add_child(faction_ending)
+		return
 	_body.add_child(_label("Сектор 12 открыт для бесконечной глубины." if completed else "Выберите: закрепить добычу и выйти или продолжить в следующий сектор с текущими ресурсами и незакреплённым грузом.", 14, COLOR_MUTED))
 	var continue_button: Button = _button("ВОЙТИ В ЭНДГЕЙМ · СЕКТОР %02d" % (_run.depth + 1) if completed else "ПРОДОЛЖИТЬ КАМПАНИЮ · СЕКТОР %02d" % (_run.depth + 1), false)
 	continue_button.pressed.connect(_on_continue_campaign)
@@ -1199,6 +1219,12 @@ func _on_event_choice(choice_id: String) -> void:
 
 func _on_continue_campaign() -> void:
 	if _session.continue_campaign():
+		_show_road()
+	else:
+		_footer.text = _session.last_error
+
+func _on_campaign_ending(ending_id: String, faction_id: String) -> void:
+	if _session.resolve_campaign_ending(ending_id, faction_id):
 		_show_road()
 	else:
 		_footer.text = _session.last_error

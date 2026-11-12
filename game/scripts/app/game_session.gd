@@ -379,7 +379,7 @@ func available_contract_offers() -> Array[Dictionary]:
 		return offers
 	var depth: int = maxi(1, state.meta.unlocked_forpost + 1)
 	var seed: String = "%s:sector:%d" % [state.save_id, depth]
-	var biome: String = _generator.campaign_biome(depth, seed)
+	var biome: String = _generator.campaign_biome(depth, seed, _campaign_biome_history(state.meta.campaign_flags))
 	var catalog: QuestCatalog = QuestCatalog.new()
 	if not bool(catalog.load_catalog().get("ok", false)):
 		return offers
@@ -412,7 +412,7 @@ func start_expedition(seed_value: String = "", use_medical_restore: bool = false
 	var seed: String = seed_value.strip_edges()
 	if seed.is_empty():
 		seed = "%s:run:%d" % [state.save_id, int(Time.get_ticks_usec())]
-	var biome: String = _generator.campaign_biome(depth, seed)
+	var biome: String = _generator.campaign_biome(depth, seed, _campaign_biome_history(state.meta.campaign_flags))
 	var generated: Dictionary = _generator.generate(
 		seed, depth, biome,
 		depth == 1 and not bool(state.meta.tutorial.get("firstSectorCompleted", false)) and not bool(state.meta.tutorial.get("starterPrototypeSecured", false)),
@@ -484,6 +484,7 @@ func start_expedition(seed_value: String = "", use_medical_restore: bool = false
 	}
 	var payload: Dictionary = state.to_payload()
 	payload["run"] = run_payload
+	_record_campaign_biome(payload["meta"], depth, biome)
 	if use_medical_restore:
 		payload["meta"]["protectedBank"]["CREDITS"] = float(payload["meta"]["protectedBank"].get("CREDITS", 0.0)) - float(medical_cost)
 		run_payload["resources"]["hull"] = run_payload["resources"]["maxHull"]
@@ -531,6 +532,48 @@ func _force_contract_node(layers: Array, type: String, preferred_layer: int) -> 
 		selected.erase("prototypeChoices")
 		selected["enemies"] = []
 	return selected
+
+func _campaign_biome_history(flags: Array) -> Array[String]:
+	var entries: Array[Dictionary] = []
+	for flag_value: Variant in flags:
+		var flag: String = str(flag_value)
+		if not flag.begins_with("BIOME_HISTORY:"):
+			continue
+		var parts: PackedStringArray = flag.split(":")
+		if parts.size() == 3:
+			entries.append({"depth": int(parts[1]), "biome": parts[2]})
+	entries.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["depth"]) < int(b["depth"]))
+	var history: Array[String] = []
+	for entry: Dictionary in entries:
+		history.append(str(entry["biome"]))
+	return history
+
+func _record_campaign_biome(meta: Dictionary, depth: int, biome: String) -> void:
+	var flags: Array = meta.get("campaignFlags", [])
+	var prefix: String = "BIOME_HISTORY:%d:" % depth
+	for flag_value: Variant in flags.duplicate():
+		if str(flag_value).begins_with(prefix): flags.erase(flag_value)
+	flags.append("BIOME_HISTORY:%d:%s" % [depth, biome])
+	meta["campaignFlags"] = flags
+
+func resolve_campaign_ending(ending_id: String, faction_id: String = "") -> bool:
+	if state == null or state.run == null or state.run.phase != "CHECKPOINT" or state.run.depth != 12 or not state.meta.campaign_flags.has("CAMPAIGN_COMPLETED"):
+		last_error = "Исход кампании выбирается только после финального босса сектора 12."
+		return false
+	if state.meta.campaign_flags.has("ENDING_SELECTED"):
+		last_error = "Исход кампании уже зафиксирован."
+		return false
+	var payload: Dictionary = state.to_payload()
+	var flags: Array = payload["meta"]["campaignFlags"]
+	if ending_id == "FREE_CORRIDOR":
+		flags.append_array(["ENDING_SELECTED", "ENDING_FREE_CORRIDOR", "ENDGAME_UNLOCKED", "FORPOST_12", "NEUTRAL_CONTRACTS"])
+	elif ending_id == "FACTION_CONTROL" and ["F_VANTA", "F_RUST", "F_CHOIR", "F_ECHO"].has(faction_id):
+		flags.append_array(["ENDING_SELECTED", "ENDING_CONTROL_%s" % faction_id, "ENDING_FACTION:%s" % faction_id, "EXCLUSIVE_CONTRACTS:%s" % faction_id, "ENDGAME_UNLOCKED", "FORPOST_12"])
+	else:
+		last_error = "Выбран недопустимый финал или неизвестная фракция."
+		return false
+	payload["meta"]["unlockedForpost"] = maxi(12, int(payload["meta"].get("unlockedForpost", 0)))
+	return _commit_payload(payload)
 
 func reachable_nodes() -> Array[Dictionary]:
 	if state == null or state.run == null or state.run.phase != "ROUTE":
@@ -1335,16 +1378,20 @@ func continue_campaign() -> bool:
 	if state == null or state.run == null or state.run.phase != "CHECKPOINT":
 		last_error = "Продолжить кампанию можно только с контрольного узла."
 		return false
+	if state.run.depth == 12 and state.meta.campaign_flags.has("CAMPAIGN_COMPLETED") and not state.meta.campaign_flags.has("ENDING_SELECTED"):
+		last_error = "Перед эндгеймом необходимо выбрать исход кампании."
+		return false
 	var next_depth: int = state.run.depth + 1
 	var build: Dictionary = build_preview()
 	var seed: String = "%s:sector:%d" % [state.run.seed, next_depth]
-	var biome: String = _generator.campaign_biome(next_depth, seed)
+	var biome: String = _generator.campaign_biome(next_depth, seed, _campaign_biome_history(state.meta.campaign_flags))
 	var generated: Dictionary = _generator.generate(seed, next_depth, biome, false, state.run.wanted, state.run.events_seen)
 	if not bool(generated.get("ok", false)):
 		last_error = str(generated.get("error", "Не удалось создать следующий сектор."))
 		return false
 	var payload: Dictionary = state.to_payload()
 	_expire_quest_deadlines(payload["meta"], next_depth)
+	_record_campaign_biome(payload["meta"], next_depth, biome)
 	var run_payload: Dictionary = payload["run"]
 	run_payload["seed"] = seed
 	run_payload["depth"] = next_depth
@@ -1632,6 +1679,9 @@ func resolve_active_combat() -> bool:
 			var boss_flag: String = "SECTOR_BOSS_%d" % depth
 			if not payload["meta"]["campaignFlags"].has(boss_flag):
 				payload["meta"]["campaignFlags"].append(boss_flag)
+			var milestones: Array[String] = ["ACT_I_ARCHIVE", "FORPOST_4"] if depth == 4 else ["ACT_II_DRONE_LINE", "TARGET_HUNT_TOOLS", "FORPOST_8"] if depth == 8 else []
+			for milestone: String in milestones:
+				if not payload["meta"]["campaignFlags"].has(milestone): payload["meta"]["campaignFlags"].append(milestone)
 		if depth == 12 and not payload["meta"]["campaignFlags"].has("CAMPAIGN_COMPLETED"):
 			payload["meta"]["campaignFlags"].append("CAMPAIGN_COMPLETED")
 	payload["run"] = run_payload
@@ -2420,6 +2470,9 @@ func extract_run() -> bool:
 		return false
 	if state.run.phase != "CHECKPOINT":
 		last_error = "Эвакуация доступна на контрольном узле."
+		return false
+	if state.run.depth == 12 and state.meta.campaign_flags.has("CAMPAIGN_COMPLETED") and not state.meta.campaign_flags.has("ENDING_SELECTED"):
+		last_error = "Перед эвакуацией после финального босса выберите исход кампании."
 		return false
 	var payload: Dictionary = state.to_payload()
 	var run_payload: Dictionary = payload["run"]

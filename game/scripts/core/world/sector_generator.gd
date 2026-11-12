@@ -13,12 +13,17 @@ var _events: EventCatalog = EventCatalog.new()
 var _loaded: bool = false
 var _load_error: String = ""
 
-func campaign_biome(depth: int, seed_value: String) -> String:
+func campaign_biome(depth: int, seed_value: String, previous_biomes: Array[String] = []) -> String:
 	if CAMPAIGN_BIOMES.has(depth):
 		return str(CAMPAIGN_BIOMES[depth])
 	var rng: DeterministicRng = DeterministicRng.new()
 	rng.seed("world:biome", seed_value)
-	return ["B01", "B02", "B03", "B04", "B05", "B06"][rng.int_range(0, 5)]
+	var biomes: Array[String] = ["B01", "B02", "B03", "B04", "B05", "B06"]
+	var selected: String = biomes[rng.int_range(0, biomes.size() - 1)]
+	if previous_biomes.size() >= 2 and previous_biomes[-1] == previous_biomes[-2] and selected == previous_biomes[-1]:
+		var reroll: Array[String] = biomes.filter(func(value: String) -> bool: return value != previous_biomes[-1])
+		selected = str(rng.pick(reroll))
+	return selected
 
 func generate(seed_value: String, depth: int, biome: String, tutorial: bool = false, wanted: float = 0.0, used_event_ids: Array[String] = []) -> Dictionary:
 	if seed_value.strip_edges().is_empty() or depth < 1:

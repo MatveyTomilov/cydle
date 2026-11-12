@@ -44,6 +44,23 @@ func run(_tree: SceneTree) -> bool:
 			var repeat_payout: Dictionary = contract_session.state.to_payload()
 			contract_session._complete_contract(repeat_payout, {"CREDITS": 30}, {"rarity": "RARE", "tag": "weapon"})
 			check(contract_session._commit_payload(repeat_payout) and is_equal_approx(contract_session.state.run.wallet.credits, credits_before + 30.0) and contract_session.state.run.unsecured_cargo.size() == 1, "game_session: repeated contract payout duplicated its grant")
+	var ending_session: GameSession = GameSession.new()
+	ending_session.configure_save_directory("user://test-saves/campaign-ending")
+	if check(ending_session.start_new_game(1762900000120), "game_session: could not create a campaign-ending profile"):
+		check(ending_session.start_expedition("campaign-ending-seed"), "game_session: campaign-ending expedition did not start")
+		var ending_payload: Dictionary = ending_session.state.to_payload()
+		ending_payload["run"]["depth"] = 12
+		ending_payload["run"]["biome"] = "B06"
+		ending_payload["run"]["graph"]["depth"] = 12
+		ending_payload["run"]["graph"]["biome"] = "B06"
+		ending_payload["run"]["phase"] = "CHECKPOINT"
+		ending_payload["meta"]["campaignFlags"].append_array(["CAMPAIGN_COMPLETED", "BIOME_HISTORY:11:B06", "BIOME_HISTORY:12:B06"])
+		check(ending_session._commit_payload(ending_payload), "game_session: could not prepare the final checkpoint: %s" % ending_session.last_error)
+		check(not ending_session.continue_campaign() and ending_session.last_error.contains("исход кампании"), "game_session: final sector continued without an ending choice")
+		check(ending_session.resolve_campaign_ending("FACTION_CONTROL", "F_RUST"), "game_session: faction ending could not be resolved: %s" % ending_session.last_error)
+		check(ending_session.state.meta.campaign_flags.has("ENDGAME_UNLOCKED") and ending_session.state.meta.campaign_flags.has("ENDING_FACTION:F_RUST"), "game_session: faction ending did not unlock and record endgame control")
+		check(ending_session.continue_campaign(), "game_session: campaign could not continue into endgame: %s" % ending_session.last_error)
+		check(ending_session.state.run.depth == 13 and ending_session.state.run.biome != "B06", "game_session: endgame did not begin or enforced a three-sector biome streak")
 	var session: GameSession = GameSession.new()
 	session.configure_save_directory("user://test-saves/game-session")
 	if not check(session.start_new_game(1762900000000), "game_session: could not create a new game: %s" % session.last_error):
