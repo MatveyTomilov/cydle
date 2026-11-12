@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — Q06 objective gate regression
+
+- Extended the Q06 route test: the sector's default anomaly alone does not unlock stage 2, while clearing the additional Q06-tagged anomaly does. This guards the objective condition rather than only checking node generation.
+- Godot editor import and 22 headless scripts / 87,644 assertions passed. Windows export/EXE smoke passed for the preceding production-code checkpoint; this delta is test/doc-only.
+
 ## Unreleased — Q05 anomaly survival objective
 
 - The Q05 fallback “survive three B05 combat nodes” now counts a cleared ANOMALY node. Regression verifies an anomaly among three B05 clears unlocks the Q05_S2 decision.

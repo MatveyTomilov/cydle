@@ -1,9 +1,10 @@
 # CYDLE — Project handoff and development history
 
-## Current live continuation (2026-11-13; quest condition coverage)
+## Current live continuation (2026-11-13; Q06 objective gating regression)
 
-- Latest pushed base: `0c51f4721e94ff66ea92219c6991a0392de64ff9` on `development/codex`; current Q05 combat-count changes are local and not yet committed/pushed.
-- Q05's “survive three B05 combat nodes” alternative now counts ANOMALY nodes as combat, alongside COMBAT/ELITE/BOUNTY. Regression confirms three cleared B05 nodes including one ANOMALY unlock the Q05_S2 choice.
+- Latest pushed base: `154e70d3fa3c3a5ce6a75d350c8032287336657d` on `development/codex`; current WIP adds further verification of the Q06 objective gate.
+- Q05's “survive three B05 combat nodes” alternative counts ANOMALY nodes alongside COMBAT/ELITE/BOUNTY. Regression confirms three cleared B05 nodes including one ANOMALY unlock the Q05_S2 choice.
+- Additional Q06 regression distinguishes the ordinary B06 anomaly from the quest's extra tagged anomaly: clearing only the ordinary one leaves Q06_S2 unavailable; clearing the extra objective enables it.
 - `continue_campaign()` now applies the same active quest elite targets, quest event IDs, and faction world effects as `start_expedition()`. Previously the next sector generated at a campaign checkpoint silently omitted all three integrations. Regression continues from the d5 checkpoint to d6 and verifies the Q03 E09 elite target and Q03_S2 event tag in the generated B03 graph.
 - Active Q06 stage 2 now transforms a deterministic B06 layer-2 COMBAT into an additional elite ANOMALY encounter and tags it as the Q06 objective. The normal B06 anomaly remains, so the route gains a real extra threat node. Stage readiness requires this tagged node to be cleared on newly generated routes; legacy graph fallback still accepts a cleared anomaly. A session regression verifies two total B06 anomalies, the tagged elite, and Q06_S2 event identity.
 - All 18 quest stages now have unique catalog event IDs (`Q01_S1`…`Q06_S3`). Starting a run tags the generated route's event node with IDs for each active stage whose authored biome matches. Quest stage resolution now requires the matching ID in newly generated graphs; older saved graphs without this metadata remain compatible. The quest catalog rejects duplicate/missing stage IDs. Existing quest UI renders the stage's actual title/text/actions beside the route event.
@@ -11,8 +12,8 @@
 - EV18 now instantiates its authored E08 turret as a 50%-strength allied actor in the next combat, persists it as part of `CombatState`, includes it in player-side targeting/terminal checks, and lets it perform real deterministic attacks. `combat_step_test.gd` verifies identity, scaled HP/damage, COMBAT_START allied count, and a real attack.
 - EV05's extra RARE reward now applies only to the next ELITE encounter; it no longer turns into an arbitrary next-combat item roll. A `GameSession` regression checks the persisted pending effect.
 - EV08 B now consumes the specific unsecured cargo item chosen by the player before granting its catalogued credit/reputation rewards. Cargo equipped in the active run cannot be surrendered. The route UI renders item-level choice buttons. This is an implementation of the Master Spec action “сдать груз VANTA”; there is no item-faction tag or further cargo quantity in the spec, so the choice consumes one selected item.
-- Actual verification after Q05 condition update: Godot editor import exit 0; `res://tests/run_tests.gd` exit 0 (22 scripts, 87,641 assertions); Windows Desktop export exit 0; exported `game/build/CYDLE.exe --headless --quit-after 3` exit 0; `git diff --check` exit 0. TypeScript/web checks were not run.
-- Exact continuation: commit/push this fix, then audit remaining quest-stage conditions and broader campaign systems. The Q06 anomaly is a physical combat node; quest stage IDs elsewhere still annotate the shared generated event node. Verify all six chains through player-facing route flow. Do not claim 1.0/release acceptance complete. Preserve the external campaign E2E profile and backup recorded below.
+- Actual verification after Q06 objective-gate regression: Godot editor import exit 0; `res://tests/run_tests.gd` exit 0 (22 scripts, 87,644 assertions). Windows export/EXE smoke passed for the preceding production-code checkpoint; this WIP changes only test code and docs. TypeScript/web checks were not run.
+- Exact continuation: commit/push the regression, then audit remaining quest-stage conditions and broader campaign systems. The Q06 anomaly is a physical combat node; quest stage IDs elsewhere still annotate the shared generated event node. Verify all six chains through player-facing route flow. Do not claim 1.0/release acceptance complete. Preserve the external campaign E2E profile and backup recorded below.
 
 ### Current status override (2026-11-13; run-cargo dismantle pushed)
 

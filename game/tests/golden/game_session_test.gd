@@ -564,14 +564,31 @@ func run(_tree: SceneTree) -> bool:
 			var q06_anomaly_count: int = 0
 			var q06_extra_found: bool = false
 			var q06_event_found: bool = false
+			var q06_main_anomaly_id: String = ""
+			var q06_extra_anomaly_id: String = ""
+			var q06_event_id: String = ""
 			for layer: Array in q06_route_session.state.run.graph.get("layers", []):
 				for node: Dictionary in layer:
 					if str(node.get("type", "")) == "ANOMALY":
 						q06_anomaly_count += 1
 						if (node.get("questTargets", []) as Array).has("Q06") and int(node.get("layer", -1)) == 2 and node.get("enemies", []).any(func(enemy: Dictionary) -> bool: return str(enemy.get("elite", "")).begins_with("EL_")):
 							q06_extra_found = true
-					if str(node.get("type", "")) == "EVENT" and (node.get("questEventIds", []) as Array).has("Q06_S2"): q06_event_found = true
+							q06_extra_anomaly_id = str(node.get("id", ""))
+						elif q06_main_anomaly_id.is_empty():
+							q06_main_anomaly_id = str(node.get("id", ""))
+					if str(node.get("type", "")) == "EVENT" and (node.get("questEventIds", []) as Array).has("Q06_S2"):
+						q06_event_found = true
+						q06_event_id = str(node.get("id", ""))
 			check(q06_route_session.state.run.biome == "B06" and q06_anomaly_count == 2 and q06_extra_found and q06_event_found, "game_session: Q06 did not add its extra elite anomaly threat and stage event to the B06 route")
+			var q06_objective_payload: Dictionary = q06_route_session.state.to_payload()
+			q06_objective_payload["run"]["currentNodeId"] = q06_event_id
+			q06_objective_payload["run"]["phase"] = "NODE"
+			q06_objective_payload["run"]["visitedNodeIds"] = [q06_event_id]
+			q06_objective_payload["run"]["clearedNodeIds"] = [q06_main_anomaly_id]
+			check(not q06_event_id.is_empty() and not q06_main_anomaly_id.is_empty() and not q06_extra_anomaly_id.is_empty() and q06_route_session._commit_payload(q06_objective_payload), "game_session: Q06 target-gating fixture could not be saved")
+			check(q06_route_session.available_quest_stages().is_empty(), "game_session: clearing only B06's default anomaly incorrectly satisfied Q06's extra-threat objective")
+			q06_objective_payload["run"]["clearedNodeIds"].append(q06_extra_anomaly_id)
+			check(q06_route_session._commit_payload(q06_objective_payload) and q06_route_session.available_quest_stages().any(func(opportunity: Dictionary) -> bool: return str(opportunity.get("quest", {}).get("id", "")) == "Q06"), "game_session: clearing the Q06-tagged anomaly did not unlock its stage decision")
 	var session: GameSession = GameSession.new()
 	session.configure_save_directory("user://test-saves/game-session")
 	if not check(session.start_new_game(1762900000000), "game_session: could not create a new game: %s" % session.last_error):

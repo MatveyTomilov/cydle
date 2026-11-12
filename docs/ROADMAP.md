@@ -20,6 +20,8 @@ Checkpoint-continuation audit found `continue_campaign()` bypassed active quest 
 
 Q05's fallback objective now treats a cleared ANOMALY as one of the three survived B05 combat nodes. The regression builds three cleared encounters, including an anomaly, and verifies Q05_S2 becomes available. Godot suite now passes 22 scripts / 87,641 assertions; Windows export/EXE smoke and diff check pass.
 
+Q06 stage gate regression now clears the default B06 anomaly first and verifies it does not satisfy the quest; only clearing the additional `questTargets: Q06` anomaly opens Q06_S2. Godot suite: 22 scripts / 87,644 assertions. This delta is test/doc-only; Windows export/smoke remains valid from the preceding code checkpoint.
+
 ### Current campaign and build status (2026-11-12; supersedes older live checkpoints below)
 
 The saved d12 route reached a genuine no-fuel dead end, exposing the absent Master Spec §16.4 recovery rules. `GameSession` now implements the priced evacuation tow (charge credits, lose 30% of remaining unsecured currencies and one deterministic random unsecured item, secure the rest), and ABANDON_RUN (lose unsecured cargo/currency, reduce permanent equipped durability by 10). The route UI presents both with confirmation; campaign E2E uses the same session methods. The real saved run was recovered by tow; d9–d11 were cleared and BOSS_CORE was defeated with the current authored build (192 ticks, operator survived at 112 HP). The player selected FREE_CORRIDOR, reached d13, then played real d13 combat across two outings and reached the d13 CHECKPOINT. E2E passes d1–d12, ending, and d13 route/checkpoint. This does not complete broad release acceptance.
