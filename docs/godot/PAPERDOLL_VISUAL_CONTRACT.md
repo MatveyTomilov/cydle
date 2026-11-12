@@ -1,127 +1,66 @@
-# CYDLE — operator paper-doll visual contract v1 (DRAFT)
+# CYDLE — Paper Doll & Raster Asset Production Contract v1 (DRAFT)
 
-**Status:** design contract drafted on 2026-11-12; numeric reference landmarks are **provisional until verified against one approved front-view base art**. No runtime rig/scene is implemented by this change.
+**Decision (2026-11-12): new CYDLE alpha art is PNG, NOT SVG.** The prior plan to trace/generated artwork into vectors is superseded. We first generate compelling original raster artwork, then cleanly isolate each usable component and export tightly cropped transparent PNGs with precise placement metadata. Do not generate SVGs, convert PNG to SVG, embed PNG in SVG, or require vectorization for the new art pipeline.
 
-**Purpose:** generated → cleaned SVG overlays fit a fixed operator's anatomy, reusable weapons, ARMOR outfits, OFFHAND devices and implants without hand-aligning every new item. This is a purely presentation-layer contract and does not change CYDLE combat, loot, saved item IDs, item validity or RNG.
+**Status:** approved production *direction*, **draft geometry**. The 1024 × 1536 reference grid and numeric sockets are provisional until one base operator and its test outfit/weapon assets are reviewed. This document defines presentation art production, not game mechanics. No gameplay code, saves, formulas or RNG are changed by this PR.
 
-**Source rules:** CYDLE_MASTER_SPEC.md section 5 already defines MAIN_WEAPON ×1, OFFHAND ×1, ARMOR ×1 and IMPLANT ×4–6 with HEAD/ARMS/CHEST/NEURAL/UNIVERSAL types. Section 10 lists 12 main weapons, six offhands, six armor templates and twelve implants. No new gameplay equipment slots are authorized by this art proposal. See ART_BIBLE.md, ASSET_PIPELINE.md, ALPHA_VECTOR_PLACEHOLDERS.md.
+Read with `CYDLE_MASTER_SPEC.md` (equipment slots), `ART_BIBLE.md` (style) and `ASSET_PIPELINE.md` (asset states). Existing SVG demo placeholders are **legacy temporary assets only**; the goal is to replace them with PNGs without breaking existing Godot scenes or CI.
 
-## 1. Two views, one equipment configuration
+## Hard production rules (mandatory for every new character/equipment asset)
 
-- **paperdoll_front_v1** is a 2D **straight-on** neutral A-pose used in garage, loadout, item preview and Build Lab. Level shoulders/pelvis, feet stable, elbows slightly bent and arms separated from chest; base hands are **open, empty**, never permanently holding a weapon. No three-quarter perspective, fisheye, body rotation, shadows baked into background or equipment baked into base undersuit.
-- **combat_side_v1** is a *separate eventual visual rig/asset set* for the side-on arena in ART_BIBLE.md. Do not assume flipping or rotating a front-view SVG creates a side-view character. The same gameplay equipment ID resolves distinct front/side art where present, otherwise the relevant alpha silhouette fallback remains.
-- The approved full-body front *undersuit* is the only source of truth for anatomy, style, proportions, scale and joint positions. The scarf/cloak is a removable visual layer (rear cape and front collar), **not** fused into the chest/base anatomy.
+1. **Source image first.** Generate original illustration/painted concept in the approved dark, high-contrast, inked/cel-shaded cyberpunk style; source should match the approved operator reference. Do not use a previous UI screenshot as the gameplay sprite.
+2. **Fixed canonical front body.** Adopt one approved `paperdoll_front_v1` base operator, straight-on, neutral A-pose, relaxed empty/open hands, clear shoulder/elbow/wrist joints, torso unobscured. No three-quarter perspective. Every new armor/implant uses that exact body as conditioning and positioning reference; never re-generate the whole body to create a single item.
+3. **Two different cameras.** Front view is for garage, loadout and Build Lab. The side-on combat arena needs a **separate** `combat_side_v1` asset/pose rig. Never rotate or perspective-warp the front PNG and call it a side view.
+4. **Reference canvas.** Front master canvas is **1024 × 1536 physical pixels**, origin top-left, X right, Y down, transparent RGBA. Full-body/armor/implant/arm-pose masters all share exactly this grid. Anchor feet midpoint **(512,1456)**. No baked backgrounds or cast shadows in these layers.
+5. **Three obligatory deliverables per visual asset:** (a) original generated/painted source image, retained for provenance; (b) full-canvas RGBA **master PNG** showing only this item's layer on its reference canvas; (c) **tight-cropped transparent runtime PNG**, plus a **JSON metadata sidecar** describing the crop/anchors/slot/pose/source. The source image can be a flattened PNG or editable layered raster file; the cleaned master and runtime must be PNG.
+6. **Deterministic cropping.** Crop to alpha>8 pixel bounds, expand by **8 px padding** on each side, clamp to master boundaries; do **not** resize, rotate, trim internal whitespace, re-center, or add background during export. Save `crop_rect: [x,y,w,h]` in reference-canvas pixels; `offset: [x,y]` MUST equal the crop's top-left position. Cropped PNG size MUST be exactly `[w,h]`. Fully transparent PNG is invalid for a published item.
+7. **Coordinate reconstruction.** Pixel at cropped local `[u,v]` maps to canonical `[u + offset_x, v + offset_y]` before the common stage transform. Reconstruct **without changes** when switching items. For weapons, local source canvas may differ, but metadata must identify its source canvas, crop rect and local grip(s) so its attachment remains mathematically unambiguous.
+8. **Hands and equipment are independently composable.** Body, rear cape, armor pieces, implants, arm pose/hand-back, weapon, and foreground gripping fingers live in ordered layers. The visible hand starts immediately past the wrist; forearm/gauntlet overlaps the wrist seam by **24 canvas pixels**, not a zero-overlap hard cut. Do not bake a weapon into a hand or base operator.
+9. **Static weapon pose families.** `neutral`, `pistol_onehand`, `longgun_twohand`, `blade_onehand`, `dual_sidearm`, `digital_focus`. Select arm-pose art by weapon family; keep fixed torso/legs/scale. Weapon `grip_main` is compulsory; `grip_support` for two-handed guns; `muzzle` for guns using muzzle VFX. For front pose the hands must actually enclose the handle in drawing order.
+10. **Game equipment slots remain unchanged.** `MAIN_WEAPON`, `OFFHAND`, `ARMOR`, existing `IMPLANT` types and `DRONE` are the sole gameplay sources. `ARMOR` may resolve to multiple raster overlay layers. Invisible implants may remain visible only in UI icons. Never add gameplay slots, recalculate combat, block a valid build or change a save for visual convenience.
+11. **Clean transparency, no white fringing.** Cutout silhouettes with quality edge/matte decontamination. Preview on white, #777777 and #15191F. No opaque white boxes, halos, stray outlines, holes or semi-opaque generator remnants; no unrelated pixels and no hard seams at joint connections.
+12. **Correct image QA.** Check placement at native 1024×1536, garage 320×480, and smaller battle-readability size; confirm identical original proportions, weapon grips **within 8 reference pixels** of the chosen pose points, correct left/right anatomical naming, untouched baseline body, no overlapping layer errors. Save comparison previews to asset-review path where practical.
+13. **Metadata and provenance required.** Use stable gameplay-facing visual IDs; include actual `template_id`, `view`, `visual_slot`, `pose_profile`, `source_image`, `master_png`, `runtime_png`, `source_canvas`, `crop_rect`, `offset`, `anchors`, `draw_layer`, `generation_provenance`, `license`. Weapon-specific grip/muzzle points required by the type. An example is in `docs/godot/PAPERDOLL_ASSET_METADATA_EXAMPLE.json`.
+14. **Godot renders PNG layers, not a flattened UI mockup.** `OperatorPaperdoll` uses `Sprite2D` / `Texture2D` and an outer shared stage transform. Cropped art positioned using metadata offsets. Every game action is still handled by Godot controls and real gameplay data; no interactive labels are baked into sprite images.
+15. **Decommission SVG carefully.** Existing `game/assets/source/placeholders/*.svg` and `alpha_visual_fallbacks.json` still power current Godot screens. Do **not delete them in this documentation PR**. Once a matching tested PNG exists and references are migrated, retire that individual SVG. Do not introduce any new SVG sources. Default future fallback: approved PNG → temporary legacy SVG *only for unmigrated IDs* → Godot procedural silhouette.
+16. **Acceptance, no invented implementation.** A written contract is not a working paper doll. After choosing one base art, calibrate sockets and then prove 3 poses (PISTOL_K1, RIFLE_K2, BLADE_K4) × 2 armor sets (ARM_LIGHT, ARM_HEAVY), equip/unequip and save reload in Godot. Seeded combat state/event hash must match with art enabled and disabled. Only then finalize coordinates and scale production.
 
-## 2. Authoring canvas and origin
+## Canonical layers and socket anchors
 
-- Canonical **source design canvas = 1024 × 1536 art units**, SVG `viewBox="0 0 1024 1536"`; X grows right, Y grows down. Transparent background. Position is fixed for all front-view body, armor and implant overlays.
-- Feet midpoint reference at (512,1456). Front body occupies the stable guide bounds; leave margin for equipment, no cropping of worn modules. Full-canvas visual overlays retain the identical viewBox and origin even if only a gauntlet occupies a small area.
-- This is an **authoring/attachment coordinate space**, not a global Godot viewport or final in-game texture size. Garage preview indicative size 320 × 480 UI px; smaller HUD portraits are separate/downscaled or simplified. Exact in-engine scale to be measured at first visual slice.
-- Reference sockets and pose points are described in `game/data/presentation/operator_paperdoll_rig_v1.json`, which is intentionally **presentation-only**, not an input to the deterministic core.
+In `operator_paperdoll_rig_v1.json`, `r` is **operator's own right, screen-left**; `l` is operator-left, screen-right. Coordinate values are provisional and must be measured from the **approved base PNG**, never inferred as finalized landmarks from an unrelated generated image.
 
-## 3. Skeleton landmarks and joints
-
-In anatomical convention, `r` means the **operator's own right** (screen-left), `l` is operator-left (screen-right).
-
-| marker | canonical x,y | usage |
+| Anchor | Draft position (x,y) | Role |
 |---|---|---|
-| feet | 512,1456 | align entire operator to stage |
-| head | 512,212 | visor/helmet/HEAD implant |
-| neck | 512,365 | scarf and collar |
-| chest | 512,560 | ARMOR chest and CHEST implants |
-| hips | 512,885 | belt, holster and leg armor |
-| shoulder_r / shoulder_l | 355,435 / 667,435 | upper arm pose root |
-| elbow_r / elbow_l | 299,594 / 721,594 | upper→forearm hinge |
-| wrist_r / wrist_l | 276,780 / 748,780 | forearm→hand joint (cut boundary) |
-| grip_r / grip_l | 253,832 / 767,832 | empty neutral pose; weapon poses override grip |
-| knee_r / knee_l | 421,1160 / 603,1160 | leg overlay landmark |
+| feet_center | 512,1456 | stage reference |
+| head_center | 512,212 | visor/head implant |
+| neck | 512,365 | collar/scarf |
+| chest_center | 512,560 | armor and chest device |
+| hips_center | 512,885 | belt/leg armor |
+| shoulder_r / shoulder_l | 355,435 / 667,435 | upper-arm attachment |
+| elbow_r / elbow_l | 299,594 / 721,594 | hinge |
+| wrist_r / wrist_l | 276,780 / 748,780 | forearm/hand boundary |
+| grip_r_neutral / grip_l_neutral | 253,832 / 767,832 | no-weapon hand guide |
+| knee_r / knee_l | 421,1160 / 603,1160 | legs |
 
-**Wrist definition:** the visible glove/hand begins immediately distal to the wrist socket. The forearm art should run **24 art units beneath the gauntlet seam** (concealed overlap) to eliminate transparent cracks. Do not terminate forearm artwork at the exact line with no margin. Hand-back and finger-front can be separate to visually wrap around a weapon.
+Default stack, back to front: cape behind → base undersuit → leg armor → chest implant under armor → torso/shoulder armor → collar → posed arms/hand-backs → offhand → main weapon → foreground fingers → head/visor. Compatibility and z overrides are **presentation-only**.
 
-These are calibration targets, **not assertions that already approved character artwork conforms**. Once one base art is accepted, refine them only in a versioned rig revision, not independently per gear piece.
+## Asset path & naming contract
 
-## 4. Logical equipment → visual slots
-
-| Existing gameplay slot | Visual presentation |
-|---|---|
-| MAIN_WEAPON | weapon layer at pose-specific primary grip; long guns also have support grip + muzzle origin |
-| OFFHAND | separate left-hand item for SIDEARM_1; other offhands are body/forearm-mounted devices, scanner or back attachments, depending on approved visual profile |
-| ARMOR | one item ID resolves a *bundle* of torso, shoulders, leg plates and optional boots; visually split into overlays, never new gameplay slots |
-| IMPLANT HEAD | helmet/visor/hairline hardware over head |
-| IMPLANT ARMS | arm plates/bracers/gloves, with forearm↔wrist overlap |
-| IMPLANT CHEST | underlay or exposed chest implant according to conflicts with ARMOR |
-| IMPLANT NEURAL/UNIVERSAL | use a compatible visible overlay if relevant; otherwise show item icon but do not hallucinate external hardware |
-| DRONE | separate actor, **not** a costume attached to operator |
-
-Multiple mechanical implants can coexist; their **visual precedence and visibility** are controlled by the presentation profile. Do not alter equipment legality to resolve picture overlap. Not every mechanical effect must be visibly attached.
-
-Only `templateId`/`item category` determines the alpha visual profile initially; item-instance ID, rarity/affix/TechLevel stay in game data, and optional cosmetics can be added later.
-
-## 5. Weapon posing: never pre-draw a gun onto the base
-
-A single neutral A-pose cannot plausibly hold every item. Use replaceable static **arm-pose groups**, with the torso, legs, face and equipped armor unchanged:
-- `neutral`: empty, both hands low.
-- `pistol_onehand`: right arm bent, one grip, left idle or offhand module.
-- `longgun_twohand`: right hand on weapon's `grip_main`, left on `grip_support`; also record `muzzle` for presentation VFX.
-- `blade_onehand`: right arm lowered/ready, hand encloses hilt.
-- `dual_sidearm`: when compatible OFFHAND sidearm is explicitly displayed, both hand sockets can be occupied.
-- `digital_focus`: visually-held focus or forearm device per template; don't depict all digital attacks as rifles.
-
-Each weapon is **a separate SVG without hands**. Its metadata has local art dimensions, `grip_main`, optional `grip_support` and `muzzle`. Convert weapon-local grip to the selected pose's hand marker; use the second marker to validate two-hand alignment, not to independently re-scale the weapon after the fact.
-
-Indicative weapon source envelopes: pistol/small 512 × 384, long gun 896 × 384, blade 512 × 768. Their exact cropped viewBoxes may differ; **accurate grip markers matter more than identical weapon file dimensions**. For basic alpha only pre-author a few weapon-family poses; animations are not required.
-
-If a weapon lacks a matching pose, fall back to a distinct visual placeholder *without claiming a correct hand-held pose*. Missing visual data never rejects a valid game item.
-
-## 6. SVG generation and vectorization rules
-
-1. Approve **one original front-view base character** first. Never independently regenerate the entire body when adding a piece of armor or a weapon.
-2. For each armor/implant, use the same base art as conditioning/reference. Produce the new piece at the exact canonical view, body proportions and joint map; output its own transparent layer, not a re-painted full character or screenshot.
-3. Generate source illustration first; **then** trace to real editable SVG paths, clean paths/overlaps manually or programmatically and confirm the output contains no embedded raster data.
-4. All front equipment full-canvas SVGs must use the 1024 × 1536 viewBox with no implicit `transform` to fake alignment. Weapon local sprites may have distinct viewBoxes and explicit sockets. Store original source image, SVG, color palette, generation/provenance metadata and visual ID.
-5. No stray white lines / transparency seams: maintain 24-unit concealed overlaps at joints, opaque underlayers where relevant and test rendered output against dark (#15191F), middle-grey and white backgrounds.
-6. Keep strong ink silhouette, cell-shaded planes and restrained cyan/red highlights of ART_BIBLE.md. Do not copy external game's exact characters, symbols, or UI.
-7. SVG syntax must import in the pinned Godot engine: avoid unsupported filters, embedded fonts/text and untested SVG effects. Validate actual Godot import (ThorVG SVG support can differ from browser/Inkscape); use source SVG with imported Texture2D for alpha.
-8. Each published asset includes stable ID, view, equipment slot, associated templateId, visual family, viewBox, anchors, provenance, logical draw layer and a fallback.
-9. Require **a screenshot at actual game scale** plus a white/dark/gray comparison and joint/weapon-socket diagram for each new pose family before marking visually accepted.
-
-## 7. Draw order, scene implementation and integration point
-
-Suggested Godot presentation scene (not yet present in the current branch):
-
+Source (not necessarily transparent) and full master and cropped runtime are **different** files:
 ```text
-OperatorPaperdoll (Control)
-  VisualRoot (Node2D; stage transform from 1024x1536)
-    CapeBehind (Sprite2D)
-    BaseUndersuit (Sprite2D)
-    ArmorLegs (Sprite2D)
-    ChestImplantsUnderArmor (Sprite2D)
-    ArmorBodyAndShoulders (Sprite2D)
-    CollarScarfFront (Sprite2D)
-    PoseArms (Node2D; upper/forearm/hand-back; Marker2D joints and grips)
-    OffhandDeviceOrWeapon (Node2D)
-    MainWeapon (Node2D; Sprite2D, grip markers)
-    ForegroundFingers (Sprite2D)
-    HeadAndVisorOverlays (Sprite2D)
-  PreviewControls (Control)
+game/assets/source/paperdoll/<visual_id>/source.png       # original image, untouched
+game/assets/source/paperdoll/<visual_id>/master.png       # cleaned transparent 1024x1536 aligned
+game/assets/characters/operator/paperdoll/<visual_id>.png # tight transparent cropped runtime
+game/data/presentation/assets/<visual_id>.json            # cropped PNG metadata/anchors
 ```
+For a weapon's own local canvas, `master.png` size may vary and must match `source_canvas`; front body/armor/implants/pose arms always use 1024×1536. Source may additionally include original layered paint files and alternate generation attempts, but accepted files must be uniquely identified.
 
-Use a canvas-aligned `Sprite2D` with `centered=false` or equivalent explicit origin so source coordinates map directly to Godot local positions. Weapon transform maps its `grip_main` to the pose primary-hand marker; for `longgun_twohand`, support grip must coincide with support hand within tolerance. Animated combat-side view remains a separate presentation rig.
+**Example sidecar geometry:** `source_canvas=[1024,1536]`, `crop_rect=[390,220,260,430]`, `offset=[390,220]`, `runtime_size=[260,430]`. A Godot Sprite2D using a top-left origin draws the cropped PNG at `offset` in the shared 1024×1536 coordinate system.
 
-At garage/Build Lab, replace the currently static `actor_operator_base.svg` `TextureRect` in `game/scripts/app/app_root.gd` with reusable `OperatorPaperdoll` **during the visual integration slice**, not by touching native `CombatSimulator` or `BuildResolver`. After `GameSession` confirms an equipment change, read current META/RUN equipment and rebuild the visible layers from **actual equipped item template IDs**, not button labels. Preview invalid builds without committing state.
+**Weapon rule:** metadata for `grip_main`/`grip_support`/`muzzle` is in the **uncropped weapon source coordinate system**. When cropping, display-local grip point = original grip point − `offset`; align weapon by matching its translated `grip_main` to the selected pose's canonical grip position. The second grip validates alignment, it does not silently stretch the gun.
 
-The global art resolver stays final runtime art → mapped SVG → procedural fallback. Existing manifest final `PLANNED` rows do not become `INTEGRATED` because this draft exists.
+## Integration boundary
 
-## 8. Alpha verification gate
+Current `game/scripts/app/app_root.gd` loads a static SVG texture for the garage operator. In a later *implementation* PR Codex can replace that TextureRect with `OperatorPaperdoll`, reading actual equipped `templateId`/slot values from `GameSession` **after** validation. The full item instance still drives stats; only visual profiles are chosen by template/category.
 
-Test with **PISTOL_K1**, **RIFLE_K2**, **BLADE_K4**, **ARM_LIGHT** and **ARM_HEAVY** first. Check both armor variations with all three weapon pose groups plus missing/offhand cases.
-
-- Same rig transform and feet location, **no torso jump or scale drift** when switching gear.
-- Grip alignment tolerance: **≤ 8 source art units**, equivalent to 2.5 UI pixels at 320/1024 source scale. Check both long-gun grips, and muzzle origins.
-- Wrist overlap hides gaps; both gloves visibly clasp weapons and armor doesn't cover fingers.
-- Visuals remain readable at 320 × 480 garage preview and at a much smaller battle presentation scale; for combat-side, use a separate silhouette/rig.
-- Godot SVG import/headless checks succeed; validated paths, source provenance and fallbacks exist.
-- Equip → un-equip → reload save → same visual composition; invalid equipment is never displayed as committed.
-- Run a seeded combat replay with visuals enabled/disabled; simulation result, events and state hash are identical.
-
-**No implementation/animation/final rendered art or test results are asserted by this proposal.** Create one accepted base operator and three grip poses, then calibrate and freeze the v1 landmarks before broad content generation.
+The current art/documentation PR changes **no runtime implementation**, no current CSV final-art acceptance state, no deterministic calculations and no existing placeholders. The JSON contract is a specification draft, not a guarantee that a PNG exporter, scene renderer, automated test, or accepted operator art already exists.

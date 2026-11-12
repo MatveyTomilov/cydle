@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "visual_id": "armor_bastion_torso_front",
+  "template_id": "ARM_HEAVY",
+  "view": "paperdoll_front_v1",
+  "visual_slot": "armor_torso_shoulders",
+  "pose_profile": "neutral",
+  "source_image": "res://assets/source/paperdoll/armor_bastion_torso_front/source.png",
+  "master_png": "res://assets/source/paperdoll/armor_bastion_torso_front/master.png",
+  "runtime_png": "res://assets/characters/operator/paperdoll/armor_bastion_torso_front.png",
+  "source_canvas": [
+    1024,
+    1536
+  ],
+  "crop_rect": [
+    390,
+    220,
+    260,
+    430
+  ],
+  "offset": [
+    390,
+    220
+  ],
+  "runtime_size": [
+    260,
+    430
+  ],
+  "anchors": {
+    "chest_center": [
+      512,
+      560
+    ]
+  },
+  "draw_layer": 40,
+  "generation_provenance": "EXAMPLE_ONLY_NOT_CREATED",
+  "license": "EXAMPLE_ONLY_NOT_VERIFIED",
+  "status": "example_not_asset"
+}

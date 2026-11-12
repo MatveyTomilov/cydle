@@ -205,9 +205,12 @@
     "template_id",
     "pose_profile",
     "view",
-    "source_viewbox",
+    "source_canvas",
     "grip_main",
-    "muzzle"
+    "muzzle",
+    "runtime_png",
+    "crop_rect",
+    "offset"
   ],
   "weapon_visual_metadata_optional": [
     "grip_support",
@@ -224,5 +227,21 @@
     "verify_in_godot": true,
     "simulation_hash_unchanged": true
   },
-  "notes": "All coordinates are provisional art guide targets. A locked accepted base SVG must be calibrated before broad art generation. Deterministic domain code never reads this data."
+  "notes": "Numeric attachment points are provisional and require calibration to approved original PNG operator. No vector/SVG generation in new asset production. Deterministic gameplay must not read this config.",
+  "asset_format": "PNG",
+  "asset_pipeline": "generated_raster_to_aligned_master_png_to_cropped_runtime_png_with_json",
+  "crop_policy": {
+    "alpha_threshold_gt": 8,
+    "padding_pixels": 8,
+    "preserve_source_scale": true,
+    "offset_equals_crop_xy": true,
+    "transparent_rgba_required": true
+  },
+  "production_outputs": [
+    "original_source_image",
+    "full_canvas_transparent_png_master",
+    "cropped_transparent_png_runtime",
+    "json_metadata"
+  ],
+  "legacy_svg_policy": "read_only_transitional_fallback_until_png_integrated_no_new_svg"
 }
