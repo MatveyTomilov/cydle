@@ -49,7 +49,65 @@ func run(_tree: SceneTree) -> bool:
 		check(_json_equivalent(actual_frame, frame), "combat_step: replay diverged at t=%d ms" % int(frame.get("timeMs", -1)))
 		if int(frame.get("timeMs", 0)) == 100:
 			check(_json_equivalent(initial_payload, _initial_state_payload(state_result["state"])), "combat_step: advancing mutated the source state")
+	_test_support_relay(config, operator)
 	return failure_count == 0
+
+func _test_support_relay(config: Dictionary, operator: Dictionary) -> void:
+	var catalog: ItemCatalog = ItemCatalog.new()
+	if not check(bool(catalog.load_catalog().get("ok", false)), "combat_step: item catalog failed to load for support relay"):
+		return
+	var raw_by_tech: Dictionary = {}
+	for tech_level: int in [1, 3]:
+		var item_rng: DeterministicRng = DeterministicRng.new()
+		item_rng.seed("support-test", "tech-%d" % tech_level)
+		var created: Dictionary = ItemFactory.new().create_item(item_rng, catalog, {
+			"templateId": "TR_SUPPORT_2", "techLevel": tech_level, "rarity": "COMMON",
+			"secured": false, "originGrantId": "support-test-%d" % tech_level,
+			"origin": "test", "acquiredAt": 0,
+		})
+		if not check(bool(created.get("ok", false)), "combat_step: relay item could not be created"):
+			return
+		var relay: ItemInstance = created["item"] as ItemInstance
+		var main: ItemInstance = ItemInstance.new()
+		var meta: Dictionary = _read_dictionary(SAVE_FIXTURE).get("meta", {})
+		var main_raw: Dictionary = {}
+		for item_value: Dictionary in meta.get("inventory", []):
+			if str(item_value.get("itemId", "")) == str(meta.get("equipment", {}).get("MAIN", "")):
+				main_raw = item_value
+				break
+		if not check(main.instantiate_from_dictionary(main_raw), "combat_step: main weapon failed to parse for support relay"):
+			return
+		var build: Dictionary = BuildResolver.new().resolve_build({
+			"equipment": {"MAIN": main, "SUPPORT": relay}, "attributes": operator.get("attributes", {}),
+			"skillIds": [], "passiveIds": [], "treeNodeIds": [],
+			"attributePointsEarned": 0, "treePointsEarned": 0,
+		})
+		if not check(bool(build.get("valid", false)), "combat_step: relay build was rejected: %s" % str(build.get("issues", []))):
+			return
+		var initialized: Dictionary = CombatSimulator.new().create_state({
+			"seed": "support-relay-seed", "depth": int(config.get("depth", 1)), "biome": str(config.get("biome", "B01")),
+			"nodeType": "COMBAT", "build": build, "enemies": [config.get("enemy", {})],
+			"tactics": config.get("tactics", {}), "maxDurationMs": 30000,
+		})
+		if not check(bool(initialized.get("ok", false)), "combat_step: relay combat could not initialize"):
+			return
+		var state: CombatState = initialized["state"] as CombatState
+		state.operator.next_attack_at = 100000.0
+		for enemy: CombatActorState in state.enemies:
+			enemy.next_attack_at = 100000.0
+		state.operator.ability_next["periodic:TR_SUPPORT_blast"] = 100.0
+		var stepped: Dictionary = CombatSimulator.new().step_combat(state)
+		if not check(bool(stepped.get("ok", false)), "combat_step: relay pulse was rejected: %s" % str(stepped.get("error", ""))):
+			return
+		var next: CombatState = stepped["state"] as CombatState
+		for event: Dictionary in next.log:
+			if str(event.get("kind", "")) == "DAMAGE" and str(event.get("actionId", "")).begins_with("operator:periodic:TR_SUPPORT_blast:"):
+				raw_by_tech[tech_level] = float(event.get("amountBeforeDefense", 0.0))
+				break
+		check(raw_by_tech.has(tech_level), "combat_step: support relay did not produce its periodic ENERGY hit")
+	if raw_by_tech.has(1) and raw_by_tech.has(3):
+		var expected_ratio: float = CydleFormula.new().h_depth(3.0) / CydleFormula.new().h_depth(1.0)
+		check(absf(float(raw_by_tech[3]) / maxf(0.000001, float(raw_by_tech[1])) - expected_ratio) < 0.000001, "combat_step: support relay damage ignored support-item TechLevel")
 
 func _initial_state_payload(state_value: Variant) -> Dictionary:
 	return (state_value as CombatState).to_dictionary()

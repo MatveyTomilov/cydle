@@ -192,8 +192,8 @@ func _supports_skill_trigger_effects(state: CombatState) -> bool:
 		var effect: Dictionary = trigger_value.get("effect", {})
 		var effect_id: String = str(effect.get("id", ""))
 		var skill_trigger: bool = source_id in ["SK_BLADE", "SK_NEURO", "SK_SEED", "SK_BREAK"]
-		var drone_trigger: bool = effect_id in ["DR_MED_heal", "DR_EMP_interrupt"] and str(effect.get("event", "")) == "PERIODIC" and str(trigger_value.get("sourceKind", "")) == "item"
-		if not skill_trigger and not drone_trigger:
+		var periodic_item_trigger: bool = effect_id in ["DR_MED_heal", "DR_EMP_interrupt", "TR_SUPPORT_blast"] and str(effect.get("event", "")) == "PERIODIC" and str(trigger_value.get("sourceKind", "")) == "item"
+		if not skill_trigger and not periodic_item_trigger:
 			return false
 	return true
 
@@ -207,7 +207,7 @@ func _run_periodic_drone_triggers(state: CombatState, rng: DeterministicRng) -> 
 	for trigger_value: Dictionary in state.build.get("triggerEffects", []):
 		var effect: Dictionary = trigger_value.get("effect", {})
 		var effect_id: String = str(effect.get("id", ""))
-		if effect_id not in ["DR_MED_heal", "DR_EMP_interrupt"]:
+		if effect_id not in ["DR_MED_heal", "DR_EMP_interrupt", "TR_SUPPORT_blast"]:
 			continue
 		var owner: CombatActorState = _trigger_owner(state, str(trigger_value.get("sourceId", "")))
 		var schedule_key: String = "periodic:%s" % effect_id
@@ -242,6 +242,22 @@ func _run_periodic_drone_triggers(state: CombatState, rng: DeterministicRng) -> 
 					target.cast = null
 					state.metrics["interrupts"] = int(state.metrics.get("interrupts", 0)) + 1
 					_emit(state, "CAST_INTERRUPT", owner.id, {"targetId": target.id, "actionId": action_id, "text": "%s: каст прерван." % target.display_name})
+		elif effect_id == "TR_SUPPORT_blast":
+			var target: CombatActorState = _pick_auto_target(state, owner)
+			if target == null:
+				continue
+			var tech_level: int = _trigger_item_tech_level(state, str(trigger_value.get("sourceId", "")))
+			var coefficient: float = float(effect.get("action", {}).get("coefficient", 40.0))
+			var raw: float = coefficient * _formula.h_depth(float(tech_level))
+			var hit: Dictionary = _resolve_basic_hit(state, rng, owner, target, raw, "ENERGY", action_id, false)
+			if not bool(hit.get("ok", false)):
+				push_error("CombatSimulator: support relay hit failed: %s" % str(hit.get("error", "unknown error")))
+
+func _trigger_item_tech_level(state: CombatState, source_id: String) -> int:
+	for item_value: Variant in state.build.get("equipment", {}).values():
+		if item_value is ItemInstance and item_value.item_id == source_id:
+			return maxi(1, item_value.tech_level)
+	return 1
 
 func _has_enabled_tactic(state: CombatState, skill_id: String) -> bool:
 	for rule_value: Variant in state.tactics.get("rules", []):
