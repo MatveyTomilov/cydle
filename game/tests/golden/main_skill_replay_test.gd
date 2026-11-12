@@ -5,6 +5,7 @@ func run(_tree: SceneTree) -> bool:
 	_run_replay("main_skill_replay", "SK_BURST")
 	_run_replay("pierce_skill_replay", "SK_PIERCE")
 	_run_replay("execute_skill_replay", "SK_EXEC")
+	_run_replay("plasma_skill_replay", "SK_PLASMA")
 	return failure_count == 0
 
 func _run_replay(replay_name: String, skill_id: String) -> void:

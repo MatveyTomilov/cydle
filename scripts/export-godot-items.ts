@@ -394,6 +394,45 @@ writeFileSync(executeReplayOutput, `${JSON.stringify({
 }, null, 2)}\n`, 'utf8');
 console.log(`Exported ${executeFrames.length} execute-skill replay frames to ${executeReplayOutput}`);
 
+const plasmaBuild = resolveBuild({
+  attributes: initialSaveFixture.meta.operator.attributes, equipment: { MAIN: starterMain },
+  skillIds: ['SK_PLASMA'], passiveIds: [], treeNodeIds: [], attributePointsEarned: 0, treePointsEarned: 0,
+});
+const plasmaTactics: TacticalProfile = {
+  id: 'PLASMA_TEST', name: 'Plasma replay', rules: [{
+    id: 'RULE_PLASMA', priority: 100, enabled: true, skillId: 'SK_PLASMA',
+    target: 'nearest', conditions: [], logic: 'AND',
+  }],
+};
+const plasmaConfig = { ...basicStateConfig, build: plasmaBuild, tactics: plasmaTactics, startEnergy: 20 };
+let plasmaState = createCombatState(plasmaConfig);
+const plasmaFrames = [];
+for (let tick = 0; tick < 16; tick++) {
+  const previousLogLength = plasmaState.log.length;
+  plasmaState = stepCombat(plasmaState);
+  const actorFrame = (actor: typeof plasmaState.operator) => ({
+    id: actor.id, hp: actor.hp, shield: actor.shield, energy: actor.energy, heat: actor.heat,
+    nextAttackAt: actor.nextAttackAt, alive: actor.alive, flags: actor.flags, counters: actor.counters,
+    cooldowns: actor.cooldowns, cast: actor.cast,
+    damageDealt: actor.damageDealt, damageTaken: actor.damageTaken,
+  });
+  plasmaFrames.push({
+    timeMs: plasmaState.timeMs, rng: plasmaState.rng, nextEventId: plasmaState.nextEventId,
+    metrics: plasmaState.metrics, outcome: plasmaState.outcome,
+    operator: actorFrame(plasmaState.operator), enemies: plasmaState.enemies.map(actorFrame),
+    events: plasmaState.log.slice(previousLogLength),
+  });
+}
+const plasmaReplayOutput = resolve('game/tests/fixtures/combat/plasma_skill_replay.json');
+writeFileSync(plasmaReplayOutput, `${JSON.stringify({
+  config: {
+    seed: plasmaConfig.seed, depth: plasmaConfig.depth, biome: plasmaConfig.biome, nodeType: plasmaConfig.nodeType,
+    enemy: plasmaConfig.enemies[0], tactics: plasmaTactics, maxDurationMs: plasmaConfig.maxDurationMs,
+    startEnergy: plasmaConfig.startEnergy,
+  }, build: plasmaBuild, frames: plasmaFrames,
+}, null, 2)}\n`, 'utf8');
+console.log(`Exported ${plasmaFrames.length} TECH_E skill replay frames to ${plasmaReplayOutput}`);
+
 let dotState = createCombatState(basicStateConfig);
 applyStatus(dotState, dotState.operator, dotState.enemies[0]!, 'BLEED', { snapshot: 100 });
 const dotFrames = [];
