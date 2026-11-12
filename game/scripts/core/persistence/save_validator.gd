@@ -57,7 +57,13 @@ func validate(value: Variant) -> Dictionary:
 func checksum(document: Dictionary) -> String:
 	var payload: Dictionary = document.duplicate(true)
 	payload.erase("checksum")
-	return _state_hash.state_hash(payload)
+	if not _is_json_value(payload):
+		return _state_hash.state_hash(payload)
+	# Match the representation that can actually survive a JSON save/load round-trip.
+	# Godot's JSON encoder may round the last digits of floats, so hashing the in-memory
+	# value directly can make a freshly written save fail validation immediately.
+	var normalized: Variant = JSON.parse_string(JSON.stringify(payload, "", true, true))
+	return _state_hash.state_hash(normalized)
 
 func parse_text(text: String) -> Dictionary:
 	var parser: JSON = JSON.new()

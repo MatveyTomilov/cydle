@@ -339,9 +339,14 @@ func _show_current_node(run: GameSaveState.RunState) -> void:
 	_body.add_child(_label("УЗЕЛ · %s" % str(node.get("type", "UNKNOWN")), 20, COLOR_TEXT))
 	_body.add_child(_label("Угроза: %s     ·     %s" % [str(node.get("threat", "?")), str(node.get("lootHint", ""))], 13, COLOR_MUTED))
 	if ["COMBAT", "ELITE", "BOUNTY", "BOSS"].has(str(node.get("type", ""))):
-		var begin: Button = _button("НАЧАТЬ АВТОБОЙ", true)
-		begin.pressed.connect(_on_begin_combat)
-		_body.add_child(begin)
+		if _session.has_active_combat():
+			var resume: Button = _button("ПРОДОЛЖИТЬ СОХРАНЁННЫЙ БОЙ", true)
+			resume.pressed.connect(_show_battle)
+			_body.add_child(resume)
+		else:
+			var begin: Button = _button("НАЧАТЬ АВТОБОЙ", true)
+			begin.pressed.connect(_on_begin_combat)
+			_body.add_child(begin)
 	elif str(node.get("type", "")) == "FUEL":
 		var buy: Button = _button("КУПИТЬ 1 ТОПЛИВО · КРЕДИТЫ", true)
 		buy.pressed.connect(_on_service_action.bind("BUY_FUEL"))

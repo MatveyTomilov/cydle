@@ -23,6 +23,19 @@ func run(_tree: SceneTree) -> bool:
 	if not check(session.begin_combat(), "game_session: first combat could not start: %s" % session.last_error):
 		return false
 	check(session.combat_notice.is_empty(), "game_session: supported starter reactions were incorrectly filtered")
+	for _tick: int in range(3):
+		if not check(session.advance_combat_step(), "game_session: active combat snapshot could not be saved: %s" % session.last_error):
+			return false
+	var before_resume: Dictionary = session.combat_state().to_dictionary()
+	var combat_resumed: GameSession = GameSession.new()
+	combat_resumed.configure_save_directory("user://test-saves/game-session")
+	if not check(combat_resumed.load_saved_game(), "game_session: active combat could not be restored: %s" % combat_resumed.last_error):
+		return false
+	check(combat_resumed.has_active_combat(), "game_session: loaded profile lost its active combat")
+	check(StateHash.new().state_hash(combat_resumed.combat_state().to_dictionary()) == StateHash.new().state_hash(before_resume), "game_session: restored combat state differs from the saved state")
+	check(session.advance_combat_step(), "game_session: original combat could not advance after snapshot")
+	check(combat_resumed.advance_combat_step(), "game_session: restored combat could not advance: %s" % combat_resumed.last_error)
+	check(StateHash.new().state_hash(combat_resumed.combat_state().to_dictionary()) == StateHash.new().state_hash(session.combat_state().to_dictionary()), "game_session: restored combat diverged from uninterrupted deterministic simulation")
 	var ticks: int = 0
 	var used_burst: bool = false
 	while session.combat_state() != null and session.combat_state().outcome.is_empty() and ticks < 1800:

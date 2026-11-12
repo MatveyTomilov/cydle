@@ -34,7 +34,7 @@ func restore(serialized: Dictionary) -> bool:
 			return false
 		restored_state.append(int(word) & UINT32_MASK)
 	var calls_value: Variant = serialized["calls"]
-	if not calls_value is int or int(calls_value) < 0:
+	if (not calls_value is int and not calls_value is float) or not is_finite(float(calls_value)) or float(calls_value) < 0.0 or float(calls_value) != floor(float(calls_value)):
 		return false
 	stream = str(serialized["stream"])
 	_state = restored_state

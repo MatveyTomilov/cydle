@@ -59,6 +59,49 @@ func to_dictionary() -> Dictionary:
 		"extraEnemyDigitalBonus": extra_enemy_digital_bonus, "triggerChains": trigger_chains.duplicate(true),
 	}
 
+static func from_dictionary(value: Dictionary, resolved_build: Dictionary) -> CombatState:
+	if not value.get("operator") is Dictionary or resolved_build.is_empty():
+		return null
+	var state: CombatState = CombatState.new()
+	state.seed = str(value.get("seed", ""))
+	state.depth = int(value.get("depth", 1))
+	state.biome = str(value.get("biome", "B01"))
+	state.node_type = str(value.get("nodeType", "COMBAT"))
+	state.time_ms = int(value.get("timeMs", 0))
+	state.max_duration_ms = int(value.get("maxDurationMs", 180000))
+	state.operator = CombatActorState.from_dictionary(value["operator"])
+	for actor_value: Variant in value.get("drones", []):
+		if actor_value is Dictionary: state.drones.append(CombatActorState.from_dictionary(actor_value))
+	for actor_value: Variant in value.get("enemies", []):
+		if actor_value is Dictionary: state.enemies.append(CombatActorState.from_dictionary(actor_value))
+	for actor_value: Variant in value.get("allies", []):
+		if actor_value is Dictionary: state.allies.append(CombatActorState.from_dictionary(actor_value))
+	var rng_value: Variant = value.get("rng", {})
+	if not rng_value is Dictionary:
+		return null
+	var restored_rng: DeterministicRng = DeterministicRng.new()
+	if not restored_rng.restore(rng_value):
+		return null
+	state.rng = restored_rng.serialize()
+	state.next_event_id = int(value.get("nextEventId", 1))
+	state.log.assign(value.get("log", []))
+	state.log_truncated = bool(value.get("logTruncated", false))
+	state.metrics = value.get("metrics", {}).duplicate(true)
+	state.outcome = str(value.get("outcome", "")) if value.get("outcome") != null else ""
+	state.build = resolved_build.duplicate(true)
+	state.tactics = value.get("tactics", {}).duplicate(true)
+	state.rules_hash = str(value.get("rulesHash", ""))
+	state.wanted_delta = int(value.get("wantedDelta", 0))
+	state.reveal_delta = int(value.get("revealDelta", 0))
+	state.record_log = bool(value.get("recordLog", true))
+	state.ambient_heat_per_sec = float(value.get("ambientHeatPerSec", 0.0))
+	state.cooling_penalty = float(value.get("coolingPenalty", 0.0))
+	state.enemy_windup_mult = float(value.get("enemyWindupMult", 1.0))
+	state.elite_pen = float(value.get("elitePen", 0.0))
+	state.extra_enemy_digital_bonus = float(value.get("extraEnemyDigitalBonus", 0.0))
+	state.trigger_chains = value.get("triggerChains", {}).duplicate(true)
+	return state if state.operator != null and not state.rng.is_empty() else null
+
 func clone() -> CombatState:
 	var copy: CombatState = CombatState.new()
 	for property: Dictionary in get_property_list():

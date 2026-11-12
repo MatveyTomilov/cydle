@@ -23,6 +23,9 @@ func load_saved_game() -> bool:
 	var loaded: Dictionary = _repository.load_game(SLOT_ID)
 	if bool(loaded.get("ok", false)):
 		state = loaded["state"] as GameSaveState
+		if state.run != null and state.run.combat_snapshot != null:
+			if not _restore_combat_snapshot():
+				return false
 		last_error = ""
 		return true
 	if bool(loaded.get("empty", false)):
@@ -621,6 +624,9 @@ func begin_combat() -> bool:
 	_combat = initialized["state"] as CombatState
 	_active_node_type = effective_type
 	_active_reward_modifiers = pending_next.duplicate(true)
+	if not _persist_combat_snapshot():
+		_combat = null
+		return false
 	last_error = ""
 	return true
 
@@ -638,7 +644,11 @@ func advance_combat_step() -> bool:
 	if not bool(stepped.get("ok", false)):
 		last_error = str(stepped.get("error", "Боевой шаг отклонён."))
 		return false
+	var previous: CombatState = _combat
 	_combat = stepped["state"] as CombatState
+	if not _persist_combat_snapshot():
+		_combat = previous
+		return false
 	last_error = ""
 	return true
 
@@ -689,6 +699,7 @@ func resolve_active_combat() -> bool:
 		run_payload["clearedNodeIds"].append(node_id)
 	run_payload["phase"] = "CHECKPOINT" if int(node.get("layer", 0)) == 5 else "ROUTE"
 	run_payload["combatResult"] = null
+	run_payload["combatSnapshot"] = null
 	run_payload["lastCommandId"] = "combat:%s" % node_id
 	var retain_elite_contract: bool = bool(_active_reward_modifiers.get("extraRareOnElite", false)) and _active_node_type != "ELITE"
 	run_payload["pendingCombatEffects"] = {"initialTempShield": 0.0, "extraHeat": 0.0}
@@ -826,6 +837,7 @@ func _resolve_combat_defeat(run_payload: Dictionary, node_id: String) -> bool:
 	resources["maxShield"] = float(stats.get("maxShield", 0.0))
 	run_payload["phase"] = "DEFEATED"
 	run_payload["combatResult"] = null
+	run_payload["combatSnapshot"] = null
 	run_payload["unsecuredCargo"] = []
 	run_payload["shippedCargo"] = []
 	run_payload["temporaryMutationIds"] = []
@@ -936,6 +948,48 @@ func _build_input(save_state: GameSaveState) -> Dictionary:
 		"unlockedImplantSlots": save_state.meta.unlocked_implant_slots,
 		"unlockedDroneSlots": save_state.meta.unlocked_drone_slots,
 	}
+
+func _persist_combat_snapshot() -> bool:
+	if state == null or state.run == null or _combat == null:
+		last_error = "Нельзя сохранить снимок: нет активного профиля, выезда или боя."
+		return false
+	var snapshot: GameSaveState.CombatSnapshotState = GameSaveState.CombatSnapshotState.new()
+	snapshot.sim_time_ms = _combat.time_ms
+	snapshot.actors = [{
+		"combatState": _combat.to_dictionary(), "nodeType": _active_node_type,
+		"rewardModifiers": _active_reward_modifiers.duplicate(true),
+	}]
+	snapshot.event_queue = []
+	snapshot.rng_streams = [_combat.rng.duplicate(true)]
+	snapshot.event_log = _combat.log.duplicate(true)
+	snapshot.next_sequence_id = _combat.next_event_id
+	snapshot.rules_hash = _combat.rules_hash
+	var payload: Dictionary = state.to_payload()
+	payload["run"]["combatSnapshot"] = snapshot.to_dictionary()
+	return _commit_payload(payload)
+
+func _restore_combat_snapshot() -> bool:
+	var snapshot: GameSaveState.CombatSnapshotState = state.run.combat_snapshot
+	if snapshot.actors.is_empty() or not snapshot.actors[0] is Dictionary:
+		last_error = "Снимок активного боя пуст или повреждён."
+		return false
+	var saved: Dictionary = snapshot.actors[0]
+	var serialized: Variant = saved.get("combatState")
+	if not serialized is Dictionary:
+		last_error = "В снимке отсутствует сериализованное состояние симулятора."
+		return false
+	var build: Dictionary = build_preview()
+	if not bool(build.get("valid", false)):
+		last_error = "Нельзя восстановить бой: сохранённая сборка недействительна."
+		return false
+	var restored: CombatState = CombatState.from_dictionary(serialized, build)
+	if restored == null or restored.time_ms != snapshot.sim_time_ms or restored.rules_hash != snapshot.rules_hash:
+		last_error = "Снимок боя не прошёл проверку времени/правил."
+		return false
+	_combat = restored
+	_active_node_type = str(saved.get("nodeType", restored.node_type))
+	_active_reward_modifiers = saved.get("rewardModifiers", {}).duplicate(true)
+	return true
 
 func _slot_accepts(slot: String, category: String) -> bool:
 	match category:

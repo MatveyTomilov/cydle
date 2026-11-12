@@ -20,6 +20,8 @@ func run(_tree: SceneTree) -> bool:
 	repository.call("configure_directory", test_directory)
 
 	var payload: Dictionary = {"profile": {"level": 1, "credits": 120}, "items": ["starter"]}
+	var precise_float_result: Dictionary = repository.call("save", "precise_float", {"hp": 90.87378640776699}, 99)
+	check(bool(precise_float_result.get("ok", false)), "save_repository: JSON float round-trip invalidated a valid save")
 	var first_result: Dictionary = repository.call("save", "slot_a", payload, 100)
 	check(bool(first_result.get("ok", false)), "save_repository: first snapshot was not saved")
 	var first: Dictionary = first_result.get("save", {})
