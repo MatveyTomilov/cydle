@@ -4,6 +4,15 @@
 
 This block supersedes the historical Qwen/Luna work notes below for the active checkout.
 
+### Latest combat continuation (WIP after `8880709`)
+
+- Files currently changed: `game/scripts/core/combat/combat_simulator.gd`, `game/scripts/app/game_session.gd`, and `game/tests/golden/main_skill_replay_test.gd`.
+- The same 100 ms `CombatSimulator` now includes timed enemy abilities, E14/E18/E19/E23/E24 passive behaviors, boss threshold phases, and the six elite modifiers. These are integrated behavior slices, not complete parity for the entire catalog.
+- Main-channel active skill resolution now covers SK_BURST, SK_PIERCE, SK_EXEC, SK_BLADE, SK_PLASMA, SK_ARC, SK_OVR, SK_NEURO, SK_SEED, SK_DETONATE, SK_BREAK, SK_SCAN, SK_LEECH, SK_CHAIN, SK_KINETIC, and SK_SIDE_FIRE. Skills still use the shared tactic selection, cast timing, damage, status, and RNG path; unsupported trigger-effect sources remain rejected. Regression tests verify SK_BLADE bleed, SK_OVR, and virus detonation, alongside boss phase, elite split, and enemy behavior cases.
+- A targeted compatibility guard now permits only the four catalogued skill-trigger sources whose effects are actually executed (SK_BLADE, SK_NEURO, SK_SEED, SK_BREAK); other build trigger sources still make the configuration unsupported rather than being silently dropped.
+- Verification run on 2026-11-12: Godot 4.7.2 editor import exit 0; native runner exit 0, 22 test scripts, 86,873 assertions, 0 failures; Windows Desktop release export exit 0; exported `game/build/CYDLE.exe --headless --quit-after 3` exit 0. Legacy `npm run typecheck`, `npm test -- --run` (22 files / 206 tests), `npm run build`, and `npm run validate` all exit 0. `git diff --check` passes. Full visual/manual playthrough was not performed.
+- Still missing or incomplete against `CYDLE_MASTER_SPEC.md`: remaining skill-trigger and item/passive proc parity, broader enemy AI/passives and event outcomes, full boss/elite mechanics, active combat save/resume, all campaign and quest/faction/endgame flow, autopilot/offline progression, Simulation Lab, complete build investment/operations, and production art/audio/release acceptance. Do not infer these from catalog or partial behavior support.
+
 - Repository: `https://github.com/MatveyTomilov/cydle.git`.
 - Working directory: `E:\cydle\project`.
 - Working branch: `development/codex`, created directly from verified checkpoint `3f28c7926a8c6ea4a99b1291a8c9e0ac8025cc67`. The protected source branches remain unchanged. Current exact HEAD and remote comparison are available from `git rev-parse HEAD` and `git ls-remote origin refs/heads/development/codex`.

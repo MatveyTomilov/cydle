@@ -572,7 +572,7 @@ func begin_combat() -> bool:
 		if not rule_value is Dictionary or not bool(rule_value.get("enabled", false)):
 			continue
 		var skill_id: String = str(rule_value.get("skillId", "AUTO"))
-		if skill_id in ["AUTO", "SK_BURST", "SK_PIERCE", "SK_EXEC", "SK_PLASMA", "SK_SHIELD", "SK_EMP", "SK_GUARD", "SK_VENT", "SK_HEAL", "SK_DRONE_MARK"]:
+		if skill_id in ["AUTO", "SK_BURST", "SK_PIERCE", "SK_EXEC", "SK_BLADE", "SK_PLASMA", "SK_ARC", "SK_OVR", "SK_NEURO", "SK_SEED", "SK_DETONATE", "SK_BREAK", "SK_SCAN", "SK_LEECH", "SK_CHAIN", "SK_KINETIC", "SK_SIDE_FIRE", "SK_SHIELD", "SK_EMP", "SK_GUARD", "SK_VENT", "SK_HEAL", "SK_DRONE_MARK"]:
 			var compatible_rule: Dictionary = rule_value.duplicate(true)
 			if skill_id == "SK_BURST" and str(compatible_rule.get("target", "")) == "allEnemies":
 				compatible_rule["target"] = "nearest"
