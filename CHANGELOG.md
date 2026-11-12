@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — Q05 anomaly survival objective
+
+- The Q05 fallback “survive three B05 combat nodes” now counts a cleared ANOMALY node. Regression verifies an anomaly among three B05 clears unlocks the Q05_S2 decision.
+- Godot import passed; 22 headless scripts / 87,641 assertions passed; Windows Desktop export and exported EXE smoke passed; `git diff --check` passed. TypeScript not run (native Godot-only change).
+
 ## Unreleased — checkpoint quest and faction integration
 
 - Campaign checkpoint transitions now inject active quest elite targets, quest-stage event IDs and faction world effects into the next sector, matching the normal expedition-start path. Previously `continue_campaign()` bypassed those integrations.

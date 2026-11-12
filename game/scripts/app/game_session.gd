@@ -1943,7 +1943,7 @@ func _quest_stage_ready(quest: Dictionary, stage: Dictionary, progress: Dictiona
 				var survived_biome_combats: int = 0
 				for layer: Array in state.run.graph.get("layers", []):
 					for node: Dictionary in layer:
-						if str(node.get("type", "")) in ["COMBAT", "ELITE", "BOUNTY"] and state.run.cleared_node_ids.has(str(node.get("id", ""))):
+						if str(node.get("type", "")) in ["COMBAT", "ELITE", "BOUNTY", "ANOMALY"] and state.run.cleared_node_ids.has(str(node.get("id", ""))):
 							survived_biome_combats += 1
 				return survived_biome_combats >= 3
 			return false
@@ -1951,7 +1951,7 @@ func _quest_stage_ready(quest: Dictionary, stage: Dictionary, progress: Dictiona
 			var count: int = 0
 			for layer: Array in state.run.graph.get("layers", []):
 				for node: Dictionary in layer:
-					if str(node.get("type", "")) in ["COMBAT", "ELITE", "BOUNTY"] and state.run.cleared_node_ids.has(str(node.get("id", ""))): count += 1
+					if str(node.get("type", "")) in ["COMBAT", "ELITE", "BOUNTY", "ANOMALY"] and state.run.cleared_node_ids.has(str(node.get("id", ""))): count += 1
 			return state.run.biome == str(requirement.get("biome", "")) and count >= int(requirement.get("count", 1))
 		"anomaly":
 			var has_quest_anomaly: bool = false

@@ -522,10 +522,36 @@ func run(_tree: SceneTree) -> bool:
 		check(thermal_quest_target._commit_payload(thermal_payload), "game_session: could not prepare the Q05 target")
 		if check(thermal_quest_target.start_expedition("q05-target-elite"), "game_session: Q05 target expedition failed: %s" % thermal_quest_target.last_error):
 			var q05_target_found: bool = false
+			var q05_event_id_found: bool = false
 			for layer: Array in thermal_quest_target.state.run.graph.get("layers", []):
 				for node: Dictionary in layer:
 					if str(node.get("type", "")) == "ELITE" and node.get("questTargets", []).has("Q05") and node.get("enemies", []).any(func(enemy: Dictionary) -> bool: return str(enemy.get("templateId", "")) == "E19"): q05_target_found = true
-			check(thermal_quest_target.state.run.biome == "B05" and q05_target_found, "game_session: active Q05 did not create its E19 objective in B05")
+					if str(node.get("type", "")) == "EVENT" and (node.get("questEventIds", []) as Array).has("Q05_S2"): q05_event_id_found = true
+			check(thermal_quest_target.state.run.biome == "B05" and q05_target_found and q05_event_id_found, "game_session: active Q05 did not create its E19 objective and stage event in B05")
+			var q05_progress_payload: Dictionary = thermal_quest_target.state.to_payload()
+			var q05_layers: Array = q05_progress_payload["run"]["graph"]["layers"]
+			var q05_combat_ids: Array[String] = []
+			var q05_anomaly_node: Dictionary = {}
+			for layer: Array in q05_layers:
+				for node: Dictionary in layer:
+					if q05_combat_ids.size() < 3 and str(node.get("type", "")) == "COMBAT":
+						q05_combat_ids.append(str(node.get("id", "")))
+						if q05_combat_ids.size() == 2:
+							q05_anomaly_node = node
+			var q05_event_id: String = ""
+			for node: Dictionary in q05_layers[3]:
+				if str(node.get("type", "")) == "EVENT" and (node.get("questEventIds", []) as Array).has("Q05_S2"):
+					q05_event_id = str(node.get("id", ""))
+			if not q05_anomaly_node.is_empty():
+				q05_anomaly_node["type"] = "ANOMALY"
+			q05_progress_payload["run"]["clearedNodeIds"] = q05_combat_ids
+			q05_progress_payload["run"]["currentNodeId"] = q05_event_id
+			q05_progress_payload["run"]["visitedNodeIds"] = q05_combat_ids.duplicate()
+			q05_progress_payload["run"]["visitedNodeIds"].append(q05_event_id)
+			q05_progress_payload["run"]["phase"] = "NODE"
+			check(q05_combat_ids.size() == 3 and not q05_event_id.is_empty() and thermal_quest_target._commit_payload(q05_progress_payload), "game_session: could not prepare three survived B05 combats including an anomaly")
+			var q05_stage_opportunities: Array[Dictionary] = thermal_quest_target.available_quest_stages()
+			check(q05_stage_opportunities.any(func(opportunity: Dictionary) -> bool: return str(opportunity.get("quest", {}).get("id", "")) == "Q05"), "game_session: Q05 fallback did not count a survived ANOMALY among its three B05 combats")
 	var q06_route_session: GameSession = GameSession.new()
 	q06_route_session.configure_save_directory("user://test-saves/q06-extra-anomaly")
 	if check(q06_route_session.start_new_game(1762900000134), "game_session: could not create a Q06 anomaly-route profile"):
