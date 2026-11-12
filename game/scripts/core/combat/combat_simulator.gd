@@ -595,6 +595,8 @@ func _rule_conditions_pass(state: CombatState, actor: CombatActorState, rule: Di
 func _eval_tactic_condition(state: CombatState, actor: CombatActorState, condition: Dictionary, target: CombatActorState) -> bool:
 	var kind: String = str(condition.get("kind", "always"))
 	var value: float = float(condition.get("value", 0.0))
+	if kind in ["hpBelow", "hpAbove", "shieldBelow"] and value > 1.0:
+		value = clampf(value / 100.0, 0.0, 1.0) # Legacy save compatibility: old thresholds were stored as whole percentages.
 	var max_hp: float = maxf(1.0, float(actor.base_sheet.get("maxHP", 1.0)))
 	var max_shield: float = float(actor.base_sheet.get("maxShield", 0.0))
 	var living: Array[CombatActorState] = []
@@ -977,7 +979,7 @@ func _resolve_main_skill(state: CombatState, rng: DeterministicRng, actor: Comba
 		var limit: int = int(skill.get("maxTargets", targets.size()))
 		for current_target: CombatActorState in targets.slice(0, limit):
 			var raw_base: float = _skill_raw_damage(skill, base_damage, effective, current_target)
-			var hit: Dictionary = _resolve_basic_hit(state, rng, actor, current_target, raw_base, damage_type, action_id, is_main, skill_id)
+			var hit: Dictionary = _resolve_basic_hit(state, rng, actor, current_target, raw_base, damage_type, action_id, is_main, skill_id, 0.0, true, float(skill.get("procWeight", 1.0)))
 			if not bool(hit.get("ok", false)):
 				return
 		return
@@ -987,7 +989,7 @@ func _resolve_main_skill(state: CombatState, rng: DeterministicRng, actor: Comba
 		return
 	if skill_id == "SK_ARC":
 		var primary_raw: float = _skill_raw_damage(skill, base_damage, effective, target)
-		var primary_hit: Dictionary = _resolve_basic_hit(state, rng, actor, target, primary_raw, damage_type, action_id, is_main, skill_id)
+		var primary_hit: Dictionary = _resolve_basic_hit(state, rng, actor, target, primary_raw, damage_type, action_id, is_main, skill_id, 0.0, true, float(skill.get("procWeight", 1.0)))
 		if not bool(primary_hit.get("ok", false)):
 			return
 		var arc_others: Array[CombatActorState] = []
@@ -997,7 +999,7 @@ func _resolve_main_skill(state: CombatState, rng: DeterministicRng, actor: Comba
 		arc_others.sort_custom(func(left: CombatActorState, right: CombatActorState) -> bool: return left.id < right.id)
 		for secondary: CombatActorState in arc_others.slice(0, 2):
 			var splash_raw: float = _skill_raw_damage(skill, base_damage, effective, secondary) * float(skill.get("splash", {}).get("coefficient", 0.5))
-			var splash_hit: Dictionary = _resolve_basic_hit(state, rng, actor, secondary, splash_raw, damage_type, action_id, is_main, skill_id, 0.0, false)
+			var splash_hit: Dictionary = _resolve_basic_hit(state, rng, actor, secondary, splash_raw, damage_type, action_id, is_main, skill_id, 0.0, false, float(skill.get("procWeight", 1.0)))
 			if bool(splash_hit.get("hit", false)):
 				_add_simple_status(state, actor, secondary, "SHOCK", 1000.0)
 		return
@@ -1012,7 +1014,7 @@ func _resolve_main_skill(state: CombatState, rng: DeterministicRng, actor: Comba
 			raw_base *= 1.4 * float(_effective_sheet(state, actor, current_target).get("moreExecute", 1.0))
 		if skill_id == "SK_CHAIN" and actor.heat >= 80.0:
 			raw_base *= 1.25
-		var hit: Dictionary = _resolve_basic_hit(state, rng, actor, current_target, raw_base, damage_type, action_id, is_main, skill_id)
+		var hit: Dictionary = _resolve_basic_hit(state, rng, actor, current_target, raw_base, damage_type, action_id, is_main, skill_id, 0.0, true, float(skill.get("procWeight", 1.0)))
 		if not bool(hit.get("ok", false)):
 			return
 		if not bool(hit.get("hit", false)):
@@ -1507,7 +1509,7 @@ func _attack_packets(actor: CombatActorState, weapon: Dictionary) -> Array[Dicti
 		packets.append({"type": actor.attack_type, "amount": actor.attack_damage})
 	return packets
 
-func _resolve_basic_hit(state: CombatState, rng: DeterministicRng, actor: CombatActorState, target: CombatActorState, raw_base: float, damage_type: String, action_id: String, is_main: bool, skill_id: String = "", bypass_shield_ratio: float = 0.0, direct: bool = true) -> Dictionary:
+func _resolve_basic_hit(state: CombatState, rng: DeterministicRng, actor: CombatActorState, target: CombatActorState, raw_base: float, damage_type: String, action_id: String, is_main: bool, skill_id: String = "", bypass_shield_ratio: float = 0.0, direct: bool = true, proc_weight: float = 1.0) -> Dictionary:
 	var attacker: Dictionary = _effective_sheet(state, actor, target)
 	var defender: Dictionary = _effective_sheet(state, target, actor)
 	var accuracy: float = float(attacker.get("accuracy", 100.0))
@@ -1598,14 +1600,14 @@ func _resolve_basic_hit(state: CombatState, rng: DeterministicRng, actor: Combat
 	if not skill_id.is_empty():
 		damage_event["skillId"] = skill_id
 	_emit(state, "DAMAGE", actor.id, damage_event)
-	_dispatch_direct_status_triggers(state, rng, actor, target, damage_type, action_id, skill_id, direct)
+	_dispatch_direct_status_triggers(state, rng, actor, target, damage_type, action_id, skill_id, direct, proc_weight)
 	if actor.side == "enemy" and target.side == "player":
 		_resolve_enemy_direct_hit_effects(state, actor, target, action_id, raw)
 	if bulwark != null and redirected_raw > 0.0:
 		_apply_redirected_damage(state, actor, bulwark, redirected_raw, damage_type, action_id, skill_id, penetration, crit)
 	return {"ok": true, "hit": true, "damage": dealt, "raw": raw, "error": ""}
 
-func _dispatch_direct_status_triggers(state: CombatState, rng: DeterministicRng, actor: CombatActorState, target: CombatActorState, damage_type: String, action_id: String, skill_id: String, direct: bool) -> void:
+func _dispatch_direct_status_triggers(state: CombatState, rng: DeterministicRng, actor: CombatActorState, target: CombatActorState, damage_type: String, action_id: String, skill_id: String, direct: bool, proc_weight: float) -> void:
 	if not direct or actor.side != "player" or not actor.alive or not target.alive:
 		return
 	if not _status_catalog_loaded:
@@ -1635,7 +1637,7 @@ func _dispatch_direct_status_triggers(state: CombatState, rng: DeterministicRng,
 		var trigger_key: String = "%s:%s" % [source_id, trigger_id]
 		if float(owner.icds.get(trigger_key, 0.0)) > float(state.time_ms):
 			continue
-		var proc_chance: float = clampf(float(effect.get("chance", 1.0)) * float(_effective_sheet(state, owner, target).get("procMultiplier", 1.0)), 0.0, 1.0)
+		var proc_chance: float = clampf(float(effect.get("chance", 1.0)) * proc_weight * float(_effective_sheet(state, owner, target).get("procMultiplier", 1.0)), 0.0, 1.0)
 		if not rng.chance(proc_chance):
 			continue
 		var action: Dictionary = effect.get("action", {})

@@ -69,7 +69,7 @@ func _run_campaign() -> void:
 				var depth: int = int(session.state.run.depth)
 				var boss_depth: int = depth + 1
 				var farm_count: int = int(gate_farm_counts.get(boss_depth, 0))
-				var required_farms: int = 3
+				var required_farms: int = 1
 				if depth % 4 == 3 and farm_count < required_farms:
 					gate_farm_counts[boss_depth] = farm_count + 1
 					if not session.extract_run():
@@ -268,9 +268,9 @@ func _prepare_garage(session: GameSession) -> bool:
 				break
 			if slot == "MAIN":
 				print("E2E main candidate rejected template=%s T%d rarity=%s error=%s" % [str(item.get("templateId", "")), int(item.get("techLevel", 1)), str(item.get("rarity", "COMMON")), session.last_error])
-	var campaign_tree: Array[String] = ["S1A", "S1B", "S2C", "K1A", "K1B", "K2A", "K1C", "K1D", "K3A"]
+	var campaign_tree: Array[String] = ["S1A", "S1B", "S2C", "S1C", "K1A", "K1B", "K2A", "K1C", "K1D", "K3A"]
 	for node_id: String in session.state.meta.tree_node_ids.duplicate():
-		if not campaign_tree.has(node_id) and not session.set_tree_node_allocated(node_id, false):
+		if session.state.meta.tree_node_ids.has(node_id) and not campaign_tree.has(node_id) and not session.set_tree_node_allocated(node_id, false):
 			print("E2E garage rejected: tree removal %s error=%s" % [node_id, session.last_error])
 			return false
 	for node_id: String in campaign_tree:
@@ -283,6 +283,9 @@ func _prepare_garage(session: GameSession) -> bool:
 		if not session.allocate_attribute("POW"):
 			print("E2E garage rejected: attribute allocation error=%s" % session.last_error)
 			return false
+	if not session.state.meta.passive_ids.has("PP_AMMO") and not session.set_passive_equipped("PP_AMMO", true):
+		print("E2E garage rejected: main-damage protocol error=%s" % session.last_error)
+		return false
 	var equipped_ids: Array[String] = []
 	for item_id: Variant in session.state.meta.equipment.values():
 		equipped_ids.append(str(item_id))
@@ -317,10 +320,20 @@ func _prepare_boss_tactic(session: GameSession) -> bool:
 		var auto_skill_ok: bool = session.set_tactic_rule_skill("starter-burst", "AUTO")
 		var auto_condition_ok: bool = session.set_tactic_rule_condition("starter-burst", {"kind": "always"})
 		return auto_skill_ok and auto_condition_ok
-	for starter_skill: String in ["SK_SHIELD", "SK_EMP", "SK_BURST"]:
+	if session.state.meta.skill_ids.has("SK_GUARD") and not session.state.meta.skill_ids.has("SK_SHIELD"):
+		if not session.set_skill_equipped("SK_GUARD", false):
+			return false
+	if not session.state.meta.skill_ids.has("SK_SHIELD") and not session.set_skill_equipped("SK_SHIELD", true):
+		return false
+	if session.state.meta.skill_ids.has("SK_HEAL") and not session.state.meta.skill_ids.has("SK_EMP"):
+		if not session.set_skill_equipped("SK_HEAL", false):
+			return false
+	if not session.state.meta.skill_ids.has("SK_EMP") and not session.set_skill_equipped("SK_EMP", true):
+		return false
+	for starter_skill: String in ["SK_BURST"]:
 		if not session.state.meta.skill_ids.has(starter_skill) and not session.set_skill_equipped(starter_skill, true):
 			return false
-	return session.set_tactic_rule_skill("starter-burst", "SK_BURST") and session.set_tactic_rule_target("starter-burst", "healer") and session.set_tactic_rule_condition("starter-burst", {"kind": "enemiesAtLeast", "value": 2})
+	return session.set_tactic_rule_skill("starter-shield", "SK_SHIELD") and session.set_tactic_rule_target("starter-shield", "self") and session.set_tactic_rule_condition("starter-shield", {"kind": "hpBelow", "value": 0.75}) and session.set_tactic_rule_skill("starter-emp", "SK_EMP") and session.set_tactic_rule_target("starter-emp", "imminentCast") and session.set_tactic_rule_condition("starter-emp", {"kind": "enemyCasting", "interruptibleOnly": true}) and session.set_tactic_rule_skill("starter-burst", "SK_BURST") and session.set_tactic_rule_target("starter-burst", "healer") and session.set_tactic_rule_condition("starter-burst", {"kind": "enemiesAtLeast", "value": 2})
 
 func _item_rank(item: Dictionary) -> int:
 	var rarity_order: Dictionary = {"COMMON": 0, "MODIFIED": 1, "RARE": 2, "LEGENDARY": 3, "UNIQUE": 4}

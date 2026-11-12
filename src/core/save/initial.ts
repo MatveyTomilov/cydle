@@ -59,7 +59,7 @@ export function createInitialSave(options: { saveId?: string; now?: number } = {
         id: 'DEFAULT',
         name: 'Тактика по умолчанию',
         rules: [
-          { id: 'starter-shield', priority: 3, enabled: true, skillId: 'SK_SHIELD', target: 'self', conditions: [{ kind: 'hpBelow', value: 45 }], logic: 'AND', note: 'Защита при низком HP' },
+          { id: 'starter-shield', priority: 3, enabled: true, skillId: 'SK_SHIELD', target: 'self', conditions: [{ kind: 'hpBelow', value: 0.45 }], logic: 'AND', note: 'Защита при низком HP' },
           { id: 'starter-emp', priority: 2, enabled: true, skillId: 'SK_EMP', target: 'imminentCast', conditions: [{ kind: 'enemyCasting', interruptibleOnly: true }], logic: 'AND', note: 'Прерывание опасного каста' },
           { id: 'starter-burst', priority: 1, enabled: true, skillId: 'SK_BURST', target: 'allEnemies', conditions: [{ kind: 'enemiesAtLeast', value: 2 }], logic: 'AND', note: 'Очередь по группе' },
           { id: 'starter-auto', priority: 0, enabled: true, skillId: 'AUTO', target: 'nearest', conditions: [{ kind: 'always' }], logic: 'AND', note: 'Базовая атака' },

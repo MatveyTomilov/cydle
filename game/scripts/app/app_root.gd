@@ -552,9 +552,12 @@ func _show_tactics() -> void:
 			if condition.has("value"):
 				var threshold: SpinBox = SpinBox.new()
 				threshold.min_value = 0.0
-				threshold.max_value = 100000.0
+				threshold.max_value = 1.0 if str(condition.get("kind", "")) in ["hpBelow", "hpAbove", "shieldBelow"] else 100000.0
 				threshold.step = 0.05 if str(condition.get("kind", "")) in ["hpBelow", "hpAbove", "shieldBelow"] else 1.0
-				threshold.value = float(condition.get("value", 0.0))
+				var threshold_value: float = float(condition.get("value", 0.0))
+				if str(condition.get("kind", "")) in ["hpBelow", "hpAbove", "shieldBelow"] and threshold_value > 1.0:
+					threshold_value = clampf(threshold_value / 100.0, 0.0, 1.0)
+				threshold.value = threshold_value
 				threshold.value_changed.connect(_on_tactic_condition_value.bind(rule_id, condition_selector, threshold))
 				condition_row.add_child(threshold)
 			var details: Label = _label("Примечание: %s" % str(rule.get("note", "нет")), 10, COLOR_MUTED)

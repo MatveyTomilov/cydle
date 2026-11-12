@@ -1,5 +1,14 @@
 # CYDLE — Project handoff and development history
 
+## Current live continuation (2026-11-12; supersedes checkpoint below)
+
+- Branch `development/codex`; latest pushed base `78459a949a3bbdfb63fc8803c2c1910398455c4b`. Local WIP is pending commit.
+- The native campaign can be advanced through the shared route, battle, reward and save commands; E2E has now completed d1–d4 routes and attempted BOSS_A several times, but BOSS_A remains undefeated. Confirmed attempts: level10 offensive tree/T3 kinetic rifle dealt 1,968 player damage, killed E09 and died with BOSS_A at 1,042 HP; level11 defensive tree+SK_GUARD died at 823 player damage with 1,705 boss HP; defensive tree+SK_SHIELD/SK_HEAL died after 15.3 s at 1,338 damage with boss at 1,473 HP and E09 still alive; level11 defensive tree+SK_SHIELD/SK_EMP dealt 1,688, killed E09, interrupted once, and died after 17.7 s with boss at 1,034 HP. These outcomes are diagnostic evidence, not game completion.
+- Current uncommitted code: K3A direct-status trigger proc chance now includes each skill's `procWeight`; the starter tactic threshold is corrected from `45` to `0.45` in both native and oracle new-save factories; older whole-percent thresholds are interpreted as fractions on load/use and displayed normalized; the UI bounds fraction fields to 0–1. Victory settlement clamps HP/shield to sortie maxima. The forced K3A and legacy-threshold regressions pass.
+- The E2E driver now tries a 10-node level11 mixed kinetic/defensive build with `PP_AMMO`, keeping starter SK_SHIELD and SK_EMP with a 75% HP threshold for shield timing. This actual campaign run is currently progressing from an external preserved profile in `%APPDATA%\Godot\app_userdata\CYDLE\campaign-e2e-repro`; next inspect its d4 BOSS_A outcome. Do not delete this profile.
+- Latest actual checks: Godot editor import exit 0; 22 scripts / 87,501 assertions / 0 failures; legacy TypeScript Vitest 206/206; typecheck and Vite production build exit 0; `git diff --check` exit 0. Windows export has not been rerun after this WIP.
+- Next: observe the active E2E result, then refresh this checkpoint, commit and push; continue solving shared combat/campaign blockers through d12/d13 without changing Master Spec balance. d4 success and all later campaign completion remain unverified.
+
 ## Current continuation checkpoint (2026-11-12)
 
 - Branch: `development/codex`; pushed base: `2af38337287306f9eddde9299b6630bdeb0df9a0`; local WIP is pending commit. This supersedes older latest-status bullets below.

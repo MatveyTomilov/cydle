@@ -32,6 +32,10 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	var simulator: CombatSimulator = CombatSimulator.new()
 	var state: CombatState = state_result["state"] as CombatState
+	var threshold_actor: CombatActorState = state.operator.clone()
+	threshold_actor.hp = float(threshold_actor.base_sheet.get("maxHP", 1.0)) * 0.5
+	check(not simulator._eval_tactic_condition(state, threshold_actor, {"kind": "hpBelow", "value": 45.0}, null), "combat_step: legacy 45-percent HP condition did not retain its intended threshold")
+	check(simulator._eval_tactic_condition(state, threshold_actor, {"kind": "hpBelow", "value": 0.55}, null), "combat_step: fractional HP condition stopped using its 0–1 threshold")
 	var escalation_state_result: Dictionary = simulator.create_state({
 		"seed": "endgame-escalation-combat", "depth": 13, "biome": "B01", "nodeType": "ELITE",
 		"build": build, "enemies": [{"templateId": "E02", "elite": "EL_FAST"}], "tactics": config.get("tactics", {}),

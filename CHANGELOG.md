@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — tactic thresholds and K3A proc-weight parity
+
+- Corrected the new-game starter shield trigger from invalid whole-percent `45` to the native 0–1 fraction `0.45` in Godot and the TypeScript save oracle. The tactic editor now constrains fractional HP/shield thresholds to 0–1 and displays older whole-percent thresholds as normalized fractions; the combat simulator interprets historical values such as `45` as 45%.
+- Direct `ON_HIT` status procs now multiply their configured chance by the skill's `procWeight` as well as the owning build's proc multiplier, matching the TypeScript dispatcher. The deterministic K3A regression and legacy threshold regression pass.
+- Campaign diagnostics: at level 11, the defensive tree plus shield/EMP reached BOSS_A, killed E09 and interrupted once, but died after 17.7 s with 1,034 boss HP left. A 10-point mixed K/defense tree with `PP_AMMO` is now saved for the next real route attempt; its boss result is pending. No balance values changed.
+- Checks: Godot editor import 0; Godot 22 scripts / 87,501 assertions / 0 failures; TypeScript/Vitest 206 tests, typecheck and Vite build pass; `git diff --check` passes.
+
 ## Unreleased — direct kinetic status procs and resource-safe settlement
 
 - The Godot combat simulator now executes direct `ON_HIT` status triggers from non-skill build sources, including K3A's kinetic ARMOR_BREAK proc. Proc chances use the deterministic battle RNG; cooldowns belong to the trigger owner; damage type/directness and supported status conditions are respected. Secondary splash/detonation packets do not count as direct hits.

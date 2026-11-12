@@ -297,7 +297,7 @@
             "conditions": [
               {
                 "kind": "hpBelow",
-                "value": 45
+                "value": 0.45
               }
             ],
             "logic": "AND",

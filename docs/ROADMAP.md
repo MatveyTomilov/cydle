@@ -6,6 +6,12 @@
 
 The active strategy is **FULL GAME FIRST**: connect every major Master Spec system into a campaign that can be completed, then deepen edge cases, balance, and presentation. The entries below report implementation status; they are not a queue of isolated feature slices. A checkpoint commit is a safety measure, so continue to the next missing campaign-critical system while the session permits. Defer saved Simulation Lab presets, report exports, cosmetic polish, secondary settings, and redundant tests until functional campaign coverage exists.
 
+### Live combat/campaign checkpoint (2026-11-12)
+
+The direct K3A status-proc path now honors `procWeight` and trigger-owner ICDs. New starter saves use the declared 0–1 HP threshold; the Godot engine/editor preserve compatibility with old saves that stored whole percentages. A settlement clamp prevents fractional max-HP drift from blocking post-battle saves. Godot headless: 22 scripts / 87,501 assertions; TypeScript tests: 206/206; typecheck, Vite build and diff check pass.
+
+Campaign E2E has repeatedly traversed d1–d4, but has not yet cleared BOSS_A. Level11 defensive+shield/EMP dealt 1,688, killed E09 and interrupted once, but died with 1,034 boss HP left. Current uncommitted driver tests a 10-point mixed K/defense tree plus PP_AMMO on the preserved profile. d4 acceptance is pending; d5–d12/endgame remain unverified. No boss balance was altered.
+
 ### Live continuation (2026-11-12)
 
 The local WIP wires deterministic direct `ON_HIT` status triggers into the shared Godot simulator, including K3A ARMOR_BREAK, and excludes secondary splash/detonation packets. Victory settlement clamps HP/shield to persisted sortie maxima after fractional max-stat drift caused a save rejection. The forced-proc regression passes. A real saved-profile campaign diagnostic completed three d3 extraction farms and started the next d1–d4 attempt; d4 is unconfirmed. This WIP is pending commit/push; Windows export has not been rerun.
