@@ -25,6 +25,8 @@ func _run_campaign() -> void:
 	var processed_nodes: int = 0
 	var seed_index: int = 3 if resume_existing else 0
 	var seed_nonce: String = str(Time.get_ticks_usec())
+	if resume_existing and int(session.state.meta.max_sector_cleared) >= 6:
+		sector_attempts[int(session.state.meta.unlocked_forpost) + 1] = 1
 	if resume_existing and int(session.state.meta.unlocked_forpost) < 4:
 		sector_attempts[1] = 3
 	while int(session.state.meta.unlocked_forpost) < 12 and processed_nodes < MAX_NODE_STEPS:
@@ -240,6 +242,15 @@ func _prepare_garage(session: GameSession) -> bool:
 		var candidates: Array[Dictionary] = []
 		for item: Dictionary in session.state.meta.inventory:
 			if not bool(item.get("secured", false)) or str(item.get("itemId", "")) == current_id:
+				continue
+			var item_id: String = str(item.get("itemId", ""))
+			var equipped_elsewhere: bool = false
+			for equipped_slot_value: Variant in session.state.meta.equipment.keys():
+				var equipped_slot: String = str(equipped_slot_value)
+				if equipped_slot != slot and str(session.state.meta.equipment.get(equipped_slot, "")) == item_id:
+					equipped_elsewhere = true
+					break
+			if equipped_elsewhere:
 				continue
 			var template: Dictionary = catalog.get_template(str(item.get("templateId", "")))
 			var candidate_type: String = str(template.get("weapon", {}).get("type", ""))

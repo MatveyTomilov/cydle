@@ -4,6 +4,7 @@
 
 - Continuing past any depth checkpoint now persists that depth as cleared, independently of the d4/d8/d12 boss-gate unlock. This makes depth based quest availability and the Master Spec's HANGAR L2 after d6 progression reachable at the correct point.
 - Added a session regression that advances past d6 and verifies both the META milestone and HANGAR L2 gate. The campaign diagnostic equips the second drone when the upgrade is available and affordable.
+- Corrected the diagnostic garage picker to exclude items already mounted in another slot. The previous pass moved DR_BULWARK from DRONE_1 to DRONE_2 rather than equipping a second distinct drone; the preserved profile is stopped before further progression so the corrected pass can verify both slots.
 - Godot headless suite: 22 scripts, 87,512 assertions, 0 failures; Godot editor import exit 0. Full d8 boss and campaign validation remains active/incomplete.
 
 ## Unreleased — stable save checksum round-trips
