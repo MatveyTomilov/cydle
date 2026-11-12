@@ -216,7 +216,7 @@ func _prepare_garage(session: GameSession) -> bool:
 	var current_slots: Array[String] = ["MAIN", "ARMOR", "OFFHAND", "DRONE_1", "IMP_1", "IMP_2", "IMP_3", "IMP_4"]
 	for slot: String in current_slots:
 		var current_id: String = str(session.state.meta.equipment.get(slot, ""))
-		var expected_category: String = "IMPLANT" if slot.begins_with("IMP_") else slot
+		var expected_category: String = "IMPLANT" if slot.begins_with("IMP_") else "DRONE" if slot.begins_with("DRONE_") else slot
 		var current_rank: int = 0
 		var current_template_id: String = ""
 		var current_weapon_type: String = ""
@@ -248,6 +248,14 @@ func _prepare_garage(session: GameSession) -> bool:
 				var b_rifle: bool = str(b_template.get("id", "")) == "RIFLE_K2" and int(b.get("techLevel", 1)) >= 3
 				if a_rifle != b_rifle:
 					return a_rifle
+			if slot.begins_with("DRONE_"):
+				var a_role: String = str(catalog.get_template(str(a.get("templateId", ""))).get("drone", {}).get("role", ""))
+				var b_role: String = str(catalog.get_template(str(b.get("templateId", ""))).get("drone", {}).get("role", ""))
+				var role_priority: Dictionary = {"bulwark": 3, "medic": 2, "emp": 1}
+				var a_role_priority: int = int(role_priority.get(a_role, 0))
+				var b_role_priority: int = int(role_priority.get(b_role, 0))
+				if a_role_priority != b_role_priority:
+					return a_role_priority > b_role_priority
 			return _item_rank(a) > _item_rank(b)
 		)
 		for item: Dictionary in candidates:
