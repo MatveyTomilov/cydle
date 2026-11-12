@@ -367,6 +367,51 @@ func reachable_nodes() -> Array[Dictionary]:
 		return []
 	return _generator.reachable_nodes(state.run.graph, state.run.current_node_id)
 
+func route_intel() -> Dictionary:
+	if state == null or state.run == null:
+		return {}
+	var graph: Dictionary = state.run.graph
+	var adjacency: Dictionary = {}
+	for edge_value: Variant in graph.get("edges", []):
+		if not edge_value is Dictionary:
+			continue
+		var edge: Dictionary = edge_value
+		var from_id: String = str(edge.get("from", ""))
+		var to_id: String = str(edge.get("to", ""))
+		if not adjacency.has(from_id):
+			adjacency[from_id] = []
+		(adjacency[from_id] as Array).append(to_id)
+	var distances: Dictionary = {state.run.current_node_id: 0}
+	var queue: Array[String] = [state.run.current_node_id]
+	var cursor: int = 0
+	while cursor < queue.size():
+		var from_id: String = queue[cursor]
+		cursor += 1
+		var next_distance: int = int(distances[from_id]) + 1
+		for next_id_value: Variant in adjacency.get(from_id, []):
+			var next_id: String = str(next_id_value)
+			if distances.has(next_id):
+				continue
+			distances[next_id] = next_distance
+			queue.append(next_id)
+	var intel_level: int = garage_level("INTEL")
+	var scan_distance: int = 1 + (1 if intel_level >= 3 else 0)
+	var result: Dictionary = {"level": intel_level, "nodes": {}}
+	for layer: Array in graph.get("layers", []):
+		for node: Dictionary in layer:
+			var node_id: String = str(node.get("id", ""))
+			var visited: bool = state.run.visited_node_ids.has(node_id) or state.run.cleared_node_ids.has(node_id)
+			var distance: int = int(distances.get(node_id, 999))
+			var revealed: bool = visited or (distance > 0 and distance <= scan_distance and intel_level >= 1)
+			var info: Dictionary = {"revealed": revealed, "visited": visited}
+			if revealed:
+				info["type"] = str(node.get("type", "UNKNOWN"))
+				if intel_level >= 2:
+					info["threat"] = str(node.get("threat", "unknown"))
+					info["lootHint"] = str(node.get("lootHint", "unknown"))
+			result["nodes"][node_id] = info
+	return result
+
 func travel_to(node_id: String) -> bool:
 	if state == null or state.run == null or state.run.phase != "ROUTE":
 		last_error = "Переход доступен только на карте дороги."

@@ -12,6 +12,10 @@ func run(_tree: SceneTree) -> bool:
 	check(session.state.run.graph.get("layers", []).size() == 6, "game_session: saved run has no six-layer route")
 	var choices: Array[Dictionary] = session.reachable_nodes()
 	check(choices.size() == 1, "game_session: starting route does not expose its connected node")
+	var starter_intel: Dictionary = session.route_intel().get("nodes", {})
+	if not choices.is_empty():
+		var first_known: Dictionary = starter_intel.get(str(choices[0].get("id", "")), {})
+		check(bool(first_known.get("revealed", false)) and first_known.has("type") and not first_known.has("lootHint"), "game_session: INTEL L1 did not reveal adjacent type while hiding reward bands")
 	if choices.is_empty():
 		return false
 	var battle_payload: Dictionary = session.state.to_payload()
@@ -198,6 +202,24 @@ func run(_tree: SceneTree) -> bool:
 		check(garage_session.upgrade_garage_object("NEUROLAB") and garage_session.state.meta.unlocked_implant_slots == 5, "game_session: NEUROLAB L2 did not unlock implant socket five")
 		check(garage_session.upgrade_garage_object("HANGAR") and garage_session.state.meta.unlocked_drone_slots == 2, "game_session: HANGAR L2 did not unlock drone socket two")
 		check(garage_session.state.meta.protected_bank.credits < 500.0 and garage_session.state.meta.protected_bank.scrap < 200.0, "game_session: garage upgrades did not spend protected resources")
+	var intel_session: GameSession = GameSession.new()
+	intel_session.configure_save_directory("user://test-saves/garage-intel")
+	if check(intel_session.start_new_game(1762900000900), "game_session: could not create an Intel profile"):
+		var intel_payload: Dictionary = intel_session.state.to_payload()
+		intel_payload["meta"]["garage"]["INTEL"] = 3
+		check(intel_session._commit_payload(intel_payload), "game_session: Intel fixture could not be saved")
+		check(intel_session.start_expedition("intel-scan"), "game_session: Intel scan route could not start")
+		var intel_report: Dictionary = intel_session.route_intel()
+		var revealed_next_layer: bool = false
+		for edge_value: Variant in intel_session.state.run.graph.get("edges", []):
+			var edge: Dictionary = edge_value
+			if str(edge.get("from", "")) == "START":
+				continue
+			var visible_node: Dictionary = intel_report.get("nodes", {}).get(str(edge.get("to", "")), {})
+			if bool(visible_node.get("revealed", false)):
+				revealed_next_layer = true
+				check(visible_node.has("type") and visible_node.has("threat") and visible_node.has("lootHint"), "game_session: INTEL L3 omitted scanned type or reward bands")
+		check(revealed_next_layer, "game_session: INTEL L3 did not scan one layer beyond adjacent nodes")
 	var medical_session: GameSession = GameSession.new()
 	medical_session.configure_save_directory("user://test-saves/garage-medical")
 	if check(medical_session.start_new_game(1762900000700), "game_session: could not create a medical-bay profile"):

@@ -210,7 +210,7 @@ func _show_garage() -> void:
 		"SERVER": "Редактор тактики · профили и архивы открываются по уровню",
 		"HANGAR": "L1 стартовый дрон · L2 второй слот после сектора 6 · L3 дешевле ремонт дронов",
 		"MARKET": "L1 три предложения · L2 пять · L3 тематическое предложение",
-		"INTEL": "Раскрывает типы узлов, затем угрозы и дополнительный слой карты",
+		"INTEL": "L1 типы соседних узлов · L2 диапазон угрозы и добычи · L3 ещё один слой",
 		"GARAGE_MED": "Стабилизация после поражения · L3 платное полное восстановление при старте",
 		"CALIBRATOR": "Калибровка TechLevel · L2 снижает расход SCRAP · L3 пакетная калибровка",
 	}
@@ -540,6 +540,7 @@ func _show_road() -> void:
 		_show_checkpoint(run)
 	else:
 		var graph: Dictionary = run.graph
+		var map_intel: Dictionary = _session.route_intel().get("nodes", {})
 		for layer_index: int in range(graph.get("layers", []).size()):
 			var row: HBoxContainer = HBoxContainer.new()
 			row.add_theme_constant_override("separation", 8)
@@ -549,7 +550,10 @@ func _show_road() -> void:
 				var node_id: String = str(node.get("id", ""))
 				var reachable: bool = _contains_node(_session.reachable_nodes(), node_id)
 				var visited: bool = run.visited_node_ids.has(node_id)
-				var button: Button = _button("%s\n%s" % [str(node.get("type", "?")), str(node.get("lootHint", ""))], reachable)
+				var intel: Dictionary = map_intel.get(node_id, {})
+				var node_type: String = str(intel.get("type", "НЕИЗВЕСТНО"))
+				var secondary: String = "%s · %s" % [str(intel.get("threat", "")), str(intel.get("lootHint", ""))] if intel.has("threat") else ("УЖЕ ПОСЕЩЁН" if visited else "РАЗВЕДДАННЫХ НЕТ")
+				var button: Button = _button("%s\n%s" % [node_type, secondary], reachable)
 				button.custom_minimum_size = Vector2(145, 58)
 				button.disabled = not reachable
 				if visited:
