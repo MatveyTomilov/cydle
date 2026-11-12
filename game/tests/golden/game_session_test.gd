@@ -203,6 +203,67 @@ func run(_tree: SceneTree) -> bool:
 		check(float(calibrated_affix.get("value", 0.0)) >= 4.0 and float(calibrated_affix.get("value", 0.0)) <= 6.0 and float(calibrated_affix.get("rawRoll", 0.0)) >= 0.8 and float(calibrated_affix.get("rawRoll", 0.0)) <= 1.2, "game_session: calibrated roll escaped its same-tier range")
 		check(item_ops_session.start_expedition("item-operations-lock"), "game_session: item-operation lock test run could not start")
 		check(not item_ops_session.repair_item(item_id) and not item_ops_session.calibrate_item_affix(item_id, 0), "game_session: garage crafting was allowed during an active run")
+	var affix_craft_session: GameSession = GameSession.new()
+	affix_craft_session.configure_save_directory("user://test-saves/affix-crafting")
+	if check(affix_craft_session.start_new_game(1762900000350), "game_session: could not create an affix-crafting profile"):
+		var craft_payload: Dictionary = affix_craft_session.state.to_payload()
+		var craft_item: Dictionary = craft_payload["meta"]["inventory"][2]
+		craft_item["rarity"] = "MODIFIED"
+		craft_item["tr"] = 18.0
+		craft_item["affixes"] = [{"affixId": "AF_ARM", "tier": 1, "value": 2.0, "rawRoll": 1.0, "tierBoosted": false, "center": 2.0, "min": 2.0, "max": 2.0}]
+		craft_payload["meta"]["inventory"][2] = craft_item
+		craft_payload["meta"]["protectedBank"]["SCRAP"] = 100.0
+		craft_payload["meta"]["protectedBank"]["DATA"] = 100.0
+		check(affix_craft_session._commit_payload(craft_payload), "game_session: affix-crafting fixture could not be saved")
+		var craft_item_id: String = str(craft_item.get("itemId", ""))
+		var replace_quote: Dictionary = affix_craft_session.affix_replacement_options(craft_item_id, 0)
+		check(bool(replace_quote.get("valid", false)) and bool(replace_quote.get("affordable", false)) and replace_quote.get("options", []).any(func(option: Dictionary) -> bool: return str(option.get("id", "")) == "AF_HP"), "game_session: replacement preview did not provide a compatible alternate affix")
+		var scrap_before_replace: float = affix_craft_session.state.meta.protected_bank.scrap
+		var data_before_replace: float = affix_craft_session.state.meta.protected_bank.data
+		check(affix_craft_session.replace_item_affix(craft_item_id, 0, "AF_HP"), "game_session: replacing a selected affix failed: %s" % affix_craft_session.last_error)
+		var replaced_item: Dictionary = affix_craft_session.state.meta.inventory[2]
+		check(str(replaced_item.get("itemId", "")) == craft_item_id and str(replaced_item["affixes"][0].get("affixId", "")) == "AF_HP" and int(replaced_item["affixes"][0].get("tier", 0)) == 1, "game_session: replacement did not preserve item identity and use the TechLevel tier")
+		check(is_equal_approx(float(replaced_item.get("tr", 0.0)), 10.0) and is_equal_approx(affix_craft_session.state.meta.protected_bank.scrap, scrap_before_replace) and is_equal_approx(affix_craft_session.state.meta.protected_bank.data, data_before_replace - float(replace_quote["data"])), "game_session: replacement charged the wrong TR or materials")
+		var add_quote: Dictionary = affix_craft_session.affix_replacement_options(craft_item_id)
+		check(bool(add_quote.get("valid", false)) and bool(add_quote.get("affordable", false)) and int(add_quote.get("tr", 0)) == 10, "game_session: free-slot crafting preview is invalid")
+		var scrap_before_add: float = affix_craft_session.state.meta.protected_bank.scrap
+		var data_before_add: float = affix_craft_session.state.meta.protected_bank.data
+		check(affix_craft_session.add_item_affix(craft_item_id, "AF_SR"), "game_session: adding an affix to a free rarity slot failed: %s" % affix_craft_session.last_error)
+		var added_item: Dictionary = affix_craft_session.state.meta.inventory[2]
+		check(added_item["affixes"].size() == 2 and str(added_item["affixes"][1].get("affixId", "")) == "AF_SR" and is_equal_approx(float(added_item.get("tr", 0.0)), 0.0), "game_session: added affix did not occupy a free slot or spend exactly 10 TR")
+		check(is_equal_approx(affix_craft_session.state.meta.protected_bank.scrap, scrap_before_add - float(add_quote["scrap"])) and is_equal_approx(affix_craft_session.state.meta.protected_bank.data, data_before_add - float(add_quote["data"])), "game_session: free-slot crafting charged the wrong materials")
+		check(not affix_craft_session.add_item_affix(craft_item_id, "AF_ACC"), "game_session: crafting exceeded the item's rarity affix cap")
+	var disposal_session: GameSession = GameSession.new()
+	disposal_session.configure_save_directory("user://test-saves/item-disposal")
+	if check(disposal_session.start_new_game(1762900000360), "game_session: could not create an item-disposal profile"):
+		var disposal_catalog: ItemCatalog = ItemCatalog.new()
+		check(bool(disposal_catalog.load_catalog().get("ok", false)), "game_session: disposal test catalog failed to load")
+		var disposal_factory: ItemFactory = ItemFactory.new()
+		var disposal_rng: DeterministicRng = DeterministicRng.new()
+		disposal_rng.seed("item-disposal-test", 1)
+		var sale_created: Dictionary = disposal_factory.create_item(disposal_rng, disposal_catalog, {"templateId": "ARM_CLOTH", "techLevel": 1, "rarity": "COMMON", "secured": true, "originGrantId": "test-sale-item", "origin": "TEST", "acquiredAt": 1762900000360})
+		var dismantle_created: Dictionary = disposal_factory.create_item(disposal_rng, disposal_catalog, {"templateId": "ARM_NET", "techLevel": 1, "rarity": "COMMON", "secured": true, "originGrantId": "test-dismantle-item", "origin": "TEST", "acquiredAt": 1762900000360})
+		check(bool(sale_created.get("ok", false)) and bool(dismantle_created.get("ok", false)), "game_session: could not create sale/dismantle fixture items")
+		if bool(sale_created.get("ok", false)) and bool(dismantle_created.get("ok", false)):
+			var sale_item: Dictionary = (sale_created["item"] as ItemInstance).to_dictionary()
+			var dismantle_item: Dictionary = (dismantle_created["item"] as ItemInstance).to_dictionary()
+			var disposal_payload: Dictionary = disposal_session.state.to_payload()
+			disposal_payload["meta"]["inventory"].append(sale_item)
+			disposal_payload["meta"]["inventory"].append(dismantle_item)
+			check(disposal_session._commit_payload(disposal_payload), "game_session: disposal fixtures failed save validation: %s" % disposal_session.last_error)
+			var credits_before_sale: float = disposal_session.state.meta.protected_bank.credits
+			var sale_quote: Dictionary = disposal_session.item_disposal_quote(str(sale_item["itemId"]), "SELL")
+			check(bool(sale_quote.get("valid", false)) and int(sale_quote.get("credits", 0)) > 0, "game_session: sale preview did not calculate an offer")
+			check(disposal_session.sell_item(str(sale_item["itemId"])), "game_session: sale transaction failed: %s" % disposal_session.last_error)
+			check(is_equal_approx(disposal_session.state.meta.protected_bank.credits, credits_before_sale + float(sale_quote["credits"])) and disposal_session._secured_inventory_item(str(sale_item["itemId"])).is_empty(), "game_session: sale did not atomically pay and remove its item")
+			check(not disposal_session.sell_item(str(sale_item["itemId"])), "game_session: a sold item granted sale value more than once")
+			var scrap_before_dismantle: float = disposal_session.state.meta.protected_bank.scrap
+			var data_before_dismantle: float = disposal_session.state.meta.protected_bank.data
+			var dismantle_quote: Dictionary = disposal_session.item_disposal_quote(str(dismantle_item["itemId"]), "DISMANTLE")
+			check(bool(dismantle_quote.get("valid", false)) and int(dismantle_quote.get("scrap", 0)) > 0 and int(dismantle_quote.get("data", 0)) == 1, "game_session: digital-item dismantle preview did not include capped materials")
+			check(disposal_session.dismantle_item(str(dismantle_item["itemId"])), "game_session: dismantle transaction failed: %s" % disposal_session.last_error)
+			check(is_equal_approx(disposal_session.state.meta.protected_bank.scrap, scrap_before_dismantle + float(dismantle_quote["scrap"])) and is_equal_approx(disposal_session.state.meta.protected_bank.data, data_before_dismantle + 1.0) and disposal_session._secured_inventory_item(str(dismantle_item["itemId"])).is_empty(), "game_session: dismantling did not return capped scrap/data and consume its item")
+			check(not disposal_session.dismantle_item(str(dismantle_item["itemId"])), "game_session: a dismantled item granted materials more than once")
 	var tech_calibration_session: GameSession = GameSession.new()
 	tech_calibration_session.configure_save_directory("user://test-saves/tech-calibration")
 	if check(tech_calibration_session.start_new_game(1762900000400), "game_session: could not create a TechLevel-calibration profile"):

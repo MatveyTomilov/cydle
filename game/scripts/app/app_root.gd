@@ -834,6 +834,21 @@ func _show_inventory() -> void:
 				equip_button.disabled = not can_edit_items
 				equip_button.pressed.connect(_on_equip_item.bind(slot, item_id))
 				item_actions.add_child(equip_button)
+		if bool(item_value.get("secured", false)) and active_slot.is_empty():
+			var sell_quote: Dictionary = _session.item_disposal_quote(item_id, "SELL")
+			if bool(sell_quote.get("valid", false)):
+				var sell_button: Button = _button("ПРОДАТЬ · %d CREDITS" % int(sell_quote.get("credits", 0)), false)
+				sell_button.disabled = not can_edit_items
+				sell_button.tooltip_text = "Цена составляет 25%% от стоимости покупки по TechLevel и редкости."
+				sell_button.pressed.connect(_confirm_item_disposal.bind(item_id, "SELL", int(sell_quote.get("credits", 0)), 0, 0))
+				item_actions.add_child(sell_button)
+			var dismantle_quote: Dictionary = _session.item_disposal_quote(item_id, "DISMANTLE")
+			if bool(dismantle_quote.get("valid", false)):
+				var dismantle_button: Button = _button("РАЗОБРАТЬ · %d SCR / %d DATA" % [int(dismantle_quote.get("scrap", 0)), int(dismantle_quote.get("data", 0))], false)
+				dismantle_button.disabled = not can_edit_items
+				dismantle_button.tooltip_text = "Вернуть материалы по лимиту стоимости изготовления."
+				dismantle_button.pressed.connect(_confirm_item_disposal.bind(item_id, "DISMANTLE", 0, int(dismantle_quote.get("scrap", 0)), int(dismantle_quote.get("data", 0))))
+				item_actions.add_child(dismantle_button)
 		if bool(item_value.get("secured", false)):
 			if float(item_value.get("durability", 100.0)) < 100.0:
 				var repair_tech: int = int(item_value.get("techLevel", 1))
@@ -848,6 +863,12 @@ func _show_inventory() -> void:
 				var affix: Dictionary = item_value["affixes"][affix_index]
 				var item_tech: int = int(item_value.get("techLevel", 1))
 				var max_affix_tier: int = clampi(int(ceil(float(item_tech) / 4.0)), 1, 4)
+				var replace_quote: Dictionary = _session.affix_replacement_options(item_id, affix_index)
+				var replace_button: Button = _button("ЗАМЕНИТЬ %s · 8 TR / %d DATA" % [str(affix.get("affixId", "АФФИКС")), int(replace_quote.get("data", 0))], false)
+				replace_button.disabled = not can_edit_items or not bool(replace_quote.get("valid", false)) or not bool(replace_quote.get("affordable", false)) or replace_quote.get("options", []).is_empty()
+				replace_button.tooltip_text = str(replace_quote.get("error", "Выбрать другой совместимый аффикс"))
+				replace_button.pressed.connect(_show_affix_picker.bind(item_id, affix_index))
+				item_actions.add_child(replace_button)
 				if _session.garage_level("WORKSHOP") >= 3 and str(item_value.get("rarity", "")) != "UNIQUE" and int(affix.get("tier", 1)) < max_affix_tier:
 					var tier_scrap: int = ceili(20.0 * reward_formula.reward_scale(float(item_tech)))
 					var tier_data: int = ceili(5.0 * reward_formula.reward_scale(float(item_tech)))
@@ -860,6 +881,13 @@ func _show_inventory() -> void:
 				calibrate_button.disabled = not can_edit_items or _session.garage_level("WORKSHOP") < 2 or str(item_value.get("rarity", "")) == "UNIQUE" or float(item_value.get("tr", 0.0)) < 3.0
 				calibrate_button.pressed.connect(_on_calibrate_item_affix.bind(str(item_value.get("itemId", "")), affix_index))
 				item_actions.add_child(calibrate_button)
+			var add_quote: Dictionary = _session.affix_replacement_options(item_id)
+			if bool(add_quote.get("valid", false)):
+				var add_button: Button = _button("ДОБАВИТЬ АФФИКС · 10 TR / %d SCR / %d DATA" % [int(add_quote.get("scrap", 0)), int(add_quote.get("data", 0))], false)
+				add_button.disabled = not can_edit_items or not bool(add_quote.get("affordable", false)) or add_quote.get("options", []).is_empty()
+				add_button.tooltip_text = str(add_quote.get("error", "Добавить аффикс в свободный слот"))
+				add_button.pressed.connect(_show_affix_picker.bind(item_id, -1))
+				item_actions.add_child(add_button)
 			var current_tech: int = int(item_value.get("techLevel", 1))
 			var max_tech: int = maxi(4, _session.state.meta.unlocked_forpost)
 			for target_tech: int in range(current_tech + 1, max_tech + 1):
@@ -1295,10 +1323,60 @@ func _on_repair_item(item_id: String) -> void:
 	_show_inventory()
 	_footer.text = "ПРЕДМЕТ ОТРЕМОНТИРОВАН" if repaired else _session.last_error
 
+func _confirm_item_disposal(item_id: String, method: String, credits: int, scrap: int, data: int) -> void:
+	var title: String = "ПРОДАЖА ПРЕДМЕТА" if method == "SELL" else "РАЗБОР ПРЕДМЕТА"
+	var dialog: ConfirmationDialog = ConfirmationDialog.new()
+	dialog.title = title
+	dialog.dialog_text = "Предмет %s будет удалён из постоянного склада. Вы получите: %d CREDITS · %d SCRAP · %d DATA." % [item_id, credits, scrap, data]
+	dialog.ok_button_text = "ПОДТВЕРДИТЬ"
+	dialog.cancel_button_text = "ОТМЕНА"
+	dialog.confirmed.connect(_on_confirm_item_disposal.bind(item_id, method))
+	dialog.confirmed.connect(dialog.queue_free)
+	dialog.canceled.connect(dialog.queue_free)
+	add_child(dialog)
+	dialog.popup_centered()
+
+func _on_confirm_item_disposal(item_id: String, method: String) -> void:
+	var disposed: bool = _session.sell_item(item_id) if method == "SELL" else _session.dismantle_item(item_id)
+	_show_inventory()
+	_footer.text = "ПРЕДМЕТ %s · ПРОФИЛЬ СОХРАНЁН" % ("ПРОДАН" if method == "SELL" else "РАЗОБРАН") if disposed else _session.last_error
+
 func _on_calibrate_item_affix(item_id: String, affix_index: int) -> void:
 	var calibrated: bool = _session.calibrate_item_affix(item_id, affix_index)
 	_show_inventory()
 	_footer.text = "АФФИКС ПЕРЕКАЛИБРОВАН · BUILD LAB ПЕРЕСЧИТАН" if calibrated else _session.last_error
+
+func _show_affix_picker(item_id: String, affix_index: int) -> void:
+	var quote: Dictionary = _session.affix_replacement_options(item_id, affix_index)
+	if not bool(quote.get("valid", false)) or not bool(quote.get("affordable", false)):
+		_footer.text = str(quote.get("error", "Операция недоступна."))
+		_show_inventory()
+		return
+	_screen = "affix_picker"
+	_clear_body()
+	var adding: bool = affix_index < 0
+	_body.add_child(_label("МАСТЕРСКАЯ   /   %s" % ("НОВЫЙ АФФИКС" if adding else "ЗАМЕНА АФФИКСА"), 12, COLOR_CYAN))
+	_body.add_child(_label("Выберите совместимый эффект", 25, COLOR_TEXT))
+	_body.add_child(_label("При подтверждении: %d TR · %d SCRAP · %d DATA. Все списания и предмет сохранятся одной транзакцией." % [int(quote.get("tr", 0)), int(quote.get("scrap", 0)), int(quote.get("data", 0))], 12, COLOR_MUTED))
+	var catalog: ItemCatalog = ItemCatalog.new()
+	var catalog_result: Dictionary = catalog.load_catalog()
+	if not bool(catalog_result.get("ok", false)):
+		_body.add_child(_label(str(catalog_result.get("error", "Каталог аффиксов недоступен.")), 13, COLOR_RED))
+	else:
+		for option: Dictionary in quote.get("options", []):
+			var definition: Dictionary = catalog.get_affix(str(option.get("id", "")))
+			var button: Button = _button("%s  ·  %s" % [str(option.get("id", "")), str(option.get("name", "Аффикс"))], false)
+			button.tooltip_text = "%s · %s · tiers: %s" % [str(definition.get("stat", "")), str(definition.get("unit", "")), str(definition.get("tiers", []))]
+			button.pressed.connect(_on_choose_affix.bind(item_id, affix_index, str(option.get("id", ""))))
+			_body.add_child(button)
+	var cancel: Button = _button("ОТМЕНА", true)
+	cancel.pressed.connect(_show_inventory)
+	_body.add_child(cancel)
+
+func _on_choose_affix(item_id: String, affix_index: int, affix_id: String) -> void:
+	var applied: bool = _session.add_item_affix(item_id, affix_id) if affix_index < 0 else _session.replace_item_affix(item_id, affix_index, affix_id)
+	_show_inventory()
+	_footer.text = "АФФИКС УСТАНОВЛЕН · BUILD LAB ПЕРЕСЧИТАН" if applied else _session.last_error
 
 func _on_calibrate_item_tech(item_id: String, target_level: int) -> void:
 	var calibrated: bool = _session.calibrate_item_tech_level(item_id, target_level)

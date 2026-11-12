@@ -2,8 +2,11 @@
 
 ## Unreleased
 
+- Added garage affix replacement and free-slot crafting with deterministic rolls, TechLevel-based cost previews, compatibility/rank/TR validation, and atomic save updates.
+- Added secured unequipped item sale and dismantling, shop-price sale formula, digital-tag DATA recovery, capped material rewards, explicit confirmation, and single-transaction item removal.
+- Added regression coverage for affix replacement/addition, sale, dismantling, retained item identity, resource costs, rarity slots, and duplicate payout prevention.
 - Imported the six three-stage quest chains and three contract templates from frozen TypeScript data into Godot. Added the persisted quest journal and initial biome-gated HUNT, TECH, and ESCORT contract gameplay, including generated objectives, rewards, checkpoint requirements, and repeat-grant protection. Offer breadth, some quest semantics, and anomaly routes remain incomplete.
-- Aligned item save validation with the Master Spec and item roller so distinct affixes may share a group; this allows valid rare contract rewards to persist.
+- Earlier item-generation/save changes left an unresolved conflict between the affix-group uniqueness rule and broad catalog groups; see the active HANDOFF note before changing item-roll validation.
 - Added a conservative road autopilot that scores only revealed route information, acts through existing game transactions, resolves battles with the shared 100 ms simulator, extracts at checkpoints, pauses on material decisions/resources, and reports its stop reason. Configurable policy breadth remains incomplete.
 - Added explicit persisted offline-autopilot opt-in. Loading an active opted-in run simulates elapsed wall-clock time up to 12 hours through the same route, node, combat, and reward transactions; decision stops such as the tutorial prototype choice require the player's input.
 - Added d4/d8 campaign milestone flags and a final d12 ending choice. Free Corridor and faction-control endings record persistent branch flags, unlock endgame/sector 12, and gate final extraction or continuation until the choice is made. Depth-13+ biome rolls use saved history to prevent three identical biomes consecutively.

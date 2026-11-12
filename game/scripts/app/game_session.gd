@@ -1945,6 +1945,64 @@ func unequip_item(slot: String) -> bool:
 		return false
 	return _commit(candidate)
 
+func item_disposal_quote(item_id: String, method: String) -> Dictionary:
+	if not _garage_action_allowed():
+		return {"valid": false, "error": "Продажа и разбор доступны в гараже после завершения выезда."}
+	if not ["SELL", "DISMANTLE"].has(method):
+		return {"valid": false, "error": "Неизвестный способ утилизации предмета."}
+	var item: Dictionary = _secured_inventory_item(item_id)
+	if item.is_empty():
+		return {"valid": false, "error": "Предмет отсутствует в постоянном складе."}
+	if not equipped_slot(item_id).is_empty():
+		return {"valid": false, "error": "Сначала снимите предмет со всех слотов."}
+	if not _item_catalog_loaded():
+		return {"valid": false, "error": last_error}
+	var template: Dictionary = _item_catalog.get_template(str(item.get("templateId", "")))
+	if template.is_empty():
+		return {"valid": false, "error": "Шаблон предмета отсутствует в каталоге."}
+	var tech: int = int(item.get("techLevel", 1))
+	var scale: float = CydleFormula.new().reward_scale(float(tech))
+	var rarity_multiplier: Dictionary = {"COMMON": 1.0, "MODIFIED": 1.3, "RARE": 2.0, "LEGENDARY": 4.0, "UNIQUE": 10.0}
+	var price: int = ceili((25.0 + 7.0 * float(tech)) * float(rarity_multiplier.get(str(item.get("rarity", "COMMON")), 1.0)) * scale)
+	if method == "SELL":
+		return {"valid": true, "itemId": item_id, "method": method, "credits": floori(float(price) * 0.25), "scrap": 0, "data": 0, "error": ""}
+	var scrap_cap: int = floori(18.0 * scale * 0.6)
+	var data_cap: int = floori(10.0 * scale * 0.6)
+	var scrap_gain: int = mini(ceili(3.0 * scale), scrap_cap)
+	var digital: bool = (template.get("tags", []) as Array).has("digital")
+	var data_gain: int = mini(1 if digital else 0, data_cap)
+	return {"valid": true, "itemId": item_id, "method": method, "credits": 0, "scrap": scrap_gain, "data": data_gain, "error": ""}
+
+func sell_item(item_id: String) -> bool:
+	return _dispose_secured_item(item_id, "SELL")
+
+func dismantle_item(item_id: String) -> bool:
+	return _dispose_secured_item(item_id, "DISMANTLE")
+
+func _dispose_secured_item(item_id: String, method: String) -> bool:
+	var quote: Dictionary = item_disposal_quote(item_id, method)
+	if not bool(quote.get("valid", false)):
+		last_error = str(quote.get("error", "Операция с предметом недоступна."))
+		return false
+	var payload: Dictionary = state.to_payload()
+	var inventory: Array = payload["meta"]["inventory"]
+	var item_found: bool = false
+	for index: int in range(inventory.size()):
+		var item: Dictionary = inventory[index]
+		if str(item.get("itemId", "")) == item_id and bool(item.get("secured", false)):
+			inventory.remove_at(index)
+			item_found = true
+			break
+	if not item_found:
+		last_error = "Предмет уже потрачен или отсутствует в профиле."
+		return false
+	payload["meta"]["inventory"] = inventory
+	var currency: String = "CREDITS" if method == "SELL" else "SCRAP"
+	payload["meta"]["protectedBank"][currency] = float(payload["meta"]["protectedBank"].get(currency, 0.0)) + float(quote.get("credits" if method == "SELL" else "scrap", 0))
+	if method == "DISMANTLE":
+		payload["meta"]["protectedBank"]["DATA"] = float(payload["meta"]["protectedBank"].get("DATA", 0.0)) + float(quote.get("data", 0))
+	return _commit_payload(payload)
+
 func repair_item(item_id: String) -> bool:
 	if not _garage_action_allowed():
 		last_error = "Экипировку можно ремонтировать только в гараже между выездами."
@@ -2121,6 +2179,156 @@ func upgrade_item_affix_tier(item_id: String, affix_index: int) -> bool:
 		return _commit(candidate)
 	last_error = "Предмет не найден в постоянном складе."
 	return false
+
+func affix_replacement_options(item_id: String, affix_index: int = -1) -> Dictionary:
+	var required_tr: float = 10.0 if affix_index < 0 else 8.0
+	if not _garage_action_allowed():
+		return {"valid": false, "error": "Крафт доступен только в гараже между выездами."}
+	if not _item_catalog_loaded():
+		return {"valid": false, "error": last_error}
+	var item: Dictionary = _secured_inventory_item(item_id)
+	if item.is_empty():
+		return {"valid": false, "error": "Предмет отсутствует в постоянном складе."}
+	if str(item.get("rarity", "")) == "UNIQUE":
+		return {"valid": false, "error": "Уникальный предмет нельзя произвольно редактировать."}
+	var affixes: Array = item.get("affixes", [])
+	var adding: bool = affix_index < 0
+	if not adding and (affix_index >= affixes.size()):
+		return {"valid": false, "error": "Выбранный слот аффикса не существует."}
+	if adding:
+		var range_value: Array = _item_catalog.get_rules().get("rarityAffixCount", {}).get(str(item.get("rarity", "")), [])
+		if range_value.size() != 2 or affixes.size() >= int(range_value[1]):
+			return {"valid": false, "error": "У предмета нет свободного аффиксного слота."}
+	if float(item.get("tr", 0.0)) < required_tr:
+		return {"valid": false, "error": "Операция требует %d TR; у предмета %d." % [int(required_tr), int(item.get("tr", 0.0))]}
+	var tech_level: int = int(item.get("techLevel", 1))
+	var scale: float = CydleFormula.new().reward_scale(float(tech_level))
+	var scrap_cost: int = ceili((20.0 if adding else 0.0) * scale)
+	var data_cost: int = ceili((10.0 if adding else 12.0) * scale)
+	var bank: Variant = state.meta.protected_bank
+	var template: Dictionary = _item_catalog.get_template(str(item.get("templateId", "")))
+	if template.is_empty():
+		return {"valid": false, "error": "Шаблон предмета отсутствует в каталоге."}
+	var used_ids: Dictionary = {}
+	var used_groups: Dictionary = {}
+	for index: int in range(affixes.size()):
+		if not adding and index == affix_index:
+			continue
+		var existing: Dictionary = affixes[index]
+		var existing_id: String = str(existing.get("affixId", ""))
+		used_ids[existing_id] = true
+		var existing_definition: Dictionary = _item_catalog.get_affix(existing_id)
+		if not existing_definition.is_empty():
+			used_groups[str(existing_definition.get("group", ""))] = true
+	var options: Array[Dictionary] = []
+	for definition: Dictionary in _item_catalog.get_rules().get("affixes", []):
+		var affix_id: String = str(definition.get("id", ""))
+		var group: String = str(definition.get("group", ""))
+		if affix_id.is_empty() or used_ids.has(affix_id) or used_groups.has(group):
+			continue
+		if not (definition.get("slots", []) as Array).has(str(template.get("category", ""))):
+			continue
+		options.append({"id": affix_id, "name": str(definition.get("name", affix_id)), "group": group})
+	return {"valid": true, "affordable": int(bank.scrap) >= scrap_cost and int(bank.data) >= data_cost, "error": "" if int(bank.scrap) >= scrap_cost and int(bank.data) >= data_cost else "Недостаточно материалов.", "options": options, "scrap": scrap_cost, "data": data_cost, "tr": int(required_tr), "affixIndex": affix_index, "adding": adding}
+
+func replace_item_affix(item_id: String, affix_index: int, new_affix_id: String) -> bool:
+	return _craft_item_affix(item_id, affix_index, new_affix_id, false)
+
+func add_item_affix(item_id: String, new_affix_id: String) -> bool:
+	return _craft_item_affix(item_id, -1, new_affix_id, true)
+
+func _craft_item_affix(item_id: String, affix_index: int, new_affix_id: String, adding: bool) -> bool:
+	var quote: Dictionary = affix_replacement_options(item_id, -1 if adding else affix_index)
+	if not bool(quote.get("valid", false)):
+		last_error = str(quote.get("error", "Крафт недоступен."))
+		return false
+	if not bool(quote.get("affordable", false)):
+		last_error = str(quote.get("error", "Недостаточно материалов."))
+		return false
+	var allowed: bool = false
+	for option: Dictionary in quote.get("options", []):
+		if str(option.get("id", "")) == new_affix_id:
+			allowed = true
+			break
+	if not allowed:
+		last_error = "Аффикс несовместим со слотом, предметом или уже установленной группой."
+		return false
+	var payload: Dictionary = state.to_payload()
+	var inventory: Array = payload["meta"]["inventory"]
+	for index: int in range(inventory.size()):
+		var item: Dictionary = inventory[index]
+		if str(item.get("itemId", "")) != item_id or not bool(item.get("secured", false)):
+			continue
+		var definition: Dictionary = _item_catalog.get_affix(new_affix_id)
+		var tiers: Array = definition.get("tiers", [])
+		var tier: int = _affix_tier_for_tech(int(item.get("techLevel", 1)))
+		if tiers.size() < tier:
+			last_error = "У аффикса нет значения для доступного TechLevel."
+			return false
+		var rng: DeterministicRng = DeterministicRng.new()
+		rng.seed("affix:%s:%s:%d:%d:%s" % [state.save_id, item_id, state.revision, affix_index, new_affix_id], state.revision)
+		var roll: Dictionary = _roll_affix(definition, tier, rng)
+		if roll.is_empty():
+			last_error = "Не удалось создать ролл нового аффикса."
+			return false
+		var affixes: Array = item.get("affixes", []).duplicate(true)
+		if adding:
+			affixes.append(roll)
+		else:
+			affixes[affix_index] = roll
+		item["affixes"] = affixes
+		item["tr"] = float(item.get("tr", 0.0)) - float(quote["tr"])
+		item["rollSeed"] = "%s:%d" % [rng.stream, rng.calls]
+		inventory[index] = item
+		payload["meta"]["inventory"] = inventory
+		payload["meta"]["protectedBank"]["SCRAP"] = float(payload["meta"]["protectedBank"].get("SCRAP", 0.0)) - float(quote["scrap"])
+		payload["meta"]["protectedBank"]["DATA"] = float(payload["meta"]["protectedBank"].get("DATA", 0.0)) - float(quote["data"])
+		var parsed: Dictionary = GameSaveState.new().parse_payload(payload)
+		if not bool(parsed.get("ok", false)):
+			last_error = str(parsed.get("error", "Изменение аффикса не прошло проверку сохранения."))
+			return false
+		var candidate: GameSaveState = parsed["state"] as GameSaveState
+		var resolved: Dictionary = BuildResolver.new().resolve_build(_build_input(candidate))
+		if not bool(resolved.get("valid", false)):
+			last_error = "Изменение аффикса отклонено BuildResolver: %s" % str(resolved.get("issues", []))
+			return false
+		return _commit(candidate)
+	last_error = "Предмет не найден в постоянном складе."
+	return false
+
+func _item_catalog_loaded() -> bool:
+	var loaded: Dictionary = _item_catalog.load_catalog()
+	if bool(loaded.get("ok", false)):
+		return true
+	last_error = str(loaded.get("error", "Каталог предметов недоступен."))
+	return false
+
+func _secured_inventory_item(item_id: String) -> Dictionary:
+	if state == null:
+		return {}
+	for item: Dictionary in state.meta.inventory:
+		if str(item.get("itemId", "")) == item_id and bool(item.get("secured", false)):
+			return item.duplicate(true)
+	return {}
+
+func _affix_tier_for_tech(tech_level: int) -> int:
+	if tech_level <= 4:
+		return 1
+	if tech_level <= 8:
+		return 2
+	if tech_level <= 12:
+		return 3
+	return 4
+
+func _roll_affix(definition: Dictionary, tier: int, rng: DeterministicRng) -> Dictionary:
+	var tiers: Array = definition.get("tiers", [])
+	if tier < 1 or tier > tiers.size():
+		return {}
+	var center: float = float(tiers[tier - 1])
+	var raw: float = 1.0 if bool(definition.get("fixed", false)) else rng.range_float(0.8, 1.2)
+	var integer_value: bool = bool(definition.get("integer", false))
+	var value: float = maxf(1.0, roundf(center * raw)) if integer_value else floorf(center * raw * 100.0 + 0.5) / 100.0
+	return {"affixId": str(definition.get("id", "")), "tier": tier, "value": value, "rawRoll": floorf(raw * 10000.0 + 0.5) / 10000.0, "tierBoosted": false, "center": center, "min": maxf(1.0, roundf(center * 0.8)) if integer_value else floorf(center * 0.8 * 100.0 + 0.5) / 100.0, "max": roundf(center * 1.2) if integer_value else floorf(center * 1.2 * 100.0 + 0.5) / 100.0}
 
 func tech_calibration_quote(item_id: String, target_level: int) -> Dictionary:
 	if not _garage_action_allowed():
