@@ -522,14 +522,15 @@ func _apply_faction_world_effects(graph: Dictionary, seed_value: String) -> void
 				hostile_nodes.append(node)
 	# At hostile standing the route presents a real named bounty even when wanted
 	# alone would not have rolled one; the underlying enemy and battle pipeline remain shared.
-	if not hated_faction.is_empty() and not hostile_nodes.is_empty():
+	var bounty_candidates: Array[Dictionary] = hostile_nodes.filter(func(node: Dictionary) -> bool: return node.get("questTargets", []).is_empty())
+	if not hated_faction.is_empty() and not bounty_candidates.is_empty():
 		var target: Dictionary = {}
-		for node: Dictionary in hostile_nodes:
+		for node: Dictionary in bounty_candidates:
 			if str(node.get("type", "")) == "BOUNTY":
 				target = node
 				break
 		if target.is_empty():
-			target = hostile_nodes[0]
+			target = bounty_candidates[0]
 			target["type"] = "BOUNTY"
 			target["factionId"] = hated_faction
 			target["factionBounty"] = true

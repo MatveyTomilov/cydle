@@ -21,6 +21,7 @@
 - Added boss-selection fixtures for all three campaign milestones plus deterministic, compatible, non-repeating endgame selection.
 - A faction-control ending now generates a distinct endgame-exclusive HUNT offer for its controlling faction, with compatible targeted loot and faction reputation; neutral endings and all ordinary contracts remain available. The offer is accepted through the same deterministic contract target/reward pipeline.
 - Added the VANTA Wanted rules from Master Spec §16.3: reputation below −60 starts an expedition at +10 Wanted; VANTA ordinary/elite route victories add +4/+7 Wanted, with the separate hostile-reputation +3 applied on top. The node view previews the consequence.
+- Faction bounties now avoid quest-reserved elite nodes, so hostile standing cannot replace an active Q03/Q04/Q05 target; added a combined hostile-faction and quest-target regression.
 
 ## Unreleased
 

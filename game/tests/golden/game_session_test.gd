@@ -232,14 +232,17 @@ func run(_tree: SceneTree) -> bool:
 		var quest_target_payload: Dictionary = quest_target_session.state.to_payload()
 		quest_target_payload["meta"]["unlockedForpost"] = 2
 		quest_target_payload["meta"]["maxSectorCleared"] = 2
+		quest_target_payload["meta"]["reputation"]["F_ECHO"] = -60
 		quest_target_payload["meta"]["questProgress"] = {"Q04": {"status": "ACTIVE", "stage": 2, "startedDepth": 2, "stageStartedDepth": 2, "completedStages": ["S1"], "choiceHistory": [{"stage": 1, "choiceId": "A", "nodeId": "D2N1"}], "flags": []}}
 		check(quest_target_session._commit_payload(quest_target_payload), "game_session: could not prepare the Q04 elite objective")
 		if check(quest_target_session.start_expedition("q04-target-elite"), "game_session: next-sector Q04 expedition failed: %s" % quest_target_session.last_error):
 			var q04_target_found: bool = false
+			var q04_bounty_found: bool = false
 			for layer: Array in quest_target_session.state.run.graph.get("layers", []):
 				for node: Dictionary in layer:
 					if str(node.get("type", "")) == "ELITE" and node.get("questTargets", []).has("Q04") and node.get("enemies", []).any(func(enemy: Dictionary) -> bool: return str(enemy.get("templateId", "")) == "E12"): q04_target_found = true
-			check(quest_target_session.state.run.biome == "B02" and q04_target_found, "game_session: active Q04 did not create its promised E12 elite in the next B02 sector")
+					if str(node.get("type", "")) == "BOUNTY" and str(node.get("factionId", "")) == "F_ECHO" and bool(node.get("factionBounty", false)): q04_bounty_found = true
+			check(quest_target_session.state.run.biome == "B02" and q04_target_found and q04_bounty_found, "game_session: faction bounty replaced the active Q04 target or its promised route bounty was missing")
 	var rust_quest_target: GameSession = GameSession.new()
 	rust_quest_target.configure_save_directory("user://test-saves/q03-target-elite")
 	if check(rust_quest_target.start_new_game(1762900000132), "game_session: could not create a Q03 target profile"):
