@@ -384,9 +384,21 @@ func available_contract_offers() -> Array[Dictionary]:
 	var catalog: QuestCatalog = QuestCatalog.new()
 	if not bool(catalog.load_catalog().get("ok", false)):
 		return offers
-	for id: String in ["CT_HUNT", "CT_TECH", "CT_ESCORT"]:
+	var contract_ids: Array[String] = ["CT_HUNT", "CT_TECH", "CT_ESCORT"]
+	var offer_rng: DeterministicRng = DeterministicRng.new()
+	offer_rng.seed("contract-offers", seed)
+	for index: int in range(contract_ids.size() - 1, 0, -1):
+		var swap_index: int = offer_rng.int_range(0, index)
+		var swap_id: String = contract_ids[index]
+		contract_ids[index] = contract_ids[swap_index]
+		contract_ids[swap_index] = swap_id
+	var biome_tags: Dictionary = {"B01": "weapon", "B02": "armor", "B03": "drone", "B04": "digital", "B05": "energy", "B06": "hybrid"}
+	for id: String in contract_ids:
 		var definition: Dictionary = catalog.get_contract(id)
-		if not definition.is_empty() and str(definition.get("targetBiome", "")) == biome:
+		if not definition.is_empty():
+			definition["targetBiome"] = biome
+			definition["targetTechTag"] = str(biome_tags.get(biome, "tech"))
+			definition["eventId"] = "contract-offer:%d:%s" % [depth, id]
 			offers.append(definition)
 	var signal_catalog: ItemCatalog = ItemCatalog.new()
 	if bool(signal_catalog.load_catalog().get("ok", false)):
@@ -452,6 +464,8 @@ func start_expedition(seed_value: String = "", use_medical_restore: bool = false
 				var unique_template: Dictionary = item_catalog.get_template(unique_id)
 				if not unique_template.is_empty() and str(unique_template.get("uniqueEffectId", "")) == unique_id and (unique_template.get("biomes", []) as Array).has(biome):
 					contract = {"id": contract_id, "kind": "SIGNAL", "name": "Целевой контракт · %s" % str(unique_template.get("name", unique_id)), "desc": "Найти указанную уникальную технологию в элитном узле целевого биома.", "targetBiome": biome, "targetUniqueId": unique_id, "rewardItem": {"rarity": "UNIQUE", "templateId": unique_id}}
+		elif not contract.is_empty():
+			contract["targetBiome"] = biome
 		if contract.is_empty() or str(contract.get("targetBiome", "")) != biome:
 			last_error = "Контракт недоступен для биома текущего сектора."
 			return false

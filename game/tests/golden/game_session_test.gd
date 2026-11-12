@@ -23,7 +23,15 @@ func run(_tree: SceneTree) -> bool:
 	contract_session.configure_save_directory("user://test-saves/contracts")
 	if check(contract_session.start_new_game(1762900000100), "game_session: could not create a contract profile"):
 		var offers: Array[Dictionary] = contract_session.available_contract_offers()
-		check(offers.size() == 1 and str(offers[0].get("id", "")) == "CT_HUNT", "game_session: contract offers did not match the current sector biome")
+		var offers_repeat: Array[Dictionary] = contract_session.available_contract_offers()
+		var offer_ids: Array[String] = []
+		var offer_targets_match: bool = offers.size() == 3 and offers_repeat.size() == offers.size()
+		for offer_index: int in range(offers.size()):
+			offer_ids.append(str(offers[offer_index].get("id", "")))
+			if str(offers[offer_index].get("targetBiome", "")) != "B01" or str(offers_repeat[offer_index].get("id", "")) != str(offers[offer_index].get("id", "")):
+				offer_targets_match = false
+		check(offer_targets_match and offer_ids.has("CT_HUNT") and offer_ids.has("CT_TECH") and offer_ids.has("CT_ESCORT"), "game_session: world-seeded offers did not expose all contract types for the current biome")
+		check(str(offers[0].get("eventId", "")) == "contract-offer:1:%s" % str(offers[0].get("id", "")), "game_session: generated offer did not retain its world event identifier")
 		check(contract_session.start_expedition("contract-fixed-seed", false, "CT_HUNT"), "game_session: HUNT contract failed to start: %s" % contract_session.last_error)
 		if contract_session.state.run != null:
 			var contract: Dictionary = contract_session.state.run.contract
@@ -44,6 +52,15 @@ func run(_tree: SceneTree) -> bool:
 			var repeat_payout: Dictionary = contract_session.state.to_payload()
 			contract_session._complete_contract(repeat_payout, {"CREDITS": 30}, {"rarity": "RARE", "tag": "weapon"})
 			check(contract_session._commit_payload(repeat_payout) and is_equal_approx(contract_session.state.run.wallet.credits, credits_before + 30.0) and contract_session.state.run.unsecured_cargo.size() == 1, "game_session: repeated contract payout duplicated its grant")
+	var tech_offer_session: GameSession = GameSession.new()
+	tech_offer_session.configure_save_directory("user://test-saves/contracts-tech-any-biome")
+	if check(tech_offer_session.start_new_game(1762900000105), "game_session: could not create a cross-biome TECH profile"):
+		if check(tech_offer_session.start_expedition("tech-contract-b01", false, "CT_TECH"), "game_session: generated TECH offer was rejected outside its template biome: %s" % tech_offer_session.last_error):
+			var tech_target: Dictionary = {}
+			for layer: Array in tech_offer_session.state.run.graph.get("layers", []):
+				for candidate: Dictionary in layer:
+					if str(candidate.get("id", "")) == str(tech_offer_session.state.run.contract.get("targetNodeId", "")): tech_target = candidate
+			check(str(tech_offer_session.state.run.biome) == "B01" and str(tech_offer_session.state.run.contract.get("targetBiome", "")) == "B01" and str(tech_target.get("type", "")) == "CACHE", "game_session: cross-biome TECH offer did not inject its target cache")
 	var signal_session: GameSession = GameSession.new()
 	signal_session.configure_save_directory("user://test-saves/signal-contract")
 	if check(signal_session.start_new_game(1762900000110), "game_session: could not create a signal-contract profile"):
