@@ -62,12 +62,16 @@ func condition_text(condition: Dictionary) -> String:
 		"hpBelow": return "HP < %d%%" % roundi(value * 100.0)
 		"hpAbove": return "HP > %d%%" % roundi(value * 100.0)
 		"shieldBelow": return "щит < %d%%" % roundi(value * 100.0)
-		"energyAtLeast": return "энергия ≥ %s" % value
-		"energyBelow": return "энергия < %s" % value
-		"heatAtLeast": return "нагрев ≥ %s" % value
-		"heatAtMost": return "нагрев ≤ %s" % value
+		"energyAtLeast": return "энергия ≥ %s" % _num_text(value)
+		"energyBelow": return "энергия < %s" % _num_text(value)
+		"heatAtLeast": return "нагрев ≥ %s" % _num_text(value)
+		"heatAtMost": return "нагрев ≤ %s" % _num_text(value)
 		"heatLockout": return "перегрев (lockout)"
-		"targetStatus": return "цель имеет %s%s" % [condition.get("status", ""), " ≥%d" % int(condition.get("minStacks", 1)) if int(condition.get("minStacks", 1)) > 0 else ""]
+		"targetStatus":
+			var suffix: String = ""
+			if condition.has("minStacks") and float(condition["minStacks"]) != 0.0:
+				suffix = " ≥%s" % _num_text(float(condition["minStacks"]))
+			return "цель имеет %s%s" % [condition.get("status", ""), suffix]
 		"targetNoStatus": return "цель без %s" % condition.get("status", "")
 		"targetHpBelow": return "HP цели < %d%%" % roundi(value * 100.0)
 		"targetHpAbove": return "HP цели > %d%%" % roundi(value * 100.0)
@@ -75,13 +79,13 @@ func condition_text(condition: Dictionary) -> String:
 		"targetNotBoss": return "цель не босс"
 		"targetMechanical": return "цель механическая"
 		"targetAlone": return "цель одна"
-		"enemiesAtLeast": return "врагов ≥ %s" % value
-		"dronesAlive": return "живых дронов ≥ %s" % value
+		"enemiesAtLeast": return "врагов ≥ %s" % _num_text(value)
+		"dronesAlive": return "живых дронов ≥ %s" % _num_text(value)
 		"otherDroneDead": return "второй дрон мёртв/отсутствует"
 		"bothDronesSameTarget": return "оба дрона бьют одну цель"
-		"firstSeconds": return "первые %s с боя" % value
-		"afterSeconds": return "после %s с боя" % value
-		"flagAtLeast": return "%s ≥ %s" % [condition.get("key", ""), value]
+		"firstSeconds": return "первые %s с боя" % _num_text(value)
+		"afterSeconds": return "после %s с боя" % _num_text(value)
+		"flagAtLeast": return "%s ≥ %s" % [condition.get("key", ""), _num_text(value)]
 		"flagTrue": return "%s активно" % condition.get("key", "")
 		"hasUnique": return "экипирован %s" % condition.get("id", "")
 		"not": return "НЕ (%s)" % condition_text(condition.get("inner", {}))
@@ -441,3 +445,8 @@ func _group_label(group_key: Variant) -> String:
 
 func _bound_text(value: float, fallback: String) -> String:
 	return fallback if is_inf(value) else str(value)
+
+func _num_text(value: float) -> String:
+	if is_finite(value) and value == floor(value) and absf(value) < 1.0e15:
+		return str(int(value))
+	return str(value)

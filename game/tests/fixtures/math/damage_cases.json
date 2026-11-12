@@ -1,0 +1,9794 @@
+[
+ {
+  "fn": "hit_probability",
+  "args": [
+   100,
+   20
+  ],
+  "expected": 0.8333333333333334
+ },
+ {
+  "fn": "hit_probability",
+  "args": [
+   0,
+   0
+  ],
+  "expected": 0.99
+ },
+ {
+  "fn": "hit_probability",
+  "args": [
+   100,
+   0
+  ],
+  "expected": 0.99
+ },
+ {
+  "fn": "hit_probability",
+  "args": [
+   1,
+   1000
+  ],
+  "expected": 0.05
+ },
+ {
+  "fn": "hit_probability",
+  "args": [
+   500,
+   50
+  ],
+  "expected": 0.9090909090909091
+ },
+ {
+  "fn": "hit_probability",
+  "args": [
+   -10,
+   20
+  ],
+  "expected": 0.05
+ },
+ {
+  "fn": "crit_probability",
+  "args": [
+   0
+  ],
+  "expected": 0
+ },
+ {
+  "fn": "crit_probability",
+  "args": [
+   5
+  ],
+  "expected": 0.05
+ },
+ {
+  "fn": "crit_probability",
+  "args": [
+   50
+  ],
+  "expected": 0.5
+ },
+ {
+  "fn": "crit_probability",
+  "args": [
+   95
+  ],
+  "expected": 0.95
+ },
+ {
+  "fn": "crit_probability",
+  "args": [
+   150
+  ],
+  "expected": 0.95
+ },
+ {
+  "fn": "crit_probability",
+  "args": [
+   -10
+  ],
+  "expected": 0
+ },
+ {
+  "fn": "armor_effective",
+  "args": [
+   100,
+   20,
+   0
+  ],
+  "expected": 80
+ },
+ {
+  "fn": "armor_effective",
+  "args": [
+   100,
+   0,
+   50
+  ],
+  "expected": 50
+ },
+ {
+  "fn": "armor_effective",
+  "args": [
+   10,
+   50,
+   0
+  ],
+  "expected": 0
+ },
+ {
+  "fn": "armor_effective",
+  "args": [
+   100,
+   20,
+   150
+  ],
+  "expected": 0
+ },
+ {
+  "fn": "armor_effective",
+  "args": [
+   0,
+   0,
+   0
+  ],
+  "expected": 0
+ },
+ {
+  "fn": "kinetic_reduction",
+  "args": [
+   0
+  ],
+  "expected": 0
+ },
+ {
+  "fn": "kinetic_reduction",
+  "args": [
+   50
+  ],
+  "expected": 0.3333333333333333
+ },
+ {
+  "fn": "kinetic_reduction",
+  "args": [
+   100
+  ],
+  "expected": 0.5
+ },
+ {
+  "fn": "kinetic_reduction",
+  "args": [
+   500
+  ],
+  "expected": 0.8333333333333334
+ },
+ {
+  "fn": "kinetic_reduction",
+  "args": [
+   5000
+  ],
+  "expected": 0.85
+ },
+ {
+  "fn": "resistance_after_penetration",
+  "args": [
+   50,
+   50,
+   5
+  ],
+  "expected": 0.2
+ },
+ {
+  "fn": "resistance_after_penetration",
+  "args": [
+   0,
+   0,
+   0
+  ],
+  "expected": 0
+ },
+ {
+  "fn": "resistance_after_penetration",
+  "args": [
+   -30,
+   0,
+   0
+  ],
+  "expected": -0.3
+ },
+ {
+  "fn": "resistance_after_penetration",
+  "args": [
+   75,
+   0,
+   100
+  ],
+  "expected": -0.25
+ },
+ {
+  "fn": "resistance_after_penetration",
+  "args": [
+   50,
+   150,
+   0
+  ],
+  "expected": 0
+ },
+ {
+  "fn": "resistance_after_penetration",
+  "args": [
+   20,
+   20,
+   50
+  ],
+  "expected": -0.33999999999999997
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "KINETIC",
+   {
+    "armor": 100,
+    "energyRes": 50,
+    "digitalRes": 25
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 100,
+   "reduction": 0.5,
+   "resistanceAfterPen": 0,
+   "afterDefense": 50
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "KINETIC",
+   {
+    "armor": 100,
+    "energyRes": 50,
+    "digitalRes": 25
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 100,
+   "reduction": 0.5,
+   "resistanceAfterPen": 0,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "KINETIC",
+   {
+    "armor": 100,
+    "energyRes": 50,
+    "digitalRes": 25
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 100,
+   "reduction": 0.5,
+   "resistanceAfterPen": 0,
+   "afterDefense": 27.75
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "KINETIC",
+   {
+    "armor": 100,
+    "energyRes": 50,
+    "digitalRes": 25
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 56,
+   "reduction": 0.358974358974359,
+   "resistanceAfterPen": 0,
+   "afterDefense": 64.1025641025641
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "KINETIC",
+   {
+    "armor": 100,
+    "energyRes": 50,
+    "digitalRes": 25
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 56,
+   "reduction": 0.358974358974359,
+   "resistanceAfterPen": 0,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "KINETIC",
+   {
+    "armor": 100,
+    "energyRes": 50,
+    "digitalRes": 25
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 56,
+   "reduction": 0.358974358974359,
+   "resistanceAfterPen": 0,
+   "afterDefense": 35.57692307692307
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "KINETIC",
+   {
+    "armor": 100,
+    "energyRes": 50,
+    "digitalRes": 25
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0,
+   "resistanceAfterPen": 0,
+   "afterDefense": 100
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "KINETIC",
+   {
+    "armor": 100,
+    "energyRes": 50,
+    "digitalRes": 25
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0,
+   "resistanceAfterPen": 0,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "KINETIC",
+   {
+    "armor": 100,
+    "energyRes": 50,
+    "digitalRes": 25
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0,
+   "resistanceAfterPen": 0,
+   "afterDefense": 55.5
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "KINETIC",
+   {
+    "armor": 0,
+    "energyRes": 0,
+    "digitalRes": 0
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0,
+   "resistanceAfterPen": 0,
+   "afterDefense": 100
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "KINETIC",
+   {
+    "armor": 0,
+    "energyRes": 0,
+    "digitalRes": 0
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0,
+   "resistanceAfterPen": 0,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "KINETIC",
+   {
+    "armor": 0,
+    "energyRes": 0,
+    "digitalRes": 0
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0,
+   "resistanceAfterPen": 0,
+   "afterDefense": 55.5
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "KINETIC",
+   {
+    "armor": 0,
+    "energyRes": 0,
+    "digitalRes": 0
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0,
+   "resistanceAfterPen": 0,
+   "afterDefense": 100
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "KINETIC",
+   {
+    "armor": 0,
+    "energyRes": 0,
+    "digitalRes": 0
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0,
+   "resistanceAfterPen": 0,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "KINETIC",
+   {
+    "armor": 0,
+    "energyRes": 0,
+    "digitalRes": 0
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0,
+   "resistanceAfterPen": 0,
+   "afterDefense": 55.5
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "KINETIC",
+   {
+    "armor": 0,
+    "energyRes": 0,
+    "digitalRes": 0
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0,
+   "resistanceAfterPen": 0,
+   "afterDefense": 100
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "KINETIC",
+   {
+    "armor": 0,
+    "energyRes": 0,
+    "digitalRes": 0
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0,
+   "resistanceAfterPen": 0,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "KINETIC",
+   {
+    "armor": 0,
+    "energyRes": 0,
+    "digitalRes": 0
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0,
+   "resistanceAfterPen": 0,
+   "afterDefense": 55.5
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "KINETIC",
+   {
+    "armor": 500,
+    "energyRes": 75,
+    "digitalRes": -50
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 500,
+   "reduction": 0.8333333333333334,
+   "resistanceAfterPen": 0,
+   "afterDefense": 16.666666666666664
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "KINETIC",
+   {
+    "armor": 500,
+    "energyRes": 75,
+    "digitalRes": -50
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 500,
+   "reduction": 0.8333333333333334,
+   "resistanceAfterPen": 0,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "KINETIC",
+   {
+    "armor": 500,
+    "energyRes": 75,
+    "digitalRes": -50
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 500,
+   "reduction": 0.8333333333333334,
+   "resistanceAfterPen": 0,
+   "afterDefense": 9.249999999999998
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "KINETIC",
+   {
+    "armor": 500,
+    "energyRes": 75,
+    "digitalRes": -50
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 336,
+   "reduction": 0.7706422018348624,
+   "resistanceAfterPen": 0,
+   "afterDefense": 22.935779816513758
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "KINETIC",
+   {
+    "armor": 500,
+    "energyRes": 75,
+    "digitalRes": -50
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 336,
+   "reduction": 0.7706422018348624,
+   "resistanceAfterPen": 0,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "KINETIC",
+   {
+    "armor": 500,
+    "energyRes": 75,
+    "digitalRes": -50
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 336,
+   "reduction": 0.7706422018348624,
+   "resistanceAfterPen": 0,
+   "afterDefense": 12.729357798165136
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "KINETIC",
+   {
+    "armor": 500,
+    "energyRes": 75,
+    "digitalRes": -50
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0,
+   "resistanceAfterPen": 0,
+   "afterDefense": 100
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "KINETIC",
+   {
+    "armor": 500,
+    "energyRes": 75,
+    "digitalRes": -50
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0,
+   "resistanceAfterPen": 0,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "KINETIC",
+   {
+    "armor": 500,
+    "energyRes": 75,
+    "digitalRes": -50
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0,
+   "resistanceAfterPen": 0,
+   "afterDefense": 55.5
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "KINETIC",
+   {
+    "armor": 25,
+    "energyRes": -30,
+    "digitalRes": 60
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 25,
+   "reduction": 0.2,
+   "resistanceAfterPen": 0,
+   "afterDefense": 80
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "KINETIC",
+   {
+    "armor": 25,
+    "energyRes": -30,
+    "digitalRes": 60
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 25,
+   "reduction": 0.2,
+   "resistanceAfterPen": 0,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "KINETIC",
+   {
+    "armor": 25,
+    "energyRes": -30,
+    "digitalRes": 60
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 25,
+   "reduction": 0.2,
+   "resistanceAfterPen": 0,
+   "afterDefense": 44.400000000000006
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "KINETIC",
+   {
+    "armor": 25,
+    "energyRes": -30,
+    "digitalRes": 60
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 3.5,
+   "reduction": 0.033816425120772944,
+   "resistanceAfterPen": 0,
+   "afterDefense": 96.61835748792271
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "KINETIC",
+   {
+    "armor": 25,
+    "energyRes": -30,
+    "digitalRes": 60
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 3.5,
+   "reduction": 0.033816425120772944,
+   "resistanceAfterPen": 0,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "KINETIC",
+   {
+    "armor": 25,
+    "energyRes": -30,
+    "digitalRes": 60
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 3.5,
+   "reduction": 0.033816425120772944,
+   "resistanceAfterPen": 0,
+   "afterDefense": 53.6231884057971
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "KINETIC",
+   {
+    "armor": 25,
+    "energyRes": -30,
+    "digitalRes": 60
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0,
+   "resistanceAfterPen": 0,
+   "afterDefense": 100
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "KINETIC",
+   {
+    "armor": 25,
+    "energyRes": -30,
+    "digitalRes": 60
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0,
+   "resistanceAfterPen": 0,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "KINETIC",
+   {
+    "armor": 25,
+    "energyRes": -30,
+    "digitalRes": 60
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0,
+   "resistanceAfterPen": 0,
+   "afterDefense": 55.5
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "ENERGY",
+   {
+    "armor": 100,
+    "energyRes": 50,
+    "digitalRes": 25
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0.5,
+   "resistanceAfterPen": 0.5,
+   "afterDefense": 50
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "ENERGY",
+   {
+    "armor": 100,
+    "energyRes": 50,
+    "digitalRes": 25
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0.5,
+   "resistanceAfterPen": 0.5,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "ENERGY",
+   {
+    "armor": 100,
+    "energyRes": 50,
+    "digitalRes": 25
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0.5,
+   "resistanceAfterPen": 0.5,
+   "afterDefense": 27.75
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "ENERGY",
+   {
+    "armor": 100,
+    "energyRes": 50,
+    "digitalRes": 25
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0.2,
+   "resistanceAfterPen": 0.2,
+   "afterDefense": 80
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "ENERGY",
+   {
+    "armor": 100,
+    "energyRes": 50,
+    "digitalRes": 25
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0.2,
+   "resistanceAfterPen": 0.2,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "ENERGY",
+   {
+    "armor": 100,
+    "energyRes": 50,
+    "digitalRes": 25
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0.2,
+   "resistanceAfterPen": 0.2,
+   "afterDefense": 44.400000000000006
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "ENERGY",
+   {
+    "armor": 100,
+    "energyRes": 50,
+    "digitalRes": 25
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.5,
+   "resistanceAfterPen": -0.5,
+   "afterDefense": 150
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "ENERGY",
+   {
+    "armor": 100,
+    "energyRes": 50,
+    "digitalRes": 25
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.5,
+   "resistanceAfterPen": -0.5,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "ENERGY",
+   {
+    "armor": 100,
+    "energyRes": 50,
+    "digitalRes": 25
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.5,
+   "resistanceAfterPen": -0.5,
+   "afterDefense": 83.25
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "ENERGY",
+   {
+    "armor": 0,
+    "energyRes": 0,
+    "digitalRes": 0
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0,
+   "resistanceAfterPen": 0,
+   "afterDefense": 100
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "ENERGY",
+   {
+    "armor": 0,
+    "energyRes": 0,
+    "digitalRes": 0
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0,
+   "resistanceAfterPen": 0,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "ENERGY",
+   {
+    "armor": 0,
+    "energyRes": 0,
+    "digitalRes": 0
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0,
+   "resistanceAfterPen": 0,
+   "afterDefense": 55.5
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "ENERGY",
+   {
+    "armor": 0,
+    "energyRes": 0,
+    "digitalRes": 0
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.05,
+   "resistanceAfterPen": -0.05,
+   "afterDefense": 105
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "ENERGY",
+   {
+    "armor": 0,
+    "energyRes": 0,
+    "digitalRes": 0
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.05,
+   "resistanceAfterPen": -0.05,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "ENERGY",
+   {
+    "armor": 0,
+    "energyRes": 0,
+    "digitalRes": 0
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.05,
+   "resistanceAfterPen": -0.05,
+   "afterDefense": 58.275000000000006
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "ENERGY",
+   {
+    "armor": 0,
+    "energyRes": 0,
+    "digitalRes": 0
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.5,
+   "resistanceAfterPen": -0.5,
+   "afterDefense": 150
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "ENERGY",
+   {
+    "armor": 0,
+    "energyRes": 0,
+    "digitalRes": 0
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.5,
+   "resistanceAfterPen": -0.5,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "ENERGY",
+   {
+    "armor": 0,
+    "energyRes": 0,
+    "digitalRes": 0
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.5,
+   "resistanceAfterPen": -0.5,
+   "afterDefense": 83.25
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "ENERGY",
+   {
+    "armor": 500,
+    "energyRes": 75,
+    "digitalRes": -50
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0.75,
+   "resistanceAfterPen": 0.75,
+   "afterDefense": 25
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "ENERGY",
+   {
+    "armor": 500,
+    "energyRes": 75,
+    "digitalRes": -50
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0.75,
+   "resistanceAfterPen": 0.75,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "ENERGY",
+   {
+    "armor": 500,
+    "energyRes": 75,
+    "digitalRes": -50
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0.75,
+   "resistanceAfterPen": 0.75,
+   "afterDefense": 13.875
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "ENERGY",
+   {
+    "armor": 500,
+    "energyRes": 75,
+    "digitalRes": -50
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0.325,
+   "resistanceAfterPen": 0.325,
+   "afterDefense": 67.5
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "ENERGY",
+   {
+    "armor": 500,
+    "energyRes": 75,
+    "digitalRes": -50
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0.325,
+   "resistanceAfterPen": 0.325,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "ENERGY",
+   {
+    "armor": 500,
+    "energyRes": 75,
+    "digitalRes": -50
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0.325,
+   "resistanceAfterPen": 0.325,
+   "afterDefense": 37.462500000000006
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "ENERGY",
+   {
+    "armor": 500,
+    "energyRes": 75,
+    "digitalRes": -50
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.5,
+   "resistanceAfterPen": -0.5,
+   "afterDefense": 150
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "ENERGY",
+   {
+    "armor": 500,
+    "energyRes": 75,
+    "digitalRes": -50
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.5,
+   "resistanceAfterPen": -0.5,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "ENERGY",
+   {
+    "armor": 500,
+    "energyRes": 75,
+    "digitalRes": -50
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.5,
+   "resistanceAfterPen": -0.5,
+   "afterDefense": 83.25
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "ENERGY",
+   {
+    "armor": 25,
+    "energyRes": -30,
+    "digitalRes": 60
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.3,
+   "resistanceAfterPen": -0.3,
+   "afterDefense": 130
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "ENERGY",
+   {
+    "armor": 25,
+    "energyRes": -30,
+    "digitalRes": 60
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.3,
+   "resistanceAfterPen": -0.3,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "ENERGY",
+   {
+    "armor": 25,
+    "energyRes": -30,
+    "digitalRes": 60
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.3,
+   "resistanceAfterPen": -0.3,
+   "afterDefense": 72.15
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "ENERGY",
+   {
+    "armor": 25,
+    "energyRes": -30,
+    "digitalRes": 60
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.35,
+   "resistanceAfterPen": -0.35,
+   "afterDefense": 135
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "ENERGY",
+   {
+    "armor": 25,
+    "energyRes": -30,
+    "digitalRes": 60
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.35,
+   "resistanceAfterPen": -0.35,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "ENERGY",
+   {
+    "armor": 25,
+    "energyRes": -30,
+    "digitalRes": 60
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.35,
+   "resistanceAfterPen": -0.35,
+   "afterDefense": 74.92500000000001
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "ENERGY",
+   {
+    "armor": 25,
+    "energyRes": -30,
+    "digitalRes": 60
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.5,
+   "resistanceAfterPen": -0.5,
+   "afterDefense": 150
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "ENERGY",
+   {
+    "armor": 25,
+    "energyRes": -30,
+    "digitalRes": 60
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.5,
+   "resistanceAfterPen": -0.5,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "ENERGY",
+   {
+    "armor": 25,
+    "energyRes": -30,
+    "digitalRes": 60
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.5,
+   "resistanceAfterPen": -0.5,
+   "afterDefense": 83.25
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "DIGITAL",
+   {
+    "armor": 100,
+    "energyRes": 50,
+    "digitalRes": 25
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0.25,
+   "resistanceAfterPen": 0.25,
+   "afterDefense": 75
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "DIGITAL",
+   {
+    "armor": 100,
+    "energyRes": 50,
+    "digitalRes": 25
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0.25,
+   "resistanceAfterPen": 0.25,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "DIGITAL",
+   {
+    "armor": 100,
+    "energyRes": 50,
+    "digitalRes": 25
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0.25,
+   "resistanceAfterPen": 0.25,
+   "afterDefense": 41.625
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "DIGITAL",
+   {
+    "armor": 100,
+    "energyRes": 50,
+    "digitalRes": 25
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0.1,
+   "resistanceAfterPen": 0.1,
+   "afterDefense": 90
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "DIGITAL",
+   {
+    "armor": 100,
+    "energyRes": 50,
+    "digitalRes": 25
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0.1,
+   "resistanceAfterPen": 0.1,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "DIGITAL",
+   {
+    "armor": 100,
+    "energyRes": 50,
+    "digitalRes": 25
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0.1,
+   "resistanceAfterPen": 0.1,
+   "afterDefense": 49.95
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "DIGITAL",
+   {
+    "armor": 100,
+    "energyRes": 50,
+    "digitalRes": 25
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.5,
+   "resistanceAfterPen": -0.5,
+   "afterDefense": 150
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "DIGITAL",
+   {
+    "armor": 100,
+    "energyRes": 50,
+    "digitalRes": 25
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.5,
+   "resistanceAfterPen": -0.5,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "DIGITAL",
+   {
+    "armor": 100,
+    "energyRes": 50,
+    "digitalRes": 25
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.5,
+   "resistanceAfterPen": -0.5,
+   "afterDefense": 83.25
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "DIGITAL",
+   {
+    "armor": 0,
+    "energyRes": 0,
+    "digitalRes": 0
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0,
+   "resistanceAfterPen": 0,
+   "afterDefense": 100
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "DIGITAL",
+   {
+    "armor": 0,
+    "energyRes": 0,
+    "digitalRes": 0
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0,
+   "resistanceAfterPen": 0,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "DIGITAL",
+   {
+    "armor": 0,
+    "energyRes": 0,
+    "digitalRes": 0
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0,
+   "resistanceAfterPen": 0,
+   "afterDefense": 55.5
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "DIGITAL",
+   {
+    "armor": 0,
+    "energyRes": 0,
+    "digitalRes": 0
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.1,
+   "resistanceAfterPen": -0.1,
+   "afterDefense": 110.00000000000001
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "DIGITAL",
+   {
+    "armor": 0,
+    "energyRes": 0,
+    "digitalRes": 0
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.1,
+   "resistanceAfterPen": -0.1,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "DIGITAL",
+   {
+    "armor": 0,
+    "energyRes": 0,
+    "digitalRes": 0
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.1,
+   "resistanceAfterPen": -0.1,
+   "afterDefense": 61.050000000000004
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "DIGITAL",
+   {
+    "armor": 0,
+    "energyRes": 0,
+    "digitalRes": 0
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.5,
+   "resistanceAfterPen": -0.5,
+   "afterDefense": 150
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "DIGITAL",
+   {
+    "armor": 0,
+    "energyRes": 0,
+    "digitalRes": 0
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.5,
+   "resistanceAfterPen": -0.5,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "DIGITAL",
+   {
+    "armor": 0,
+    "energyRes": 0,
+    "digitalRes": 0
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.5,
+   "resistanceAfterPen": -0.5,
+   "afterDefense": 83.25
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "DIGITAL",
+   {
+    "armor": 500,
+    "energyRes": 75,
+    "digitalRes": -50
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.5,
+   "resistanceAfterPen": -0.5,
+   "afterDefense": 150
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "DIGITAL",
+   {
+    "armor": 500,
+    "energyRes": 75,
+    "digitalRes": -50
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.5,
+   "resistanceAfterPen": -0.5,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "DIGITAL",
+   {
+    "armor": 500,
+    "energyRes": 75,
+    "digitalRes": -50
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.5,
+   "resistanceAfterPen": -0.5,
+   "afterDefense": 83.25
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "DIGITAL",
+   {
+    "armor": 500,
+    "energyRes": 75,
+    "digitalRes": -50
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.5,
+   "resistanceAfterPen": -0.5,
+   "afterDefense": 150
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "DIGITAL",
+   {
+    "armor": 500,
+    "energyRes": 75,
+    "digitalRes": -50
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.5,
+   "resistanceAfterPen": -0.5,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "DIGITAL",
+   {
+    "armor": 500,
+    "energyRes": 75,
+    "digitalRes": -50
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.5,
+   "resistanceAfterPen": -0.5,
+   "afterDefense": 83.25
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "DIGITAL",
+   {
+    "armor": 500,
+    "energyRes": 75,
+    "digitalRes": -50
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.5,
+   "resistanceAfterPen": -0.5,
+   "afterDefense": 150
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "DIGITAL",
+   {
+    "armor": 500,
+    "energyRes": 75,
+    "digitalRes": -50
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.5,
+   "resistanceAfterPen": -0.5,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "DIGITAL",
+   {
+    "armor": 500,
+    "energyRes": 75,
+    "digitalRes": -50
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.5,
+   "resistanceAfterPen": -0.5,
+   "afterDefense": 83.25
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "DIGITAL",
+   {
+    "armor": 25,
+    "energyRes": -30,
+    "digitalRes": 60
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0.6,
+   "resistanceAfterPen": 0.6,
+   "afterDefense": 40
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "DIGITAL",
+   {
+    "armor": 25,
+    "energyRes": -30,
+    "digitalRes": 60
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0.6,
+   "resistanceAfterPen": 0.6,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "DIGITAL",
+   {
+    "armor": 25,
+    "energyRes": -30,
+    "digitalRes": 60
+   },
+   {
+    "armorPen": 0,
+    "armorPenPercent": 0,
+    "energyPen": 0,
+    "energyPenPercent": 0,
+    "digitalPen": 0,
+    "digitalPenPercent": 0
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0.6,
+   "resistanceAfterPen": 0.6,
+   "afterDefense": 22.200000000000003
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "DIGITAL",
+   {
+    "armor": 25,
+    "energyRes": -30,
+    "digitalRes": 60
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0.38,
+   "resistanceAfterPen": 0.38,
+   "afterDefense": 62
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "DIGITAL",
+   {
+    "armor": 25,
+    "energyRes": -30,
+    "digitalRes": 60
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0.38,
+   "resistanceAfterPen": 0.38,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "DIGITAL",
+   {
+    "armor": 25,
+    "energyRes": -30,
+    "digitalRes": 60
+   },
+   {
+    "armorPen": 20,
+    "armorPenPercent": 30,
+    "energyPen": 5,
+    "energyPenPercent": 50,
+    "digitalPen": 10,
+    "digitalPenPercent": 20
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": 0.38,
+   "resistanceAfterPen": 0.38,
+   "afterDefense": 34.41
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   100,
+   "DIGITAL",
+   {
+    "armor": 25,
+    "energyRes": -30,
+    "digitalRes": 60
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.5,
+   "resistanceAfterPen": -0.5,
+   "afterDefense": 150
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   0,
+   "DIGITAL",
+   {
+    "armor": 25,
+    "energyRes": -30,
+    "digitalRes": 60
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.5,
+   "resistanceAfterPen": -0.5,
+   "afterDefense": 0
+  }
+ },
+ {
+  "fn": "mitigate_packet",
+  "args": [
+   55.5,
+   "DIGITAL",
+   {
+    "armor": 25,
+    "energyRes": -30,
+    "digitalRes": 60
+   },
+   {
+    "armorPen": 1000,
+    "armorPenPercent": 150,
+    "energyPen": 100,
+    "energyPenPercent": 200,
+    "digitalPen": 100,
+    "digitalPenPercent": 200
+   }
+  ],
+  "expected": {
+   "armorEff": 0,
+   "reduction": -0.5,
+   "resistanceAfterPen": -0.5,
+   "afterDefense": 83.25
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   0,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 19,
+   "hpLost": 1,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": [
+    {
+     "sourceId": "early",
+     "amount": 5
+    },
+    {
+     "sourceId": "late",
+     "amount": 4
+    }
+   ]
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   0,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   0,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 19,
+   "hpLost": 100,
+   "bypassed": 0,
+   "overkill": 381,
+   "tempConsumed": [
+    {
+     "sourceId": "early",
+     "amount": 5
+    },
+    {
+     "sourceId": "late",
+     "amount": 4
+    }
+   ]
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   0,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 19,
+   "hpLost": 10.5,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": [
+    {
+     "sourceId": "early",
+     "amount": 5
+    },
+    {
+     "sourceId": "late",
+     "amount": 4
+    }
+   ]
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   0,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   0,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 19,
+   "hpLost": 100,
+   "bypassed": 0,
+   "overkill": 390.5,
+   "tempConsumed": [
+    {
+     "sourceId": "early",
+     "amount": 5
+    },
+    {
+     "sourceId": "late",
+     "amount": 4
+    }
+   ]
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   0,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   0,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   0,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 100,
+   "bypassed": 0,
+   "overkill": 400,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   0,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 10,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": [
+    {
+     "sourceId": "early",
+     "amount": 5
+    },
+    {
+     "sourceId": "late",
+     "amount": 4
+    }
+   ]
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   0,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   0,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 19,
+   "hpLost": 100,
+   "bypassed": 0,
+   "overkill": 362,
+   "tempConsumed": [
+    {
+     "sourceId": "early",
+     "amount": 5
+    },
+    {
+     "sourceId": "late",
+     "amount": 4
+    }
+   ]
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   0.25,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 15,
+   "hpLost": 5,
+   "bypassed": 5,
+   "overkill": 0,
+   "tempConsumed": [
+    {
+     "sourceId": "early",
+     "amount": 5
+    },
+    {
+     "sourceId": "late",
+     "amount": 4
+    }
+   ]
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   0.25,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   0.25,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 19,
+   "hpLost": 100,
+   "bypassed": 125,
+   "overkill": 381,
+   "tempConsumed": [
+    {
+     "sourceId": "early",
+     "amount": 5
+    },
+    {
+     "sourceId": "late",
+     "amount": 4
+    }
+   ]
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   0.25,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 19,
+   "hpLost": 10.5,
+   "bypassed": 5,
+   "overkill": 0,
+   "tempConsumed": [
+    {
+     "sourceId": "early",
+     "amount": 5
+    },
+    {
+     "sourceId": "late",
+     "amount": 4
+    }
+   ]
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   0.25,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   0.25,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 19,
+   "hpLost": 100,
+   "bypassed": 125,
+   "overkill": 390.5,
+   "tempConsumed": [
+    {
+     "sourceId": "early",
+     "amount": 5
+    },
+    {
+     "sourceId": "late",
+     "amount": 4
+    }
+   ]
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   0.25,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 5,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   0.25,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   0.25,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 100,
+   "bypassed": 125,
+   "overkill": 400,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   0.25,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 7.5,
+   "hpLost": 5,
+   "bypassed": 5,
+   "overkill": 0,
+   "tempConsumed": [
+    {
+     "sourceId": "early",
+     "amount": 5
+    },
+    {
+     "sourceId": "late",
+     "amount": 2.5
+    }
+   ]
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   0.25,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   0.25,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 19,
+   "hpLost": 100,
+   "bypassed": 125,
+   "overkill": 362,
+   "tempConsumed": [
+    {
+     "sourceId": "early",
+     "amount": 5
+    },
+    {
+     "sourceId": "late",
+     "amount": 4
+    }
+   ]
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   1,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 20,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   1,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   1,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 100,
+   "bypassed": 500,
+   "overkill": 400,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   1,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 20,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   1,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   1,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 100,
+   "bypassed": 500,
+   "overkill": 400,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   1,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 20,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   1,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   1,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 100,
+   "bypassed": 500,
+   "overkill": 400,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   1,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 20,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   1,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   1,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 100,
+   "bypassed": 500,
+   "overkill": 400,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   1.5,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 20,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   1.5,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   1.5,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 100,
+   "bypassed": 500,
+   "overkill": 400,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   1.5,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 20,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   1.5,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   1.5,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 100,
+   "bypassed": 500,
+   "overkill": 400,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   1.5,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 20,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   1.5,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   1.5,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 100,
+   "bypassed": 500,
+   "overkill": 400,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   1.5,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 20,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   1.5,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 100,
+    "shield": 10,
+    "temp": [
+     {
+      "sourceId": "late",
+      "amount": 4,
+      "cap": 4,
+      "expiresAt": 20
+     },
+     {
+      "sourceId": "early",
+      "amount": 5,
+      "cap": 5,
+      "expiresAt": 10
+     }
+    ]
+   },
+   1.5,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 100,
+   "bypassed": 500,
+   "overkill": 400,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   0,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   0,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   0,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 50,
+   "bypassed": 0,
+   "overkill": 450,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   0,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   0,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   0,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 50,
+   "bypassed": 0,
+   "overkill": 450,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   0,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   0,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   0,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 50,
+   "bypassed": 0,
+   "overkill": 450,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   0,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   0,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   0,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 50,
+   "bypassed": 0,
+   "overkill": 450,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   0.25,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 5,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   0.25,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   0.25,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 50,
+   "bypassed": 125,
+   "overkill": 450,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   0.25,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 5,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   0.25,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   0.25,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 50,
+   "bypassed": 125,
+   "overkill": 450,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   0.25,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 5,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   0.25,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   0.25,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 50,
+   "bypassed": 125,
+   "overkill": 450,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   0.25,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 5,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   0.25,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   0.25,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 50,
+   "bypassed": 125,
+   "overkill": 450,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   1,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 20,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   1,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   1,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 50,
+   "bypassed": 500,
+   "overkill": 450,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   1,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 20,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   1,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   1,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 50,
+   "bypassed": 500,
+   "overkill": 450,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   1,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 20,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   1,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   1,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 50,
+   "bypassed": 500,
+   "overkill": 450,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   1,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 20,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   1,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   1,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 50,
+   "bypassed": 500,
+   "overkill": 450,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   1.5,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 20,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   1.5,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   1.5,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 50,
+   "bypassed": 500,
+   "overkill": 450,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   1.5,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 20,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   1.5,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   1.5,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 50,
+   "bypassed": 500,
+   "overkill": 450,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   1.5,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 20,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   1.5,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   1.5,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 50,
+   "bypassed": 500,
+   "overkill": 450,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   1.5,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 20,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   1.5,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 50,
+    "shield": 0,
+    "temp": []
+   },
+   1.5,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 50,
+   "bypassed": 500,
+   "overkill": 450,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   0,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 20,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   0,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   0,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 100,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 400,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   0,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 40,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   0,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   0,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 100,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 450,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   0,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 20,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   0,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   0,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 500,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   0,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 10,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   0,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   0,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 100,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 300,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   0.25,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 15,
+   "hpLost": 0,
+   "bypassed": 5,
+   "overkill": 5,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   0.25,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   0.25,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 100,
+   "hpLost": 0,
+   "bypassed": 125,
+   "overkill": 400,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   0.25,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 30,
+   "hpLost": 0,
+   "bypassed": 5,
+   "overkill": 5,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   0.25,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   0.25,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 100,
+   "hpLost": 0,
+   "bypassed": 125,
+   "overkill": 450,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   0.25,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 5,
+   "overkill": 20,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   0.25,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   0.25,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 125,
+   "overkill": 500,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   0.25,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 7.5,
+   "hpLost": 0,
+   "bypassed": 5,
+   "overkill": 5,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   0.25,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   0.25,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 100,
+   "hpLost": 0,
+   "bypassed": 125,
+   "overkill": 300,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   1,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 20,
+   "overkill": 20,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   1,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   1,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 500,
+   "overkill": 500,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   1,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 20,
+   "overkill": 20,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   1,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   1,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 500,
+   "overkill": 500,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   1,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 20,
+   "overkill": 20,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   1,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   1,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 500,
+   "overkill": 500,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   1,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 20,
+   "overkill": 20,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   1,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   1,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 500,
+   "overkill": 500,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   1.5,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 20,
+   "overkill": 20,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   1.5,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   1.5,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 500,
+   "overkill": 500,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   1.5,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 20,
+   "overkill": 20,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   1.5,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   1.5,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 500,
+   "overkill": 500,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   1.5,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 20,
+   "overkill": 20,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   1.5,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   1.5,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 500,
+   "overkill": 500,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   1.5,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 20,
+   "overkill": 20,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   1.5,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 0,
+    "shield": 100,
+    "temp": []
+   },
+   1.5,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 500,
+   "overkill": 500,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   0,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 20,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": [
+    {
+     "sourceId": "a",
+     "amount": 10
+    },
+    {
+     "sourceId": "b",
+     "amount": 10
+    }
+   ]
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   0,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   0,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 120,
+   "hpLost": 100,
+   "bypassed": 0,
+   "overkill": 280,
+   "tempConsumed": [
+    {
+     "sourceId": "a",
+     "amount": 10
+    },
+    {
+     "sourceId": "b",
+     "amount": 10
+    }
+   ]
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   0,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 40,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": [
+    {
+     "sourceId": "a",
+     "amount": 10
+    },
+    {
+     "sourceId": "b",
+     "amount": 10
+    }
+   ]
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   0,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   0,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 120,
+   "hpLost": 100,
+   "bypassed": 0,
+   "overkill": 340,
+   "tempConsumed": [
+    {
+     "sourceId": "a",
+     "amount": 10
+    },
+    {
+     "sourceId": "b",
+     "amount": 10
+    }
+   ]
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   0,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   0,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   0,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 100,
+   "bypassed": 0,
+   "overkill": 400,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   0,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 10,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": [
+    {
+     "sourceId": "a",
+     "amount": 10
+    }
+   ]
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   0,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   0,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 120,
+   "hpLost": 100,
+   "bypassed": 0,
+   "overkill": 160,
+   "tempConsumed": [
+    {
+     "sourceId": "a",
+     "amount": 10
+    },
+    {
+     "sourceId": "b",
+     "amount": 10
+    }
+   ]
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   0.25,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 15,
+   "hpLost": 5,
+   "bypassed": 5,
+   "overkill": 0,
+   "tempConsumed": [
+    {
+     "sourceId": "a",
+     "amount": 10
+    },
+    {
+     "sourceId": "b",
+     "amount": 5
+    }
+   ]
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   0.25,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   0.25,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 120,
+   "hpLost": 100,
+   "bypassed": 125,
+   "overkill": 280,
+   "tempConsumed": [
+    {
+     "sourceId": "a",
+     "amount": 10
+    },
+    {
+     "sourceId": "b",
+     "amount": 10
+    }
+   ]
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   0.25,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 30,
+   "hpLost": 5,
+   "bypassed": 5,
+   "overkill": 0,
+   "tempConsumed": [
+    {
+     "sourceId": "a",
+     "amount": 10
+    },
+    {
+     "sourceId": "b",
+     "amount": 10
+    }
+   ]
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   0.25,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   0.25,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 120,
+   "hpLost": 100,
+   "bypassed": 125,
+   "overkill": 340,
+   "tempConsumed": [
+    {
+     "sourceId": "a",
+     "amount": 10
+    },
+    {
+     "sourceId": "b",
+     "amount": 10
+    }
+   ]
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   0.25,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 5,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   0.25,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   0.25,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 100,
+   "bypassed": 125,
+   "overkill": 400,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   0.25,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 7.5,
+   "hpLost": 5,
+   "bypassed": 5,
+   "overkill": 0,
+   "tempConsumed": [
+    {
+     "sourceId": "a",
+     "amount": 7.5
+    }
+   ]
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   0.25,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   0.25,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 120,
+   "hpLost": 100,
+   "bypassed": 125,
+   "overkill": 160,
+   "tempConsumed": [
+    {
+     "sourceId": "a",
+     "amount": 10
+    },
+    {
+     "sourceId": "b",
+     "amount": 10
+    }
+   ]
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   1,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 20,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   1,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   1,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 100,
+   "bypassed": 500,
+   "overkill": 400,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   1,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 20,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   1,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   1,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 100,
+   "bypassed": 500,
+   "overkill": 400,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   1,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 20,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   1,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   1,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 100,
+   "bypassed": 500,
+   "overkill": 400,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   1,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 20,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   1,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   1,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 100,
+   "bypassed": 500,
+   "overkill": 400,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   1.5,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 20,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   1.5,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   1.5,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 100,
+   "bypassed": 500,
+   "overkill": 400,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   1.5,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 20,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   1.5,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   1.5,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 100,
+   "bypassed": 500,
+   "overkill": 400,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   1.5,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 20,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   1.5,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   1.5,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 100,
+   "bypassed": 500,
+   "overkill": 400,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   1.5,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 20,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   1.5,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 100,
+    "shield": 100,
+    "temp": [
+     {
+      "sourceId": "b",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     },
+     {
+      "sourceId": "a",
+      "amount": 10,
+      "cap": 10,
+      "expiresAt": 5
+     }
+    ]
+   },
+   1.5,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 100,
+   "bypassed": 500,
+   "overkill": 400,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   0,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 20,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   0,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   0,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 50,
+   "hpLost": 200,
+   "bypassed": 0,
+   "overkill": 250,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   0,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 40,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   0,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   0,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 50,
+   "hpLost": 200,
+   "bypassed": 0,
+   "overkill": 275,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   0,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   0,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   0,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 200,
+   "bypassed": 0,
+   "overkill": 300,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   0,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 10,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   0,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   0,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 50,
+   "hpLost": 200,
+   "bypassed": 0,
+   "overkill": 200,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   0.25,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 15,
+   "hpLost": 5,
+   "bypassed": 5,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   0.25,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   0.25,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 50,
+   "hpLost": 200,
+   "bypassed": 125,
+   "overkill": 250,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   0.25,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 30,
+   "hpLost": 5,
+   "bypassed": 5,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   0.25,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   0.25,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 50,
+   "hpLost": 200,
+   "bypassed": 125,
+   "overkill": 275,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   0.25,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 5,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   0.25,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   0.25,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 200,
+   "bypassed": 125,
+   "overkill": 300,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   0.25,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 7.5,
+   "hpLost": 5,
+   "bypassed": 5,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   0.25,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   0.25,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 50,
+   "hpLost": 200,
+   "bypassed": 125,
+   "overkill": 200,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   1,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 20,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   1,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   1,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 200,
+   "bypassed": 500,
+   "overkill": 300,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   1,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 20,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   1,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   1,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 200,
+   "bypassed": 500,
+   "overkill": 300,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   1,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 20,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   1,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   1,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 200,
+   "bypassed": 500,
+   "overkill": 300,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   1,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 20,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   1,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   1,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 200,
+   "bypassed": 500,
+   "overkill": 300,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   1.5,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 20,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   1.5,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   1.5,
+   1
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 200,
+   "bypassed": 500,
+   "overkill": 300,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   1.5,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 20,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   1.5,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   1.5,
+   2
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 200,
+   "bypassed": 500,
+   "overkill": 300,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   1.5,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 20,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   1.5,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   1.5,
+   0
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 200,
+   "bypassed": 500,
+   "overkill": 300,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   20,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   1.5,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 20,
+   "bypassed": 20,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   0,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   1.5,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 0,
+   "bypassed": 0,
+   "overkill": 0,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "partition_damage",
+  "args": [
+   500,
+   {
+    "hp": 200,
+    "shield": 50,
+    "temp": [
+     {
+      "sourceId": "x",
+      "amount": 0,
+      "cap": 0,
+      "expiresAt": 1
+     }
+    ]
+   },
+   1.5,
+   0.5
+  ],
+  "expected": {
+   "shieldConsumed": 0,
+   "hpLost": 200,
+   "bypassed": 500,
+   "overkill": 300,
+   "tempConsumed": []
+  }
+ },
+ {
+  "fn": "simple_ehp",
+  "args": [
+   300,
+   75,
+   {
+    "armor": 100,
+    "energyRes": 50,
+    "digitalRes": 25
+   },
+   "KINETIC"
+  ],
+  "expected": 750
+ },
+ {
+  "fn": "simple_ehp",
+  "args": [
+   300,
+   75,
+   {
+    "armor": 100,
+    "energyRes": 50,
+    "digitalRes": 25
+   },
+   "ENERGY"
+  ],
+  "expected": 750
+ },
+ {
+  "fn": "simple_ehp",
+  "args": [
+   300,
+   75,
+   {
+    "armor": 100,
+    "energyRes": 50,
+    "digitalRes": 25
+   },
+   "DIGITAL"
+  ],
+  "expected": 500
+ },
+ {
+  "fn": "simple_ehp",
+  "args": [
+   300,
+   75,
+   {
+    "armor": 0,
+    "energyRes": 0,
+    "digitalRes": 0
+   },
+   "KINETIC"
+  ],
+  "expected": 375
+ },
+ {
+  "fn": "simple_ehp",
+  "args": [
+   300,
+   75,
+   {
+    "armor": 0,
+    "energyRes": 0,
+    "digitalRes": 0
+   },
+   "ENERGY"
+  ],
+  "expected": 375
+ },
+ {
+  "fn": "simple_ehp",
+  "args": [
+   300,
+   75,
+   {
+    "armor": 0,
+    "energyRes": 0,
+    "digitalRes": 0
+   },
+   "DIGITAL"
+  ],
+  "expected": 375
+ },
+ {
+  "fn": "simple_ehp",
+  "args": [
+   300,
+   75,
+   {
+    "armor": 500,
+    "energyRes": 75,
+    "digitalRes": -50
+   },
+   "KINETIC"
+  ],
+  "expected": 2250.0000000000005
+ },
+ {
+  "fn": "simple_ehp",
+  "args": [
+   300,
+   75,
+   {
+    "armor": 500,
+    "energyRes": 75,
+    "digitalRes": -50
+   },
+   "ENERGY"
+  ],
+  "expected": 1500
+ },
+ {
+  "fn": "simple_ehp",
+  "args": [
+   300,
+   75,
+   {
+    "armor": 500,
+    "energyRes": 75,
+    "digitalRes": -50
+   },
+   "DIGITAL"
+  ],
+  "expected": 250
+ },
+ {
+  "fn": "simple_ehp",
+  "args": [
+   300,
+   75,
+   {
+    "armor": 25,
+    "energyRes": -30,
+    "digitalRes": 60
+   },
+   "KINETIC"
+  ],
+  "expected": 468.75
+ },
+ {
+  "fn": "simple_ehp",
+  "args": [
+   300,
+   75,
+   {
+    "armor": 25,
+    "energyRes": -30,
+    "digitalRes": 60
+   },
+   "ENERGY"
+  ],
+  "expected": 288.46153846153845
+ },
+ {
+  "fn": "simple_ehp",
+  "args": [
+   300,
+   75,
+   {
+    "armor": 25,
+    "energyRes": -30,
+    "digitalRes": 60
+   },
+   "DIGITAL"
+  ],
+  "expected": 937.5
+ }
+]

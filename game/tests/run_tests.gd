@@ -6,6 +6,7 @@ const TEST_PATHS: Array[String] = [
 	"res://tests/golden/save_repository_test.gd",
 	"res://tests/golden/math_golden_test.gd",
 	"res://tests/golden/stats_golden_test.gd",
+	"res://tests/golden/math_differential_test.gd",
 ]
 
 func _initialize() -> void:
