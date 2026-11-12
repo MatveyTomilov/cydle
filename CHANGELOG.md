@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — Q06 extra anomaly objective
+
+- An active Q06 stage 2 now adds a second elite ANOMALY encounter to the B06 route, keeps the sector's default anomaly, and marks the added fight as the quest objective. The stage requires the tagged quest encounter to be cleared on new routes; old route saves retain the generic anomaly fallback.
+- Godot editor import passed; 22 headless scripts / 87,634 assertions passed. Windows export and EXE smoke are pending for this checkpoint.
+
 ## Unreleased — quest-stage event identity
 
 - Assigned unique event IDs to all 18 stages in the six authored quest chains. Generated event nodes record the matching IDs for active, biome-eligible stages; stage actions are gated to those IDs on new routes while older persisted graphs remain load-compatible.

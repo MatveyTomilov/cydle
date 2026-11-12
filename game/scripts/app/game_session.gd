@@ -583,10 +583,19 @@ func _apply_active_quest_targets(graph: Dictionary, biome: String, reserved_node
 			continue
 		var stage: Dictionary = quest["stages"][stage_index]
 		var requirement: Dictionary = stage.get("requirement", {})
-		if str(requirement.get("kind", "")) != "killElite":
-			continue
 		var target_biome: String = str(stage.get("biome", quest.get("biome", "")))
 		if target_biome != biome:
+			continue
+		if str(requirement.get("kind", "")) == "anomaly" and quest_id == "Q06":
+			var anomaly_target: Dictionary = _force_quest_anomaly_node(graph.get("layers", []), quest_id, reserved)
+			if not anomaly_target.is_empty():
+				reserved[str(anomaly_target.get("id", ""))] = true
+			var anomaly_event_ids: Array = anomaly_target.get("questTargets", [])
+			if not anomaly_event_ids.has(quest_id):
+				anomaly_event_ids.append(quest_id)
+			anomaly_target["questTargets"] = anomaly_event_ids
+			continue
+		if str(requirement.get("kind", "")) != "killElite":
 			continue
 		var target_node: Dictionary = _force_quest_target_node(graph.get("layers", []), str(requirement.get("enemyId", "")), reserved)
 		if target_node.is_empty():
@@ -597,6 +606,34 @@ func _apply_active_quest_targets(graph: Dictionary, biome: String, reserved_node
 		if not quest_targets.has(quest_id):
 			quest_targets.append(quest_id)
 		target_node["questTargets"] = quest_targets
+
+func _force_quest_anomaly_node(layers: Array, quest_id: String, reserved: Dictionary) -> Dictionary:
+	if layers.size() <= 2:
+		return {}
+	var candidates: Array[Dictionary] = []
+	for node_value: Variant in layers[2]:
+		if not node_value is Dictionary:
+			continue
+		var node: Dictionary = node_value
+		if not reserved.has(str(node.get("id", ""))) and str(node.get("type", "")) == "COMBAT" and not node.get("enemies", []).is_empty():
+			candidates.append(node)
+	candidates.sort_custom(func(left: Dictionary, right: Dictionary) -> bool: return str(left.get("id", "")) < str(right.get("id", "")))
+	if candidates.is_empty():
+		return {}
+	var target: Dictionary = candidates[0]
+	var protocol_rng: DeterministicRng = DeterministicRng.new()
+	protocol_rng.seed("quest:%s:anomaly" % quest_id, str(target.get("id", "")))
+	var protocol: String = str(protocol_rng.pick(["EL_SHIELD", "EL_FAST", "EL_VIRUS", "EL_ANTI_DRONE", "EL_PEN", "EL_SPLIT"]))
+	var enemies: Array = target.get("enemies", [])
+	var anomaly_enemy: Dictionary = enemies[0].duplicate(true)
+	anomaly_enemy["elite"] = protocol
+	target["enemies"] = [anomaly_enemy]
+	target["type"] = "ANOMALY"
+	target["threat"] = "high"
+	target["lootHint"] = "аномальная добыча"
+	target["anomalyProtocol"] = protocol
+	target["questTargets"] = [quest_id]
+	return target
 
 func _apply_active_quest_event_ids(graph: Dictionary, biome: String) -> void:
 	if state == null or state.meta.quest_progress.is_empty():
@@ -1917,6 +1954,14 @@ func _quest_stage_ready(quest: Dictionary, stage: Dictionary, progress: Dictiona
 					if str(node.get("type", "")) in ["COMBAT", "ELITE", "BOUNTY"] and state.run.cleared_node_ids.has(str(node.get("id", ""))): count += 1
 			return state.run.biome == str(requirement.get("biome", "")) and count >= int(requirement.get("count", 1))
 		"anomaly":
+			var has_quest_anomaly: bool = false
+			for layer: Array in state.run.graph.get("layers", []):
+				for node: Dictionary in layer:
+					if str(node.get("type", "")) == "ANOMALY" and (node.get("questTargets", []) as Array).has(str(quest.get("id", ""))):
+						has_quest_anomaly = true
+						if state.run.cleared_node_ids.has(str(node.get("id", ""))): return true
+			if has_quest_anomaly:
+				return false
 			for layer: Array in state.run.graph.get("layers", []):
 				for node: Dictionary in layer:
 					if str(node.get("type", "")) == "ANOMALY" and state.run.cleared_node_ids.has(str(node.get("id", ""))): return true

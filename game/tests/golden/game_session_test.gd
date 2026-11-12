@@ -503,6 +503,26 @@ func run(_tree: SceneTree) -> bool:
 				for node: Dictionary in layer:
 					if str(node.get("type", "")) == "ELITE" and node.get("questTargets", []).has("Q05") and node.get("enemies", []).any(func(enemy: Dictionary) -> bool: return str(enemy.get("templateId", "")) == "E19"): q05_target_found = true
 			check(thermal_quest_target.state.run.biome == "B05" and q05_target_found, "game_session: active Q05 did not create its E19 objective in B05")
+	var q06_route_session: GameSession = GameSession.new()
+	q06_route_session.configure_save_directory("user://test-saves/q06-extra-anomaly")
+	if check(q06_route_session.start_new_game(1762900000134), "game_session: could not create a Q06 anomaly-route profile"):
+		var q06_route_payload: Dictionary = q06_route_session.state.to_payload()
+		q06_route_payload["meta"]["unlockedForpost"] = 8
+		q06_route_payload["meta"]["maxSectorCleared"] = 8
+		q06_route_payload["meta"]["questProgress"] = {"Q06": {"status": "ACTIVE", "stage": 2, "startedDepth": 9, "stageStartedDepth": 9, "completedStages": ["S1"], "choiceHistory": [{"stage": 1, "choiceId": "A", "nodeId": "prior-sensor"}], "flags": ["earlyAnomaly", "xp-milestone:S1"]}}
+		check(q06_route_session._commit_payload(q06_route_payload), "game_session: Q06 anomaly-route progress could not be saved")
+		if check(q06_route_session.start_expedition("q06-extra-anomaly"), "game_session: Q06 anomaly-route run failed: %s" % q06_route_session.last_error):
+			var q06_anomaly_count: int = 0
+			var q06_extra_found: bool = false
+			var q06_event_found: bool = false
+			for layer: Array in q06_route_session.state.run.graph.get("layers", []):
+				for node: Dictionary in layer:
+					if str(node.get("type", "")) == "ANOMALY":
+						q06_anomaly_count += 1
+						if (node.get("questTargets", []) as Array).has("Q06") and int(node.get("layer", -1)) == 2 and node.get("enemies", []).any(func(enemy: Dictionary) -> bool: return str(enemy.get("elite", "")).begins_with("EL_")):
+							q06_extra_found = true
+					if str(node.get("type", "")) == "EVENT" and (node.get("questEventIds", []) as Array).has("Q06_S2"): q06_event_found = true
+			check(q06_route_session.state.run.biome == "B06" and q06_anomaly_count == 2 and q06_extra_found and q06_event_found, "game_session: Q06 did not add its extra elite anomaly threat and stage event to the B06 route")
 	var session: GameSession = GameSession.new()
 	session.configure_save_directory("user://test-saves/game-session")
 	if not check(session.start_new_game(1762900000000), "game_session: could not create a new game: %s" % session.last_error):
