@@ -78,11 +78,11 @@ The frozen TypeScript quest definitions export as six three-stage chains and thr
 
 This is a breadth-first integration directive, not a sequence of narrow acceptance gates. Keep the native game playable while wiring the missing major systems together. Do not spend time on saved Simulation Lab presets, report exports, or visual polish until campaign completion, the other core systems, persistence, and offline/autopilot exist end to end.
 
-### Latest connected gameplay status (2026-11-13)
+### Latest connected gameplay status (2026-11-13; pushed at `bc05701`)
 
 - Campaign chronicle is pushed at `167908d`; it renders Act I/II/III milestones, ending choice, and faction standing from persistent campaign state.
 - The §19.3 loot-filter work is connected to combat, cache, event, quest, and contract item grants. The UI supports keep-all, rare+, required-tag, and custom rarity/item-type/slot/affix policies. Undiscovered UNIQUE items bypass rejection. Optional auto-dismantle requires an installed SCANNER or WORKSHOP L3; yield remains unsecured RUN SCRAP/DATA, the last salvage can be undone before the next node, and up to 100 dismantles retain item seed/reason. Default save payloads retain their legacy shape; old saves use the default filter. Build Lab comparison as a filter predicate is not implemented yet.
-- Actual verification for this local WIP: Godot editor import passed; 22 scripts / 87,606 assertions / 0 failures; Windows export and exported EXE headless smoke passed; `git diff --check` passed. TypeScript was not run because this change is Godot-only. Checkpoint commit/push is pending; this does not complete all economy or release criteria.
+- Actual verification for the pushed checkpoint: Godot editor import passed; 22 scripts / 87,606 assertions / 0 failures; Windows export and exported EXE headless smoke passed; `git diff --check` passed. TypeScript was not run because this change is Godot-only. Build Lab comparison as a filter predicate remains outstanding; this does not complete all economy or release criteria.
 
 1. Complete the 12-sector campaign loop through sector 12 and depth-13+ endgame, including all six biome rules, boss milestones, finale, and persistent recovery.
 2. Complete all 24 events, six quest chains, contracts, faction reputation, requirements, outcomes, and one-time rewards across route generation, UI, and META/RUN saves; current integrations are partial.
