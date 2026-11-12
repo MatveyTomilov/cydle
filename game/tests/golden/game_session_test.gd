@@ -108,6 +108,7 @@ func run(_tree: SceneTree) -> bool:
 		starter_item["affixes"] = [{"affixId": "AF_KDM", "tier": 1, "value": 5.0, "rawRoll": 1.0, "tierBoosted": false, "center": 5.0, "min": 4.0, "max": 6.0}]
 		item_ops_payload["meta"]["inventory"][0] = starter_item
 		item_ops_payload["meta"]["protectedBank"]["SCRAP"] = 30.0
+		item_ops_payload["meta"]["garage"]["WORKSHOP"] = 2
 		check(item_ops_session._commit_payload(item_ops_payload), "game_session: item-operation fixture could not be saved: %s" % item_ops_session.last_error)
 		var drone_id: String = str(item_ops_session.state.meta.inventory[5].get("itemId", ""))
 		check(item_ops_session.valid_equipment_slots(drone_id) == ["DRONE_1"], "game_session: locked second drone slot was exposed")
@@ -154,6 +155,7 @@ func run(_tree: SceneTree) -> bool:
 	if check(tier_upgrade_session.start_new_game(1762900000500), "game_session: could not create an affix-tier profile"):
 		var tier_payload: Dictionary = tier_upgrade_session.state.to_payload()
 		tier_payload["meta"]["unlockedForpost"] = 8
+		tier_payload["meta"]["garage"]["WORKSHOP"] = 3
 		tier_payload["meta"]["protectedBank"]["SCRAP"] = 100.0
 		tier_payload["meta"]["protectedBank"]["DATA"] = 100.0
 		var tier_item: Dictionary = tier_payload["meta"]["inventory"][0]
@@ -172,6 +174,30 @@ func run(_tree: SceneTree) -> bool:
 		check(str(tier_upgrade_session.state.meta.inventory[0].get("itemId", "")) == tier_item_id and int(upgraded_affix.get("tier", 0)) == 2 and float(upgraded_affix.get("value", 0.0)) >= 7.2 and float(upgraded_affix.get("value", 0.0)) <= 10.8, "game_session: tier upgrade did not preserve identity or use the new tier range")
 		check(float(tier_upgrade_session.state.meta.inventory[0].get("tr", 0.0)) == 12.0 and is_equal_approx(tier_upgrade_session.state.meta.protected_bank.scrap, 100.0 - tier_scrap_cost) and is_equal_approx(tier_upgrade_session.state.meta.protected_bank.data, 100.0 - tier_data_cost), "game_session: tier upgrade did not charge its declared resources")
 		check(not tier_upgrade_session.upgrade_item_affix_tier(tier_item_id, 0), "game_session: affix was upgraded above the TechLevel tier cap")
+	var garage_session: GameSession = GameSession.new()
+	garage_session.configure_save_directory("user://test-saves/garage-upgrades")
+	if check(garage_session.start_new_game(1762900000600), "game_session: could not create a garage-upgrade profile"):
+		var garage_payload: Dictionary = garage_session.state.to_payload()
+		garage_payload["meta"]["protectedBank"]["CREDITS"] = 500.0
+		garage_payload["meta"]["protectedBank"]["SCRAP"] = 200.0
+		garage_payload["meta"]["protectedBank"]["DATA"] = 100.0
+		check(garage_session._commit_payload(garage_payload), "game_session: garage-upgrade currency fixture could not be saved")
+		var workshop_quote: Dictionary = garage_session.garage_upgrade_quote("WORKSHOP")
+		check(bool(workshop_quote.get("valid", false)) and int(workshop_quote.get("credits", 0)) == 65 and int(workshop_quote.get("scrap", 0)) == 25, "game_session: WORKSHOP L2 price differs from the master formula")
+		var protected_starter_id: String = str(garage_session.state.meta.inventory[0].get("itemId", ""))
+		check(not garage_session.calibrate_item_affix(protected_starter_id, 0) and garage_session.last_error.contains("WORKSHOP уровня 2"), "game_session: affix roll editing bypassed the WORKSHOP L2 gate")
+		check(not garage_session.upgrade_item_affix_tier(protected_starter_id, 0) and garage_session.last_error.contains("WORKSHOP уровня 3"), "game_session: tier upgrade bypassed the WORKSHOP L3 gate")
+		check(garage_session.upgrade_garage_object("WORKSHOP") and garage_session.garage_level("WORKSHOP") == 2, "game_session: WORKSHOP could not reach L2")
+		check(garage_session.upgrade_garage_object("WORKSHOP") and garage_session.garage_level("WORKSHOP") == 3, "game_session: WORKSHOP could not reach L3")
+		check(not garage_session.garage_upgrade_quote("WORKSHOP").get("valid", false), "game_session: garage object exceeded max level 3")
+		check(not garage_session.garage_upgrade_quote("NEUROLAB").get("valid", false), "game_session: NEUROLAB L2 unlocked before sector 5")
+		var gates_payload: Dictionary = garage_session.state.to_payload()
+		gates_payload["meta"]["maxSectorCleared"] = 6
+		gates_payload["meta"]["unlockedForpost"] = 4
+		check(garage_session._commit_payload(gates_payload), "game_session: garage gate fixture could not be saved")
+		check(garage_session.upgrade_garage_object("NEUROLAB") and garage_session.state.meta.unlocked_implant_slots == 5, "game_session: NEUROLAB L2 did not unlock implant socket five")
+		check(garage_session.upgrade_garage_object("HANGAR") and garage_session.state.meta.unlocked_drone_slots == 2, "game_session: HANGAR L2 did not unlock drone socket two")
+		check(garage_session.state.meta.protected_bank.credits < 500.0 and garage_session.state.meta.protected_bank.scrap < 200.0, "game_session: garage upgrades did not spend protected resources")
 	var resumed: GameSession = GameSession.new()
 	resumed.configure_save_directory("user://test-saves/game-session")
 	check(resumed.load_saved_game(), "game_session: persisted state did not reload: %s" % resumed.last_error)

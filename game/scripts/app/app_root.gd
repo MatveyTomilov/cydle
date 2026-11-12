@@ -202,6 +202,46 @@ func _show_garage() -> void:
 	respec_button.disabled = spent_points <= 0 or meta.protected_bank.credits < spent_points * 10
 	respec_button.pressed.connect(_on_respec_attributes)
 	attribute_row.add_child(respec_button)
+	_body.add_child(_label("ОБЪЕКТЫ ГАРАЖА · МАКСИМУМ L3", 15, COLOR_CYAN))
+	var garage_descriptions: Dictionary = {
+		"WORKSHOP": "L1 ремонт · L2 калибровка ролла · L3 повышение tier",
+		"NEUROLAB": "L2: пятый имплантный слот после сектора 5 · L3: шестой после сектора 9",
+		"SERVER": "Редактор тактики · профили и архивы открываются по уровню",
+		"HANGAR": "L1 стартовый дрон · L2 второй слот после сектора 6 · L3 дешевле ремонт дронов",
+		"MARKET": "L1 три предложения · L2 пять · L3 тематическое предложение",
+		"INTEL": "Раскрывает типы узлов, затем угрозы и дополнительный слой карты",
+		"GARAGE_MED": "Стабилизация после поражения · L3 платное полное восстановление при старте",
+		"CALIBRATOR": "Калибровка TechLevel · L2 снижает расход SCRAP · L3 пакетная калибровка",
+	}
+	for object_id: String in ["WORKSHOP", "NEUROLAB", "SERVER", "HANGAR", "MARKET", "INTEL", "GARAGE_MED", "CALIBRATOR"]:
+		var upgrade_row: HBoxContainer = HBoxContainer.new()
+		_body.add_child(upgrade_row)
+		var upgrade_info: VBoxContainer = VBoxContainer.new()
+		upgrade_info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		upgrade_row.add_child(upgrade_info)
+		var object_level: int = _session.garage_level(object_id)
+		upgrade_info.add_child(_label("%s · L%d / 3" % [object_id, object_level], 12, COLOR_TEXT))
+		var object_description: Label = _label(str(garage_descriptions[object_id]), 10, COLOR_MUTED)
+		object_description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		upgrade_info.add_child(object_description)
+		if object_level >= 3:
+			upgrade_row.add_child(_button("МАКСИМУМ", true))
+			continue
+		var upgrade_quote: Dictionary = _session.garage_upgrade_quote(object_id)
+		if bool(upgrade_quote.get("valid", false)):
+			var cost_text: String = "%d ¤ · %d SCRAP" % [int(upgrade_quote["credits"]), int(upgrade_quote["scrap"])]
+			if int(upgrade_quote.get("data", 0)) > 0:
+				cost_text += " · %d DATA" % int(upgrade_quote["data"])
+			var upgrade_button: Button = _button("УЛУЧШИТЬ · %s" % cost_text, false)
+			upgrade_button.disabled = not bool(upgrade_quote.get("affordable", false))
+			upgrade_button.tooltip_text = str(upgrade_quote.get("error", ""))
+			upgrade_button.pressed.connect(_on_upgrade_garage_object.bind(object_id))
+			upgrade_row.add_child(upgrade_button)
+		else:
+			var locked_upgrade: Button = _button("ЗАКРЫТО", true)
+			locked_upgrade.disabled = true
+			locked_upgrade.tooltip_text = str(upgrade_quote.get("error", ""))
+			upgrade_row.add_child(locked_upgrade)
 	var equipped: HBoxContainer = HBoxContainer.new()
 	equipped.add_theme_constant_override("separation", 8)
 	_body.add_child(equipped)
@@ -428,6 +468,8 @@ func _show_inventory() -> void:
 			if float(item_value.get("durability", 100.0)) < 100.0:
 				var repair_tech: int = int(item_value.get("techLevel", 1))
 				var repair_cost: int = mini(ceili((100.0 - float(item_value.get("durability", 100.0))) / 10.0 * (2.0 + float(repair_tech) / 5.0)), ceili((25.0 + 7.0 * float(repair_tech)) * reward_formula.reward_scale(float(repair_tech))))
+				if str(template.get("category", "")) == "DRONE" and _session.garage_level("HANGAR") >= 3:
+					repair_cost = ceili(float(repair_cost) * 0.8)
 				var repair_button: Button = _button("РЕМОНТ · %d SCRAP" % repair_cost, false)
 				repair_button.disabled = not can_edit_items
 				repair_button.pressed.connect(_on_repair_item.bind(str(item_value.get("itemId", ""))))
@@ -436,7 +478,7 @@ func _show_inventory() -> void:
 				var affix: Dictionary = item_value["affixes"][affix_index]
 				var item_tech: int = int(item_value.get("techLevel", 1))
 				var max_affix_tier: int = clampi(int(ceil(float(item_tech) / 4.0)), 1, 4)
-				if str(item_value.get("rarity", "")) != "UNIQUE" and int(affix.get("tier", 1)) < max_affix_tier:
+				if _session.garage_level("WORKSHOP") >= 3 and str(item_value.get("rarity", "")) != "UNIQUE" and int(affix.get("tier", 1)) < max_affix_tier:
 					var tier_scrap: int = ceili(20.0 * reward_formula.reward_scale(float(item_tech)))
 					var tier_data: int = ceili(5.0 * reward_formula.reward_scale(float(item_tech)))
 					var tier_button: Button = _button("TIER UP · 6 TR / %d SCR / %d DATA" % [tier_scrap, tier_data], false)
@@ -445,7 +487,7 @@ func _show_inventory() -> void:
 					item_actions.add_child(tier_button)
 				var calibration_cost: int = ceili(10.0 * reward_formula.reward_scale(float(item_value.get("techLevel", 1))))
 				var calibrate_button: Button = _button("%s · 3 TR / %d SCRAP" % [str(affix.get("affixId", "AF")), calibration_cost], false)
-				calibrate_button.disabled = not can_edit_items or str(item_value.get("rarity", "")) == "UNIQUE" or float(item_value.get("tr", 0.0)) < 3.0
+				calibrate_button.disabled = not can_edit_items or _session.garage_level("WORKSHOP") < 2 or str(item_value.get("rarity", "")) == "UNIQUE" or float(item_value.get("tr", 0.0)) < 3.0
 				calibrate_button.pressed.connect(_on_calibrate_item_affix.bind(str(item_value.get("itemId", "")), affix_index))
 				item_actions.add_child(calibrate_button)
 			var current_tech: int = int(item_value.get("techLevel", 1))
@@ -779,6 +821,11 @@ func _on_respec_attributes() -> void:
 	var reset: bool = _session.respec_attributes()
 	_show_garage()
 	_footer.text = "АТРИБУТЫ СБРОШЕНЫ · ОЧКИ ВОЗВРАЩЕНЫ" if reset else _session.last_error
+
+func _on_upgrade_garage_object(object_id: String) -> void:
+	var upgraded: bool = _session.upgrade_garage_object(object_id)
+	_show_garage()
+	_footer.text = "%s УЛУЧШЕН · L%d" % [object_id, _session.garage_level(object_id)] if upgraded else _session.last_error
 
 func _on_set_skill_equipped(skill_id: String, equipped: bool) -> void:
 	var changed: bool = _session.set_skill_equipped(skill_id, equipped)

@@ -693,15 +693,26 @@ func shop_offers() -> Array[Dictionary]:
 				return []
 			var rng: DeterministicRng = DeterministicRng.new()
 			rng.seed("shop", "%s:%s" % [state.run.seed, node_id])
-			var categories: Array[String] = ["MAIN", "MAIN", "IMPLANT", "ARMOR", "DRONE"]
+			var market_level: int = garage_level("MARKET")
+			var categories: Array[String] = ["MAIN", "IMPLANT", "ARMOR"]
+			if market_level >= 2:
+				categories.append_array(["MAIN", "DRONE"])
+			if market_level >= 3:
+				categories.append("")
 			var stock: Array[Dictionary] = []
 			for index: int in range(categories.size()):
 				var grant_id: String = "shop:%s:%s:%d" % [state.run.seed, node_id, index]
-				var rolled: Dictionary = ItemFactory.new().roll_item(rng, _item_catalog, {
+				var roll_options: Dictionary = {
 					"depth": state.run.depth, "biome": state.run.biome, "table": "ORDINARY",
-					"forceCategory": categories[index], "secured": false, "grantId": grant_id,
+					"secured": false, "grantId": grant_id,
 					"origin": "shop", "acquiredAt": state.updated_at,
-				})
+				}
+				if not categories[index].is_empty():
+					roll_options["forceCategory"] = categories[index]
+				elif market_level >= 3:
+					var target_tags: Dictionary = {"B01": "weapon", "B02": "armor", "B03": "drone", "B04": "digital", "B05": "energy", "B06": "hybrid"}
+					roll_options["forceTag"] = str(target_tags.get(state.run.biome, "weapon"))
+				var rolled: Dictionary = ItemFactory.new().roll_item(rng, _item_catalog, roll_options)
 				if not bool(rolled.get("ok", false)):
 					continue
 				var item: Dictionary = (rolled["item"] as ItemInstance).to_dictionary()
@@ -1177,6 +1188,13 @@ func repair_item(item_id: String) -> bool:
 	if not _garage_action_allowed():
 		last_error = "Экипировку можно ремонтировать только в гараже между выездами."
 		return false
+	if garage_level("WORKSHOP") < 1:
+		last_error = "Ремонт требует WORKSHOP уровня 1."
+		return false
+	var repair_catalog: Dictionary = _item_catalog.load_catalog()
+	if not bool(repair_catalog.get("ok", false)):
+		last_error = str(repair_catalog.get("error", "Каталог предметов недоступен."))
+		return false
 	var payload: Dictionary = state.to_payload()
 	var inventory: Array = payload["meta"]["inventory"]
 	for index: int in range(inventory.size()):
@@ -1192,6 +1210,8 @@ func repair_item(item_id: String) -> bool:
 		var repair_cost: int = ceili((100.0 - durability) / 10.0 * (2.0 + float(tech_level) / 5.0))
 		var replacement_cap: int = ceili((25.0 + 7.0 * float(tech_level)) * formula.reward_scale(float(tech_level)))
 		repair_cost = mini(repair_cost, replacement_cap)
+		if str(_item_catalog.get_template(str(item.get("templateId", ""))).get("category", "")) == "DRONE" and garage_level("HANGAR") >= 3:
+			repair_cost = ceili(float(repair_cost) * 0.8)
 		var scrap: float = float(payload["meta"]["protectedBank"].get("SCRAP", 0.0))
 		if scrap < float(repair_cost):
 			last_error = "Ремонт требует %d SCRAP, доступно %d." % [repair_cost, int(scrap)]
@@ -1207,6 +1227,9 @@ func repair_item(item_id: String) -> bool:
 func calibrate_item_affix(item_id: String, affix_index: int) -> bool:
 	if not _garage_action_allowed():
 		last_error = "Калибровка доступна только в гараже между выездами."
+		return false
+	if garage_level("WORKSHOP") < 2:
+		last_error = "Изменение ролла требует WORKSHOP уровня 2."
 		return false
 	var payload: Dictionary = state.to_payload()
 	var inventory: Array = payload["meta"]["inventory"]
@@ -1268,6 +1291,9 @@ func calibrate_item_affix(item_id: String, affix_index: int) -> bool:
 func upgrade_item_affix_tier(item_id: String, affix_index: int) -> bool:
 	if not _garage_action_allowed():
 		last_error = "Повышение tier доступно только в гараже между выездами."
+		return false
+	if garage_level("WORKSHOP") < 3:
+		last_error = "Повышение tier требует WORKSHOP уровня 3."
 		return false
 	var payload: Dictionary = state.to_payload()
 	var inventory: Array = payload["meta"]["inventory"]
@@ -1351,7 +1377,8 @@ func tech_calibration_quote(item_id: String, target_level: int) -> Dictionary:
 		return {"valid": false, "affordable": false, "error": "Целевой TechLevel должен быть выше текущего и не выше открытого форпоста."}
 	var delta: int = target_level - current_level
 	var scale: float = CydleFormula.new().reward_scale(float(target_level))
-	var scrap_cost: int = ceili(5.0 * float(delta) * scale)
+	var calibrator_discount: float = 0.9 if garage_level("CALIBRATOR") >= 2 else 1.0
+	var scrap_cost: int = ceili(5.0 * float(delta) * scale * calibrator_discount)
 	var data_cost: int = ceili(2.0 * float(delta) * scale)
 	var core_count: int = ceili(float(delta) / 4.0)
 	var core_group: int = clampi(int(ceil(float(target_level) / 4.0)), 1, 4)
@@ -1412,6 +1439,79 @@ func calibrate_item_tech_level(item_id: String, target_level: int) -> bool:
 
 func _garage_action_allowed() -> bool:
 	return state != null and (state.run == null or ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(state.run.phase))
+
+func garage_level(object_id: String) -> int:
+	if state == null:
+		return 0
+	return int(state.meta.garage.get(object_id, 0))
+
+func garage_upgrade_quote(object_id: String) -> Dictionary:
+	if not _garage_action_allowed():
+		return {"valid": false, "affordable": false, "error": "Гаражные объекты улучшаются между выездами."}
+	var garage_objects: Array[String] = ["WORKSHOP", "NEUROLAB", "SERVER", "HANGAR", "MARKET", "INTEL", "GARAGE_MED", "CALIBRATOR"]
+	if not garage_objects.has(object_id):
+		return {"valid": false, "affordable": false, "error": "Неизвестный объект гаража."}
+	var level: int = garage_level(object_id)
+	if level < 1 or level >= 3:
+		return {"valid": false, "affordable": false, "error": "Объект уже достиг максимального уровня."}
+	var target_level: int = level + 1
+	var cleared: int = state.meta.max_sector_cleared
+	if object_id == "NEUROLAB" and target_level == 2 and cleared < 5:
+		return {"valid": false, "affordable": false, "error": "NEUROLAB L2 требует завершить сектор 5."}
+	if object_id == "NEUROLAB" and target_level == 3 and cleared < 9:
+		return {"valid": false, "affordable": false, "error": "NEUROLAB L3 требует завершить сектор 9."}
+	if object_id == "HANGAR" and target_level == 2 and cleared < 6:
+		return {"valid": false, "affordable": false, "error": "HANGAR L2 требует завершить сектор 6."}
+	var scale: float = CydleFormula.new().reward_scale(float(state.meta.unlocked_forpost + 1))
+	var credits_cost: int = ceili((40.0 + 25.0 * float(level)) * scale)
+	var scrap_cost: int = ceili((15.0 + 10.0 * float(level)) * scale)
+	var data_cost: int = 0
+	if object_id == "CALIBRATOR":
+		data_cost = ceili(5.0 * scale)
+	elif object_id == "SERVER" and target_level == 3:
+		data_cost = 10
+	var credits_available: float = state.meta.protected_bank.credits
+	var scrap_available: float = state.meta.protected_bank.scrap
+	var data_available: float = state.meta.protected_bank.data
+	var affordable: bool = credits_available >= credits_cost and scrap_available >= scrap_cost and data_available >= data_cost
+	var reason: String = ""
+	if credits_available < credits_cost:
+		reason = "Нужно %d CREDITS" % credits_cost
+	elif scrap_available < scrap_cost:
+		reason = "Нужно %d SCRAP" % scrap_cost
+	elif data_available < data_cost:
+		reason = "Нужно %d DATA" % data_cost
+	return {"valid": true, "affordable": affordable, "error": reason, "objectId": object_id, "currentLevel": level, "targetLevel": target_level, "credits": credits_cost, "scrap": scrap_cost, "data": data_cost}
+
+func upgrade_garage_object(object_id: String) -> bool:
+	var quote: Dictionary = garage_upgrade_quote(object_id)
+	if not bool(quote.get("valid", false)):
+		last_error = str(quote.get("error", "Улучшение гаража недоступно."))
+		return false
+	if not bool(quote.get("affordable", false)):
+		last_error = str(quote.get("error", "Недостаточно ресурсов для улучшения."))
+		return false
+	var payload: Dictionary = state.to_payload()
+	var meta: Dictionary = payload["meta"]
+	var target_level: int = int(quote["targetLevel"])
+	meta["garage"][object_id] = target_level
+	meta["protectedBank"]["CREDITS"] = float(meta["protectedBank"].get("CREDITS", 0.0)) - float(quote["credits"])
+	meta["protectedBank"]["SCRAP"] = float(meta["protectedBank"].get("SCRAP", 0.0)) - float(quote["scrap"])
+	meta["protectedBank"]["DATA"] = float(meta["protectedBank"].get("DATA", 0.0)) - float(quote["data"])
+	if object_id == "NEUROLAB":
+		meta["unlockedImplantSlots"] = 4 + (1 if target_level >= 2 else 0) + (1 if target_level >= 3 else 0)
+	if object_id == "HANGAR" and target_level >= 2:
+		meta["unlockedDroneSlots"] = 2
+	var parsed: Dictionary = GameSaveState.new().parse_payload(payload)
+	if not bool(parsed.get("ok", false)):
+		last_error = str(parsed.get("error", "Улучшение гаража не прошло проверку сохранения."))
+		return false
+	var candidate: GameSaveState = parsed["state"] as GameSaveState
+	var resolved: Dictionary = BuildResolver.new().resolve_build(_build_input(candidate))
+	if not bool(resolved.get("valid", false)):
+		last_error = "Улучшение отклонено BuildResolver: %s" % str(resolved.get("issues", []))
+		return false
+	return _commit(candidate)
 
 func extract_run() -> bool:
 	if state == null or state.run == null:
