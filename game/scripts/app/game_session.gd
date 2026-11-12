@@ -1265,6 +1265,81 @@ func calibrate_item_affix(item_id: String, affix_index: int) -> bool:
 	last_error = "Предмет не найден в постоянном складе."
 	return false
 
+func tech_calibration_quote(item_id: String, target_level: int) -> Dictionary:
+	if not _garage_action_allowed():
+		return {"valid": false, "affordable": false, "error": "Калибровка доступна только в гараже между выездами."}
+	var item: Dictionary = {}
+	for inventory_item: Dictionary in state.meta.inventory:
+		if str(inventory_item.get("itemId", "")) == item_id and bool(inventory_item.get("secured", false)):
+			item = inventory_item
+			break
+	if item.is_empty():
+		return {"valid": false, "affordable": false, "error": "Предмет отсутствует в постоянном складе."}
+	var current_level: int = int(item.get("techLevel", 1))
+	var max_target: int = maxi(4, state.meta.unlocked_forpost)
+	if target_level <= current_level or target_level > max_target:
+		return {"valid": false, "affordable": false, "error": "Целевой TechLevel должен быть выше текущего и не выше открытого форпоста."}
+	var delta: int = target_level - current_level
+	var scale: float = CydleFormula.new().reward_scale(float(target_level))
+	var scrap_cost: int = ceili(5.0 * float(delta) * scale)
+	var data_cost: int = ceili(2.0 * float(delta) * scale)
+	var core_count: int = ceili(float(delta) / 4.0)
+	var core_group: int = clampi(int(ceil(float(target_level) / 4.0)), 1, 4)
+	var cores_available: int = 0
+	for inventory_item: Dictionary in state.meta.inventory:
+		if bool(inventory_item.get("secured", false)) and str(inventory_item.get("templateId", "")) == "MAT_CORE" and int(inventory_item.get("coreGroup", 0)) == core_group:
+			cores_available += 1
+	var scrap_available: int = int(state.meta.protected_bank.scrap)
+	var data_available: int = int(state.meta.protected_bank.data)
+	var affordable: bool = scrap_available >= scrap_cost and data_available >= data_cost and cores_available >= core_count
+	var reason: String = ""
+	if scrap_available < scrap_cost:
+		reason = "Нужно %d SCRAP" % scrap_cost
+	elif data_available < data_cost:
+		reason = "Нужно %d DATA" % data_cost
+	elif cores_available < core_count:
+		reason = "Нужно %d CalibrationCore группы %d" % [core_count, core_group]
+	return {"valid": true, "affordable": affordable, "error": reason, "itemId": item_id, "currentTechLevel": current_level, "targetTechLevel": target_level, "scrap": scrap_cost, "data": data_cost, "coreCount": core_count, "coreGroup": core_group, "coresAvailable": cores_available}
+
+func calibrate_item_tech_level(item_id: String, target_level: int) -> bool:
+	var quote: Dictionary = tech_calibration_quote(item_id, target_level)
+	if not bool(quote.get("valid", false)):
+		last_error = str(quote.get("error", "Калибровка недоступна."))
+		return false
+	if not bool(quote.get("affordable", false)):
+		last_error = str(quote.get("error", "Недостаточно ресурсов для калибровки."))
+		return false
+	var payload: Dictionary = state.to_payload()
+	var inventory: Array = payload["meta"]["inventory"]
+	var found_item: bool = false
+	var remaining_cores: int = int(quote["coreCount"])
+	for index: int in range(inventory.size() - 1, -1, -1):
+		var item: Dictionary = inventory[index]
+		if str(item.get("itemId", "")) == item_id and bool(item.get("secured", false)):
+			item["techLevel"] = target_level
+			inventory[index] = item
+			found_item = true
+			continue
+		if remaining_cores > 0 and bool(item.get("secured", false)) and str(item.get("templateId", "")) == "MAT_CORE" and int(item.get("coreGroup", 0)) == int(quote["coreGroup"]):
+			inventory.remove_at(index)
+			remaining_cores -= 1
+	if not found_item or remaining_cores > 0:
+		last_error = "Состав инвентаря изменился; калибровка отменена."
+		return false
+	payload["meta"]["inventory"] = inventory
+	payload["meta"]["protectedBank"]["SCRAP"] = float(payload["meta"]["protectedBank"].get("SCRAP", 0.0)) - float(quote["scrap"])
+	payload["meta"]["protectedBank"]["DATA"] = float(payload["meta"]["protectedBank"].get("DATA", 0.0)) - float(quote["data"])
+	var parsed: Dictionary = GameSaveState.new().parse_payload(payload)
+	if not bool(parsed.get("ok", false)):
+		last_error = str(parsed.get("error", "Калибровка не прошла проверку сохранения."))
+		return false
+	var candidate: GameSaveState = parsed["state"] as GameSaveState
+	var resolved: Dictionary = BuildResolver.new().resolve_build(_build_input(candidate))
+	if not bool(resolved.get("valid", false)):
+		last_error = "Калибровка отклонена BuildResolver: %s" % str(resolved.get("issues", []))
+		return false
+	return _commit(candidate)
+
 func _garage_action_allowed() -> bool:
 	return state != null and (state.run == null or ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(state.run.phase))
 

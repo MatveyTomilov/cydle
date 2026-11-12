@@ -127,6 +127,28 @@ func run(_tree: SceneTree) -> bool:
 		check(float(calibrated_affix.get("value", 0.0)) >= 4.0 and float(calibrated_affix.get("value", 0.0)) <= 6.0 and float(calibrated_affix.get("rawRoll", 0.0)) >= 0.8 and float(calibrated_affix.get("rawRoll", 0.0)) <= 1.2, "game_session: calibrated roll escaped its same-tier range")
 		check(item_ops_session.start_expedition("item-operations-lock"), "game_session: item-operation lock test run could not start")
 		check(not item_ops_session.repair_item(item_id) and not item_ops_session.calibrate_item_affix(item_id, 0), "game_session: garage crafting was allowed during an active run")
+	var tech_calibration_session: GameSession = GameSession.new()
+	tech_calibration_session.configure_save_directory("user://test-saves/tech-calibration")
+	if check(tech_calibration_session.start_new_game(1762900000400), "game_session: could not create a TechLevel-calibration profile"):
+		var tech_payload: Dictionary = tech_calibration_session.state.to_payload()
+		tech_payload["meta"]["protectedBank"]["SCRAP"] = 100.0
+		tech_payload["meta"]["protectedBank"]["DATA"] = 50.0
+		var core: ItemInstance = ItemInstance.new()
+		core.item_id = "calibration-core-fixture"
+		core.template_id = "MAT_CORE"
+		core.secured = true
+		core.origin_grant_id = "grant:calibration-core-fixture"
+		core.origin = "boss"
+		core.core_group = 1
+		tech_payload["meta"]["inventory"].append(core.to_dictionary())
+		check(tech_calibration_session._commit_payload(tech_payload), "game_session: TechLevel-calibration fixture could not be saved")
+		var calibrate_id: String = str(tech_calibration_session.state.meta.inventory[0].get("itemId", ""))
+		var calibration_quote: Dictionary = tech_calibration_session.tech_calibration_quote(calibrate_id, 4)
+		check(bool(calibration_quote.get("affordable", false)) and int(calibration_quote.get("coreCount", 0)) == 1 and int(calibration_quote.get("coreGroup", 0)) == 1, "game_session: TechLevel calibration quote did not count the matching core")
+		check(not tech_calibration_session.tech_calibration_quote(calibrate_id, 5).get("valid", false), "game_session: TechLevel calibration exceeded the starting cap")
+		check(tech_calibration_session.calibrate_item_tech_level(calibrate_id, 4), "game_session: item TechLevel calibration failed: %s" % tech_calibration_session.last_error)
+		check(int(tech_calibration_session.state.meta.inventory[0].get("techLevel", 0)) == 4 and float(tech_calibration_session.state.meta.protected_bank.scrap) == float(100 - int(calibration_quote["scrap"])) and float(tech_calibration_session.state.meta.protected_bank.data) == float(50 - int(calibration_quote["data"])), "game_session: TechLevel calibration did not update the item and charge quoted resources")
+		check(tech_calibration_session.state.meta.inventory.size() == 12, "game_session: consumed CalibrationCore remained in the secured inventory")
 	var resumed: GameSession = GameSession.new()
 	resumed.configure_save_directory("user://test-saves/game-session")
 	check(resumed.load_saved_game(), "game_session: persisted state did not reload: %s" % resumed.last_error)

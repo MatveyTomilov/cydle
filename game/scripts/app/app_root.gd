@@ -439,6 +439,17 @@ func _show_inventory() -> void:
 				calibrate_button.disabled = not can_edit_items or str(item_value.get("rarity", "")) == "UNIQUE" or float(item_value.get("tr", 0.0)) < 3.0
 				calibrate_button.pressed.connect(_on_calibrate_item_affix.bind(str(item_value.get("itemId", "")), affix_index))
 				item_actions.add_child(calibrate_button)
+			var current_tech: int = int(item_value.get("techLevel", 1))
+			var max_tech: int = maxi(4, _session.state.meta.unlocked_forpost)
+			for target_tech: int in range(current_tech + 1, max_tech + 1):
+				var quote: Dictionary = _session.tech_calibration_quote(item_id, target_tech)
+				if not bool(quote.get("valid", false)):
+					continue
+				var tech_button: Button = _button("TECH · T%d · %d SCR / %d DATA / %d CORE" % [target_tech, int(quote["scrap"]), int(quote["data"]), int(quote["coreCount"])], false)
+				tech_button.disabled = not can_edit_items or not bool(quote.get("affordable", false))
+				tech_button.tooltip_text = str(quote.get("error", "CalibrationCore group %d" % int(quote["coreGroup"])))
+				tech_button.pressed.connect(_on_calibrate_item_tech.bind(item_id, target_tech))
+				item_actions.add_child(tech_button)
 	var back: Button = _button("НАЗАД В ГАРАЖ", false)
 	back.pressed.connect(_show_garage)
 	_body.add_child(back)
@@ -796,6 +807,11 @@ func _on_calibrate_item_affix(item_id: String, affix_index: int) -> void:
 	var calibrated: bool = _session.calibrate_item_affix(item_id, affix_index)
 	_show_inventory()
 	_footer.text = "АФФИКС ПЕРЕКАЛИБРОВАН · BUILD LAB ПЕРЕСЧИТАН" if calibrated else _session.last_error
+
+func _on_calibrate_item_tech(item_id: String, target_level: int) -> void:
+	var calibrated: bool = _session.calibrate_item_tech_level(item_id, target_level)
+	_show_inventory()
+	_footer.text = "TECHLEVEL T%d · BUILD LAB ПЕРЕСЧИТАН" % target_level if calibrated else _session.last_error
 
 func _contains_node(nodes: Array[Dictionary], node_id: String) -> bool:
 	for node: Dictionary in nodes:
