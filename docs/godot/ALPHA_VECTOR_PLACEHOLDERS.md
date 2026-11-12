@@ -39,3 +39,11 @@ All ten SVG source files were drawn as original vector geometry for CYDLE in thi
 ## Scope
 
 This contribution deliberately adds **only art sources and instructions**. It does not claim a playable scene, rendered integration, passing Godot imports or changed tests.
+
+## Approved alpha delivery contract (2026-11-12)
+
+The first playable alpha uses original distinguishable placeholders without mandatory animation or final painted assets. The gameplay loop is the acceptance target; this art kit is a temporary presentation dependency only. See the companion `game/data/presentation/alpha_visual_fallbacks.json`, which is the machine-readable visual ID → SVG source mapping.
+
+The future presentation resolver must prefer: **final art (when present and validated) → these SVG placeholders → generated silhouette**. A single missing texture must never change a deterministic state, run hash, combat event order, loot, replay result or save format. Do not load the placeholder map from deterministic core. Critical game-state UI remains separate from imagery. Preserve stable anchors and independently defined hitboxes.
+
+**Acceptance checks to implement during the playable Godot slice:** show all required actors and clear HP/shield/status indicators at game scale; test missing-final and missing-placeholder fallbacks; change a source path deliberately and verify in-engine error handling; verify the same seeded combat produces identical state hashes for all visual modes. The current art PR does not claim any of these run-time checks have passed.
