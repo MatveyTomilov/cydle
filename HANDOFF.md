@@ -2,19 +2,18 @@
 
 ## Current live continuation (2026-11-12; supersedes checkpoint below)
 
-### Current status override (2026-11-13; enemy intel events)
+### Current status override (2026-11-13; campaign chronicle WIP)
 
-- Pushed HEAD: `9e323caac786e99095e1468de20302d508421993` on `development/codex`; remote SHA was verified equal and the working tree is clean after the event checkpoint.
+- Pushed base: `610f5469005e0197aa590c9c466910a613d2e033` on `development/codex`. Current local WIP adds an Act I/II/III campaign chronicle that renders boss milestones, ending choice, and faction standings from saved campaign flags.
 - EV15 A now grants a deterministic, previously undiscovered enemy codex entry eligible for the current run depth/biome, persists it in validated META, and exposes an enemy archive screen from the garage/quest journal. EV10 B records the actual sector boss and lower ENERGY/DIGITAL resistance as weakness intel; the road map shows it next to that boss. The generic event flags remain for compatibility.
-- Actual checks: Godot 4.7.2 editor import exit 0; 22 scripts / 87,592 assertions / 0 failures; regressions cover EV15 grant/save/reload and EV10 BOSS_A weakness; Windows Desktop export exit 0; exported EXE `--headless --quit-after 3` exit 0; `git diff --check` exit 0. TypeScript was not run (native Godot only).
-- Next action: continue the event/quest audit for catalog-backed effects or narrative state that still has no player-visible consequence. Do not claim all 24 events or quest story behavior complete based on these two effects.
+- Actual checks for chronicle WIP: Godot 4.7.2 editor import exit 0; 22 scripts / 87,593 assertions / 0 failures; Windows Desktop export exit 0; exported EXE `--headless --quit-after 3` exit 0; `git diff --check` exit 0. TypeScript was not run (native Godot only).
+- Next action: commit/push the chronicle, then continue the event/quest audit for remaining player-invisible effects. Do not claim the full story complete.
 - Preserve the external campaign E2E profile and safety copy below; continue full-game coverage without Lab presets, report exports, or polish.
 
-### Active compatibility fix (same date)
+### Previous connected event/autopilot checkpoints
 
-- Base is pushed commit `2fca2ccf5ae21aa2b0239d39277e04fb1881665c`. Current local WIP fixes bounded auto-restart migration for legacy RUN saves that lack `autopilotRunCount`: treat the active outing as run 1, so the next sortie increments to run 2 and cannot exceed `maxRuns`.
-- Checks: editor import exit 0; 22 scripts / 87,592 assertions / 0 failures; Windows Desktop export and EXE headless smoke exit 0; `git diff --check` exit 0.
-- Next: commit/push this compatibility correction and continue the event/quest interaction audit.
+- Event intel was committed as `9e323ca`; legacy auto-restart run-limit migration as `610f546`. These retain the original default behavior for existing profiles and RUN saves.
+- Checks for those checkpoints: 22 scripts / 87,592 assertions / 0 failures; Windows Desktop export and EXE smoke exit 0; `git diff --check` exit 0.
 
 ### Previous continuation: bounded auto-restart
 

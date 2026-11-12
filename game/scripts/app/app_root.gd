@@ -315,6 +315,9 @@ func _show_garage() -> void:
 	var journal_button: Button = _button("ЖУРНАЛ ЗАДАНИЙ", false)
 	journal_button.pressed.connect(_show_quest_journal)
 	actions.add_child(journal_button)
+	var chronicle_button: Button = _button("ХРОНИКА КАМПАНИИ", false)
+	chronicle_button.pressed.connect(_show_campaign_chronicle)
+	actions.add_child(chronicle_button)
 	var codex_button: Button = _button("АРХИВ ВРАГОВ · %d / 24" % meta.codex_enemy_ids.size(), false)
 	codex_button.pressed.connect(_show_enemy_codex)
 	actions.add_child(codex_button)
@@ -829,6 +832,49 @@ func _show_enemy_codex() -> void:
 				details.add_child(_label("HP %s · ЩИТ %s · БРОНЯ %s · RES E/D %s/%s · РОЛЬ %s" % [_fmt(enemy.get("hp", 0)), _fmt(enemy.get("shield", 0)), _fmt(enemy.get("armor", 0)), _fmt(enemy.get("resE", 0)), _fmt(enemy.get("resD", 0)), str(enemy.get("role", "—"))], 10, COLOR_TEXT))
 	var back: Button = _button("НАЗАД К ЖУРНАЛУ", false)
 	back.pressed.connect(_show_quest_journal)
+	_body.add_child(back)
+
+func _show_campaign_chronicle() -> void:
+	_screen = "campaign_chronicle"
+	_clear_body()
+	if _session.state == null:
+		_body.add_child(_label("Нет активной кампании.", 16, COLOR_MUTED))
+		return
+	var meta: GameSaveState.MetaState = _session.state.meta
+	_body.add_child(_label("АРХИВ ОПЕРАЦИИ · СОБЫТИЯ КАМПАНИИ", 12, COLOR_CYAN))
+	_body.add_child(_label("Хроника", 28, COLOR_TEXT))
+	var act_i_open: bool = meta.campaign_flags.has("ACT_I_ARCHIVE")
+	var act_ii_open: bool = meta.campaign_flags.has("ACT_II_DRONE_LINE")
+	var campaign_complete: bool = meta.campaign_flags.has("CAMPAIGN_COMPLETED")
+	var ending_selected: bool = meta.campaign_flags.has("ENDING_SELECTED")
+	var chronicle_rows: Array[Dictionary] = [
+		{"title": "АКТ I · ПЕРВЫЙ КОРИДОР", "open": act_i_open, "gate": "Откроется после победы над Бастион-Мастером в секторе 4.", "text": "BOSS_A уничтожен. Форпост 4 открыт; архив фиксирует первое пересечение нулевого тракта и данные для следующего перехвата."},
+		{"title": "АКТ II · ЛИНИЯ ДРОНОВ", "open": act_ii_open, "gate": "Откроется после победы над Хирургом в секторе 8.", "text": "BOSS_B уничтожен. Форпост 8 открыт; гаражная линия усиленных дронов и инструменты целевой охоты доступны."},
+		{"title": "АКТ III · СЕРДЦЕ ТРАКТА", "open": campaign_complete, "gate": "Откроется после победы над BOSS_CORE в секторе 12.", "text": "Финальный узел кампании очищен. Теперь предстоит определить, кому принадлежит коридор и как его удерживать."},
+	]
+	for row: Dictionary in chronicle_rows:
+		var card: PanelContainer = PanelContainer.new()
+		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_body.add_child(card)
+		var content: VBoxContainer = VBoxContainer.new()
+		card.add_child(content)
+		var unlocked: bool = bool(row["open"])
+		content.add_child(_label(str(row["title"]) if unlocked else "ЗАПИСЬ ЗАШИФРОВАНА · %s" % str(row["title"]), 15, COLOR_CYAN if unlocked else COLOR_MUTED))
+		content.add_child(_label(str(row["text"]) if unlocked else str(row["gate"]), 11, COLOR_TEXT if unlocked else COLOR_MUTED))
+	if campaign_complete:
+		var ending_text: String = "Исход ещё не выбран на контрольной точке сектора 12."
+		if ending_selected:
+			if meta.campaign_flags.has("ENDING_FREE_CORRIDOR"):
+				ending_text = "СВОБОДНЫЙ КОРИДОР: нейтральные контракты доступны; фракции остаются доступны для отношений и заказов."
+			else:
+				for campaign_flag: String in meta.campaign_flags:
+					if campaign_flag.begins_with("ENDING_FACTION:"):
+						ending_text = "КОНТРОЛЬ ПЕРЕДАН %s: открыт набор контрактов этой фракции; остальные фракции остаются в мире." % campaign_flag.trim_prefix("ENDING_FACTION:")
+		_body.add_child(_label("ИСХОД И ЭНДГЕЙМ", 13, COLOR_AMBER))
+		_body.add_child(_label(ending_text, 11, COLOR_TEXT))
+		_body.add_child(_label("РЕПУТАЦИЯ · VANTA %d · RUST %d · CHOIR %d · ECHO %d" % [int(meta.reputation.get("F_VANTA", 0)), int(meta.reputation.get("F_RUST", 0)), int(meta.reputation.get("F_CHOIR", 0)), int(meta.reputation.get("F_ECHO", 0))], 11, COLOR_MUTED))
+	var back: Button = _button("НАЗАД В ГАРАЖ", false)
+	back.pressed.connect(_show_garage)
 	_body.add_child(back)
 
 func _on_resolve_quest_choice(quest_id: String, choice_id: String) -> void:

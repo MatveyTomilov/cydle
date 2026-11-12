@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — campaign chronicle
+
+- Added the garage campaign chronicle with the authored Act I archive, Act II drone-line milestone, Act III finale, current ending choice, endgame access and faction standings. Entries render from persisted milestone flags and remain locked until their actual boss gates are cleared.
+- Added a navigation regression for opening the chronicle. Checks: Godot 4.7.2 editor import exit 0; 22 scripts / 87,593 assertions / 0 failures; Windows Desktop export exit 0; exported EXE `--headless --quit-after 3` exit 0; `git diff --check` exit 0.
+
 ## Unreleased — functional enemy intel events
 
 - EV15's archive option now selects a deterministic, previously unknown catalog enemy eligible for the current depth/biome and stores its ID in permanent META. Added a browsable enemy archive from the garage/quest journal with the discovered enemy's real catalog stats and description; the list is validated and save-compatible.

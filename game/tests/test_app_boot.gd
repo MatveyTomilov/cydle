@@ -27,6 +27,8 @@ func run(tree: SceneTree) -> bool:
 	pilot_session.configure_save_directory("user://test-saves/autopilot-ui")
 	if check(pilot_session.start_new_game(17629000000501), "test_app_boot: could not create an isolated autopilot UI profile"):
 		app.set("_session", pilot_session)
+		app.call("_show_campaign_chronicle")
+		check(str(app.get("_screen")) == "campaign_chronicle" and _has_label(app, "Хроника"), "test_app_boot: campaign chronicle did not open from the garage navigation")
 		app.call("_show_road")
 		var pilot_picker: OptionButton = _find_option_button(app)
 		check(pilot_picker != null and pilot_picker.item_count == 3, "test_app_boot: road did not render all three autopilot presets")
