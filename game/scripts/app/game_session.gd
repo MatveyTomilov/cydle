@@ -1294,6 +1294,17 @@ func _finalize_autopilot_report(report: Dictionary) -> Dictionary:
 	for internal_key: String in ["_startingTime", "_startingItems", "_startingInventory", "_combatTime"]:
 		report.erase(internal_key)
 	last_autopilot_report = report.duplicate(true)
+	if state != null:
+		var history: Array[Dictionary] = state.meta.autopilot_report_history.duplicate(true)
+		history.append(last_autopilot_report.duplicate(true))
+		while history.size() > 20:
+			history.pop_front()
+		var payload: Dictionary = state.to_payload()
+		payload["meta"]["autopilotReportHistory"] = history
+		if not _commit_payload(payload):
+			last_error = "Не удалось сохранить журнал автопилота: %s" % last_error
+		else:
+			last_autopilot_report = state.meta.autopilot_report_history.back().duplicate(true)
 	return last_autopilot_report
 
 func travel_to(node_id: String) -> bool:

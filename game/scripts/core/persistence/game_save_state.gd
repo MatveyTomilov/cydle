@@ -168,6 +168,7 @@ class MetaState:
 	var active_tactic_id: String = ""
 	var autopilot_profiles: Array[Dictionary] = []
 	var active_autopilot_profile_id: String = ""
+	var autopilot_report_history: Array[Dictionary] = []
 	var quest_progress: Dictionary = {}
 	var disassembly_history: Array[Dictionary] = []
 	var disassembly_undo: Dictionary = {}
@@ -199,6 +200,8 @@ class MetaState:
 		}
 		if not disassembly_history.is_empty():
 			result["disassemblyHistory"] = disassembly_history.duplicate(true)
+		if not autopilot_report_history.is_empty():
+			result["autopilotReportHistory"] = autopilot_report_history.duplicate(true)
 		if not disassembly_undo.is_empty():
 			result["disassemblyUndo"] = disassembly_undo.duplicate(true)
 		if not active_autopilot_profile_id.is_empty():
@@ -283,6 +286,7 @@ func _meta_from_dictionary(value: Dictionary) -> MetaState:
 	result.active_tactic_id = str(value["activeTacticId"])
 	result.autopilot_profiles.assign(value["autopilotProfiles"])
 	result.active_autopilot_profile_id = str(value.get("activeAutopilotProfileId", ""))
+	result.autopilot_report_history.assign(value.get("autopilotReportHistory", []))
 	result.quest_progress = value.get("questProgress", {}).duplicate(true)
 	result.disassembly_history.assign(value.get("disassemblyHistory", []))
 	result.disassembly_undo = value.get("disassemblyUndo", {}).duplicate(true)

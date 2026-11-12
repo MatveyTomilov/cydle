@@ -1,10 +1,16 @@
 # Changelog
 
+## Unreleased — persistent autopilot reports
+
+- Added backward-compatible META storage for the 20 latest autopilot reports, strict structural validation, and a road-screen view of the latest five stop summaries. Empty history is omitted from saves, preserving the prior payload shape.
+- Appended every completed online/offline simulation through the regular validated save transaction. Session coverage checks online/offline ordering and persistence after reload.
+- Checks: Godot 4.7.2 editor import exit 0; 22 scripts / 87,580 assertions / 0 failures; `git diff --check` exit 0. Windows export and TypeScript checks have not been rerun for this WIP.
+
 ## Unreleased — configurable autopilot policies
 
 - Added a saved policy editor for the three starter profiles: min HP/shield, max Wanted, fuel reserve, allowed route node types, elite/anomaly permission, repair budget, route objective weights, checkpoint action, quest choice, explicit `Qxx:stage → choiceId` mappings, preferred mutations, cargo priority, and opt-in tow/abandon. Policies are immutable during an active outing, validated when saved, and backward compatible with profiles that have no settings object.
 - Connected policy values to route scoring and route restrictions without exposing unrevealed node data; recorded autopilot repair spending in RUN so the configured cap persists across offline reloads; routed MATCH choices through real quest transactions; preferred mutation IDs through event choices; and explicit tow/abandon permissions through the emergency-exit transaction. Balanced cargo shipping honors the configured cargo priority.
-- Tests cover UI save/reload, a named Q02 choice, preferred EV22 mutation, and a zero-credit repair budget. Auto-restart/max-runs and persistent autopilot report history remain unimplemented.
+- Tests cover UI save/reload, a named Q02 choice, preferred EV22 mutation, and a zero-credit repair budget. Auto-restart/max-runs remain unimplemented.
 - Checks: Godot 4.7.2 editor import exit 0; 22 scripts / 87,578 assertions / 0 failures; Windows Desktop export and exported EXE headless smoke exit 0. The current executable is `%TEMP%\CYDLE-export-autopilot-config-final\CYDLE.exe`. TypeScript checks were not rerun because this WIP changes only native Godot code.
 
 ## Unreleased — protected checkpoint cargo shipping

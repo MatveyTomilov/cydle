@@ -96,6 +96,10 @@ func run(_tree: SceneTree) -> bool:
 		var autopilot_report: Dictionary = offline_resumed.simulate_autopilot(600000)
 		check(bool(autopilot_report.get("ok", false)), "game_session: autopilot did not produce a route report: %s" % autopilot_report)
 		check(not ["SAFE_ERROR_STOP", "RUNNING"].has(str(autopilot_report.get("status", ""))), "game_session: autopilot returned without a clear stop state")
+		check(offline_resumed.state.meta.autopilot_report_history.size() == 2 and str(offline_resumed.state.meta.autopilot_report_history.back().get("reasonCode", "")) == str(autopilot_report.get("reasonCode", "")), "game_session: offline and interactive autopilot reports were not persisted in order")
+		var report_history_reload: GameSession = GameSession.new()
+		report_history_reload.configure_save_directory("user://test-saves/autopilot")
+		check(report_history_reload.load_saved_game() and report_history_reload.state.meta.autopilot_report_history.size() == 2, "game_session: autopilot report history did not survive save reload")
 	var mutation_pilot_session: GameSession = GameSession.new()
 	mutation_pilot_session.configure_save_directory("user://test-saves/autopilot-mutation-choice")
 	if check(mutation_pilot_session.start_new_game(1762900000052), "game_session: could not create an autopilot mutation-choice profile"):

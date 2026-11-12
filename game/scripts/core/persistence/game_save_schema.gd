@@ -48,6 +48,7 @@ func _validate_meta(value: Variant) -> Dictionary:
 	meta_allowed.append("disassemblyHistory")
 	meta_allowed.append("disassemblyUndo")
 	meta_allowed.append("activeAutopilotProfileId")
+	meta_allowed.append("autopilotReportHistory")
 	if not _has_keys(meta, keys) or not _has_only_keys(meta, meta_allowed):
 		return _failure("meta: отсутствуют обязательные поля или есть неизвестные поля.")
 	if meta.has("questProgress") and not _validate_quest_progress(meta["questProgress"]):
@@ -56,6 +57,8 @@ func _validate_meta(value: Variant) -> Dictionary:
 		return _failure("meta.disassemblyHistory: история разбора повреждена.")
 	if meta.has("disassemblyUndo") and not _validate_disassembly_undo(meta["disassemblyUndo"]):
 		return _failure("meta.disassemblyUndo: запись отмены разбора повреждена.")
+	if meta.has("autopilotReportHistory") and not _validate_autopilot_report_history(meta["autopilotReportHistory"]):
+		return _failure("meta.autopilotReportHistory: история автопилота повреждена.")
 	var operator_value: Variant = meta["operator"]
 	if not operator_value is Dictionary or not _has_exact_keys(operator_value, ["level", "xp", "attributes", "attributePoints", "treePoints"]):
 		return _failure("meta.operator: неверная структура.")
@@ -141,6 +144,21 @@ func _validate_meta(value: Variant) -> Dictionary:
 	if meta.has("activeAutopilotProfileId") and (not _nonempty_string(meta["activeAutopilotProfileId"]) or not autopilot_profile_ids.has(str(meta["activeAutopilotProfileId"]))):
 		return _failure("meta.activeAutopilotProfileId: профиль не найден.")
 	return {"ok": true, "error": ""}
+
+func _validate_autopilot_report_history(value: Variant) -> bool:
+	if not value is Array or value.size() > 20:
+		return false
+	for report_value: Variant in value:
+		if not report_value is Dictionary:
+			return false
+		var report: Dictionary = report_value
+		for key: String in ["status", "reasonCode", "reason", "seed", "error"]:
+			if not report.has(key) or not report[key] is String:
+				return false
+		for key: String in ["simulatedMs", "nodesVisited", "battles", "itemsFound", "itemsSecured"]:
+			if not _is_integer(report.get(key)) or int(report[key]) < 0:
+				return false
+	return true
 
 func _validate_run(value: Variant, meta: Dictionary) -> Dictionary:
 	if not value is Dictionary:

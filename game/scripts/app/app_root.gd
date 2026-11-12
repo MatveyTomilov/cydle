@@ -1010,6 +1010,14 @@ func _show_road() -> void:
 		var report_label: Label = _label("АВТОПИЛОТ · %s · %s · узлов %d · боёв %d · симуляция %s" % [str(report.get("status", "")), str(report.get("reason", "")), int(report.get("nodesVisited", 0)), int(report.get("battles", 0)), _fmt(float(report.get("simulatedMs", 0.0)) / 1000.0) + " с"], 12, COLOR_CYAN)
 		report_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_body.add_child(report_label)
+	var report_history: Array[Dictionary] = _session.state.meta.autopilot_report_history
+	if not report_history.is_empty():
+		_body.add_child(_label("ЖУРНАЛ АВТОПИЛОТА · последние %d из 20" % report_history.size(), 11, COLOR_MUTED))
+		for history_index: int in range(maxi(0, report_history.size() - 5), report_history.size()):
+			var saved_report: Dictionary = report_history[history_index]
+			var history_label: Label = _label("%02d · %s · %s · узлов %d · боёв %d" % [history_index + 1, str(saved_report.get("status", "")), str(saved_report.get("reasonCode", "")), int(saved_report.get("nodesVisited", 0)), int(saved_report.get("battles", 0))], 10, COLOR_MUTED)
+			history_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			_body.add_child(history_label)
 	var active_contract: Dictionary = run.contract
 	if not active_contract.is_empty():
 		_body.add_child(_label("КОНТРАКТ %s · %s · БОЕВЫХ УЗЛОВ %d" % [str(active_contract.get("id", "")), str(active_contract.get("status", "")), int(active_contract.get("combatNodes", 0))], 12, COLOR_CYAN))
