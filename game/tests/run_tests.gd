@@ -14,6 +14,7 @@ const TEST_PATHS: Array[String] = [
 	"res://tests/golden/combat_step_test.gd",
 	"res://tests/golden/status_catalog_test.gd",
 	"res://tests/golden/dot_status_replay_test.gd",
+	"res://tests/golden/status_effect_replay_test.gd",
 	"res://tests/golden/math_golden_test.gd",
 	"res://tests/golden/stats_golden_test.gd",
 	"res://tests/golden/math_differential_test.gd",

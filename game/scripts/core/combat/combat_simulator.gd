@@ -4,6 +4,11 @@ extends RefCounted
 const COMBAT_RULES_VERSION: String = "cydle-combat-1.0"
 const MAX_LOG_EVENTS: int = 5000
 const DEFAULT_MAX_DURATION_MS: int = 180000
+const STEP_STATUS_IDS: Array[String] = [
+	"BLEED", "BURN", "VIRUS", "ARMOR_BREAK", "SHOCK", "DRONE_JAM", "SHIELD_LEAK",
+	"MARK", "SCAN_MARK", "DRONE_MARK", "CONTROLLED", "GUARD", "OVERCLOCK",
+	"ACC_BUFF", "EVASION_BUFF", "SHIELD_REGEN_BUFF",
+]
 const TICK_MS: int = 100
 const SHIELD_REGEN_DELAY_MS: int = 4000
 
@@ -105,11 +110,10 @@ func _supports_basic_auto_step(state: CombatState) -> bool:
 	if state.extra_enemy_digital_bonus != 0.0:
 		return false
 	for actor: CombatActorState in state.all_actors():
-		if not actor.elite_mod.is_empty() or not actor.ability_next.is_empty() or not actor.statuses.is_empty() or not actor.buffs.is_empty() or actor.cast != null or actor.reaction_cast != null:
-			for status_id: Variant in actor.statuses.keys():
-				if not ["BLEED", "BURN", "VIRUS"].has(str(status_id)):
-					return false
-			if not actor.elite_mod.is_empty() or not actor.ability_next.is_empty() or not actor.buffs.is_empty() or actor.cast != null or actor.reaction_cast != null:
+		if not actor.elite_mod.is_empty() or not actor.ability_next.is_empty() or not actor.buffs.is_empty() or actor.cast != null or actor.reaction_cast != null:
+			return false
+		for status_id: Variant in actor.statuses.keys():
+			if not STEP_STATUS_IDS.has(str(status_id)):
 				return false
 		if actor.side == "enemy":
 			var template: Dictionary = _factory._enemy_catalog.get_template(actor.template_id)
@@ -126,8 +130,8 @@ func apply_status(state: CombatState, source_id: String, target_id: String, stat
 		_status_catalog_error = str(loaded.get("error", "")) if not bool(loaded.get("ok", false)) else ""
 	if not _status_catalog_error.is_empty():
 		return _failure("Каталог статусов недоступен: %s" % _status_catalog_error)
-	if not ["BLEED", "BURN", "VIRUS"].has(status_id):
-		return _failure("Пока доступны только DoT-статусы BLEED, BURN и VIRUS.")
+	if not STEP_STATUS_IDS.has(status_id):
+		return _failure("Статус %s загружен из каталога, но его действие ещё не поддерживается этим срезом симулятора." % status_id)
 	var source: CombatActorState = _actor_by_id(state, source_id)
 	var target: CombatActorState = _actor_by_id(state, target_id)
 	if source == null or target == null or not target.alive:
@@ -141,7 +145,7 @@ func apply_status(state: CombatState, source_id: String, target_id: String, stat
 	if next_source == null or next_target == null:
 		return _failure("Источник или цель статуса отсутствуют в копии состояния.")
 	var stacks: int = maxi(1, int(options.get("stacks", 1)))
-	var source_sheet: Dictionary = next_source.base_sheet
+	var source_sheet: Dictionary = _effective_sheet(next, next_source)
 	var duration: float = float(options.get("durationMs", definition["durationMs"]))
 	if definition.has("tickMs"):
 		duration *= 1.0 + (float(source_sheet.get("dotDuration", 0.0)) + (float(source_sheet.get("virusDuration", 0.0)) if status_id == "VIRUS" else 0.0)) / 100.0
@@ -152,6 +156,13 @@ func apply_status(state: CombatState, source_id: String, target_id: String, stat
 		"techPower":
 			snapshot = float(source_sheet.get("techPower", 0.0)) * (1.0 + float(source_sheet.get("statusDamage", 0.0)) / 100.0) * (1.0 + float(source_sheet.get("virusDamage", 0.0)) / 100.0)
 	var max_stacks: int = int(definition["maxStacks"])
+	if status_id == "STUN":
+		var stun_ready_at: float = float(next_target.icds.get("STUN", 0.0))
+		if stun_ready_at > next.time_ms:
+			return {"ok": true, "state": state, "error": ""}
+		next_target.icds["STUN"] = next.time_ms + 3000
+		if next_target.is_boss:
+			duration *= 0.5
 	if status_id == "BLEED":
 		max_stacks += floori(float(source_sheet.get("bleedStackCap", 0.0)))
 	elif status_id == "VIRUS":
@@ -216,7 +227,7 @@ func _tick_dot_statuses(state: CombatState) -> void:
 
 func _apply_dot_damage(state: CombatState, target: CombatActorState, source_id: String, status_id: String, raw: float, damage_type: String, status_name: String) -> void:
 	var source: CombatActorState = _actor_by_id(state, source_id)
-	var defender: Dictionary = target.base_sheet
+	var defender: Dictionary = _effective_sheet(state, target, source)
 	var mitigation: Dictionary = _damage.mitigate_packet(raw, damage_type, {"armor": defender.get("armor", 0.0), "energyRes": defender.get("energyRes", 0.0), "digitalRes": defender.get("digitalRes", 0.0)}, DamageMath.ZERO_PENETRATION)
 	var incoming: float = float(mitigation["afterDefense"]) * float(defender.get("incomingAll", 1.0)) * float(defender.get("incomingKinetic" if damage_type == "KINETIC" else "incomingEnergy" if damage_type == "ENERGY" else "incomingDigital", 1.0))
 	var partition: Dictionary = _damage.partition_damage(incoming, {"hp": target.hp, "shield": target.shield, "temp": target.temp_shields}, 0.0, float(defender.get("incomingShield", 1.0)))
@@ -252,7 +263,7 @@ func _expire_dot_statuses(state: CombatState) -> void:
 	if not _status_catalog_loaded:
 		return
 	for actor: CombatActorState in state.all_actors():
-		for status_id: String in ["BLEED", "BURN", "VIRUS"]:
+		for status_id: String in actor.statuses.keys():
 			var entries: Array = actor.statuses.get(status_id, [])
 			if entries.is_empty():
 				continue
@@ -283,10 +294,34 @@ func _status_stack_count(entries: Array) -> int:
 		count += int(entry.get("stacks", 0))
 	return count
 
+func _status_stacks(actor: CombatActorState, status_id: String) -> int:
+	return _status_stack_count(actor.statuses.get(status_id, []))
+
+func _has_status(actor: CombatActorState, status_id: String) -> bool:
+	return not actor.statuses.get(status_id, []).is_empty()
+
+func _effective_sheet(_state: CombatState, actor: CombatActorState, _target: CombatActorState = null) -> Dictionary:
+	var sheet: Dictionary = actor.base_sheet.duplicate(true)
+	var armor_break: int = _status_stacks(actor, "ARMOR_BREAK")
+	if armor_break > 0:
+		sheet["armor"] = float(sheet.get("armor", 0.0)) - 10.0 * armor_break
+	if _has_status(actor, "GUARD"):
+		sheet["incomingKinetic"] = float(sheet.get("incomingKinetic", 1.0)) * 0.8
+	if _has_status(actor, "ACC_BUFF"):
+		sheet["accuracy"] = float(sheet.get("accuracy", 100.0)) + 8.0
+	if _has_status(actor, "EVASION_BUFF"):
+		sheet["evasion"] = float(sheet.get("evasion", 0.0)) * 1.2
+	if _has_status(actor, "SHIELD_REGEN_BUFF"):
+		sheet["shieldRegen"] = float(sheet.get("shieldRegen", 0.0)) + 10.0
+	var overclock_stacks: int = _status_stacks(actor, "OVERCLOCK")
+	if overclock_stacks > 0:
+		sheet["attackSpeed"] = float(sheet.get("attackSpeed", 0.0)) + 20.0 * overclock_stacks
+	return sheet
+
 func _apply_basic_continuous(state: CombatState) -> void:
 	var operator: CombatActorState = state.operator
 	if operator.alive:
-		var sheet: Dictionary = operator.base_sheet
+		var sheet: Dictionary = _effective_sheet(state, operator)
 		operator.energy = clampf(operator.energy + float(sheet.get("energyRegen", 0.0)) * 0.1, 0.0, float(sheet.get("maxEnergy", 0.0)))
 		var ambient: float = state.ambient_heat_per_sec
 		for enemy: CombatActorState in state.enemies:
@@ -300,17 +335,19 @@ func _apply_basic_continuous(state: CombatState) -> void:
 			operator.flags["coldStreak"] = 0.0
 		var since_hit: float = float(state.time_ms) - float(operator.flags.get("lastDamagedAt", -100000.0))
 		if since_hit >= SHIELD_REGEN_DELAY_MS and operator.shield < float(sheet.get("maxShield", 0.0)):
-			operator.shield = clampf(operator.shield + float(sheet.get("shieldRegen", 0.0)) * 0.1, 0.0, float(sheet.get("maxShield", 0.0)))
+			var regen_mult: float = 0.7 if _has_status(operator, "SHIELD_LEAK") else 1.0
+			operator.shield = clampf(operator.shield + float(sheet.get("shieldRegen", 0.0)) * regen_mult * 0.1, 0.0, float(sheet.get("maxShield", 0.0)))
 		if operator.shield <= 0.0:
 			state.metrics["timeWithoutShieldMs"] = int(state.metrics.get("timeWithoutShieldMs", 0)) + TICK_MS
 		state.metrics["lowestHpFraction"] = minf(float(state.metrics.get("lowestHpFraction", 1.0)), operator.hp / maxf(1.0, float(sheet.get("maxHP", 1.0))))
 	for actor: CombatActorState in state.drones + state.enemies + state.allies:
 		if not actor.alive:
 			continue
-		var sheet: Dictionary = actor.base_sheet
+		var sheet: Dictionary = _effective_sheet(state, actor)
 		var since_hit: float = float(state.time_ms) - float(actor.flags.get("lastDamagedAt", -100000.0))
 		if since_hit >= SHIELD_REGEN_DELAY_MS and actor.shield < float(sheet.get("maxShield", 0.0)):
-			actor.shield = clampf(actor.shield + float(sheet.get("shieldRegen", 0.0)) * 0.1, 0.0, float(sheet.get("maxShield", 0.0)))
+			var regen_mult: float = 0.7 if _has_status(actor, "SHIELD_LEAK") else 1.0
+			actor.shield = clampf(actor.shield + float(sheet.get("shieldRegen", 0.0)) * regen_mult * 0.1, 0.0, float(sheet.get("maxShield", 0.0)))
 
 func _pick_auto_target(state: CombatState, actor: CombatActorState) -> CombatActorState:
 	if actor.side == "enemy":
@@ -368,9 +405,12 @@ func _attack_packets(actor: CombatActorState, weapon: Dictionary) -> Array[Dicti
 	return packets
 
 func _resolve_basic_hit(state: CombatState, rng: DeterministicRng, actor: CombatActorState, target: CombatActorState, raw_base: float, damage_type: String, action_id: String, is_main: bool) -> Dictionary:
-	var attacker: Dictionary = actor.base_sheet
-	var defender: Dictionary = target.base_sheet
-	var chance_to_hit: float = _damage.hit_probability(float(attacker.get("accuracy", 100.0)), float(defender.get("evasion", 0.0)))
+	var attacker: Dictionary = _effective_sheet(state, actor, target)
+	var defender: Dictionary = _effective_sheet(state, target, actor)
+	var accuracy: float = float(attacker.get("accuracy", 100.0))
+	if actor.kind == "drone" and _has_status(target, "DRONE_MARK"):
+		accuracy += 15.0
+	var chance_to_hit: float = _damage.hit_probability(accuracy, float(defender.get("evasion", 0.0)))
 	if not rng.chance(chance_to_hit):
 		state.metrics["misses"] = int(state.metrics.get("misses", 0)) + 1
 		if target.kind == "operator":
@@ -382,6 +422,12 @@ func _resolve_basic_hit(state: CombatState, rng: DeterministicRng, actor: Combat
 		return {"ok": true, "error": ""}
 	var crit: bool = rng.chance(_damage.crit_probability(float(attacker.get("critChance", 0.0))))
 	var raw: float = raw_base * _outgoing_multiplier(attacker, damage_type, is_main)
+	if _has_status(actor, "CONTROLLED"):
+		raw *= 0.4
+	if actor.kind == "drone" and _has_status(actor, "DRONE_JAM"):
+		raw *= 0.5
+	if _has_status(target, "SCAN_MARK"):
+		raw *= 1.12
 	if crit:
 		raw *= float(attacker.get("critMultiplier", 1.5)) * float(attacker.get("moreCritDamage", 1.0))
 		state.metrics["crits"] = int(state.metrics.get("crits", 0)) + 1
@@ -393,6 +439,9 @@ func _resolve_basic_hit(state: CombatState, rng: DeterministicRng, actor: Combat
 	}
 	var mitigation: Dictionary = _damage.mitigate_packet(raw, damage_type, {"armor": defender.get("armor", 0.0), "energyRes": defender.get("energyRes", 0.0), "digitalRes": defender.get("digitalRes", 0.0)}, penetration)
 	var incoming: float = float(mitigation["afterDefense"]) * float(defender.get("incomingAll", 1.0)) * float(defender.get("incomingKinetic" if damage_type == "KINETIC" else "incomingEnergy" if damage_type == "ENERGY" else "incomingDigital", 1.0))
+	if _has_status(target, "MARK"):
+		incoming *= 1.3
+		target.statuses.erase("MARK")
 	var partition: Dictionary = _damage.partition_damage(incoming, {"hp": target.hp, "shield": target.shield, "temp": target.temp_shields}, 0.0, float(defender.get("incomingShield", 1.0)))
 	_apply_partition(target, partition)
 	target.flags["lastDamagedAt"] = float(state.time_ms)
@@ -447,9 +496,15 @@ func _apply_partition(actor: CombatActorState, result: Dictionary) -> void:
 func _schedule_next_attack(state: CombatState, actor: CombatActorState) -> void:
 	var interval: float = actor.attack_interval_ms
 	if actor.kind == "operator":
-		var sheet: Dictionary = actor.base_sheet
+		var sheet: Dictionary = _effective_sheet(state, actor)
 		var weapon: Dictionary = state.build.get("mainWeapon", {})
 		interval = _formula.attack_interval_ms(float(weapon.get("intervalMs", 1000.0)), float(sheet.get("attackSpeed", 0.0)), float(sheet.get("moreAttackSpeed", 1.0)))
+	if _has_status(actor, "SHOCK"):
+		interval /= 0.7
+	if actor.kind == "drone" and _has_status(actor, "DRONE_JAM"):
+		interval /= 0.5
+	if _has_status(actor, "OVERCLOCK"):
+		actor.heat = minf(float(actor.base_sheet.get("maxHeat", 0.0)), actor.heat + 5.0)
 	actor.next_attack_at += interval
 	if actor.next_attack_at <= float(state.time_ms):
 		actor.next_attack_at = float(state.time_ms) + interval

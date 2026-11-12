@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Ported catalogued ordinary-combat status effects for ARMOR_BREAK, SHOCK, DRONE_JAM, SHIELD_LEAK, MARK, SCAN_MARK, DRONE_MARK, CONTROLLED, GUARD, OVERCLOCK, ACC_BUFF, EVASION_BUFF, and SHIELD_REGEN_BUFF. Added 13 TypeScript-oracle replay checkpoints, including a working drone jam case; STUN/JAM and cast/tactical behavior remain unsupported.
 - Exported and validated the 25-entry native status catalog. Added native BLEED/BURN/VIRUS status application, independent DoT stacks, snapshot ticks, expiration-boundary ticks, and status expiration to the single combat transition; added a 40-frame BLEED replay fixture checked against the TypeScript oracle. Other status behaviors remain unsupported.
 - Added a checked 15-frame TypeScript combat oracle and an immutable native `step_combat()` slice for eligible basic auto-attack encounters, covering baseline resource updates, hit/crit RNG, shared damage mitigation, shields/HP, metrics, death, and combat termination.
 - Added typed native combat actor/state initialization for operators, drones, and enemies, plus deterministic RNG, rules hash, metrics, and COMBAT_START event; verified against one TypeScript `createCombatState` oracle fixture with an EL_FAST enemy.

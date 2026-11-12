@@ -264,3 +264,41 @@ writeFileSync(dotFixtureOutput, `${JSON.stringify({
   status: { id: 'BLEED', snapshot: 100 }, appliedEvent: dotState.log.find((event) => event.kind === 'STATUS_APPLY'), frames: dotFrames,
 }, null, 2)}\n`, 'utf8');
 console.log(`Exported ${dotFrames.length} DoT status replay frames to ${dotFixtureOutput}`);
+
+const statusEffectCases = [
+  { id: 'ARMOR_BREAK', target: 'enemy:0' }, { id: 'SHOCK', target: 'operator' },
+  { id: 'DRONE_JAM', target: 'drone:0' },
+  { id: 'SHIELD_LEAK', target: 'operator' }, { id: 'MARK', target: 'enemy:0' },
+  { id: 'SCAN_MARK', target: 'enemy:0' }, { id: 'DRONE_MARK', target: 'enemy:0' },
+  { id: 'CONTROLLED', target: 'enemy:0' }, { id: 'GUARD', target: 'operator' },
+  { id: 'OVERCLOCK', target: 'operator' }, { id: 'ACC_BUFF', target: 'operator' },
+  { id: 'EVASION_BUFF', target: 'operator' }, { id: 'SHIELD_REGEN_BUFF', target: 'operator' },
+];
+const starterDroneId = initialSaveFixture.meta.equipment.DRONE_1;
+if (!starterDroneId) throw new Error('Starter save is missing its drone.');
+const statusBuild = resolveBuild({
+  attributes: initialSaveFixture.meta.operator.attributes,
+  equipment: { MAIN: starterMain, DRONE_1: starterItemsById.get(starterDroneId)! },
+  skillIds: [], passiveIds: [], treeNodeIds: [], attributePointsEarned: 0, treePointsEarned: 0,
+});
+const statusEffectReplays = statusEffectCases.map(({ id, target }) => {
+  let replay = createCombatState({ ...basicStateConfig, build: statusBuild });
+  const targetActor = target === 'operator' ? replay.operator : target === 'drone:0' ? replay.drones[0]! : replay.enemies[0]!;
+  const sourceActor = targetActor.side === 'enemy' ? replay.operator : replay.enemies[0]!;
+  if (id === 'SHIELD_LEAK' || id === 'SHIELD_REGEN_BUFF') {
+    targetActor.shield = Math.max(0, targetActor.baseSheet.maxShield - 20);
+    targetActor.flags.lastDamagedAt = -100000;
+  }
+  applyStatus(replay, sourceActor, targetActor, id as keyof typeof STATUS_DEFS);
+  for (let tick = 0; tick < 40; tick++) replay = stepCombat(replay);
+  return {
+    status: id, target, timeMs: replay.timeMs, rng: replay.rng, nextEventId: replay.nextEventId,
+    metrics: replay.metrics, outcome: replay.outcome,
+    operator: { hp: replay.operator.hp, shield: replay.operator.shield, statuses: replay.operator.statuses, nextAttackAt: replay.operator.nextAttackAt },
+    drones: replay.drones.map((actor) => ({ hp: actor.hp, shield: actor.shield, statuses: actor.statuses, nextAttackAt: actor.nextAttackAt, damageTaken: actor.damageTaken })),
+    enemies: replay.enemies.map((actor) => ({ hp: actor.hp, shield: actor.shield, statuses: actor.statuses, nextAttackAt: actor.nextAttackAt, damageTaken: actor.damageTaken })),
+  };
+});
+const statusEffectOutput = resolve('game/tests/fixtures/combat/status_effect_replays.json');
+writeFileSync(statusEffectOutput, `${JSON.stringify(statusEffectReplays, null, 2)}\n`, 'utf8');
+console.log(`Exported ${statusEffectReplays.length} status effect replay checkpoints to ${statusEffectOutput}`);
