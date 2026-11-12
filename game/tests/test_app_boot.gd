@@ -34,6 +34,13 @@ func run(tree: SceneTree) -> bool:
 			check(str(pilot_picker.get_item_metadata(1)) == "BALANCED" and pilot_picker.selected == 1, "test_app_boot: selected balanced preset was not reflected in road UI")
 			pilot_picker.item_selected.emit(0)
 			check(pilot_session.active_autopilot_profile_id() == "CAUTIOUS", "test_app_boot: selecting a road preset did not save the active policy")
+		app.call("_show_autopilot_profile_editor")
+		var profile_weights: Dictionary = app.get("_autopilot_profile_weights")
+		check(str(app.get("_screen")) == "autopilot_profile" and profile_weights.has("loot"), "test_app_boot: autopilot profile editor did not open its scoring controls")
+		if profile_weights.has("loot"):
+			(profile_weights["loot"] as SpinBox).value = 5.0
+			app.call("_on_save_autopilot_profile")
+			check(is_equal_approx(float(pilot_session.active_autopilot_profile().get("objectiveWeights", {}).get("loot", 0.0)), 5.0), "test_app_boot: profile editor did not persist the custom route scoring weight")
 		check(pilot_session.start_expedition("checkpoint-shipping-ui"), "test_app_boot: could not open a checkpoint-shipping UI sortie")
 		var checkpoint_payload: Dictionary = pilot_session.state.to_payload()
 		checkpoint_payload["run"]["phase"] = "CHECKPOINT"

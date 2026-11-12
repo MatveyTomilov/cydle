@@ -96,6 +96,39 @@ func run(_tree: SceneTree) -> bool:
 		var autopilot_report: Dictionary = offline_resumed.simulate_autopilot(600000)
 		check(bool(autopilot_report.get("ok", false)), "game_session: autopilot did not produce a route report: %s" % autopilot_report)
 		check(not ["SAFE_ERROR_STOP", "RUNNING"].has(str(autopilot_report.get("status", ""))), "game_session: autopilot returned without a clear stop state")
+	var mutation_pilot_session: GameSession = GameSession.new()
+	mutation_pilot_session.configure_save_directory("user://test-saves/autopilot-mutation-choice")
+	if check(mutation_pilot_session.start_new_game(1762900000052), "game_session: could not create an autopilot mutation-choice profile"):
+		var mutation_profile: Dictionary = AutopilotPolicy.profile("BALANCED")
+		mutation_profile.erase("id")
+		mutation_profile.erase("name")
+		mutation_profile["preferMutations"] = ["MUT_REGEN"]
+		check(mutation_pilot_session.save_autopilot_profile_settings("BALANCED", mutation_profile), "game_session: could not save preferred mutation policy: %s" % mutation_pilot_session.last_error)
+		if check(mutation_pilot_session.start_expedition("autopilot-mutation-choice"), "game_session: mutation-choice sortie failed to start"):
+			var mutation_event_payload: Dictionary = mutation_pilot_session.state.to_payload()
+			mutation_event_payload["run"]["graph"] = {"layers": [[{"id": "mutation-auto-choice", "layer": 0, "type": "EVENT", "eventId": "EV22", "threat": "medium", "enemies": [], "revealLevel": 1, "lootHint": "event"}]], "edges": [{"from": "START", "to": "mutation-auto-choice", "fromLayer": -1, "toLayer": 0, "fuelCost": 1}]}
+			mutation_event_payload["run"]["currentNodeId"] = "mutation-auto-choice"
+			mutation_event_payload["run"]["phase"] = "NODE"
+			check(mutation_pilot_session._commit_payload(mutation_event_payload), "game_session: could not prepare the preferred mutation event: %s" % mutation_pilot_session.last_error)
+			var mutation_pilot_report: Dictionary = mutation_pilot_session.simulate_autopilot(20000)
+			check(not mutation_pilot_report.is_empty() and mutation_pilot_session.state.meta.reputation.get("F_CHOIR", 0) == 4 and mutation_pilot_session.state.run.temporary_mutation_ids.has("MUT_REGEN"), "game_session: autopilot did not choose its explicitly preferred event mutation: %s" % mutation_pilot_report)
+	var repair_budget_session: GameSession = GameSession.new()
+	repair_budget_session.configure_save_directory("user://test-saves/autopilot-repair-budget")
+	if check(repair_budget_session.start_new_game(1762900000053), "game_session: could not create an autopilot repair-budget profile"):
+		var repair_policy: Dictionary = AutopilotPolicy.profile("BALANCED")
+		repair_policy.erase("id")
+		repair_policy.erase("name")
+		repair_policy["maxSpendRepair"] = 0.0
+		check(repair_budget_session.save_autopilot_profile_settings("BALANCED", repair_policy) and repair_budget_session.start_expedition("autopilot-repair-budget"), "game_session: could not prepare the zero repair budget profile: %s" % repair_budget_session.last_error)
+		var repair_node_payload: Dictionary = repair_budget_session.state.to_payload()
+		repair_node_payload["run"]["graph"] = {"layers": [[{"id": "budget-repair", "layer": 0, "type": "REPAIR", "threat": "low", "enemies": [], "revealLevel": 1, "lootHint": "repair"}]], "edges": []}
+		repair_node_payload["run"]["currentNodeId"] = "budget-repair"
+		repair_node_payload["run"]["phase"] = "NODE"
+		repair_node_payload["run"]["resources"]["hull"] = 50.0
+		repair_node_payload["run"]["runWallet"]["CREDITS"] = 100.0
+		check(repair_budget_session._commit_payload(repair_node_payload), "game_session: could not prepare the paid repair node: %s" % repair_budget_session.last_error)
+		var repair_stop: Dictionary = repair_budget_session.simulate_autopilot(60000)
+		check(str(repair_stop.get("reasonCode", "")) == "REPAIR_UNAVAILABLE" and is_equal_approx(repair_budget_session.state.run.wallet.credits, 100.0) and is_zero_approx(repair_budget_session.state.run.resources.hull - 50.0), "game_session: autopilot exceeded its explicit repair-spend limit: %s" % repair_stop)
 	var contract_session: GameSession = GameSession.new()
 	contract_session.configure_save_directory("user://test-saves/contracts")
 	if check(contract_session.start_new_game(1762900000100), "game_session: could not create a contract profile"):
@@ -881,6 +914,26 @@ func run(_tree: SceneTree) -> bool:
 		check(not quest_reload._quest_stage_ready(q04_definition, q04_definition["stages"][1], q04_progress), "game_session: Q04 elimination objective was available in its source sector")
 		quest_reload.state.run.depth += 1
 		check(quest_reload._quest_stage_ready(q04_definition, q04_definition["stages"][1], q04_progress), "game_session: Q04 elimination objective did not become available in the next B02 sector")
+	var quest_autopilot_session: GameSession = GameSession.new()
+	quest_autopilot_session.configure_save_directory("user://test-saves/quest-autopilot-match")
+	if check(quest_autopilot_session.start_new_game(1762900000971), "game_session: could not create a named quest-policy profile"):
+		var quest_autopilot_meta: Dictionary = quest_autopilot_session.state.to_payload()
+		quest_autopilot_meta["meta"]["maxSectorCleared"] = 1
+		quest_autopilot_meta["meta"]["unlockedForpost"] = 1
+		check(quest_autopilot_session._commit_payload(quest_autopilot_meta), "game_session: could not unlock the named-choice quest fixture")
+		var named_quest_policy: Dictionary = AutopilotPolicy.profile("BALANCED")
+		named_quest_policy.erase("id")
+		named_quest_policy.erase("name")
+		named_quest_policy["chooseQuest"] = "MATCH"
+		named_quest_policy["questChoiceMap"] = {"Q02:1": "A"}
+		check(quest_autopilot_session.save_autopilot_profile_settings("BALANCED", named_quest_policy), "game_session: could not save the explicitly named quest choice: %s" % quest_autopilot_session.last_error)
+		check(quest_autopilot_session.accept_quest("Q02") and quest_autopilot_session.start_expedition("named-quest-choice"), "game_session: named-choice quest could not be accepted or started")
+		var named_quest_run: Dictionary = quest_autopilot_session.state.to_payload()
+		named_quest_run["run"]["biome"] = "B01"
+		named_quest_run["run"]["graph"] = {"layers": [[{"id": "named-quest-event", "layer": 0, "type": "EVENT", "eventId": "EV02", "threat": "medium", "enemies": [], "revealLevel": 1, "lootHint": "event"}]], "edges": [{"from": "START", "to": "named-quest-event", "fromLayer": -1, "toLayer": 0, "fuelCost": 1}]}
+		check(quest_autopilot_session._commit_payload(named_quest_run) and quest_autopilot_session.travel_to("named-quest-event"), "game_session: named-choice event route could not be prepared: %s" % quest_autopilot_session.last_error)
+		var named_quest_report: Dictionary = quest_autopilot_session.simulate_autopilot(60000)
+		check(int(quest_autopilot_session.state.meta.quest_progress.get("Q02", {}).get("stage", 0)) == 2 and int(quest_autopilot_session.state.run.wanted) == 5, "game_session: MATCH policy failed to resolve the configured Q02 stage 1 choice: %s" % named_quest_report)
 	var resumed: GameSession = GameSession.new()
 	resumed.configure_save_directory("user://test-saves/game-session")
 	check(resumed.load_saved_game(), "game_session: persisted state did not reload: %s" % resumed.last_error)

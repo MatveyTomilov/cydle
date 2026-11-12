@@ -129,10 +129,14 @@ func _validate_meta(value: Variant) -> Dictionary:
 		return _failure("meta.autopilotProfiles: требуется хотя бы один профиль.")
 	var autopilot_profile_ids: Dictionary = {}
 	for profile: Variant in meta["autopilotProfiles"]:
-		if not profile is Dictionary or not _has_exact_keys(profile, ["id", "name", "startDepth", "enabled"]):
+		if not profile is Dictionary or (not _has_exact_keys(profile, ["id", "name", "startDepth", "enabled"]) and not _has_exact_keys(profile, ["id", "name", "startDepth", "enabled", "settings"])):
 			return _failure("meta.autopilotProfiles: неверная структура профиля.")
 		if not _nonempty_string(profile["id"]) or not _nonempty_string(profile["name"]) or not _is_integer(profile["startDepth"]) or int(profile["startDepth"]) < 1 or int(profile["startDepth"]) > 13 or not profile["enabled"] is bool:
 			return _failure("meta.autopilotProfiles: неверные значения профиля.")
+		if profile.has("settings"):
+			var settings_result: Dictionary = AutopilotPolicy.validate_settings(profile["settings"])
+			if not bool(settings_result.get("ok", false)):
+				return _failure("meta.autopilotProfiles.%s: %s" % [str(profile["id"]), str(settings_result.get("error", "неверные настройки."))])
 		autopilot_profile_ids[str(profile["id"])] = true
 	if meta.has("activeAutopilotProfileId") and (not _nonempty_string(meta["activeAutopilotProfileId"]) or not autopilot_profile_ids.has(str(meta["activeAutopilotProfileId"]))):
 		return _failure("meta.activeAutopilotProfileId: профиль не найден.")
@@ -193,6 +197,8 @@ func _validate_run(value: Variant, meta: Dictionary) -> Dictionary:
 		return _failure("run.contract: неверный активный контракт.")
 	if run.has("autopilotEnabled") and not run["autopilotEnabled"] is bool:
 		return _failure("run.autopilotEnabled: ожидалось логическое значение.")
+	if run.has("autopilotRepairSpend") and (not _is_finite_number(run["autopilotRepairSpend"]) or float(run["autopilotRepairSpend"]) < 0.0):
+		return _failure("run.autopilotRepairSpend: ожидался конечный неотрицательный бюджет.")
 	if not _validate_count_map(run["serviceScrapFuelCounts"]) or run["lastCommandId"] != null and not _nonempty_string(run["lastCommandId"]):
 		return _failure("run.serviceScrapFuelCounts/lastCommandId: неверные значения.")
 	if run["combatResult"] != null and not run["combatResult"] is Dictionary:

@@ -26,6 +26,12 @@ var _simulation_report: Dictionary = {}
 var _selected_escalations: Array[String] = []
 var _checkpoint_shipping_ids: Array[String] = []
 var _checkpoint_shipping_percent: int = 0
+var _autopilot_profile_editor_id: String = ""
+var _autopilot_profile_spins: Dictionary = {}
+var _autopilot_profile_toggles: Dictionary = {}
+var _autopilot_profile_weights: Dictionary = {}
+var _autopilot_profile_nodes: Dictionary = {}
+var _autopilot_profile_action: OptionButton
 
 func _ready() -> void:
 	_session.load_saved_game()
@@ -971,6 +977,9 @@ func _show_road() -> void:
 		pilot_picker.select(selected_pilot_index)
 		pilot_picker.item_selected.connect(_on_autopilot_profile_selected.bind(pilot_picker))
 		_body.add_child(pilot_picker)
+		var configure_pilot: Button = _button("НАСТРОИТЬ ВЫБРАННЫЙ ПРОФИЛЬ", false)
+		configure_pilot.pressed.connect(_show_autopilot_profile_editor)
+		_body.add_child(configure_pilot)
 		_add_escalation_selector()
 		var start: Button = _button("НАЧАТЬ ВЫЕЗД", true)
 		start.pressed.connect(_on_start_expedition)
@@ -984,7 +993,7 @@ func _show_road() -> void:
 	var run: GameSaveState.RunState = _session.state.run
 	_body.add_child(_label("СЕКТОР %02d   /   %s   /   %s" % [run.depth, run.biome, run.phase], 12, COLOR_CYAN))
 	_body.add_child(_label("Маршрут", 27, COLOR_TEXT))
-	var active_pilot: Dictionary = AutopilotPolicy.profile(_session.active_autopilot_profile_id())
+	var active_pilot: Dictionary = _session.active_autopilot_profile()
 	_body.add_child(_label("ПРОФИЛЬ АВТОПИЛОТА · %s · РИСК %.1f · HP %.0f%% · ЩИТ %.0f%% · РОЗЫСК %d" % [str(active_pilot.get("name", "Сбалансированный")), float(active_pilot.get("riskWeight", 4.0)), float(active_pilot.get("minHP", 0.35)) * 100.0, float(active_pilot.get("minShield", 0.15)) * 100.0, int(active_pilot.get("maxWanted", 70))], 11, COLOR_MUTED))
 	var resources: Dictionary = run.resources
 	_body.add_child(_label("ТОПЛИВО %d/%d   ·   КОРПУС %d/%d   ·   РОЗЫСК %d" % [int(resources.get("fuel", 0)), int(resources.get("maxFuel", 0)), int(resources.get("hull", 0)), int(resources.get("maxHull", 0)), int(run.wanted)], 13, COLOR_AMBER))
@@ -1516,6 +1525,175 @@ func _on_autopilot_profile_selected(index: int, picker: OptionButton) -> void:
 		return
 	var profile_id: String = str(picker.get_item_metadata(index))
 	if _session.set_active_autopilot_profile(profile_id):
+		_show_road()
+	else:
+		_footer.text = _session.last_error
+
+func _show_autopilot_profile_editor() -> void:
+	_autopilot_profile_editor_id = _session.active_autopilot_profile_id()
+	var profile: Dictionary = _session.active_autopilot_profile()
+	_autopilot_profile_spins.clear()
+	_autopilot_profile_toggles.clear()
+	_autopilot_profile_weights.clear()
+	_autopilot_profile_nodes.clear()
+	_screen = "autopilot_profile"
+	_clear_body()
+	_body.add_child(_label("ПОЛИТИКА АВТОПИЛОТА · %s" % str(profile.get("name", _autopilot_profile_editor_id)), 22, COLOR_CYAN))
+	_body.add_child(_label("Изменения применяются только между выездами. Автопилот оценивает лишь разведанные сведения маршрута.", 12, COLOR_MUTED))
+	_add_autopilot_spin("minHP", "Остановка при HP ниже · %", 0.0, 100.0, 5.0, float(profile.get("minHP", 0.35)) * 100.0)
+	_add_autopilot_spin("minShield", "Остановка при щите ниже · %", 0.0, 100.0, 5.0, float(profile.get("minShield", 0.15)) * 100.0)
+	_add_autopilot_spin("maxWanted", "Предел розыска", 0.0, 100.0, 5.0, float(profile.get("maxWanted", 70)))
+	_add_autopilot_spin("reserveFuel", "Резерв топлива", 0.0, 24.0, 1.0, float(profile.get("reserveFuel", 1)))
+	_add_autopilot_spin("maxSpendRepair", "Бюджет ремонта за выезд · ¤", 0.0, 1000000.0, 10.0, float(profile.get("maxSpendRepair", 1000000000.0)))
+	var weight_heading: Label = _label("ВЕСА МАРШРУТНОЙ ОЦЕНКИ · 0–10", 13, COLOR_CYAN)
+	_body.add_child(weight_heading)
+	var weights: Dictionary = profile.get("objectiveWeights", AutopilotPolicy.DEFAULT_WEIGHTS)
+	for key: String in ["loot", "xp", "quest", "service", "risk", "fuel", "wanted"]:
+		_add_autopilot_weight(key, float(weights.get(key, 1.0 if key in ["service", "risk", "wanted"] else 2.0)))
+	var node_heading: Label = _label("РАЗРЕШЁННЫЕ ТИПЫ УЗЛОВ", 13, COLOR_CYAN)
+	_body.add_child(node_heading)
+	var allowed_types: Array = profile.get("allowedNodeTypes", [])
+	var node_row: HFlowContainer = HFlowContainer.new()
+	_body.add_child(node_row)
+	for node_type: String in AutopilotPolicy.NODE_TYPES:
+		var toggle: CheckButton = CheckButton.new()
+		toggle.text = node_type
+		toggle.button_pressed = allowed_types.is_empty() or allowed_types.has(node_type)
+		_autopilot_profile_nodes[node_type] = toggle
+		node_row.add_child(toggle)
+	for pair: Array in [["allowElite", "Разрешать элитных врагов"], ["allowAnomaly", "Разрешать аномалии"], ["allowTow", "Разрешить платный вызов тягача"], ["allowAbandon", "Разрешить автоматический отказ от выезда"]]:
+		var flag: String = str(pair[0])
+		var flag_toggle: CheckButton = CheckButton.new()
+		flag_toggle.text = str(pair[1])
+		flag_toggle.button_pressed = bool(profile.get(flag, false if flag in ["allowTow", "allowAbandon"] else true))
+		_autopilot_profile_toggles[flag] = flag_toggle
+		_body.add_child(flag_toggle)
+	_body.add_child(_label("ДЕЙСТВИЕ НА КОНТРОЛЬНОМ УЗЛЕ", 13, COLOR_CYAN))
+	_autopilot_profile_action = OptionButton.new()
+	for action: String in ["EXTRACT", "CONDITIONAL", "CONTINUE"]:
+		_autopilot_profile_action.add_item({"EXTRACT": "Эвакуироваться", "CONDITIONAL": "По состоянию и закрепить груз", "CONTINUE": "Продолжить"}[action])
+		_autopilot_profile_action.set_item_metadata(_autopilot_profile_action.item_count - 1, action)
+		if action == str(profile.get("checkpointAction", "CONDITIONAL")):
+			_autopilot_profile_action.select(_autopilot_profile_action.item_count - 1)
+	_body.add_child(_autopilot_profile_action)
+	_body.add_child(_label("АВТОМАТИЧЕСКИЙ ВЫБОР КВЕСТА", 13, COLOR_CYAN))
+	var quest_choice: OptionButton = OptionButton.new()
+	for choice: Array in [["PAUSE", "Остановиться и запросить решение"], ["NEVER", "Никогда не выбирать автоматически"], ["MATCH", "Выбирать только явно заданные варианты"]]:
+		quest_choice.add_item(str(choice[1]))
+		quest_choice.set_item_metadata(quest_choice.item_count - 1, str(choice[0]))
+		if str(choice[0]) == str(profile.get("chooseQuest", "PAUSE")):
+			quest_choice.select(quest_choice.item_count - 1)
+	quest_choice.set_meta("profile_key", "chooseQuest")
+	_body.add_child(quest_choice)
+	_autopilot_profile_toggles["chooseQuest"] = quest_choice
+	_body.add_child(_label("ПРЕДПОЧИТАНИЕ ГРУЗА ДЛЯ ЗАЩИЩЁННОЙ ОТПРАВКИ", 13, COLOR_CYAN))
+	var cargo_priority: OptionButton = OptionButton.new()
+	for choice: Array in [["RARITY", "Редкость предмета"], ["QUEST", "Предмет квестовой цели"], ["VALUE", "Оценочная ценность"]]:
+		cargo_priority.add_item(str(choice[1]))
+		cargo_priority.set_item_metadata(cargo_priority.item_count - 1, str(choice[0]))
+		if str(choice[0]) == str(profile.get("cargoProtectionPriority", "RARITY")):
+			cargo_priority.select(cargo_priority.item_count - 1)
+	cargo_priority.set_meta("profile_key", "cargoProtectionPriority")
+	_body.add_child(cargo_priority)
+	_autopilot_profile_toggles["cargoProtectionPriority"] = cargo_priority
+	var mutation_line: LineEdit = LineEdit.new()
+	mutation_line.placeholder_text = "ID мутаций через запятую, например MUT_X,MUT_Y"
+	mutation_line.text = ",".join(profile.get("preferMutations", []))
+	mutation_line.set_meta("profile_key", "preferMutations")
+	_body.add_child(mutation_line)
+	_autopilot_profile_toggles["preferMutations"] = mutation_line
+	var quest_map: Dictionary = profile.get("questChoiceMap", {})
+	var quest_entries: Array[String] = []
+	for quest_stage: Variant in quest_map.keys():
+		quest_entries.append("%s:%s" % [str(quest_stage), str(quest_map[quest_stage])])
+	quest_entries.sort()
+	var quest_line: LineEdit = LineEdit.new()
+	quest_line.placeholder_text = "Выборы через запятую: Q01:1:CHOICE_ID,Q03:2:CHOICE_ID"
+	quest_line.text = ",".join(quest_entries)
+	quest_line.set_meta("profile_key", "questChoiceMap")
+	_body.add_child(quest_line)
+	_autopilot_profile_toggles["questChoiceMap"] = quest_line
+	var save: Button = _button("СОХРАНИТЬ ПОЛИТИКУ", true)
+	save.pressed.connect(_on_save_autopilot_profile)
+	_body.add_child(save)
+	var back: Button = _button("НАЗАД К МАРШРУТУ", false)
+	back.pressed.connect(_show_road)
+	_body.add_child(back)
+
+func _add_autopilot_spin(key: String, title: String, minimum: float, maximum: float, step: float, value: float) -> void:
+	var row: HBoxContainer = HBoxContainer.new()
+	row.add_child(_label(title, 12, COLOR_TEXT))
+	var spin: SpinBox = SpinBox.new()
+	spin.min_value = minimum
+	spin.max_value = maximum
+	spin.step = step
+	spin.value = value
+	spin.custom_minimum_size.x = 150
+	spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_autopilot_profile_spins[key] = spin
+	row.add_child(spin)
+	_body.add_child(row)
+
+func _add_autopilot_weight(key: String, value: float) -> void:
+	var row: HBoxContainer = HBoxContainer.new()
+	row.add_child(_label(key.to_upper(), 11, COLOR_TEXT))
+	var spin: SpinBox = SpinBox.new()
+	spin.min_value = 0.0
+	spin.max_value = 10.0
+	spin.step = 0.5
+	spin.value = value
+	spin.custom_minimum_size.x = 100
+	_autopilot_profile_weights[key] = spin
+	row.add_child(spin)
+	_body.add_child(row)
+
+func _on_save_autopilot_profile() -> void:
+	var settings: Dictionary = _session.active_autopilot_profile()
+	settings.erase("id")
+	settings.erase("name")
+	settings.erase("objectiveWeights")
+	settings.erase("allowedNodeTypes")
+	settings.erase("preferMutations")
+	settings.erase("questChoiceMap")
+	for key: String in _autopilot_profile_spins:
+		var spin: SpinBox = _autopilot_profile_spins[key] as SpinBox
+		settings[key] = spin.value / 100.0 if key in ["minHP", "minShield"] else int(round(spin.value)) if key in ["maxWanted", "reserveFuel"] else spin.value
+	for key: String in _autopilot_profile_toggles:
+		var control: Control = _autopilot_profile_toggles[key] as Control
+		if control is CheckButton:
+			settings[key] = (control as CheckButton).button_pressed
+		elif control is OptionButton:
+			var option: OptionButton = control as OptionButton
+			settings[key] = option.get_item_metadata(option.selected)
+		elif control is LineEdit and key == "preferMutations":
+			var mutations: Array[String] = []
+			for part: String in (control as LineEdit).text.split(",", false):
+				var mutation_id: String = part.strip_edges()
+				if not mutation_id.is_empty() and not mutations.has(mutation_id):
+					mutations.append(mutation_id)
+			settings[key] = mutations
+		elif control is LineEdit and key == "questChoiceMap":
+			var choices: Dictionary = {}
+			for entry: String in (control as LineEdit).text.split(",", false):
+				var parts: PackedStringArray = entry.strip_edges().split(":")
+				if parts.size() == 3 and not parts[2].strip_edges().is_empty():
+					choices["%s:%s" % [parts[0].strip_edges(), parts[1].strip_edges()]] = parts[2].strip_edges()
+			settings[key] = choices
+	var allowed_node_types: Array[String] = []
+	for node_type: String in _autopilot_profile_nodes:
+		if (_autopilot_profile_nodes[node_type] as CheckButton).button_pressed:
+			allowed_node_types.append(node_type)
+	if allowed_node_types.size() == AutopilotPolicy.NODE_TYPES.size():
+		allowed_node_types.clear()
+	settings["allowedNodeTypes"] = allowed_node_types if not allowed_node_types.is_empty() else AutopilotPolicy.NODE_TYPES.duplicate()
+	var weights: Dictionary = {}
+	for key: String in _autopilot_profile_weights:
+		weights[key] = (_autopilot_profile_weights[key] as SpinBox).value
+	settings["objectiveWeights"] = weights
+	settings["riskWeight"] = float(weights.get("risk", settings.get("riskWeight", 4.0)))
+	settings["checkpointAction"] = str(_autopilot_profile_action.get_item_metadata(_autopilot_profile_action.selected))
+	if _session.save_autopilot_profile_settings(_autopilot_profile_editor_id, settings):
+		_footer.text = "ПОЛИТИКА %s СОХРАНЕНА" % _autopilot_profile_editor_id
 		_show_road()
 	else:
 		_footer.text = _session.last_error

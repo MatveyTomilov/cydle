@@ -788,6 +788,33 @@ func active_autopilot_profile_id() -> String:
 		return "BALANCED"
 	return state.meta.active_autopilot_profile_id
 
+func active_autopilot_profile() -> Dictionary:
+	if state == null:
+		return AutopilotPolicy.profile("BALANCED")
+	return AutopilotPolicy.saved_profile(active_autopilot_profile_id(), state.meta.autopilot_profiles)
+
+func save_autopilot_profile_settings(profile_id: String, settings: Dictionary) -> bool:
+	if not _garage_action_allowed():
+		last_error = "Профиль автопилота настраивается между выездами."
+		return false
+	var validation: Dictionary = AutopilotPolicy.validate_settings(settings)
+	if not bool(validation.get("ok", false)):
+		last_error = str(validation.get("error", "Настройки автопилота не прошли проверку."))
+		return false
+	var payload: Dictionary = state.to_payload()
+	var profiles: Array = payload["meta"].get("autopilotProfiles", [])
+	var found: bool = false
+	for index: int in range(profiles.size()):
+		if str(profiles[index].get("id", "")) == profile_id:
+			profiles[index]["settings"] = settings.duplicate(true)
+			found = true
+			break
+	if not found:
+		last_error = "Профиль автопилота не найден."
+		return false
+	payload["meta"]["autopilotProfiles"] = profiles
+	return _commit_payload(payload)
+
 func set_active_autopilot_profile(profile_id: String) -> bool:
 	if not _garage_action_allowed():
 		last_error = "Профиль автопилота меняется только между выездами."
@@ -997,7 +1024,7 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
 	var combat_time: int = 0
 	var policy: AutopilotPolicy = AutopilotPolicy.new()
 	var pilot_profile_id: String = active_autopilot_profile_id()
-	var pilot_profile: Dictionary = AutopilotPolicy.profile(pilot_profile_id)
+	var pilot_profile: Dictionary = active_autopilot_profile()
 	while actions < MAX_COMMANDS:
 		var used_time: int = maxi(0, roundi(float(state.run.resources.get("gameTimeMs", starting_time)) - starting_time)) + combat_time
 		if used_time >= budget:
@@ -1041,8 +1068,26 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
 					return _autopilot_stop("PAUSED_FOR_RESOURCES", "WANTED_LIMIT", "Розыск превысил предел профиля %s; требуется ручное решение." % str(pilot_profile.get("name", pilot_profile_id)), report)
 				var hp_ratio: float = float(state.run.resources.get("hp", 0.0)) / maxf(1.0, float(state.run.resources.get("maxHP", 1.0)))
 				var shield_ratio: float = float(state.run.resources.get("shield", 0.0)) / maxf(1.0, float(state.run.resources.get("maxShield", 1.0)))
-				var choice: Dictionary = policy.choose_node(reachable_nodes(), route_intel(), state.run, float(pilot_profile.get("riskWeight", 4.0)), pilot_profile_id)
+				var choice: Dictionary = policy.choose_node(reachable_nodes(), route_intel(), state.run, float(pilot_profile.get("riskWeight", 4.0)), pilot_profile_id, pilot_profile)
 				if choice.is_empty():
+					if _emergency_exit_allowed() and bool(pilot_profile.get("allowTow", false)):
+						var tow_quote: Dictionary = emergency_exit_quote()
+						if bool(tow_quote.get("towAffordable", false)):
+							if call_evacuation_tow():
+								report["status"] = "TOWED"
+								report["reasonCode"] = "PROFILE_ALLOWED_TOW"
+								report["reason"] = "Профиль %s разрешил оплачиваемую эвакуацию тягачом." % str(pilot_profile.get("name", pilot_profile_id))
+								break
+							return _autopilot_stop("SAFE_ERROR_STOP", "TOW_FAILED", last_error, report)
+						if not bool(tow_quote.get("towAffordable", false)) and not bool(pilot_profile.get("allowAbandon", false)):
+							return _autopilot_stop("PAUSED_FOR_RESOURCES", "TOW_UNAFFORDABLE", "Профиль разрешил тягач, но выезд не может оплатить эвакуацию.", report)
+					if _emergency_exit_allowed() and bool(pilot_profile.get("allowAbandon", false)):
+						if abandon_run():
+							report["status"] = "ABANDONED"
+							report["reasonCode"] = "PROFILE_ALLOWED_ABANDON"
+							report["reason"] = "Профиль %s разрешил отказаться от бесперспективного выезда." % str(pilot_profile.get("name", pilot_profile_id))
+							break
+						return _autopilot_stop("SAFE_ERROR_STOP", "ABANDON_RUN", last_error, report)
 					return _autopilot_stop("PAUSED_FOR_RESOURCES", "NO_ALLOWED_NODE", "В пределах профиля нет подходящего известного перехода; требуется ручное решение.", report)
 				var selected_info: Dictionary = route_intel().get("nodes", {}).get(str(choice.get("id", "")), {})
 				var selected_type: String = str(selected_info.get("type", "UNKNOWN")) if bool(selected_info.get("revealed", false)) else "UNKNOWN"
@@ -1070,10 +1115,33 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
 					return _autopilot_stop("PAUSED_FOR_RESOURCES", "TRAVEL_REJECTED", last_error, report)
 				report["nodesVisited"] = int(report["nodesVisited"]) + 1
 			"NODE":
-				if not available_quest_stages().is_empty():
-					return _autopilot_stop("PAUSED_FOR_DECISION", "QUEST_CHOICE", "Квестовое решение требует явного выбора игрока.", report)
+				var quest_stages: Array[Dictionary] = available_quest_stages()
+				if not quest_stages.is_empty():
+					if str(pilot_profile.get("chooseQuest", "PAUSE")) == "MATCH":
+						var choice_map: Dictionary = pilot_profile.get("questChoiceMap", {})
+						var resolved_named_choice: bool = false
+						for opportunity: Dictionary in quest_stages:
+							var quest_id: String = str(opportunity.get("quest", {}).get("id", ""))
+							var quest_stage: int = int(opportunity.get("progress", {}).get("stage", 1))
+							var choice_id: String = str(choice_map.get("%s:%d" % [quest_id, quest_stage], ""))
+							if choice_id.is_empty():
+								continue
+							if not resolve_quest_choice(quest_id, choice_id):
+								return _autopilot_stop("PAUSED_FOR_DECISION", "QUEST_NAMED_CHOICE_INVALID", last_error, report)
+							actions += 1
+							resolved_named_choice = true
+							break
+						if resolved_named_choice:
+							continue
+						return _autopilot_stop("PAUSED_FOR_DECISION", "QUEST_NAMED_CHOICE_MISSING", "Для готового этапа нет совпадающего выбора в карте MATCH-политики.", report)
+					var quest_reason: String = "Автопилот настроен никогда не выбирать квестовые варианты." if str(pilot_profile.get("chooseQuest", "PAUSE")) == "NEVER" else "Квестовое решение требует выбора игрока."
+					var quest_code: String = "QUEST_NEVER" if str(pilot_profile.get("chooseQuest", "PAUSE")) == "NEVER" else "QUEST_CHOICE"
+					return _autopilot_stop("PAUSED_FOR_DECISION", quest_code, quest_reason, report)
 				var node: Dictionary = current_node()
 				var kind: String = str(node.get("type", ""))
+				var allowed_node_types: Array = pilot_profile.get("allowedNodeTypes", [])
+				if not allowed_node_types.is_empty() and not allowed_node_types.has(kind):
+					return _autopilot_stop("PAUSED_FOR_DECISION", "NODE_TYPE_RESTRICTED", "Тип %s не разрешён текущей политикой автопилота." % kind, report)
 				if kind in ["COMBAT", "ELITE", "BOUNTY", "BOSS", "ANOMALY"] and state.run.cleared_node_ids.has(str(node.get("id", ""))):
 					if not resolve_service_node("LEAVE_NODE"):
 						return _autopilot_stop("SAFE_ERROR_STOP", "NODE_EXIT", last_error, report)
@@ -1082,7 +1150,7 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
 						return _autopilot_stop("SAFE_ERROR_STOP", "COMBAT_START", last_error, report)
 				elif kind == "EVENT":
 					var event: Dictionary = current_event()
-					var event_choice: Dictionary = _autopilot_event_choice(event)
+					var event_choice: Dictionary = _autopilot_event_choice(event, pilot_profile)
 					if event_choice.is_empty():
 						return _autopilot_stop("PAUSED_FOR_DECISION", "EVENT_CHOICE", "Событие требует фракционного, сюжетного или рискованного выбора игрока.", report)
 					if not resolve_event(str(event_choice.get("id", ""))):
@@ -1102,7 +1170,7 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
 				elif kind == "REPAIR":
 					var resources: Dictionary = state.run.resources
 					var repair_action: String = "REPAIR_HULL" if float(resources.get("hull", 0.0)) < float(resources.get("maxHull", 0.0)) else "REPAIR_HP" if float(resources.get("hp", 0.0)) < float(resources.get("maxHP", 0.0)) else "LEAVE_NODE"
-					if repair_action != "LEAVE_NODE" and not resolve_service_node(repair_action): return _autopilot_stop("PAUSED_FOR_RESOURCES", "REPAIR_UNAVAILABLE", last_error, report)
+					if repair_action != "LEAVE_NODE" and not resolve_service_node(repair_action, "", float(pilot_profile.get("maxSpendRepair", 0.0))): return _autopilot_stop("PAUSED_FOR_RESOURCES", "REPAIR_UNAVAILABLE", last_error, report)
 					if repair_action == "LEAVE_NODE" and not resolve_service_node("LEAVE_NODE"): return _autopilot_stop("SAFE_ERROR_STOP", "NODE_EXIT", last_error, report)
 				elif kind == "SHOP":
 					if not resolve_service_node("LEAVE_NODE"): return _autopilot_stop("SAFE_ERROR_STOP", "NODE_EXIT", last_error, report)
@@ -1127,7 +1195,7 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
 					break
 				var checkpoint_ship_id: String = "ship:%s:%s" % [state.run.seed, state.run.current_node_id]
 				if checkpoint_action == "CONDITIONAL" and not state.run.shipped_checkpoint_ids.has(checkpoint_ship_id):
-					var shipping_ids: Array[String] = _autopilot_checkpoint_cargo_ids(5)
+					var shipping_ids: Array[String] = _autopilot_checkpoint_cargo_ids(5, str(pilot_profile.get("cargoProtectionPriority", "RARITY")))
 					var run_wallet: Dictionary = state.run.wallet.to_dictionary()
 					var currency_to_ship: bool = float(run_wallet.get("CREDITS", 0.0)) > 0.0 or float(run_wallet.get("SCRAP", 0.0)) > 0.0 or float(run_wallet.get("DATA", 0.0)) > 0.0
 					if not shipping_ids.is_empty() or currency_to_ship:
@@ -1151,8 +1219,16 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
 		report["status"] = "OFFLINE_CAPPED" if report["reasonCode"] == "BUDGET" else report["status"]
 	return _finalize_autopilot_report(report)
 
-func _autopilot_event_choice(event: Dictionary) -> Dictionary:
+func _autopilot_event_choice(event: Dictionary, profile: Dictionary = {}) -> Dictionary:
 	for choice: Dictionary in event.get("choices", []):
+		var preferred_mutation: bool = choice.has("grantMutation") and profile.get("preferMutations", []).has(str(choice.get("grantMutation", "")))
+		if preferred_mutation and not choice.has("flag") and not choice.has("wanted"):
+			var mutation_affordable: bool = true
+			for currency: String in choice.get("cost", {}).keys():
+				if float(state.run.wallet.to_dictionary().get(currency, 0.0)) < float(choice["cost"][currency]):
+					mutation_affordable = false
+			if mutation_affordable:
+				return choice
 		if choice.has("reputation") or choice.has("flag") or choice.has("wanted") or str(choice.get("special", "")) != "":
 			continue
 		var affordable: bool = true
@@ -1163,7 +1239,7 @@ func _autopilot_event_choice(event: Dictionary) -> Dictionary:
 			return choice
 	return {}
 
-func _autopilot_checkpoint_cargo_ids(max_units: int) -> Array[String]:
+func _autopilot_checkpoint_cargo_ids(max_units: int, priority: String = "RARITY") -> Array[String]:
 	var selected: Array[String] = []
 	if state == null or state.run == null or max_units <= 0:
 		return selected
@@ -1175,6 +1251,16 @@ func _autopilot_checkpoint_cargo_ids(max_units: int) -> Array[String]:
 	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		var rarity_a: int = int(rarity_rank.get(str(a.get("rarity", "COMMON")), 0))
 		var rarity_b: int = int(rarity_rank.get(str(b.get("rarity", "COMMON")), 0))
+		if priority == "QUEST":
+			var quest_a: bool = bool(a.get("questTarget", false))
+			var quest_b: bool = bool(b.get("questTarget", false))
+			if quest_a != quest_b:
+				return quest_a
+		if priority == "VALUE":
+			var value_a: float = float(a.get("sellValue", rarity_a * 100 + int(a.get("techLevel", 1)) * 10))
+			var value_b: float = float(b.get("sellValue", rarity_b * 100 + int(b.get("techLevel", 1)) * 10))
+			if not is_equal_approx(value_a, value_b):
+				return value_a > value_b
 		if rarity_a != rarity_b:
 			return rarity_a > rarity_b
 		return str(a.get("itemId", "")) < str(b.get("itemId", ""))
@@ -1689,7 +1775,7 @@ func _expire_quest_deadlines(meta: Dictionary, next_depth: int) -> void:
 			all_progress[quest_id] = progress
 	meta["questProgress"] = all_progress
 
-func resolve_service_node(action: String, prototype_id: String = "") -> bool:
+func resolve_service_node(action: String, prototype_id: String = "", autopilot_repair_budget: float = -1.0) -> bool:
 	if state == null or state.run == null or state.run.phase != "NODE":
 		last_error = "Сервисное действие доступно только в дорожном узле."
 		return false
@@ -1751,7 +1837,12 @@ func resolve_service_node(action: String, prototype_id: String = "") -> bool:
 			if float(wallet.get("CREDITS", 0.0)) < credit_cost:
 				last_error = "Недостаточно незакреплённых кредитов (%d требуется)." % credit_cost
 				return false
+			if autopilot_repair_budget >= 0.0 and float(state.run.autopilot_repair_spend) + float(credit_cost) > autopilot_repair_budget:
+				last_error = "Лимит ремонта автопилота (%d ¤) исчерпан." % int(autopilot_repair_budget)
+				return false
 			wallet["CREDITS"] = float(wallet["CREDITS"]) - credit_cost
+			if autopilot_repair_budget >= 0.0:
+				run_payload["autopilotRepairSpend"] = float(state.run.autopilot_repair_spend) + float(credit_cost)
 			resources["hull"] = minf(max_hull, hull + 30.0)
 		else:
 			var hp: float = float(resources.get("hp", 0.0))
@@ -1763,7 +1854,12 @@ func resolve_service_node(action: String, prototype_id: String = "") -> bool:
 			if float(wallet.get("CREDITS", 0.0)) < credit_cost:
 				last_error = "Недостаточно незакреплённых кредитов (%d требуется)." % credit_cost
 				return false
+			if autopilot_repair_budget >= 0.0 and float(state.run.autopilot_repair_spend) + float(credit_cost) > autopilot_repair_budget:
+				last_error = "Лимит ремонта автопилота (%d ¤) исчерпан." % int(autopilot_repair_budget)
+				return false
 			wallet["CREDITS"] = float(wallet["CREDITS"]) - credit_cost
+			if autopilot_repair_budget >= 0.0:
+				run_payload["autopilotRepairSpend"] = float(state.run.autopilot_repair_spend) + float(credit_cost)
 			resources["hp"] = minf(max_hp, hp + (max_hp - hp) * 0.3)
 	elif kind == "CACHE":
 		elapsed = 5000.0
