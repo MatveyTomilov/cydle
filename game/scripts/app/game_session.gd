@@ -85,6 +85,79 @@ func build_preview() -> Dictionary:
 		"unlockedDroneSlots": state.meta.unlocked_drone_slots,
 	})
 
+func simulation_equipment_candidates(slot: String) -> Array[Dictionary]:
+	var candidates: Array[Dictionary] = []
+	if state == null or not _garage_action_allowed() or not state.meta.equipment.has(slot):
+		return candidates
+	var catalog_result: Dictionary = _item_catalog.load_catalog()
+	if not bool(catalog_result.get("ok", false)):
+		return candidates
+	for item: Dictionary in state.meta.inventory:
+		var item_id: String = str(item.get("itemId", ""))
+		if not bool(item.get("secured", false)) or item_id == str(state.meta.equipment.get(slot, "")):
+			continue
+		var payload: Dictionary = state.to_payload()
+		for equipped_slot: Variant in payload["meta"]["equipment"].keys().duplicate():
+			if str(payload["meta"]["equipment"][equipped_slot]) == item_id:
+				payload["meta"]["equipment"].erase(equipped_slot)
+		payload["meta"]["equipment"][slot] = item_id
+		var parsed: Dictionary = GameSaveState.new().parse_payload(payload)
+		if not bool(parsed.get("ok", false)):
+			continue
+		var candidate_state: GameSaveState = parsed["state"] as GameSaveState
+		var build: Dictionary = BuildResolver.new().resolve_build(_build_input(candidate_state))
+		if not bool(build.get("valid", false)):
+			continue
+		var template: Dictionary = _item_catalog.get_template(str(item.get("templateId", "")))
+		var label: String = "%s · T%d · %s" % [str(template.get("name", item.get("templateId", "Предмет"))), int(item.get("techLevel", 1)), item_id]
+		candidates.append({"itemId": item_id, "label": label})
+	return candidates
+
+func simulate_equipment_comparison(slot: String, item_id: String, enemy_id: String, runs: int = 3) -> Dictionary:
+	if state == null or not _garage_action_allowed():
+		return {"ok": false, "error": "Simulation Lab доступна только в гараже между выездами."}
+	if not state.meta.equipment.has(slot):
+		return {"ok": false, "error": "Выбранный слот сейчас не экипирован."}
+	var payload: Dictionary = state.to_payload()
+	var item_found: bool = false
+	for item: Dictionary in payload["meta"]["inventory"]:
+		if str(item.get("itemId", "")) == item_id and bool(item.get("secured", false)):
+			item_found = true
+			break
+	if not item_found:
+		return {"ok": false, "error": "Предмет для сравнения отсутствует на складе."}
+	for equipped_slot: Variant in payload["meta"]["equipment"].keys().duplicate():
+		if str(payload["meta"]["equipment"][equipped_slot]) == item_id:
+			payload["meta"]["equipment"].erase(equipped_slot)
+	payload["meta"]["equipment"][slot] = item_id
+	var parsed: Dictionary = GameSaveState.new().parse_payload(payload)
+	if not bool(parsed.get("ok", false)):
+		return {"ok": false, "error": str(parsed.get("error", "Кандидатская сборка не прошла проверку."))}
+	var candidate_state: GameSaveState = parsed["state"] as GameSaveState
+	var current_build: Dictionary = build_preview()
+	var candidate_build: Dictionary = BuildResolver.new().resolve_build(_build_input(candidate_state))
+	if not bool(candidate_build.get("valid", false)):
+		return {"ok": false, "error": "Кандидатская сборка отклонена BuildResolver: %s" % str(candidate_build.get("issues", []))}
+	var enemy_catalog: EnemyCatalog = EnemyCatalog.new()
+	var loaded: Dictionary = enemy_catalog.load_catalog()
+	if not bool(loaded.get("ok", false)):
+		return {"ok": false, "error": str(loaded.get("error", "Каталог противников недоступен."))}
+	var enemy: Dictionary = enemy_catalog.get_template(enemy_id)
+	if enemy.is_empty():
+		return {"ok": false, "error": "Враг или босс %s отсутствует в каталоге." % enemy_id}
+	var tactic: Dictionary = active_tactic()
+	for rule: Dictionary in tactic.get("rules", []):
+		if str(rule.get("skillId", "")) == "SK_BURST" and str(rule.get("target", "")) == "allEnemies":
+			rule["target"] = "nearest"
+	var depth: int = maxi(1, state.meta.unlocked_forpost + 1)
+	var result: Dictionary = SimulationLab.new().compare_builds(current_build, candidate_build, [{"templateId": enemy_id}], tactic, depth, str(enemy.get("biomes", ["B01"])[0]), runs, "%s:%s:%s" % [state.save_id, slot, item_id])
+	if bool(result.get("ok", false)):
+		result["slot"] = slot
+		result["candidateItemId"] = item_id
+		result["enemyId"] = enemy_id
+		result["depth"] = depth
+	return result
+
 func attribute_points_available() -> int:
 	if state == null:
 		return 0

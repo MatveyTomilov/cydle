@@ -19,6 +19,10 @@ var _settings: ConfigFile = ConfigFile.new()
 var _muted: bool = false
 var _reduced_motion: bool = false
 var _medical_restore_next_run: bool = false
+var _simulation_slot: String = ""
+var _simulation_item_id: String = ""
+var _simulation_enemy_id: String = "E01"
+var _simulation_report: Dictionary = {}
 
 func _ready() -> void:
 	_session.load_saved_game()
@@ -280,6 +284,9 @@ func _show_garage() -> void:
 	var tactics_button: Button = _button("ТАКТИКА · %d ПРОФИЛЬ(Я)" % meta.tactics.size(), false)
 	tactics_button.pressed.connect(_show_tactics)
 	actions.add_child(tactics_button)
+	var simulation_button: Button = _button("SIMULATION LAB", false)
+	simulation_button.pressed.connect(_show_simulation_lab)
+	actions.add_child(simulation_button)
 	var save_button: Button = _button("СОХРАНИТЬ", false)
 	save_button.pressed.connect(_on_save)
 	actions.add_child(save_button)
@@ -614,6 +621,112 @@ func _on_add_tactic_rule(selector: OptionButton) -> void:
 		_show_tactics()
 	else:
 		_footer.text = _session.last_error
+
+func _show_simulation_lab() -> void:
+	_screen = "simulation_lab"
+	_clear_body()
+	_body.add_child(_label("ГАРАЖ · ДЕТЕРМИНИРОВАННЫЕ ПРОГОНЫ", 12, COLOR_CYAN))
+	_body.add_child(_label("Simulation Lab", 28, COLOR_TEXT))
+	_body.add_child(_label("Сравнение текущего снаряжения с кандидатом на одинаковых seed через боевой CombatSimulator (шаг 100 мс). Предмет в игре не меняется.", 12, COLOR_MUTED))
+	if _session.state == null:
+		return
+	if _session.state.run != null and not ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(_session.state.run.phase):
+		_body.add_child(_label("Лаборатория доступна только между выездами.", 13, COLOR_AMBER))
+	else:
+		var row: HBoxContainer = HBoxContainer.new()
+		_body.add_child(row)
+		var slot_selector: OptionButton = OptionButton.new()
+		for slot_value: Variant in _session.state.meta.equipment.keys():
+			slot_selector.add_item(str(slot_value))
+			slot_selector.set_item_metadata(slot_selector.item_count - 1, str(slot_value))
+			if _simulation_slot.is_empty():
+				_simulation_slot = str(slot_value)
+				_simulation_item_id = ""
+			if _simulation_slot == str(slot_value):
+				slot_selector.select(slot_selector.item_count - 1)
+		slot_selector.item_selected.connect(_on_simulation_slot_selected.bind(slot_selector))
+		row.add_child(slot_selector)
+		var item_selector: OptionButton = OptionButton.new()
+		var candidates: Array[Dictionary] = _session.simulation_equipment_candidates(_simulation_slot)
+		for candidate: Dictionary in candidates:
+			item_selector.add_item(str(candidate.get("label", candidate.get("itemId", "Предмет"))))
+			item_selector.set_item_metadata(item_selector.item_count - 1, str(candidate.get("itemId", "")))
+			if _simulation_item_id.is_empty():
+				_simulation_item_id = str(candidate.get("itemId", ""))
+			if _simulation_item_id == str(candidate.get("itemId", "")):
+				item_selector.select(item_selector.item_count - 1)
+		item_selector.disabled = item_selector.item_count == 0
+		item_selector.item_selected.connect(_on_simulation_item_selected.bind(item_selector))
+		row.add_child(item_selector)
+		var enemy_selector: OptionButton = OptionButton.new()
+		var enemy_catalog: EnemyCatalog = EnemyCatalog.new()
+		var catalog_result: Dictionary = enemy_catalog.load_catalog()
+		if bool(catalog_result.get("ok", false)):
+			for enemy_id: String in enemy_catalog.enemies.keys():
+				var enemy: Dictionary = enemy_catalog.get_template(enemy_id)
+				enemy_selector.add_item("ВРАГ · %s" % str(enemy.get("name", enemy_id)))
+				enemy_selector.set_item_metadata(enemy_selector.item_count - 1, enemy_id)
+			for boss_id: String in enemy_catalog.bosses.keys():
+				var boss: Dictionary = enemy_catalog.get_template(boss_id)
+				enemy_selector.add_item("БОСС · %s" % str(boss.get("name", boss_id)))
+				enemy_selector.set_item_metadata(enemy_selector.item_count - 1, boss_id)
+		for index: int in range(enemy_selector.item_count):
+			if str(enemy_selector.get_item_metadata(index)) == _simulation_enemy_id:
+				enemy_selector.select(index)
+		enemy_selector.item_selected.connect(_on_simulation_enemy_selected.bind(enemy_selector))
+		row.add_child(enemy_selector)
+		var runs: SpinBox = SpinBox.new()
+		runs.min_value = 1
+		runs.max_value = SimulationLab.MAX_BATCH_RUNS
+		runs.step = 1
+		runs.value = 3
+		row.add_child(runs)
+		var compare: Button = _button("ЗАПУСТИТЬ ПАРНОЕ СРАВНЕНИЕ", true)
+		compare.disabled = _simulation_item_id.is_empty() or not bool(catalog_result.get("ok", false))
+		compare.pressed.connect(_on_simulation_compare.bind(runs))
+		_body.add_child(compare)
+		if not _simulation_report.is_empty():
+			if not bool(_simulation_report.get("ok", false)):
+				_body.add_child(_label("Симуляция остановлена: %s" % str(_simulation_report.get("error", "ошибка")), 13, COLOR_RED))
+			else:
+				var results: Array = _simulation_report.get("results", [])
+				if results.size() == 2:
+					_body.add_child(_label("СЦЕНАРИЙ %s · ГЛУБИНА %d · %d ПАРНЫХ ПРОГОНА" % [str(_simulation_report.get("enemyId", "")), int(_simulation_report.get("depth", 1)), int(_simulation_report.get("runs", 0))], 13, COLOR_CYAN))
+					_body.add_child(_simulation_result_card("ТЕКУЩАЯ СБОРКА", results[0]))
+					_body.add_child(_simulation_result_card("КАНДИДАТ · %s" % _simulation_item_id, results[1]))
+	_body.add_child(_button("НАЗАД В ГАРАЖ", false))
+	var back: Button = _body.get_child(_body.get_child_count() - 1) as Button
+	back.pressed.connect(_show_garage)
+	_footer.text = "ПАРНЫЕ SEED · ТОТ ЖЕ СИМУЛЯТОР, ЧТО И В ИГРЕ · 100 МС"
+
+func _simulation_result_card(title: String, result: Dictionary) -> PanelContainer:
+	var card: PanelContainer = PanelContainer.new()
+	var content: VBoxContainer = VBoxContainer.new()
+	card.add_child(content)
+	content.add_child(_label(title, 14, COLOR_TEXT))
+	content.add_child(_label("Победы %.0f%% · среднее время %.1f с · урон нанесён %.1f · получен %.1f" % [100.0 * float(result.get("winRate", 0.0)), float(result.get("averageTimeMs", 0.0)) / 1000.0, float(result.get("averageDamageDealt", 0.0)), float(result.get("averageDamageTaken", 0.0))], 11, COLOR_MUTED))
+	content.add_child(_label("Среднее HP в конце %.1f%% · минимум HP %.1f%% · поражения %d · таймауты %d" % [100.0 * float(result.get("averageHpFraction", 0.0)), 100.0 * float(result.get("averageLowHpFraction", 0.0)), int(result.get("defeats", 0)), int(result.get("timeouts", 0))], 11, COLOR_MUTED))
+	return card
+
+func _on_simulation_slot_selected(index: int, selector: OptionButton) -> void:
+	_simulation_slot = str(selector.get_item_metadata(index))
+	_simulation_item_id = ""
+	_simulation_report.clear()
+	_show_simulation_lab()
+
+func _on_simulation_item_selected(index: int, selector: OptionButton) -> void:
+	_simulation_item_id = str(selector.get_item_metadata(index))
+	_simulation_report.clear()
+	_show_simulation_lab()
+
+func _on_simulation_enemy_selected(index: int, selector: OptionButton) -> void:
+	_simulation_enemy_id = str(selector.get_item_metadata(index))
+	_simulation_report.clear()
+	_show_simulation_lab()
+
+func _on_simulation_compare(runs: SpinBox) -> void:
+	_simulation_report = _session.simulate_equipment_comparison(_simulation_slot, _simulation_item_id, _simulation_enemy_id, int(runs.value))
+	_show_simulation_lab()
 
 func _show_inventory() -> void:
 	_screen = "inventory"

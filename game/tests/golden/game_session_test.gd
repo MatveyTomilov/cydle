@@ -266,6 +266,23 @@ func run(_tree: SceneTree) -> bool:
 		tactics_reload.configure_save_directory("user://test-saves/tactic-editor")
 		check(tactics_reload.load_saved_game() and tactics_reload.state.meta.tactics.size() == 5 and str(tactics_reload.active_tactic().get("id", "")) == "DEFAULT", "game_session: tactic changes or profile selection did not survive save reload")
 		check(tactics_session.start_expedition("tactics-lock-test") and not tactics_session.set_tactic_rule_enabled("starter-burst", true), "game_session: tactic editor remained mutable during an expedition")
+	var simulation_session: GameSession = GameSession.new()
+	simulation_session.configure_save_directory("user://test-saves/simulation-lab")
+	if check(simulation_session.start_new_game(1762900000960), "game_session: could not create a Simulation Lab profile"):
+		var simulation_payload: Dictionary = simulation_session.state.to_payload()
+		var comparison_item: Dictionary = simulation_payload["meta"]["inventory"][0].duplicate(true)
+		comparison_item["itemId"] = "lab-comparison-pistol"
+		comparison_item["originGrantId"] = "grant:lab-comparison-pistol"
+		simulation_payload["meta"]["inventory"].append(comparison_item)
+		check(simulation_session._commit_payload(simulation_payload), "game_session: Simulation Lab candidate fixture could not be saved: %s" % simulation_session.last_error)
+		var candidate_items: Array[Dictionary] = simulation_session.simulation_equipment_candidates("MAIN")
+		check(candidate_items.any(func(candidate: Dictionary) -> bool: return str(candidate.get("itemId", "")) == "lab-comparison-pistol"), "game_session: Simulation Lab did not expose a BuildResolver-valid equipment candidate")
+		var simulation_result: Dictionary = simulation_session.simulate_equipment_comparison("MAIN", "lab-comparison-pistol", "E01", 1)
+		check(bool(simulation_result.get("ok", false)) and simulation_result.get("results", []).size() == 2, "game_session: paired Simulation Lab combat failed: %s" % str(simulation_result.get("error", "")))
+		if bool(simulation_result.get("ok", false)):
+			var paired_results: Array = simulation_result["results"]
+			check(paired_results[0] == paired_results[1], "game_session: identical builds diverged under a shared deterministic seed")
+		check(str(simulation_session.state.meta.equipment.get("MAIN", "")) != "lab-comparison-pistol", "game_session: Simulation Lab mutated the saved equipment loadout")
 	var resumed: GameSession = GameSession.new()
 	resumed.configure_save_directory("user://test-saves/game-session")
 	check(resumed.load_saved_game(), "game_session: persisted state did not reload: %s" % resumed.last_error)
