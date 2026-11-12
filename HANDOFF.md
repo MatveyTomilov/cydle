@@ -1,5 +1,14 @@
 # CYDLE — Project handoff and development history
 
+## Live continuation (2026-11-13; FULL GAME FIRST campaign encounters)
+
+- Working branch `development/codex`, base commit `d986d62b40f69ca68c34ca14f21d2ddf130cde6d`; local work below is not yet committed while the isolated campaign run is underway.
+- Ordinary combat generation now creates a deterministic, biome-themed roster within Master Spec §17's threat budget, depth unlocks and six-actor cap. E20 expands to a bounded 2–4 actor swarm. This replaces the previous single-enemy ordinary COMBAT nodes; ELITE/BOUNTY/BOSS/ANOMALY retain their authored encounter construction.
+- Save validation now writes a wider 1e-5 float bucket to avoid JSON conversion edge cases and accepts both the previous 1e-8 checksum and legacy pre-bucket checksum, preserving existing user saves. Gameplay values themselves are unchanged.
+- Verification on current code: Godot 4.7.2 editor import exit 0; 22 headless test scripts exit 0, 88,058 assertions / 0 failures. A regression for explicitly loading the previous 1e-8 format was just added and still needs rerunning. An isolated campaign E2E is running with application name `CYDLE_ROSTER_E2E_20261113`; it has reached BOSS_A at d4, but that first boss attempt ended in defeat. The E2E is continuing through a fresh outing to exercise progression; no campaign completion is claimed.
+- Preserve the isolated test data under `%APPDATA%\Godot\app_userdata\CYDLE_ROSTER_E2E_20261113\campaign-e2e-repro`. The user's original CYDLE profile and prior E2E safety backup are untouched.
+- Next action: let the isolated driver finish or record its stopping point; rerun Godot import and all tests including checksum-compatibility regression, export/smoke if code changes remain, then commit and push. Continue from the largest remaining campaign blocker, using encounter feedback to improve the E2E build/selection without changing Master Spec balance.
+
 ## Live continuation (2026-11-13; paused-quest resume)
 
 - Branch: `development/codex`. Latest pushed checkpoint `06e59921dfaf8c8c7f2a444865d304debce52f39` is verified against origin; working tree clean after the checkpoint.

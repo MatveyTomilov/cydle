@@ -18,6 +18,9 @@ func run(_tree: SceneTree) -> bool:
 	var repository: Object = repository_script.new()
 	var test_directory: String = "user://save_test_%d" % Time.get_ticks_usec()
 	repository.call("configure_directory", test_directory)
+	var previous_checksum_document: Dictionary = validator.call("create_document", {"hp": 365.2344, "stats": [0.000001, 0.123456789, 9999.9999]}, "previous_float_bucket", 1, 1)
+	previous_checksum_document["checksum"] = validator.call("_previous_float_checksum", previous_checksum_document)
+	check(bool(validator.call("validate", previous_checksum_document).get("ok", false)), "save_repository: previous 1e-8 checksum format was not accepted")
 
 	var payload: Dictionary = {"profile": {"level": 1, "credits": 120}, "items": ["starter"]}
 	var precise_float_result: Dictionary = repository.call("save", "precise_float", {"hp": 90.87378640776699}, 99)
@@ -28,6 +31,12 @@ func run(_tree: SceneTree) -> bool:
 	var serialized_document: Variant = JSON.parse_string(JSON.stringify(precise_float_document, "", true, true))
 	serialized_document = JSON.parse_string(JSON.stringify(serialized_document, "", true, true))
 	check(bool(validator.call("validate", serialized_document).get("ok", false)), "save_repository: checksum changed after repeated JSON float conversions")
+	var combat_float_result: Dictionary = repository.call("save", "combat_float", {"hp": 365.2344, "maxHP": 365.2344, "stats": [0.000001, 0.123456789, 9999.9999]}, 100)
+	check(bool(combat_float_result.get("ok", false)), "save_repository: stat-derived combat floats failed validation after a disk round-trip")
+	var combat_float_loaded: Dictionary = repository.call("load", "combat_float")
+	var combat_float_document: Variant = JSON.parse_string(JSON.stringify(combat_float_loaded.get("save", {}), "", true, true))
+	combat_float_document = JSON.parse_string(JSON.stringify(combat_float_document, "", true, true))
+	check(bool(combat_float_loaded.get("ok", false)) and bool(validator.call("validate", combat_float_document).get("ok", false)), "save_repository: combat stat checksum did not survive repeated JSON conversion")
 	var first_result: Dictionary = repository.call("save", "slot_a", payload, 100)
 	check(bool(first_result.get("ok", false)), "save_repository: first snapshot was not saved")
 	var first: Dictionary = first_result.get("save", {})

@@ -7,7 +7,8 @@ const BALANCE_VERSION: String = "1.0.0"
 const GAME_VERSION: String = "1.0.0"
 
 var _state_hash: StateHash = StateHash.new()
-const FLOAT_CHECKSUM_SCALE: float = 100000000.0
+const FLOAT_CHECKSUM_SCALE: float = 100000.0
+const PREVIOUS_FLOAT_CHECKSUM_SCALE: float = 100000000.0
 
 func create_document(payload: Dictionary, save_id: String, revision: int, updated_at: int, balance_version: String = BALANCE_VERSION, game_version: String = GAME_VERSION) -> Dictionary:
 	var document: Dictionary = {
@@ -52,16 +53,24 @@ func validate(value: Variant) -> Dictionary:
 		if not ["format", "schemaVersion", "balanceVersion", "gameVersion", "saveId", "revision", "updatedAt", "payload", "checksum"].has(field_name):
 			return _failure("Неизвестное поле сохранения: %s." % str(field_name))
 	var saved_checksum: String = str(document["checksum"])
-	if checksum(document) != saved_checksum and _legacy_checksum(document) != saved_checksum:
+	if checksum(document) != saved_checksum and _previous_float_checksum(document) != saved_checksum and _legacy_checksum(document) != saved_checksum:
 		return _failure("Контрольная сумма не совпадает: файл повреждён.")
 	return {"ok": true, "save": document.duplicate(true), "error": ""}
 
 func checksum(document: Dictionary) -> String:
+	return _checksum_with_float_scale(document, FLOAT_CHECKSUM_SCALE)
+
+func _previous_float_checksum(document: Dictionary) -> String:
+	# Preserve saves produced by the previous 1e-8 bucket while newer writes use a
+	# wider bucket to survive JSON float round-trips near bucket boundaries.
+	return _checksum_with_float_scale(document, PREVIOUS_FLOAT_CHECKSUM_SCALE)
+
+func _checksum_with_float_scale(document: Dictionary, scale: float) -> String:
 	var payload: Dictionary = document.duplicate(true)
 	payload.erase("checksum")
 	if not _is_json_value(payload):
 		return _state_hash.state_hash(payload)
-	return _state_hash.state_hash(_canonicalize_checksum_numbers(payload))
+	return _state_hash.state_hash(_canonicalize_checksum_numbers(payload, scale))
 
 func _legacy_checksum(document: Dictionary) -> String:
 	# Accept saves created before the stable-number checksum was introduced.
@@ -76,16 +85,16 @@ func _legacy_checksum(document: Dictionary) -> String:
 	normalized = JSON.parse_string(JSON.stringify(normalized, "", true, true))
 	return _state_hash.state_hash(normalized)
 
-func _canonicalize_checksum_numbers(value: Variant) -> Variant:
+func _canonicalize_checksum_numbers(value: Variant, scale: float = FLOAT_CHECKSUM_SCALE) -> Variant:
 	if value is Dictionary:
 		var result: Dictionary = {}
 		for key: Variant in value:
-			result[key] = _canonicalize_checksum_numbers(value[key])
+			result[key] = _canonicalize_checksum_numbers(value[key], scale)
 		return result
 	if value is Array:
 		var result: Array = []
 		for entry: Variant in value:
-			result.append(_canonicalize_checksum_numbers(entry))
+			result.append(_canonicalize_checksum_numbers(entry, scale))
 		return result
 	if value is float:
 		var number: float = float(value)
@@ -94,10 +103,12 @@ func _canonicalize_checksum_numbers(value: Variant) -> Variant:
 		if number == floor(number) and absf(number) <= 9007199254740991.0:
 			return int(number)
 		# JSON's decimal-to-binary conversion can alternate between adjacent floats
-		# across repeated save/load cycles. Hash a fixed 1e-8 numeric bucket instead.
+		# across save/load cycles. Leave enough headroom that adjacent representations
+		# cannot straddle a bucket boundary for ordinary gameplay stat values.
 		# This affects integrity metadata only; the original saved value is untouched.
 		if absf(number) <= 90000000000.0:
-			return {"__cydle_float_e8__": int(round(number * FLOAT_CHECKSUM_SCALE))}
+			var bucket_key: String = "__cydle_float_e5__" if scale == FLOAT_CHECKSUM_SCALE else "__cydle_float_e8__"
+			return {bucket_key: int(round(number * scale))}
 		return {"__cydle_float_text__": "%.8e" % number}
 	return value
 

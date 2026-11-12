@@ -40,10 +40,61 @@ func run(_tree: SceneTree) -> bool:
 		for node: Dictionary in layer_value:
 			if str(node.get("type", "")) == "ANOMALY": ordinary_anomaly_count += 1
 	check(ordinary_anomaly_count == 0, "sector_generator: a Zero Zone anomaly appeared outside B06")
+	_check_combat_rosters(generator)
 	var invalid: Dictionary = generator.generate("bad-biome", 1, "B99")
 	check(not bool(invalid.get("ok", true)), "sector_generator: invalid biome was accepted")
 	_check_graph(graph)
 	return failure_count == 0
+
+func _check_combat_rosters(generator: SectorGenerator) -> void:
+	var enemy_catalog: EnemyCatalog = EnemyCatalog.new()
+	if not check(bool(enemy_catalog.load_catalog().get("ok", false)), "sector_generator: enemy templates could not load for roster verification"):
+		return
+	var depth_cases: Array[Dictionary] = [
+		{"depth": 1, "biome": "B01"}, {"depth": 2, "biome": "B03"}, {"depth": 3, "biome": "B02"},
+		{"depth": 4, "biome": "B01"}, {"depth": 5, "biome": "B04"}, {"depth": 6, "biome": "B03"},
+		{"depth": 7, "biome": "B05"}, {"depth": 8, "biome": "B04"}, {"depth": 9, "biome": "B06"},
+		{"depth": 10, "biome": "B02"}, {"depth": 11, "biome": "B05"}, {"depth": 12, "biome": "B06"},
+		{"depth": 20, "biome": "B01"}, {"depth": 20, "biome": "B02"}, {"depth": 20, "biome": "B03"},
+		{"depth": 20, "biome": "B04"}, {"depth": 20, "biome": "B05"}, {"depth": 20, "biome": "B06"},
+	]
+	var multi_unit_seen: bool = false
+	for encounter_case: Dictionary in depth_cases:
+		var depth: int = int(encounter_case["depth"])
+		var biome: String = str(encounter_case["biome"])
+		var generated: Dictionary = generator.generate("roster:%s:%d" % [biome, depth], depth, biome, false)
+		if not check(bool(generated.get("ok", false)), "sector_generator: normal roster graph failed for %s d%d" % [biome, depth]):
+			continue
+		var budget: int = mini(6, 2 + floori(float(depth) / 4.0))
+		for layer: Array in generated["graph"].get("layers", []):
+			for node: Dictionary in layer:
+				if str(node.get("type", "")) != "COMBAT":
+					continue
+				var enemies: Array = node.get("enemies", [])
+				var threat_total: int = 0
+				var counted_templates: Dictionary = {}
+				var swarm_members: int = 0
+				check(not enemies.is_empty() and enemies.size() <= 6, "sector_generator: combat roster size is outside 1..6 at %s d%d" % [biome, depth])
+				if enemies.size() > 1:
+					multi_unit_seen = true
+				for enemy_spec: Dictionary in enemies:
+					var template_id: String = str(enemy_spec.get("templateId", ""))
+					var template: Dictionary = enemy_catalog.get_template(template_id)
+					check(not template.is_empty() and int(template.get("unlockDepth", 999)) <= depth and (template.get("biomes", []) as Array).has(biome), "sector_generator: roster selected a locked or biome-incompatible enemy %s in %s d%d" % [template_id, biome, depth])
+					if template_id == "E20":
+						swarm_members += 1
+						if not counted_templates.has("E20"):
+							threat_total += int(template.get("threatUnits", 0))
+							counted_templates["E20"] = true
+					elif not counted_templates.has(template_id):
+						threat_total += int(template.get("threatUnits", 0))
+						counted_templates[template_id] = true
+				check(threat_total <= budget, "sector_generator: combat roster exceeded %d threat units in %s d%d" % [budget, biome, depth])
+				if swarm_members > 0:
+					check(swarm_members >= 2 and swarm_members <= 4, "sector_generator: E20 was not generated as a bounded 2..4 unit swarm")
+				if depth == 1:
+					check(enemies.size() <= 2 and enemies.all(func(enemy_spec: Dictionary) -> bool: return str(enemy_spec.get("templateId", "")).begins_with("E0")), "sector_generator: d1 roster exceeded its starter enemy clamp")
+	check(multi_unit_seen, "sector_generator: campaign combat routes still contain only single-enemy encounters")
 
 func _check_graph(graph: Dictionary) -> void:
 	var nodes: Dictionary = {}

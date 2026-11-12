@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — campaign combat rosters and save checksum compatibility
+
+- Ordinary combat nodes now assemble multiple biome-themed enemies within the authored depth threat budget and unlock rules, with a six-actor cap and bounded E20 swarm packs.
+- New saves use a wider float checksum bucket; validation continues to accept the prior 1e-8 bucket and pre-bucket legacy checksums. Gameplay save values are not quantized or changed.
+- Godot editor import passed; 22 headless scripts passed (88,058 assertions). The explicit previous-bucket compatibility regression was added after this run and still needs verification. An isolated full campaign E2E reached d4 BOSS_A and recorded a defeat on its first attempt; later completion is unverified.
+
 ## Unreleased — resume paused quest chains
 
 - The quest journal now offers “resume” for PAUSED chains while still showing the current stage. Previously the stage details branch swallowed the resume-button branch, leaving valid paused quests permanently inaccessible through the UI.

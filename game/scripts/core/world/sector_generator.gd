@@ -65,7 +65,7 @@ func generate(seed_value: String, depth: int, biome: String, tutorial: bool = fa
 				node_type = "BOSS" if depth % 4 == 0 else "CHECKPOINT"
 			elif layer == 0 or layer == 2:
 				node_type = "COMBAT"
-				fixed_enemies = [_enemy_for(biome, depth, rng)]
+				fixed_enemies = _combat_enemies_for(biome, depth, rng)
 			elif layer == 4:
 				node_type = "REPAIR" if index % 2 == 0 else "FUEL"
 			elif not is_tutorial and layer == 3 and index == 0:
@@ -126,7 +126,8 @@ func _create_node(seed_value: String, depth: int, biome: String, layer: int, ind
 	for template_id: String in fixed_enemies:
 		enemies.append({"templateId": template_id})
 	if node_type == "COMBAT" and enemies.is_empty():
-		enemies.append({"templateId": _enemy_for(biome, depth, rng)})
+		for template_id: String in _combat_enemies_for(biome, depth, rng):
+			enemies.append({"templateId": template_id})
 	elif node_type == "ELITE":
 		var elite_enemy: String = fixed_enemies[0] if not fixed_enemies.is_empty() else _enemy_for(biome, depth, rng)
 		enemies = [{"templateId": elite_enemy, "elite": str(rng.pick(["EL_SHIELD", "EL_FAST", "EL_VIRUS", "EL_ANTI_DRONE", "EL_PEN", "EL_SPLIT"]))}]
@@ -150,6 +151,62 @@ func _create_node(seed_value: String, depth: int, biome: String, layer: int, ind
 	for key: Variant in extras.keys():
 		node[str(key)] = extras[key]
 	return node
+
+func _combat_enemies_for(biome: String, depth: int, rng: DeterministicRng) -> Array[String]:
+	var candidates: Array[Dictionary] = []
+	for enemy_value: Variant in _enemies.enemies.values():
+		var enemy: Dictionary = enemy_value
+		var eligible: bool = int(enemy.get("unlockDepth", 1)) <= depth and (enemy.get("biomes", []) as Array).has(biome)
+		if depth == 1 and not str(enemy.get("id", "")).begins_with("E0"):
+			eligible = false
+		if eligible:
+			candidates.append(enemy)
+	candidates.sort_custom(func(left: Dictionary, right: Dictionary) -> bool: return str(left.get("id", "")) < str(right.get("id", "")))
+	if candidates.is_empty():
+		return ["E01"]
+	var preferred_roles: Array[String] = _combat_theme_roles(biome)
+	var preferred: Array[Dictionary] = candidates.filter(func(enemy: Dictionary) -> bool: return preferred_roles.has(str(enemy.get("role", ""))))
+	var budget: int = mini(6, 2 + floori(float(depth) / 4.0))
+	if depth == 1:
+		budget = 2
+	var remaining: int = budget
+	var result: Array[String] = []
+	var used_templates: Dictionary = {}
+	while remaining > 0 and result.size() < 6:
+		var affordable: Array[Dictionary] = []
+		for enemy: Dictionary in candidates:
+			var enemy_id: String = str(enemy.get("id", ""))
+			var threat_units: int = maxi(1, int(enemy.get("threatUnits", 1)))
+			if enemy_id == "E20" and 6 - result.size() < 2:
+				continue
+			if threat_units <= remaining and not used_templates.has(enemy_id):
+				affordable.append(enemy)
+		if affordable.is_empty():
+			break
+		var themed_affordable: Array[Dictionary] = affordable.filter(func(enemy: Dictionary) -> bool: return preferred_roles.has(str(enemy.get("role", ""))))
+		var pick_pool: Array[Dictionary] = themed_affordable if not themed_affordable.is_empty() and (result.is_empty() or rng.chance(0.35)) else affordable
+		var selected: Dictionary = rng.pick(pick_pool)
+		var template_id: String = str(selected.get("id", "E01"))
+		var threat_cost: int = maxi(1, int(selected.get("threatUnits", 1)))
+		remaining -= threat_cost
+		used_templates[template_id] = true
+		if template_id == "E20":
+			var pack_size: int = rng.int_range(2, mini(4, 6 - result.size()))
+			for _member: int in range(pack_size):
+				result.append(template_id)
+		else:
+			result.append(template_id)
+	return result if not result.is_empty() else [str(candidates[0].get("id", "E01"))]
+
+func _combat_theme_roles(biome: String) -> Array[String]:
+	match biome:
+		"B01": return ["melee", "sniper", "tank", "marker"]
+		"B02": return ["healer", "protector", "tank"]
+		"B03": return ["burst", "summoner", "swarm", "looter"]
+		"B04": return ["jammer", "droneDenial", "infector"]
+		"B05": return ["heat", "burst", "tank"]
+		"B06": return ["hunter", "evader", "punisher", "swarm"]
+	return []
 
 func _enemy_for(biome: String, depth: int, rng: DeterministicRng) -> String:
 	var pool: Array[String] = []
