@@ -1042,6 +1042,12 @@ func run(_tree: SceneTree) -> bool:
 		var quest_catalog_result: Dictionary = quest_catalog.load_catalog()
 		check(bool(quest_catalog_result.get("ok", false)) and int(quest_catalog_result.get("questCount", 0)) == 6 and int(quest_catalog_result.get("contractCount", 0)) == 3, "game_session: all quest chains and contracts were not imported from the legacy data catalog")
 		check(quest_session.accept_quest("Q02") and not quest_session.accept_quest("Q02"), "game_session: quest acceptance or duplicate-acceptance protection failed: %s" % quest_session.last_error)
+		var paused_quest_payload: Dictionary = quest_session.state.to_payload()
+		paused_quest_payload["meta"]["questProgress"]["Q02"]["status"] = "PAUSED"
+		check(quest_session._commit_payload(paused_quest_payload), "game_session: paused quest fixture could not be saved")
+		var paused_quest_entry: Dictionary = quest_session.quest_journal().filter(func(entry: Dictionary) -> bool: return str(entry.get("id", "")) == "Q02")[0]
+		check(str(paused_quest_entry.get("status", "")) == "PAUSED" and int(paused_quest_entry.get("currentStage", 0)) == 1 and bool(paused_quest_entry.get("available", false)), "game_session: paused quest did not remain resumable in the journal")
+		check(quest_session.accept_quest("Q02") and str(quest_session.state.meta.quest_progress["Q02"].get("status", "")) == "ACTIVE", "game_session: paused quest could not be resumed from its saved stage")
 		check(quest_session.start_expedition("quest-chain-seed"), "game_session: quest test expedition could not start")
 		var quest_run_payload: Dictionary = quest_session.state.to_payload()
 		quest_run_payload["run"]["biome"] = "B01"

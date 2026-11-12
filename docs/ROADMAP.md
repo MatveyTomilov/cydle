@@ -6,6 +6,10 @@
 
 The active strategy is **FULL GAME FIRST**: connect every major Master Spec system into a campaign that can be completed, then deepen edge cases, balance, and presentation. The entries below report implementation status; they are not a queue of isolated feature slices. A checkpoint commit is a safety measure, so continue to the next missing campaign-critical system while the session permits. Defer saved Simulation Lab presets, report exports, cosmetic polish, secondary settings, and redundant tests until functional campaign coverage exists.
 
+### Current status override (2026-11-13)
+
+Active quest stages now generate their own connected `QUEST` route nodes; ordinary events remain separate. Quest-node actions use the authored quest transaction, and paused chains can resume from the journal. The 22-script Godot suite passes at 87,649 assertions. Windows export and EXE smoke passed before the latest small journal WIP. This supersedes historical roadmap notes below that say stage IDs only annotate generic event nodes; the earlier checkpoints remain as history. Six-chain conditions/deadlines, contract breadth, full campaign acceptance, and major combat coverage remain incomplete.
+
 ### 2026-11-13 continuation — event consequence audit
 
 EV18 now creates a real 50%-strength E08 allied turret for the next shared-simulator combat; EV05's extra RARE roll is scoped to the next ELITE; EV08 B consumes a player-selected unsecured cargo item (not one installed in the active run) before paying its catalogued credits and F_VANTA reputation. These consequences are wired into save transactions, combat state, and road UI, with regressions. Godot editor import and all 22 headless scripts passed (87,624 assertions); Windows Desktop export and exported EXE smoke passed; `git diff --check` passed. TypeScript oracle checks were not run (native Godot-only changes). Next work should move on to whichever remaining major campaign system is the largest blocker; do not spend time on Simulation Lab presets, exports, or event presentation polish.

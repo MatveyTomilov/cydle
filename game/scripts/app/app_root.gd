@@ -791,7 +791,7 @@ func _show_quest_journal() -> void:
 			var stage: Dictionary = quest.get("stages", [])[stage_index]
 			content.add_child(_label("ЭТАП %d · %s" % [stage_index + 1, str(stage.get("name", ""))], 12, COLOR_AMBER))
 			content.add_child(_label(str(stage.get("text", "")), 11, COLOR_MUTED))
-		elif status in ["AVAILABLE", "PAUSED", "FAILED"] and bool(quest.get("available", false)) and can_accept:
+		if status in ["AVAILABLE", "PAUSED", "FAILED"] and bool(quest.get("available", false)) and can_accept:
 			var accept: Button = _button("ВОЗОБНОВИТЬ ЗАДАНИЕ" if status == "PAUSED" else "НАЧАТЬ ЗАНОВО" if status == "FAILED" else "ПРИНЯТЬ ЗАДАНИЕ", false)
 			accept.pressed.connect(_on_accept_quest.bind(str(quest.get("id", ""))))
 			content.add_child(accept)

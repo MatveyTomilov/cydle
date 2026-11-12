@@ -1,12 +1,12 @@
 # CYDLE — Project handoff and development history
 
-## Live continuation (2026-11-13; physical quest nodes WIP)
+## Live continuation (2026-11-13; paused-quest resume WIP)
 
-- Branch: `development/codex`. Last pushed HEAD before this WIP: `306bdbab29498213000c50e133baca93dd9a059c`. Current local changes are limited to `game/scripts/app/game_session.gd`, `game/scripts/app/app_root.gd`, and `game/tests/golden/game_session_test.gd`.
-- Active quest stages now receive their own connected `QUEST` route nodes in matching biomes. Regular route events remain present. The quest node resolves catalog-authored text/actions, gates on the exact quest/stage and objective, applies the existing quest transaction, marks the node cleared and returns to ROUTE. Existing tagged EVENT graphs retain compatibility.
-- The road UI renders quest-stage choices directly on the QUEST node, avoids duplicating the opportunity list there, and keeps cargo surrender behavior on ordinary events. Route intel identifies task nodes. Autopilot uses its configured quest-choice map when eligible; if the objective is not yet eligible it can leave the node safely.
-- Verification actually run for this WIP: Godot 4.7.2 editor import exit 0; `res://tests/run_tests.gd` exit 0 (22 scripts, 87,646 assertions). `git diff --check` exit 0. Windows export/EXE smoke not rerun yet. TypeScript checks not run.
-- Exact next action: run Windows Desktop export and EXE smoke, inspect the diff, commit/push this checkpoint, verify remote SHA and clean status. Then continue breadth-first across the remaining full-game gaps; do not treat this quest integration as campaign completion. Preserve the external campaign E2E profile and backup recorded below.
+- Branch: `development/codex`. Latest pushed checkpoint `a01652d780b2e9a4de91ae484d3edd87aecf0f1f` adds physical QUEST route nodes and is verified against origin. Current local WIP fixes paused-chain access in the quest journal (`game/scripts/app/app_root.gd`) and adds a saved-stage resume regression (`game/tests/golden/game_session_test.gd`).
+- Active quest stages now receive their own connected `QUEST` route nodes in matching biomes. Regular route events remain present. Quest nodes resolve catalog-authored text/actions, gate on the exact quest/stage and objective, apply the existing quest transaction, mark the node cleared and return to ROUTE. Existing tagged EVENT graphs retain compatibility. UI and autopilot handle these nodes; route intel identifies them.
+- Found and fixed the quest journal's PAUSED-state control-flow bug: it displayed stage details but never offered resume. Session regression checks the paused quest remains eligible and resumes with saved progress.
+- Verification for the current WIP: Godot 4.7.2 editor import exit 0; `res://tests/run_tests.gd` exit 0 (22 scripts, 87,649 assertions). Windows Desktop export and EXE headless smoke passed immediately before this small journal change; `git diff --check` not yet rerun for this WIP. TypeScript checks not run.
+- Exact next action: run `git diff --check`, Windows export/EXE smoke, then commit/push and verify remote SHA. Continue breadth-first over the remaining campaign/content/combat gaps; none of this means 1.0 is complete. Preserve the external campaign E2E profile and backup recorded below.
 
 ## Current live continuation (2026-11-13; Q06 objective gating regression)
 
