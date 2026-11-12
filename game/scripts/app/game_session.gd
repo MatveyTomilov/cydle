@@ -183,6 +183,45 @@ func set_skill_equipped(skill_id: String, equipped: bool) -> bool:
 		return false
 	return _commit(candidate)
 
+func set_passive_equipped(passive_id: String, equipped: bool) -> bool:
+	if state == null:
+		last_error = "Нет активного профиля."
+		return false
+	if state.run != null and not ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(state.run.phase):
+		last_error = "Пассивные протоколы меняются только в гараже между выездами."
+		return false
+	var catalog: BuildCatalog = BuildCatalog.new()
+	var loaded: Dictionary = catalog.load_catalog()
+	if not bool(loaded.get("ok", false)) or not catalog.passives.has(passive_id):
+		last_error = "Неизвестный пассивный протокол %s." % passive_id
+		return false
+	var passive_ids: Array[String] = state.meta.passive_ids.duplicate()
+	if equipped:
+		if passive_ids.has(passive_id):
+			last_error = "Пассивный протокол уже установлен."
+			return false
+		if passive_ids.size() >= 3:
+			last_error = "Доступны только три слота пассивных протоколов."
+			return false
+		passive_ids.append(passive_id)
+	else:
+		if not passive_ids.has(passive_id):
+			last_error = "Пассивный протокол не установлен."
+			return false
+		passive_ids.erase(passive_id)
+	var payload: Dictionary = state.to_payload()
+	payload["meta"]["passiveIds"] = passive_ids
+	var parsed: Dictionary = GameSaveState.new().parse_payload(payload)
+	if not bool(parsed.get("ok", false)):
+		last_error = str(parsed.get("error", "Изменение пассивных слотов не прошло проверку."))
+		return false
+	var candidate: GameSaveState = parsed["state"] as GameSaveState
+	var resolved: Dictionary = BuildResolver.new().resolve_build(_build_input(candidate))
+	if not bool(resolved.get("valid", false)):
+		last_error = "Пассивный протокол нельзя установить в эту сборку: %s" % str(resolved.get("issues", []))
+		return false
+	return _commit(candidate)
+
 func start_expedition(seed_value: String = "") -> bool:
 	if state == null:
 		last_error = "Сначала создайте или загрузите профиль."

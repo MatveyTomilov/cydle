@@ -299,6 +299,27 @@ func _show_build() -> void:
 			skill_button.disabled = not is_equipped and _session.state.meta.skill_ids.size() >= 3
 			skill_button.pressed.connect(_on_set_skill_equipped.bind(skill_id, not is_equipped))
 			skill_row.add_child(skill_button)
+	_body.add_child(_label("ПАССИВНЫЕ ПРОТОКОЛЫ · %d / 3" % _session.state.meta.passive_ids.size(), 16, COLOR_CYAN))
+	var passive_ids: Array = skill_catalog.passives.keys()
+	passive_ids.sort()
+	for passive_id_value: Variant in passive_ids:
+		var passive_id: String = str(passive_id_value)
+		var passive: Dictionary = skill_catalog.passives[passive_id]
+		var passive_row: HBoxContainer = HBoxContainer.new()
+		passive_row.add_theme_constant_override("separation", 10)
+		_body.add_child(passive_row)
+		var passive_info: VBoxContainer = VBoxContainer.new()
+		passive_info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		passive_row.add_child(passive_info)
+		passive_info.add_child(_label("%s · %s" % [passive_id, str(passive.get("name", passive_id))], 13, COLOR_TEXT))
+		var passive_description: Label = _label(str(passive.get("desc", "")), 11, COLOR_MUTED)
+		passive_description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		passive_info.add_child(passive_description)
+		var passive_equipped: bool = _session.state.meta.passive_ids.has(passive_id)
+		var passive_button: Button = _button("СНЯТЬ" if passive_equipped else "УСТАНОВИТЬ", passive_equipped)
+		passive_button.disabled = not passive_equipped and _session.state.meta.passive_ids.size() >= 3
+		passive_button.pressed.connect(_on_set_passive_equipped.bind(passive_id, not passive_equipped))
+		passive_row.add_child(passive_button)
 	var back: Button = _button("НАЗАД В ГАРАЖ", false)
 	back.pressed.connect(_show_garage)
 	_body.add_child(back)
@@ -647,6 +668,11 @@ func _on_set_skill_equipped(skill_id: String, equipped: bool) -> void:
 	var changed: bool = _session.set_skill_equipped(skill_id, equipped)
 	_show_build()
 	_footer.text = "АКТИВНЫЕ УМЕНИЯ ОБНОВЛЕНЫ · %d / 3" % _session.state.meta.skill_ids.size() if changed else _session.last_error
+
+func _on_set_passive_equipped(passive_id: String, equipped: bool) -> void:
+	var changed: bool = _session.set_passive_equipped(passive_id, equipped)
+	_show_build()
+	_footer.text = "ПАССИВНЫЕ ПРОТОКОЛЫ ОБНОВЛЕНЫ · %d / 3" % _session.state.meta.passive_ids.size() if changed else _session.last_error
 
 func _on_equip_item(slot: String, item_id: String) -> void:
 	if _session.equip_item(slot, item_id):
