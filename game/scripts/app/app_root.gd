@@ -24,6 +24,8 @@ var _simulation_item_id: String = ""
 var _simulation_enemy_id: String = "E01"
 var _simulation_report: Dictionary = {}
 var _selected_escalations: Array[String] = []
+var _checkpoint_shipping_ids: Array[String] = []
+var _checkpoint_shipping_percent: int = 0
 
 func _ready() -> void:
 	_session.load_saved_game()
@@ -1166,6 +1168,7 @@ func _show_checkpoint(_run: GameSaveState.RunState) -> void:
 	var completed: bool = _session.state.meta.campaign_flags.has("CAMPAIGN_COMPLETED")
 	_body.add_child(_label("КАМПАНИЯ ПРОЙДЕНА" if completed else "КОНТРОЛЬНЫЙ УЗЕЛ", 20, COLOR_CYAN if completed else COLOR_TEXT))
 	_add_checkpoint_repair_control()
+	_add_checkpoint_shipping_control()
 	if completed and not _session.state.meta.campaign_flags.has("ENDING_SELECTED"):
 		_body.add_child(_label("Коридор свободных поселений останется нейтральным — или выбранная фракция получит контроль, не закрывая доступ к другим.", 14, COLOR_MUTED))
 		var free_ending: Button = _button("СОЗДАТЬ СВОБОДНЫЙ КОРИДОР", true)
@@ -1184,6 +1187,62 @@ func _show_checkpoint(_run: GameSaveState.RunState) -> void:
 	var exit_button: Button = _button("ЭВАКУИРОВАТЬСЯ С ГРУЗОМ", true)
 	exit_button.pressed.connect(_on_exit_run)
 	_body.add_child(exit_button)
+
+func _add_checkpoint_shipping_control() -> void:
+	var run: GameSaveState.RunState = _session.state.run
+	var cargo: Array[Dictionary] = run.unsecured_cargo
+	var heading: Label = _label("ЗАЩИЩЁННАЯ ОТПРАВКА · ДО 5 ЕДИНИЦ ГРУЗА", 13, COLOR_CYAN)
+	_body.add_child(heading)
+	var checkpoint_id: String = "ship:%s:%s" % [run.seed, run.current_node_id]
+	if run.shipped_checkpoint_ids.has(checkpoint_id):
+		_body.add_child(_label("На этой контрольной точке отправка уже использована.", 11, COLOR_MUTED))
+		return
+	if cargo.is_empty():
+		_body.add_child(_label("Незакреплённого груза нет.", 11, COLOR_MUTED))
+	else:
+		for item: Dictionary in cargo:
+			var item_id: String = str(item.get("itemId", ""))
+			var choice: CheckButton = CheckButton.new()
+			choice.text = "%s · %s" % [str(item.get("templateId", "Предмет")), item_id]
+			choice.button_pressed = _checkpoint_shipping_ids.has(item_id)
+			choice.toggled.connect(_on_checkpoint_shipping_item_toggled.bind(item_id))
+			_body.add_child(choice)
+	var percentage_selector: OptionButton = OptionButton.new()
+	for percentage: int in [0, 10, 25, 50]:
+		percentage_selector.add_item("Перевести %d%% незакреплённых валют" % percentage)
+		percentage_selector.set_item_metadata(percentage_selector.item_count - 1, percentage)
+		if percentage == _checkpoint_shipping_percent:
+			percentage_selector.select(percentage_selector.item_count - 1)
+	percentage_selector.item_selected.connect(_on_checkpoint_shipping_percentage_selected.bind(percentage_selector))
+	_body.add_child(percentage_selector)
+	var quote: Dictionary = _session.checkpoint_shipping_quote(_checkpoint_shipping_ids, _checkpoint_shipping_percent)
+	var quote_text: String = "Отправка: %d ¤ · %d/5 ед. груза · валюта %s" % [int(quote.get("credits", 0)), int(quote.get("cargoUnits", 0)), str(quote.get("wallet", {}))]
+	_body.add_child(_label(quote_text if bool(quote.get("affordable", false)) else str(quote.get("error", quote_text)), 11, COLOR_MUTED))
+	var ship_button: Button = _button("ОТПРАВИТЬ НА СКЛАД И ПРОДОЛЖИТЬ", false)
+	ship_button.disabled = not bool(quote.get("valid", false)) or not bool(quote.get("affordable", false))
+	ship_button.pressed.connect(_on_ship_checkpoint_cargo)
+	_body.add_child(ship_button)
+
+func _on_checkpoint_shipping_item_toggled(selected: bool, item_id: String) -> void:
+	if selected and not _checkpoint_shipping_ids.has(item_id):
+		_checkpoint_shipping_ids.append(item_id)
+	elif not selected:
+		_checkpoint_shipping_ids.erase(item_id)
+	_show_road()
+
+func _on_checkpoint_shipping_percentage_selected(index: int, selector: OptionButton) -> void:
+	if index >= 0 and index < selector.item_count:
+		_checkpoint_shipping_percent = int(selector.get_item_metadata(index))
+	_show_road()
+
+func _on_ship_checkpoint_cargo() -> void:
+	if _session.ship_checkpoint_cargo(_checkpoint_shipping_ids, _checkpoint_shipping_percent):
+		_checkpoint_shipping_ids.clear()
+		_checkpoint_shipping_percent = 0
+		_footer.text = "ГРУЗ И ВАЛЮТА ДОСТАВЛЕНЫ НА СКЛАД · ВЫЕЗД ПРОДОЛЖАЕТСЯ"
+	else:
+		_footer.text = _session.last_error
+	_show_road()
 
 func _add_checkpoint_repair_control() -> void:
 	var quote: Dictionary = _session.checkpoint_repair_quote()

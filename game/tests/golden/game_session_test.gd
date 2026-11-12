@@ -289,6 +289,45 @@ func run(_tree: SceneTree) -> bool:
 		var credits_before_repair: float = checkpoint_repair_session.state.run.wallet.credits
 		check(checkpoint_repair_session.repair_checkpoint_hull(), "game_session: checkpoint hull repair failed: %s" % checkpoint_repair_session.last_error)
 		check(is_equal_approx(checkpoint_repair_session.state.run.resources["hull"], 84.5) and checkpoint_repair_session.state.run.wallet.credits < credits_before_repair, "game_session: checkpoint repair did not apply its upgrade and cost")
+	var checkpoint_ship_session: GameSession = GameSession.new()
+	checkpoint_ship_session.configure_save_directory("user://test-saves/checkpoint-shipping")
+	if check(checkpoint_ship_session.start_new_game(1762900000118), "game_session: could not create a checkpoint cargo profile") and check(checkpoint_ship_session.start_expedition("checkpoint-shipping"), "game_session: could not start checkpoint cargo sortie"):
+		var ship_catalog: ItemCatalog = ItemCatalog.new()
+		var ship_rng: DeterministicRng = DeterministicRng.new()
+		ship_rng.seed("checkpoint-shipping", "secured-armor")
+		var ship_catalog_result: Dictionary = ship_catalog.load_catalog()
+		var shipped_item_result: Dictionary = ItemFactory.new().create_item(ship_rng, ship_catalog, {"templateId": "ARM_HEAVY", "techLevel": 1, "rarity": "COMMON", "secured": false, "originGrantId": "checkpoint-shipping:armor", "origin": "test", "acquiredAt": 0})
+		if check(bool(ship_catalog_result.get("ok", false)) and bool(shipped_item_result.get("ok", false)), "game_session: could not create checkpoint shipment cargo: %s" % shipped_item_result):
+			var shipped_item: ItemInstance = shipped_item_result["item"] as ItemInstance
+			var shipping_payload: Dictionary = checkpoint_ship_session.state.to_payload()
+			shipping_payload["run"]["phase"] = "CHECKPOINT"
+			shipping_payload["run"]["currentNodeId"] = "boss-clear-d1"
+			shipping_payload["run"]["unsecuredCargo"].append(shipped_item.to_dictionary())
+			shipping_payload["run"]["runWallet"] = {"CREDITS": 100.0, "SCRAP": 40.0, "DATA": 20.0}
+			check(checkpoint_ship_session._commit_payload(shipping_payload), "game_session: could not prepare checkpoint cargo shipment: %s" % checkpoint_ship_session.last_error)
+			var shipment_ids: Array[String] = [shipped_item.item_id]
+			var shipping_quote: Dictionary = checkpoint_ship_session.checkpoint_shipping_quote(shipment_ids, 50)
+			check(bool(shipping_quote.get("valid", false)) and bool(shipping_quote.get("affordable", false)) and int(shipping_quote.get("cargoUnits", 0)) == 2 and int(shipping_quote.get("credits", 0)) == 10, "game_session: checkpoint shipment did not quote the authored cargo cap/cost: %s" % shipping_quote)
+			var protected_credits_before: float = checkpoint_ship_session.state.meta.protected_bank.credits
+			var protected_scrap_before: float = checkpoint_ship_session.state.meta.protected_bank.scrap
+			var protected_data_before: float = checkpoint_ship_session.state.meta.protected_bank.data
+			check(checkpoint_ship_session.ship_checkpoint_cargo(shipment_ids, 50), "game_session: checkpoint shipment failed: %s" % checkpoint_ship_session.last_error)
+			check(checkpoint_ship_session.state.run.unsecured_cargo.is_empty() and checkpoint_ship_session.state.meta.inventory.any(func(item: Dictionary) -> bool: return str(item.get("itemId", "")) == shipped_item.item_id and bool(item.get("secured", false))), "game_session: checkpoint shipment did not secure cargo into the permanent inventory")
+			check(is_equal_approx(checkpoint_ship_session.state.meta.protected_bank.credits, protected_credits_before + 45.0) and is_equal_approx(checkpoint_ship_session.state.meta.protected_bank.scrap, protected_scrap_before + 20.0) and is_equal_approx(checkpoint_ship_session.state.meta.protected_bank.data, protected_data_before + 10.0), "game_session: shipment did not bank the selected maximum half of run currency")
+			check(is_equal_approx(checkpoint_ship_session.state.run.wallet.credits, 45.0) and is_equal_approx(checkpoint_ship_session.state.run.wallet.scrap, 20.0) and is_equal_approx(checkpoint_ship_session.state.run.wallet.data, 10.0), "game_session: shipment failed to charge the fee and deduct banked currency")
+			check(not checkpoint_ship_session.ship_checkpoint_cargo(shipment_ids, 50), "game_session: checkpoint shipment could be repeated to duplicate banked value")
+			var autopilot_ship_session: GameSession = GameSession.new()
+			autopilot_ship_session.configure_save_directory("user://test-saves/checkpoint-autopilot-shipping")
+			if check(autopilot_ship_session.start_new_game(1762900000119), "game_session: could not create an autopilot checkpoint shipping profile") and check(autopilot_ship_session.start_expedition("checkpoint-autopilot-shipping"), "game_session: could not start autopilot checkpoint shipping sortie"):
+				var autopilot_shipping_payload: Dictionary = autopilot_ship_session.state.to_payload()
+				autopilot_shipping_payload["run"]["phase"] = "CHECKPOINT"
+				autopilot_shipping_payload["run"]["currentNodeId"] = "balanced-boss-clear"
+				autopilot_shipping_payload["run"]["unsecuredCargo"].append(shipped_item.to_dictionary())
+				autopilot_shipping_payload["run"]["runWallet"] = {"CREDITS": 200.0, "SCRAP": 40.0, "DATA": 20.0}
+				check(autopilot_ship_session._commit_payload(autopilot_shipping_payload), "game_session: could not prepare autopilot checkpoint cargo: %s" % autopilot_ship_session.last_error)
+				var autopilot_shipping_report: Dictionary = autopilot_ship_session.simulate_autopilot(1000)
+				check(not autopilot_shipping_report.is_empty() and str(autopilot_shipping_report.get("status", "")) == "OFFLINE_CAPPED", "game_session: balanced pilot did not continue after its checkpoint action: %s" % autopilot_shipping_report)
+				check(autopilot_ship_session.state.run.depth == 2 and autopilot_ship_session.state.meta.inventory.any(func(item: Dictionary) -> bool: return str(item.get("itemId", "")) == shipped_item.item_id and bool(item.get("secured", false))), "game_session: balanced pilot did not ship checkpoint cargo before continuing")
 	var ending_session: GameSession = GameSession.new()
 	ending_session.configure_save_directory("user://test-saves/campaign-ending")
 	if check(ending_session.start_new_game(1762900000120), "game_session: could not create a campaign-ending profile"):

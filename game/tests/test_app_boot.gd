@@ -34,6 +34,12 @@ func run(tree: SceneTree) -> bool:
 			check(str(pilot_picker.get_item_metadata(1)) == "BALANCED" and pilot_picker.selected == 1, "test_app_boot: selected balanced preset was not reflected in road UI")
 			pilot_picker.item_selected.emit(0)
 			check(pilot_session.active_autopilot_profile_id() == "CAUTIOUS", "test_app_boot: selecting a road preset did not save the active policy")
+		check(pilot_session.start_expedition("checkpoint-shipping-ui"), "test_app_boot: could not open a checkpoint-shipping UI sortie")
+		var checkpoint_payload: Dictionary = pilot_session.state.to_payload()
+		checkpoint_payload["run"]["phase"] = "CHECKPOINT"
+		check(pilot_session._commit_payload(checkpoint_payload), "test_app_boot: could not prepare the checkpoint-shipping UI")
+		app.call("_show_road")
+		check(_has_button(body, "ОТПРАВИТЬ НА СКЛАД И ПРОДОЛЖИТЬ"), "test_app_boot: checkpoint did not expose protected cargo shipping")
 
 	app.queue_free()
 	await tree.process_frame

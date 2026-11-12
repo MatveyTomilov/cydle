@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — protected checkpoint cargo shipping
+
+- Added Master Spec §16.6 checkpoint SHIP as a persisted transaction: pay `ceil(10×R(d))` from unsecured credits, secure selected cargo up to five cargo units, and transfer up to 50% of each unsecured currency balance into the protected bank. A checkpoint can ship only once; its transaction ID and shipped cargo are saved, and already secured items are not duplicated.
+- Connected the balanced autopilot checkpoint action to ship the highest-rarity cargo that fits the five-unit limit and up to half the run currencies before continuing. The road screen lets the player choose cargo and currency transfer percentage.
+- Added session regressions for fee, cargo capacity, currency split, permanent securing, duplicate prevention, and balanced-autopilot shipping; added a checkpoint UI presence check.
+- Checks: Godot 4.7.2 import exit 0; 22 scripts / 87,559 assertions / 0 failures; Windows Desktop release export and exported EXE headless smoke exit 0; `git diff --check` passed. The export was built at `%TEMP%\CYDLE-export-checkpoint-shipping\CYDLE.exe`.
+
 ## Unreleased — selectable specification-based autopilot presets
 
 - Added persistent CAUTIOUS, BALANCED and AGGRESSIVE starter presets with the §16.5 risk, health/shield, Wanted, route restriction, fuel reserve and checkpoint defaults. The player selects a preset between sorties; the active choice is immutable during an outing and appears on the road screen.

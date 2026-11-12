@@ -1125,6 +1125,17 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
 					report["reasonCode"] = "PROFILE_CHECKPOINT_EXTRACT"
 					report["reason"] = "Профиль %s закрепил добычу на контрольной точке." % str(pilot_profile.get("name", pilot_profile_id))
 					break
+				var checkpoint_ship_id: String = "ship:%s:%s" % [state.run.seed, state.run.current_node_id]
+				if checkpoint_action == "CONDITIONAL" and not state.run.shipped_checkpoint_ids.has(checkpoint_ship_id):
+					var shipping_ids: Array[String] = _autopilot_checkpoint_cargo_ids(5)
+					var run_wallet: Dictionary = state.run.wallet.to_dictionary()
+					var currency_to_ship: bool = float(run_wallet.get("CREDITS", 0.0)) > 0.0 or float(run_wallet.get("SCRAP", 0.0)) > 0.0 or float(run_wallet.get("DATA", 0.0)) > 0.0
+					if not shipping_ids.is_empty() or currency_to_ship:
+						var shipping_quote: Dictionary = checkpoint_shipping_quote(shipping_ids, 50)
+						if not bool(shipping_quote.get("affordable", false)):
+							return _autopilot_stop("PAUSED_FOR_RESOURCES", "CHECKPOINT_SHIPPING", str(shipping_quote.get("error", "Для закрепления груза не хватает ресурсов.")), report)
+						if not ship_checkpoint_cargo(shipping_ids, 50):
+							return _autopilot_stop("SAFE_ERROR_STOP", "CHECKPOINT_SHIPPING", last_error, report)
 				if not safe_to_continue and checkpoint_action == "CONTINUE":
 					return _autopilot_stop("PAUSED_FOR_RESOURCES", "CHECKPOINT_RESERVE", "Ресурсы ниже защитного резерва профиля; выезд оставлен на решающий выбор.", report)
 				if not continue_campaign():
@@ -1151,6 +1162,31 @@ func _autopilot_event_choice(event: Dictionary) -> Dictionary:
 		if affordable:
 			return choice
 	return {}
+
+func _autopilot_checkpoint_cargo_ids(max_units: int) -> Array[String]:
+	var selected: Array[String] = []
+	if state == null or state.run == null or max_units <= 0:
+		return selected
+	var catalog_result: Dictionary = _item_catalog.load_catalog()
+	if not bool(catalog_result.get("ok", false)):
+		return selected
+	var candidates: Array[Dictionary] = state.run.unsecured_cargo.duplicate(true)
+	var rarity_rank: Dictionary = {"COMMON": 0, "MODIFIED": 1, "RARE": 2, "EXTRA_RARE": 3, "LEGENDARY": 4, "UNIQUE": 5}
+	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var rarity_a: int = int(rarity_rank.get(str(a.get("rarity", "COMMON")), 0))
+		var rarity_b: int = int(rarity_rank.get(str(b.get("rarity", "COMMON")), 0))
+		if rarity_a != rarity_b:
+			return rarity_a > rarity_b
+		return str(a.get("itemId", "")) < str(b.get("itemId", ""))
+	)
+	var used_units: int = 0
+	for item: Dictionary in candidates:
+		var units: int = int(_item_catalog.get_template(str(item.get("templateId", ""))).get("cargoUnits", 1))
+		if used_units + units > max_units:
+			continue
+		used_units += units
+		selected.append(str(item.get("itemId", "")))
+	return selected
 
 func _autopilot_stop(status: String, code: String, reason: String, report: Dictionary) -> Dictionary:
 	report["status"] = status
@@ -1911,6 +1947,96 @@ func repair_checkpoint_hull() -> bool:
 	resources["hull"] = minf(float(resources.get("maxHull", 0.0)), float(resources.get("hull", 0.0)) + float(quote["repair"]))
 	resources["gameTimeMs"] = float(resources.get("gameTimeMs", 0.0)) + 8000.0
 	run_payload["lastCommandId"] = "checkpoint:repair:%s:%d" % [str(run_payload.get("seed", "")), int(resources["gameTimeMs"])]
+	return _commit_payload(payload)
+
+func checkpoint_shipping_quote(item_ids: Array[String], currency_percent: int = 0) -> Dictionary:
+	if state == null or state.run == null or state.run.phase != "CHECKPOINT":
+		return {"valid": false, "affordable": false, "credits": 0, "cargoUnits": 0, "items": [], "wallet": {}, "error": "Закрепить груз можно только на контрольном узле."}
+	if currency_percent < 0 or currency_percent > 50:
+		return {"valid": false, "affordable": false, "credits": 0, "cargoUnits": 0, "items": [], "wallet": {}, "error": "За один выезд можно отправить не более половины незакреплённой валюты."}
+	var checkpoint_id: String = "ship:%s:%s" % [state.run.seed, state.run.current_node_id]
+	if state.run.shipped_checkpoint_ids.has(checkpoint_id):
+		return {"valid": false, "affordable": false, "credits": 0, "cargoUnits": 0, "items": [], "wallet": {}, "checkpointId": checkpoint_id, "error": "На этой контрольной точке груз уже отправлен."}
+	var unique_ids: Dictionary = {}
+	var catalog_result: Dictionary = _item_catalog.load_catalog()
+	if not bool(catalog_result.get("ok", false)):
+		return {"valid": false, "affordable": false, "credits": 0, "cargoUnits": 0, "items": [], "wallet": {}, "checkpointId": checkpoint_id, "error": str(catalog_result.get("error", "Каталог груза недоступен."))}
+	for item_id: String in item_ids:
+		if item_id.is_empty() or unique_ids.has(item_id):
+			return {"valid": false, "affordable": false, "credits": 0, "cargoUnits": 0, "items": [], "wallet": {}, "checkpointId": checkpoint_id, "error": "Список груза содержит пустой или повторяющийся ID."}
+		unique_ids[item_id] = true
+	var cargo_units: int = 0
+	var selected_items: Array[Dictionary] = []
+	var cargo: Array = state.run.unsecured_cargo
+	for item_id: String in item_ids:
+		var found: Dictionary = {}
+		for candidate: Dictionary in cargo:
+			if str(candidate.get("itemId", "")) == item_id:
+				found = candidate
+				break
+		if found.is_empty():
+			return {"valid": false, "affordable": false, "credits": 0, "cargoUnits": cargo_units, "items": [], "wallet": {}, "checkpointId": checkpoint_id, "error": "Предмет %s отсутствует в незакреплённом грузе." % item_id}
+		cargo_units += int(_item_catalog.get_template(str(found.get("templateId", ""))).get("cargoUnits", 1))
+		selected_items.append(found.duplicate(true))
+	if cargo_units > 5:
+		return {"valid": false, "affordable": false, "credits": 0, "cargoUnits": cargo_units, "items": selected_items, "wallet": {}, "checkpointId": checkpoint_id, "error": "На один вывоз допускается не более 5 единиц груза."}
+	var shipping_cost: int = ceili(10.0 * CydleFormula.new().reward_scale(float(state.run.depth)))
+	var wallet: Dictionary = state.run.wallet.to_dictionary()
+	var shipped_wallet: Dictionary = {}
+	for currency: String in ["CREDITS", "SCRAP", "DATA"]:
+		var balance: float = float(wallet.get(currency, 0.0))
+		if currency == "CREDITS":
+			balance = maxf(0.0, balance - float(shipping_cost))
+		shipped_wallet[currency] = floorf(balance * float(currency_percent) / 100.0)
+	var has_value: bool = not item_ids.is_empty() or float(shipped_wallet["CREDITS"]) > 0.0 or float(shipped_wallet["SCRAP"]) > 0.0 or float(shipped_wallet["DATA"]) > 0.0
+	var affordable: bool = state.run.wallet.credits >= float(shipping_cost) and has_value
+	var error: String = "" if affordable else "Нужно %d незакреплённых кредитов и выбрать груз или валюту." % shipping_cost
+	return {"valid": true, "affordable": affordable, "credits": shipping_cost, "cargoUnits": cargo_units, "items": selected_items, "wallet": shipped_wallet, "currencyPercent": currency_percent, "checkpointId": checkpoint_id, "error": error}
+
+func ship_checkpoint_cargo(item_ids: Array[String], currency_percent: int = 0) -> bool:
+	var quote: Dictionary = checkpoint_shipping_quote(item_ids, currency_percent)
+	if not bool(quote.get("valid", false)) or not bool(quote.get("affordable", false)):
+		last_error = str(quote.get("error", "Отправка груза недоступна."))
+		return false
+	var payload: Dictionary = state.to_payload()
+	var run_payload: Dictionary = payload["run"]
+	var meta: Dictionary = payload["meta"]
+	var checkpoint_id: String = str(quote["checkpointId"])
+	if run_payload["shippedCheckpointIds"].has(checkpoint_id):
+		last_error = "Отправка с этой контрольной точки уже зарегистрирована."
+		return false
+	var selection: Dictionary = {}
+	for item_id: String in item_ids:
+		selection[item_id] = true
+	var cargo: Array = run_payload["unsecuredCargo"]
+	var remaining: Array[Dictionary] = []
+	var shipped_items: Array[Dictionary] = []
+	for value: Dictionary in cargo:
+		var item_id: String = str(value.get("itemId", ""))
+		if selection.has(item_id):
+			var secured: Dictionary = value.duplicate(true)
+			secured["secured"] = true
+			secured["origin"] = "checkpoint-shipping"
+			if not _inventory_has(meta["inventory"], item_id):
+				meta["inventory"].append(secured)
+			shipped_items.append(secured)
+		else:
+			remaining.append(value.duplicate(true))
+	if shipped_items.size() != item_ids.size():
+		last_error = "Состав груза изменился до завершения отправки."
+		return false
+	var wallet: Dictionary = run_payload["runWallet"]
+	var bank: Dictionary = meta["protectedBank"]
+	wallet["CREDITS"] = float(wallet.get("CREDITS", 0.0)) - float(quote["credits"])
+	var shipped_wallet: Dictionary = quote["wallet"]
+	for currency: String in ["CREDITS", "SCRAP", "DATA"]:
+		var amount: float = float(shipped_wallet.get(currency, 0.0))
+		wallet[currency] = float(wallet.get(currency, 0.0)) - amount
+		bank[currency] = float(bank.get(currency, 0.0)) + amount
+	run_payload["unsecuredCargo"] = remaining
+	run_payload["shippedCargo"].append_array(shipped_items)
+	run_payload["shippedCheckpointIds"].append(checkpoint_id)
+	run_payload["lastCommandId"] = "checkpoint:ship:%s" % checkpoint_id
 	return _commit_payload(payload)
 
 func shop_offers() -> Array[Dictionary]:
