@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "purpose": "alpha_presentation_only",
+  "fallback_order": [
+    "final_runtime_art",
+    "alpha_svg",
+    "procedural_silhouette"
+  ],
+  "placeholders": {
+    "actor_operator_base": {
+      "source": "res://assets/source/placeholders/actor_operator_base.svg",
+      "anchor": "feet_center",
+      "source_size": [
+        128,
+        128
+      ]
+    },
+    "drone_gun_base": {
+      "source": "res://assets/source/placeholders/drone_gun_base.svg",
+      "anchor": "body_center",
+      "source_size": [
+        128,
+        128
+      ]
+    },
+    "drone_support_base": {
+      "source": "res://assets/source/placeholders/drone_support_base.svg",
+      "anchor": "body_center",
+      "source_size": [
+        128,
+        128
+      ]
+    },
+    "drone_shield_base": {
+      "source": "res://assets/source/placeholders/drone_shield_base.svg",
+      "anchor": "body_center",
+      "source_size": [
+        128,
+        128
+      ]
+    },
+    "enemy_scrap_hound": {
+      "source": "res://assets/source/placeholders/enemy_scrap_hound.svg",
+      "anchor": "feet_center",
+      "source_size": [
+        128,
+        128
+      ]
+    },
+    "enemy_raider_gunner": {
+      "source": "res://assets/source/placeholders/enemy_raider_gunner.svg",
+      "anchor": "feet_center",
+      "source_size": [
+        128,
+        128
+      ]
+    },
+    "enemy_sentry": {
+      "source": "res://assets/source/placeholders/enemy_sentry.svg",
+      "anchor": "feet_center",
+      "source_size": [
+        128,
+        128
+      ]
+    },
+    "boss_core12": {
+      "source": "res://assets/source/placeholders/boss_core12.svg",
+      "anchor": "feet_center",
+      "source_size": [
+        220,
+        220
+      ]
+    },
+    "biome_b01_layers": {
+      "source": "res://assets/source/placeholders/biome_b01_placeholder.svg",
+      "anchor": "top_left",
+      "source_size": [
+        640,
+        360
+      ]
+    },
+    "garage_main": {
+      "source": "res://assets/source/placeholders/garage_main_placeholder.svg",
+      "anchor": "top_left",
+      "source_size": [
+        640,
+        360
+      ]
+    }
+  }
+}

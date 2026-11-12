@@ -51,6 +51,19 @@ Do not invent a universal pixel resolution before the first in-engine scene is m
 
 The eventual `game/tools/validate_assets.gd` must fail on duplicate IDs, missing files, invalid status transitions, unrecorded provenance/license, invalid dimensions/pivots, missing required animation states, and references from scenes to unknown IDs. A headless import plus manifest validation runs in CI. Runtime logs a single actionable error for a missing optional asset and never changes combat math to compensate for presentation failure.
 
+## Alpha temporary-visual policy (2026-11-12 decision)
+
+CYDLE alpha is **gameplay-first**, not art-production-first. During alpha, actor/environment visuals may be original vector SVG placeholders imported as textures, simple native Godot shapes, or procedural silhouettes. This explicit exception does not replace the final PNG cutout/art rules above.
+
+- `game/data/presentation/alpha_visual_fallbacks.json` maps stable gameplay-facing visual IDs to placeholder SVG sources and their logical anchors. It is presentation-only metadata, not a balance, save, RNG or combat input.
+- The **presentation-layer** visual resolver must use this order: **verified final runtime asset → mapped temporary asset → generated procedural silhouette**. Missing visuals do not crash combat or change deterministic outcomes. Avoid silently using an unrelated sprite.
+- The existing `ASSET_MANIFEST.csv` remains the source of truth for final runtime assets. A temporary placeholder source does **not** make a final asset `INTEGRATED`; leave those entries `PLANNED` until final path/provenance/scene acceptance is verified.
+- Keep visual dimensions, anchor/pivot, hitboxes, facing, health/status presentation and attack origin independently defined. Later sprite replacement must not change domain object IDs, simulation state, damage, saves, rewards, AI or event order.
+- The alpha must display operator, drones, distinct enemies/bosses, route/garage context, HP and shields, status effects, danger cues, combat outcomes, loot, and save recovery. **No character animations, final art or audio required for the alpha gate.**
+- Alpha acceptance: run a playable in-engine vertical slice and verify visual fallback in three cases (final available, placeholder available, neither available), with identical replay/state hash for the same fixed seed. Confirm source import works before claiming these SVGs are integrated.
+
 ## Initial acceptance gate
 
-Before scaling production, integrate an operator base, one drone, three visually distinct enemies, one boss, one biome background set, and a small attack/impact/telegraph effect set into a playable test arena. Confirm silhouette readability, frame/event mapping, asset replacement by ID, and performance on Windows desktop and Steam Deck. Only then bulk-produce the remaining roster.
+Before scaling visual production, complete the **playable alpha** with a base operator, one drone, three distinguishable enemy types, one boss, one biome and visible attack/impact/telegraph cues. Temporary SVG/procedural drawings are sufficient for alpha if readable at game scale and bound to the same deterministic events.
+
+Before bulk-producing **final illustrated assets**, separately confirm a real operator cutout, drone, three enemies, boss and layered biome art in Godot, plus sprite replacement by stable ID, animation-event alignment and performance on Windows/Steam Deck. This final-art gate comes after the functional alpha; it must not block core gameplay development.
