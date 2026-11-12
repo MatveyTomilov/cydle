@@ -43,4 +43,22 @@ func run(_tree: SceneTree) -> bool:
 	resumed.configure_save_directory("user://test-saves/game-session")
 	check(resumed.load_saved_game(), "game_session: persisted state did not reload: %s" % resumed.last_error)
 	check(resumed.state.run.current_node_id == session.state.run.current_node_id, "game_session: route position changed after reload")
+	var event_session: GameSession = GameSession.new()
+	event_session.configure_save_directory("user://test-saves/game-session-events")
+	if check(event_session.start_new_game(1762900000100), "game_session: could not create an event-test profile") and check(event_session.start_expedition("fixed-event-seed"), "game_session: could not start event-test run"):
+		var event_payload: Dictionary = event_session.state.to_payload()
+		event_payload["run"]["graph"] = {"layers": [[{"id": "event-test", "layer": 0, "type": "EVENT", "eventId": "EV02", "threat": "medium", "enemies": [], "revealLevel": 1, "lootHint": "event"}]], "edges": [{"from": "START", "to": "event-test", "fromLayer": -1, "toLayer": 0, "fuelCost": 1}]}
+		check(event_session._commit_payload(event_payload), "game_session: could not install isolated event fixture: %s" % event_session.last_error)
+		check(event_session.travel_to("event-test"), "game_session: event node travel failed: %s" % event_session.last_error)
+		check(event_session.current_event().get("id", "") == "EV02", "game_session: event node did not resolve its canonical definition")
+		check(event_session.resolve_event("A"), "game_session: event choice did not resolve: %s" % event_session.last_error)
+		check(event_session.state.run.events_seen.has("EV02") and event_session.state.run.wanted == 10.0, "game_session: event outcome flags were not persisted")
+		var mutation_payload: Dictionary = event_session.state.to_payload()
+		mutation_payload["run"]["graph"] = {"layers": [[{"id": "mutation-test", "layer": 0, "type": "EVENT", "eventId": "EV22", "threat": "medium", "enemies": [], "revealLevel": 1, "lootHint": "event"}]], "edges": [{"from": "START", "to": "mutation-test", "fromLayer": -1, "toLayer": 0, "fuelCost": 1}]}
+		mutation_payload["run"]["currentNodeId"] = "START"
+		mutation_payload["run"]["phase"] = "ROUTE"
+		check(event_session._commit_payload(mutation_payload), "game_session: could not install mutation event fixture")
+		check(event_session.travel_to("mutation-test"), "game_session: mutation event travel failed")
+		check(event_session.resolve_event("A"), "game_session: temporary mutation event failed: %s" % event_session.last_error)
+		check(event_session.state.run.temporary_mutation_ids == ["MUT_REGEN"], "game_session: event mutation did not enter the temporary run build")
 	return failure_count == 0

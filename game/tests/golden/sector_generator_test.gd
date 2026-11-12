@@ -16,6 +16,10 @@ func run(_tree: SceneTree) -> bool:
 	for depth: int in [4, 8, 12]:
 		var boss_graph: Dictionary = generator.generate("boss-seed-%d" % depth, depth, generator.campaign_biome(depth, "boss"), false)["graph"]
 		check(str(boss_graph["layers"][5][0]["type"]) == "BOSS", "sector_generator: depth %d has no boss endpoint" % depth)
+	var campaign_graph: Dictionary = generator.generate("event-seed", 2, "B03", false)["graph"]
+	var event_node: Dictionary = campaign_graph["layers"][3][0]
+	check(str(event_node.get("type", "")) == "EVENT", "sector_generator: canonical layer-three event node is missing")
+	check(EventCatalog.new().get_event(str(event_node.get("eventId", ""))).size() > 0, "sector_generator: generated event id is not in the event catalog")
 	var invalid: Dictionary = generator.generate("bad-biome", 1, "B99")
 	check(not bool(invalid.get("ok", true)), "sector_generator: invalid biome was accepted")
 	_check_graph(graph)

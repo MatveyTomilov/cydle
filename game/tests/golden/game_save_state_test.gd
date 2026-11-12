@@ -110,7 +110,7 @@ func _valid_payload() -> Dictionary:
 func _valid_run(meta: Dictionary) -> Dictionary:
 	return {
 		"seed": "native-run-seed", "depth": 1, "biome": "B01", "graph": {}, "equipment": meta["equipment"].duplicate(true), "currentNodeId": "START",
-		"visitedNodeIds": [], "clearedNodeIds": [], "eventsSeen": [], "phase": "ROUTE", "wanted": 0.0, "revealLevel": 0,
+		"visitedNodeIds": [], "clearedNodeIds": [], "eventsSeen": [], "temporaryMutationIds": [], "phase": "ROUTE", "wanted": 0.0, "revealLevel": 0,
 		"resources": {"fuel": 24.0, "maxFuel": 24.0, "hull": 100.0, "maxHull": 100.0, "hp": 300.0, "maxHP": 300.0, "shield": 75.0, "maxShield": 75.0, "energy": 100.0, "heat": 0.0, "gameTimeMs": 0.0},
 		"runWallet": {"CREDITS": 0.0, "SCRAP": 0.0, "DATA": 0.0},
 		"unsecuredCargo": [], "shippedCargo": [], "grantIds": [], "commandIds": [], "serviceScrapFuelCounts": {}, "shippedCheckpointIds": [],

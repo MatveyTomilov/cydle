@@ -379,6 +379,20 @@ func _show_current_node(run: GameSaveState.RunState) -> void:
 			buy.disabled = bool(offer.get("purchased", false))
 			buy.pressed.connect(_on_buy_shop_item.bind(index))
 			_body.add_child(buy)
+	elif str(node.get("type", "")) == "EVENT":
+		var event: Dictionary = _session.current_event()
+		if event.is_empty():
+			_body.add_child(_label("Событие отсутствует в каталоге; выезд остановлен безопасно.", 14, COLOR_RED))
+		else:
+			_body.add_child(_label(str(event.get("name", "СОБЫТИЕ")), 22, COLOR_TEXT))
+			_body.add_child(_label(str(event.get("text", "")), 14, COLOR_MUTED))
+			for choice: Dictionary in event.get("choices", []):
+				var choose: Button = _button("%s · %s" % [str(choice.get("id", "")), str(choice.get("label", "Выбрать"))], str(choice.get("id", "")) == "A")
+				choose.custom_minimum_size.x = 370
+				choose.pressed.connect(_on_event_choice.bind(str(choice.get("id", ""))))
+				_body.add_child(choose)
+				var description: Label = _label(str(choice.get("desc", "")), 11, COLOR_MUTED)
+				_body.add_child(description)
 	else:
 		_body.add_child(_label("Этот дорожный узел ещё не получил игровое действие.", 13, COLOR_AMBER))
 	if not ["COMBAT", "ELITE", "BOUNTY", "BOSS"].has(str(node.get("type", ""))):
@@ -553,6 +567,12 @@ func _on_service_action(action: String, prototype_id: String = "") -> void:
 
 func _on_buy_shop_item(index: int) -> void:
 	if _session.buy_shop_item(index):
+		_show_road()
+	else:
+		_footer.text = _session.last_error
+
+func _on_event_choice(choice_id: String) -> void:
+	if _session.resolve_event(choice_id):
 		_show_road()
 	else:
 		_footer.text = _session.last_error

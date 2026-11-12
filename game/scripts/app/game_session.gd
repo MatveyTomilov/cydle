@@ -11,6 +11,8 @@ var _generator: SectorGenerator = SectorGenerator.new()
 var _stats: StatMath = StatMath.new()
 var _simulator: CombatSimulator = CombatSimulator.new()
 var _combat: CombatState
+var _active_node_type: String = ""
+var _active_reward_modifiers: Dictionary = {}
 var _item_catalog: ItemCatalog = ItemCatalog.new()
 var _loot_rng: DeterministicRng
 
@@ -74,6 +76,7 @@ func build_preview() -> Dictionary:
 		"equipment": equipment, "attributes": operator.attributes,
 		"skillIds": state.meta.skill_ids, "passiveIds": state.meta.passive_ids,
 		"treeNodeIds": state.meta.tree_node_ids,
+		"mutationIds": state.run.temporary_mutation_ids if state.run != null else [],
 		"attributePointsEarned": operator.attribute_points, "treePointsEarned": operator.tree_points,
 		"unlockedImplantSlots": state.meta.unlocked_implant_slots,
 		"unlockedDroneSlots": state.meta.unlocked_drone_slots,
@@ -186,6 +189,129 @@ func current_node() -> Dictionary:
 			if str(node.get("id", "")) == state.run.current_node_id:
 				return node.duplicate(true)
 	return {}
+
+func current_event() -> Dictionary:
+	var node: Dictionary = current_node()
+	if str(node.get("type", "")) != "EVENT":
+		return {}
+	return EventCatalog.new().get_event(str(node.get("eventId", "")))
+
+func resolve_event(choice_id: String) -> bool:
+	if state == null or state.run == null or state.run.phase != "NODE":
+		last_error = "Выбор события доступен только в активном узле."
+		return false
+	var node: Dictionary = current_node()
+	var node_id: String = str(node.get("id", ""))
+	if str(node.get("type", "")) != "EVENT" or state.run.cleared_node_ids.has(node_id):
+		last_error = "Текущий узел не является неразрешённым событием."
+		return false
+	var event: Dictionary = current_event()
+	var choice: Dictionary = {}
+	for candidate: Dictionary in event.get("choices", []):
+		if str(candidate.get("id", "")) == choice_id:
+			choice = candidate
+			break
+	if choice.is_empty():
+		last_error = "Выбранный вариант отсутствует у этого события."
+		return false
+	var payload: Dictionary = state.to_payload()
+	var meta: Dictionary = payload["meta"]
+	var run_payload: Dictionary = payload["run"]
+	var wallet: Dictionary = run_payload["runWallet"]
+	var scale: float = CydleFormula.new().reward_scale(float(state.run.depth))
+	var costs: Dictionary = choice.get("cost", {}).duplicate(true)
+	var special: String = str(choice.get("special", ""))
+	if special == "dataForCredits":
+		costs["DATA"] = ceili(10.0 * scale)
+	if special == "greyDealer":
+		costs["CREDITS"] = ceili((25.0 + 7.0 * state.run.depth) * 2.0 * scale * 0.6)
+	for currency: String in ["CREDITS", "SCRAP", "DATA"]:
+		if float(wallet.get(currency, 0.0)) < float(costs.get(currency, 0.0)):
+			last_error = "Для выбора недостаточно незакреплённых средств: %s." % currency
+			return false
+	for currency: String in ["CREDITS", "SCRAP", "DATA"]:
+		var gain: float = float(choice.get("gains", {}).get(currency, 0.0))
+		if bool(choice.get("scaled", false)):
+			gain = ceili(gain * scale)
+		if special == "dataForCredits" and currency == "CREDITS":
+			gain = ceili(30.0 * scale)
+		wallet[currency] = float(wallet.get(currency, 0.0)) - float(costs.get(currency, 0.0)) + gain
+	var resources: Dictionary = run_payload["resources"]
+	if choice.has("wanted"):
+		run_payload["wanted"] = clampf(float(run_payload["wanted"]) + float(choice["wanted"]), 0.0, 100.0)
+	if choice.has("travelDelta"):
+		run_payload["pendingTravelDeltaMs"] = clampi(int(run_payload.get("pendingTravelDeltaMs", 0)) + int(choice["travelDelta"]), -60000, 60000)
+	if choice.has("fuel"):
+		resources["fuel"] = clampf(float(resources["fuel"]) + float(choice["fuel"]), 0.0, float(resources["maxFuel"]))
+	if choice.has("hull"):
+		resources["hull"] = clampf(float(resources["hull"]) + float(choice["hull"]), 0.0, float(resources["maxHull"]))
+	if choice.has("healMissingFraction"):
+		var hp: float = float(resources["hp"])
+		resources["hp"] = minf(float(resources["maxHP"]), hp + (float(resources["maxHP"]) - hp) * float(choice["healMissingFraction"]))
+	if bool(choice.get("refillEnergy", false)):
+		var build: Dictionary = build_preview()
+		if not bool(build.get("valid", false)):
+			last_error = "Невозможно рассчитать энергию текущей сборки."
+			return false
+		resources["energy"] = float(build.get("stats", {}).get("maxEnergy", resources["maxEnergy"]))
+	if choice.has("reputation"):
+		for faction: Variant in choice["reputation"].keys():
+			meta["reputation"][str(faction)] = clampi(int(meta["reputation"].get(str(faction), 0)) + int(choice["reputation"][faction]), -100, 100)
+	var next_combat: Dictionary = choice.get("nextCombat", {})
+	var pending_combat: Dictionary = run_payload["pendingCombatEffects"]
+	pending_combat["initialTempShield"] = float(pending_combat.get("initialTempShield", 0.0)) + float(next_combat.get("shieldBonus", 0.0))
+	pending_combat["extraHeat"] = float(pending_combat.get("extraHeat", 0.0)) + float(next_combat.get("extraHeat", 0.0))
+	var pending_next: Dictionary = run_payload["pendingNextCombat"]
+	if bool(next_combat.get("skip", false)): pending_next["skipOrdinary"] = true
+	if bool(next_combat.get("forceElite", false)): pending_next["forceElite"] = true
+	if bool(next_combat.get("forceBounty", false)): pending_next["forceBounty"] = true
+	if bool(next_combat.get("alliedTurret", false)): pending_next["alliedTurret"] = true
+	if bool(next_combat.get("extraRareRoll", false)):
+		if str(event.get("id", "")) == "EV16": pending_next["extraItemRoll"] = true
+		else: pending_next["extraRareItemRoll"] = true
+	if next_combat.has("bountyCredits"):
+		pending_next["bountyCreditsBonus"] = float(pending_next.get("bountyCreditsBonus", 0.0)) + float(next_combat["bountyCredits"])
+	var flag: String = str(choice.get("flag", ""))
+	if flag == "bountyE21":
+		pending_next["bountyEnemyId"] = "E21"
+		pending_next["extraRareItemRoll"] = true
+	if flag == "huntElite": pending_next["extraRareOnElite"] = true
+	if not flag.is_empty(): meta["campaignFlags"].append("event-flag:%s:%s" % [flag, node_id])
+	var grant: Dictionary = choice.get("grantItem", {}).duplicate(true)
+	if special == "greyDealer": grant["rarity"] = "RARE"
+	var item_values: Array[Dictionary] = []
+	if not grant.is_empty():
+		var loot: DeterministicRng = DeterministicRng.new()
+		loot.restore(run_payload["lootRng"])
+		var grant_id: String = "event:%s:%s:%s" % [str(run_payload["seed"]), node_id, choice_id]
+		var options: Dictionary = {"depth": state.run.depth, "biome": state.run.biome, "table": "ORDINARY", "secured": false, "grantId": grant_id, "origin": "event", "acquiredAt": state.updated_at}
+		if grant.has("templateId"): options["forceTemplateId"] = grant["templateId"]
+		if grant.has("category"): options["forceCategory"] = grant["category"]
+		if grant.has("tag"): options["forceTag"] = grant["tag"]
+		if grant.has("rarity"): options["forceRarity"] = grant["rarity"]
+		var rolled: Dictionary = ItemFactory.new().roll_item(loot, _item_catalog, options)
+		if not bool(rolled.get("ok", false)):
+			last_error = str(rolled.get("error", "Предмет события не удалось создать."))
+			return false
+		item_values.append((rolled["item"] as ItemInstance).to_dictionary())
+		if not _cargo_fits(run_payload, item_values[0]):
+			last_error = "В грузовом отсеке нет места для предмета события."
+			return false
+		run_payload["unsecuredCargo"].append_array(item_values)
+		run_payload["grantIds"].append(grant_id)
+		run_payload["lootRng"] = loot.serialize()
+	if choice.has("grantMutation"):
+		var mutation_id: String = str(choice["grantMutation"])
+		if not run_payload["temporaryMutationIds"].has(mutation_id) and run_payload["temporaryMutationIds"].size() < 2:
+			run_payload["temporaryMutationIds"].append(mutation_id)
+	var one_time_flag: String = "%s:%s" % [str(event.get("id", "")), choice_id]
+	if not meta["campaignFlags"].has(one_time_flag): meta["campaignFlags"].append(one_time_flag)
+	if not run_payload["eventsSeen"].has(str(event.get("id", ""))): run_payload["eventsSeen"].append(str(event.get("id", "")))
+	run_payload["clearedNodeIds"].append(node_id)
+	run_payload["resources"]["gameTimeMs"] = float(run_payload["resources"].get("gameTimeMs", 0.0)) + 10000.0
+	run_payload["phase"] = "ROUTE"
+	run_payload["lastCommandId"] = "event:%s:%s" % [node_id, choice_id]
+	return _commit_payload(payload)
 
 func resolve_service_node(action: String, prototype_id: String = "") -> bool:
 	if state == null or state.run == null or state.run.phase != "NODE":
@@ -311,7 +437,7 @@ func continue_campaign() -> bool:
 	var build: Dictionary = build_preview()
 	var seed: String = "%s:sector:%d" % [state.run.seed, next_depth]
 	var biome: String = _generator.campaign_biome(next_depth, seed)
-	var generated: Dictionary = _generator.generate(seed, next_depth, biome, false, state.run.wanted)
+	var generated: Dictionary = _generator.generate(seed, next_depth, biome, false, state.run.wanted, state.run.events_seen)
 	if not bool(generated.get("ok", false)):
 		last_error = str(generated.get("error", "Не удалось создать следующий сектор."))
 		return false
@@ -324,7 +450,6 @@ func continue_campaign() -> bool:
 	run_payload["currentNodeId"] = "START"
 	run_payload["visitedNodeIds"] = []
 	run_payload["clearedNodeIds"] = []
-	run_payload["eventsSeen"] = []
 	run_payload["phase"] = "ROUTE"
 	run_payload["combatResult"] = null
 	run_payload["pendingTravelDeltaMs"] = 0
@@ -448,19 +573,42 @@ func begin_combat() -> bool:
 		]}
 		combat_notice = "Профиль «%s» содержит ещё не подключённые условия/умения. Этот бой использует только автоатаку; сохранённый профиль не изменён." % str(tactic.get("name", tactic.get("id", "")))
 	var resources: Dictionary = state.run.resources
+	var pending_next: Dictionary = state.run.pending_next_combat
+	var effective_type: String = str(node.get("type", "COMBAT"))
+	var enemy_specs: Array = node.get("enemies", []).duplicate(true)
+	if effective_type == "COMBAT" and bool(pending_next.get("skipOrdinary", false)):
+		var skipped_payload: Dictionary = state.to_payload()
+		var skipped_run: Dictionary = skipped_payload["run"]
+		skipped_run["clearedNodeIds"].append(state.run.current_node_id)
+		skipped_run["phase"] = "ROUTE"
+		skipped_run["pendingNextCombat"]["skipOrdinary"] = false
+		skipped_run["resources"]["gameTimeMs"] = float(skipped_run["resources"].get("gameTimeMs", 0.0))
+		last_error = ""
+		return _commit_payload(skipped_payload)
+	if effective_type == "COMBAT" and bool(pending_next.get("forceElite", false)):
+		effective_type = "ELITE"
+		if not enemy_specs.is_empty(): enemy_specs[0]["elite"] = "EL_PEN"
+	if effective_type == "COMBAT" and bool(pending_next.get("forceBounty", false)):
+		effective_type = "BOUNTY"
+		if not enemy_specs.is_empty() and not str(pending_next.get("bountyEnemyId", "")).is_empty(): enemy_specs[0]["templateId"] = str(pending_next["bountyEnemyId"])
+	var pending_effects: Dictionary = state.run.pending_combat_effects
 	var config: Dictionary = {
 		"seed": "%s:%s" % [state.run.seed, state.run.current_node_id],
-		"depth": state.run.depth, "biome": state.run.biome, "nodeType": node["type"],
-		"build": build, "enemies": node.get("enemies", []), "tactics": effective_tactic,
+		"depth": state.run.depth, "biome": state.run.biome, "nodeType": effective_type,
+		"build": build, "enemies": enemy_specs, "tactics": effective_tactic,
 		"startHpFraction": float(resources.get("hp", 0.0)) / maxf(1.0, float(resources.get("maxHP", 1.0))),
 		"startShieldFraction": float(resources.get("shield", 0.0)) / maxf(1.0, float(resources.get("maxShield", 1.0))),
 		"startEnergy": float(resources.get("energy", 0.0)), "startHeat": float(resources.get("heat", 0.0)),
+		"initialTempShield": float(pending_effects.get("initialTempShield", 0.0)),
+		"initialExtraHeat": float(pending_effects.get("extraHeat", 0.0)),
 	}
 	var initialized: Dictionary = _simulator.create_state(config)
 	if not bool(initialized.get("ok", false)):
 		last_error = str(initialized.get("error", "Боевой симулятор не смог создать встречу."))
 		return false
 	_combat = initialized["state"] as CombatState
+	_active_node_type = effective_type
+	_active_reward_modifiers = pending_next.duplicate(true)
 	last_error = ""
 	return true
 
@@ -510,7 +658,7 @@ func resolve_active_combat() -> bool:
 	if _combat.outcome != "VICTORY":
 		last_error = "Бой завершился без победы; безопасное восстановление ещё не реализовано."
 		return false
-	var reward: Dictionary = _battle_reward(str(node.get("type", "COMBAT")), state.run.depth, state.run.biome, node_id, run_payload)
+	var reward: Dictionary = _battle_reward(_active_node_type if not _active_node_type.is_empty() else str(node.get("type", "COMBAT")), state.run.depth, state.run.biome, node_id, run_payload, _active_reward_modifiers)
 	var payload: Dictionary = state.to_payload()
 	var wallet: Dictionary = run_payload["runWallet"]
 	for currency: String in ["CREDITS", "SCRAP", "DATA"]:
@@ -531,6 +679,9 @@ func resolve_active_combat() -> bool:
 	run_payload["phase"] = "CHECKPOINT" if int(node.get("layer", 0)) == 5 else "ROUTE"
 	run_payload["combatResult"] = null
 	run_payload["lastCommandId"] = "combat:%s" % node_id
+	var retain_elite_contract: bool = bool(_active_reward_modifiers.get("extraRareOnElite", false)) and _active_node_type != "ELITE"
+	run_payload["pendingCombatEffects"] = {"initialTempShield": 0.0, "extraHeat": 0.0}
+	run_payload["pendingNextCombat"] = {"skipOrdinary": false, "forceElite": false, "extraItemRoll": false, "forceBounty": false, "bountyCreditsBonus": 0.0, "bountyEnemyId": null, "extraRareItemRoll": false, "alliedTurret": false, "extraRareOnElite": retain_elite_contract}
 	if str(node.get("type", "")) == "BOSS":
 		var depth: int = int(state.run.depth)
 		if depth % 4 == 0:
@@ -545,9 +696,11 @@ func resolve_active_combat() -> bool:
 	if not _commit_payload(payload):
 		return false
 	_combat = null
+	_active_node_type = ""
+	_active_reward_modifiers = {}
 	return true
 
-func _battle_reward(node_type: String, depth: int, biome: String, node_id: String, run_payload: Dictionary) -> Dictionary:
+func _battle_reward(node_type: String, depth: int, biome: String, node_id: String, run_payload: Dictionary, modifiers: Dictionary = {}) -> Dictionary:
 	var scale: float = CydleFormula.new().reward_scale(float(depth))
 	var credits: float = 12.0
 	var scrap: float = 3.0
@@ -567,7 +720,7 @@ func _battle_reward(node_type: String, depth: int, biome: String, node_id: Strin
 		"BOSS":
 			credits = 85.0; scrap = 18.0; data = 8.0; xp = ceili(160.0 * scale)
 			item_chance = 1.0; extra_item_chance = 0.5; core_chance = 1.0; table = "BOSS"
-	credits = ceili(credits * scale * (1.1 if biome == "B02" else 1.0))
+	credits = ceili(credits * scale * (1.1 if biome == "B02" else 1.0) * (1.0 + float(modifiers.get("bountyCreditsBonus", 0.0))))
 	data = ceili(data * scale * (1.2 if biome == "B04" else 1.0))
 	var wallet: Dictionary = {"CREDITS": credits, "SCRAP": ceili(scrap * scale), "DATA": data}
 	var items: Array[Dictionary] = []
@@ -578,14 +731,23 @@ func _battle_reward(node_type: String, depth: int, biome: String, node_id: Strin
 	if not bool(loaded.get("ok", false)):
 		return {"wallet": wallet, "items": items, "grantIds": grant_ids, "lootRng": run_payload["lootRng"], "xp": xp, "discardedItems": 0}
 	var grants: Array[float] = [item_chance, extra_item_chance]
+	var forced_rarities: Array[String] = ["", ""]
+	if bool(modifiers.get("extraItemRoll", false)):
+		grants.append(1.0)
+		forced_rarities.append("")
+	if bool(modifiers.get("extraRareItemRoll", false)) or bool(modifiers.get("extraRareOnElite", false)) and node_type == "ELITE":
+		grants.append(1.0)
+		forced_rarities.append("RARE")
 	for index: int in range(grants.size()):
 		var grant_id: String = "combat:%s:%s:item:%d" % [state.run.seed, node_id, index]
 		if grants[index] <= 0.0 or not rng.chance(grants[index]):
 			continue
-		var rolled: Dictionary = ItemFactory.new().roll_item(rng, _item_catalog, {
+		var roll_options: Dictionary = {
 			"depth": depth, "biome": biome, "table": table, "secured": false,
 			"grantId": grant_id, "origin": "combat", "acquiredAt": state.updated_at,
-		})
+		}
+		if not forced_rarities[index].is_empty(): roll_options["forceRarity"] = forced_rarities[index]
+		var rolled: Dictionary = ItemFactory.new().roll_item(rng, _item_catalog, roll_options)
 		if bool(rolled.get("ok", false)):
 			items.append((rolled["item"] as ItemInstance).to_dictionary())
 			grant_ids.append(grant_id)
@@ -655,7 +817,10 @@ func _resolve_combat_defeat(run_payload: Dictionary, node_id: String) -> bool:
 	run_payload["combatResult"] = null
 	run_payload["unsecuredCargo"] = []
 	run_payload["shippedCargo"] = []
+	run_payload["temporaryMutationIds"] = []
 	run_payload["runWallet"] = {"CREDITS": 0.0, "SCRAP": 0.0, "DATA": 0.0}
+	run_payload["pendingCombatEffects"] = {"initialTempShield": 0.0, "extraHeat": 0.0}
+	run_payload["pendingNextCombat"] = {"skipOrdinary": false, "forceElite": false, "extraItemRoll": false, "forceBounty": false, "bountyCreditsBonus": 0.0, "bountyEnemyId": null, "extraRareItemRoll": false, "alliedTurret": false, "extraRareOnElite": false}
 	run_payload["equipment"] = meta["equipment"].duplicate(true)
 	run_payload["lastCommandId"] = "combat:defeat:%s" % node_id
 	payload["meta"] = meta
@@ -663,6 +828,8 @@ func _resolve_combat_defeat(run_payload: Dictionary, node_id: String) -> bool:
 	if not _commit_payload(payload):
 		return false
 	_combat = null
+	_active_node_type = ""
+	_active_reward_modifiers = {}
 	return true
 
 func equip_item(slot: String, item_id: String) -> bool:
@@ -721,6 +888,7 @@ func extract_run() -> bool:
 			meta["inventory"].append(secured)
 	run_payload["unsecuredCargo"] = []
 	run_payload["runWallet"] = {"CREDITS": 0.0, "SCRAP": 0.0, "DATA": 0.0}
+	run_payload["temporaryMutationIds"] = []
 	var resources: Dictionary = run_payload["resources"]
 	var transport: Dictionary = meta["transport"]
 	transport["fuel"] = int(resources.get("fuel", transport.get("fuel", 0)))
@@ -752,6 +920,7 @@ func _build_input(save_state: GameSaveState) -> Dictionary:
 		"equipment": equipment, "attributes": operator.attributes,
 		"skillIds": save_state.meta.skill_ids, "passiveIds": save_state.meta.passive_ids,
 		"treeNodeIds": save_state.meta.tree_node_ids,
+		"mutationIds": save_state.run.temporary_mutation_ids if save_state.run != null else [],
 		"attributePointsEarned": operator.attribute_points, "treePointsEarned": operator.tree_points,
 		"unlockedImplantSlots": save_state.meta.unlocked_implant_slots,
 		"unlockedDroneSlots": save_state.meta.unlocked_drone_slots,

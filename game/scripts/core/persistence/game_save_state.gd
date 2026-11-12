@@ -68,6 +68,7 @@ class RunState:
 	var visited_node_ids: Array[String] = []
 	var cleared_node_ids: Array[String] = []
 	var events_seen: Array[String] = []
+	var temporary_mutation_ids: Array[String] = []
 	var phase: String = "ROUTE"
 	var wanted: float = 0.0
 	var reveal_level: int = 0
@@ -103,6 +104,7 @@ class RunState:
 			"visitedNodeIds": visited_node_ids.duplicate(),
 			"clearedNodeIds": cleared_node_ids.duplicate(),
 			"eventsSeen": events_seen.duplicate(),
+			"temporaryMutationIds": temporary_mutation_ids.duplicate(),
 			"phase": phase,
 			"wanted": wanted,
 			"revealLevel": reveal_level,
@@ -264,6 +266,7 @@ func _run_from_dictionary(value: Dictionary) -> RunState:
 	result.visited_node_ids.assign(value.get("visitedNodeIds", []))
 	result.cleared_node_ids.assign(value.get("clearedNodeIds", []))
 	result.events_seen.assign(value.get("eventsSeen", []))
+	result.temporary_mutation_ids.assign(value.get("temporaryMutationIds", []))
 	result.phase = str(value["phase"])
 	result.wanted = float(value["wanted"])
 	result.reveal_level = int(value["revealLevel"])

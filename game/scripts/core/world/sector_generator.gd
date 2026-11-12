@@ -9,6 +9,7 @@ const CAMPAIGN_BIOMES: Dictionary = {
 }
 
 var _enemies: EnemyCatalog = EnemyCatalog.new()
+var _events: EventCatalog = EventCatalog.new()
 var _loaded: bool = false
 var _load_error: String = ""
 
@@ -19,7 +20,7 @@ func campaign_biome(depth: int, seed_value: String) -> String:
 	rng.seed("world:biome", seed_value)
 	return ["B01", "B02", "B03", "B04", "B05", "B06"][rng.int_range(0, 5)]
 
-func generate(seed_value: String, depth: int, biome: String, tutorial: bool = false, wanted: float = 0.0) -> Dictionary:
+func generate(seed_value: String, depth: int, biome: String, tutorial: bool = false, wanted: float = 0.0, used_event_ids: Array[String] = []) -> Dictionary:
 	if seed_value.strip_edges().is_empty() or depth < 1:
 		return {"ok": false, "graph": {}, "error": "Для маршрута требуется seed и положительная глубина."}
 	if not ["B01", "B02", "B03", "B04", "B05", "B06"].has(biome):
@@ -30,6 +31,9 @@ func generate(seed_value: String, depth: int, biome: String, tutorial: bool = fa
 		_load_error = str(loaded.get("error", "")) if not bool(loaded.get("ok", false)) else ""
 	if not _load_error.is_empty():
 		return {"ok": false, "graph": {}, "error": _load_error}
+	var events_loaded: Dictionary = _events.load_catalog()
+	if not bool(events_loaded.get("ok", false)):
+		return {"ok": false, "graph": {}, "error": str(events_loaded.get("error", "Каталог событий недоступен."))}
 	var rng: DeterministicRng = DeterministicRng.new()
 	rng.seed("world", seed_value)
 	var widths: Array[int] = BASE_WIDTHS.duplicate()
@@ -59,12 +63,17 @@ func generate(seed_value: String, depth: int, biome: String, tutorial: bool = fa
 				fixed_enemies = [_enemy_for(biome, depth, rng)]
 			elif layer == 4:
 				node_type = "REPAIR" if index % 2 == 0 else "FUEL"
+			elif not is_tutorial and layer == 3 and index == 0:
+				var available_events: Array[String] = _events.available_ids(used_event_ids)
+				if not available_events.is_empty():
+					node_type = "EVENT"
+					extras["eventId"] = str(rng.pick(available_events))
+				else:
+					node_type = "CACHE"
 			elif not is_tutorial and layer == 1 and index == 0 and rng.chance(0.22):
 				node_type = "ELITE"
 			elif not is_tutorial and layer == 1 and index == 1 and wanted >= 50.0 and rng.chance(0.25):
 				node_type = "BOUNTY"
-			elif layer == 3 and index == 0:
-				node_type = "CACHE"
 			elif layer == 3 and index == 1:
 				node_type = "SHOP"
 			elif is_tutorial and layer == 3:

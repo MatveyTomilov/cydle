@@ -135,6 +135,15 @@ func _validate_run(value: Variant, meta: Dictionary) -> Dictionary:
 		return _failure("run.graph/equipment/currentNodeId: неверная структура.")
 	if not _string_array(run["visitedNodeIds"]) or not _string_array(run["clearedNodeIds"]) or not _string_array(run.get("eventsSeen", [])) or not _string_array(run["grantIds"]) or not _string_array(run["commandIds"]) or not _string_array(run["shippedCheckpointIds"]):
 		return _failure("run: неверный список ID.")
+	if not _string_array(run.get("temporaryMutationIds", [])) or run.get("temporaryMutationIds", []).size() > 2:
+		return _failure("run.temporaryMutationIds: неверный список временных мутаций.")
+	var build_catalog: BuildCatalog = BuildCatalog.new()
+	var build_catalog_result: Dictionary = build_catalog.load_catalog()
+	if not bool(build_catalog_result.get("ok", false)):
+		return _failure("run: каталог сборки недоступен для проверки мутаций.")
+	for mutation_id: Variant in run.get("temporaryMutationIds", []):
+		if not build_catalog.mutations.has(str(mutation_id)):
+			return _failure("run.temporaryMutationIds: неизвестная мутация %s." % str(mutation_id))
 	if run["commandIds"].size() > 128 or not _unique_strings(run["grantIds"]) or not _unique_strings(run["commandIds"]):
 		return _failure("run: ID наград/команд повторяются или лимит команд превышен.")
 	if not ["ROUTE", "NODE", "CHECKPOINT", "EXTRACTED", "TOWED", "ABANDONED", "DEFEATED", "SAFE_ERROR_STOP"].has(str(run["phase"])):

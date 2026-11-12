@@ -12,6 +12,7 @@ import { MUTATIONS } from '../src/data/progression';
 import { createInitialSave } from '../src/core/save/initial';
 import { UNIQUE_TEMPLATE_BY_ID } from '../src/data/uniques';
 import { BOSSES, ELITE_MODS, ENEMIES } from '../src/data/enemies';
+import { EVENTS } from '../src/data/events';
 import { applyStatus, createCombatState, stepCombat } from '../src/core/combat/engine';
 import { STATUS_DEFS } from '../src/core/combat/status';
 import type { TacticalProfile } from '../src/core/combat/types';
@@ -160,6 +161,10 @@ console.log(`Exported ${ENEMIES.length} enemies, ${BOSSES.length} bosses, and ${
 const statusCatalogOutput = resolve('game/data/catalog/status_definitions.json');
 writeFileSync(statusCatalogOutput, `${JSON.stringify({ schemaVersion: 1, statuses: Object.values(STATUS_DEFS) }, null, 2)}\n`, 'utf8');
 console.log(`Exported ${Object.keys(STATUS_DEFS).length} status definitions to ${statusCatalogOutput}`);
+
+const eventCatalogOutput = resolve('game/data/catalog/event_definitions.json');
+writeFileSync(eventCatalogOutput, `${JSON.stringify({ schemaVersion: 1, events: EVENTS }, null, 2)}\n`, 'utf8');
+console.log(`Exported ${EVENTS.length} event definitions to ${eventCatalogOutput}`);
 
 const starterItemsById = new Map(initialSaveFixture.meta.inventory.map((item) => [item.itemId, item]));
 const starterEquipment = Object.fromEntries(Object.entries(initialSaveFixture.meta.equipment).map(([slot, itemId]) => [slot, starterItemsById.get(itemId)!]));
