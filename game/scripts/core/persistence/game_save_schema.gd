@@ -218,6 +218,8 @@ func _validate_contract_instance(value: Variant) -> bool:
 	var contract: Dictionary = value
 	if not _nonempty_string(contract.get("id")) or not _nonempty_string(contract.get("instanceId")) or not _nonempty_string(contract.get("kind")):
 		return false
+	if contract.has("eventId") and not _nonempty_string(contract["eventId"]):
+		return false
 	if not ["HUNT", "TECH", "ESCORT", "SIGNAL"].has(str(contract["kind"])) or not ["ACTIVE", "COMPLETE", "FAILED"].has(str(contract.get("status", ""))):
 		return false
 	if not BIOMES.has(str(contract.get("targetBiome", ""))) or not _is_integer(contract.get("combatNodes", 0)) or int(contract.get("combatNodes", 0)) < 0:

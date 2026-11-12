@@ -35,7 +35,7 @@ func run(_tree: SceneTree) -> bool:
 		check(contract_session.start_expedition("contract-fixed-seed", false, "CT_HUNT"), "game_session: HUNT contract failed to start: %s" % contract_session.last_error)
 		if contract_session.state.run != null:
 			var contract: Dictionary = contract_session.state.run.contract
-			check(str(contract.get("status", "")) == "ACTIVE" and not str(contract.get("targetNodeId", "")).is_empty(), "game_session: HUNT contract did not retain an active target")
+			check(str(contract.get("status", "")) == "ACTIVE" and not str(contract.get("targetNodeId", "")).is_empty() and str(contract.get("eventId", "")) == "contract-offer:1:CT_HUNT", "game_session: HUNT contract did not retain its active objective and world event")
 			var found_target: bool = false
 			for layer: Array in contract_session.state.run.graph.get("layers", []):
 				for node: Dictionary in layer:
@@ -75,7 +75,7 @@ func run(_tree: SceneTree) -> bool:
 		check(signal_offer_found, "game_session: unlocked U09 signal contract was not offered in its source biome")
 		if signal_session.start_expedition("signal-contract-seed", false, "SIGNAL_U09"):
 			var signal_contract: Dictionary = signal_session.state.run.contract
-			check(str(signal_contract.get("kind", "")) == "SIGNAL" and str(signal_contract.get("targetUniqueId", "")) == "U09" and not str(signal_contract.get("targetNodeId", "")).is_empty(), "game_session: signal contract did not create a targeted elite encounter")
+			check(str(signal_contract.get("kind", "")) == "SIGNAL" and str(signal_contract.get("targetUniqueId", "")) == "U09" and not str(signal_contract.get("targetNodeId", "")).is_empty() and str(signal_contract.get("eventId", "")) == "contract-offer:5:SIGNAL_U09", "game_session: signal contract did not create a targeted elite encounter tied to its world event")
 			var signal_round_trip: Dictionary = GameSaveState.new().parse_payload(signal_session.state.to_payload())
 			check(bool(signal_round_trip.get("ok", false)) and str(signal_round_trip["state"].run.contract.get("kind", "")) == "SIGNAL", "game_session: active signal contract did not survive save validation")
 			var signal_payout: Dictionary = signal_session.state.to_payload()

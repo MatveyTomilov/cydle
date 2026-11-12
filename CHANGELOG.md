@@ -11,6 +11,7 @@
 - Connected quest `signalContract:U09/U04/U14/U07/U18` unlocks to biome-gated SIGNAL offers and generated elite objectives; successful target fights grant the exact unique template through the shared item factory with save validation and duplicate-reward protection.
 - Added all eight endgame escalation contracts with a three-contract maximum, saved per-sector selection, picker UI after campaign ending, and actual route, combat, INTEL, loot, wanted, data, scrap, and travel effects.
 - Connected Q03's SERVICE choice to paid hull repair at checkpoints (+15% repair amount) and gated Q01/Q02 visit-biome and Q04 elimination follow-ups until their next matching sector.
+- Persisted and validated each accepted world-seeded contract offer's event ID, with old RUN saves remaining compatible.
 
 ## Unreleased
 

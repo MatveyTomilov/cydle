@@ -410,6 +410,7 @@ func available_contract_offers() -> Array[Dictionary]:
 				offers.append({
 					"id": "SIGNAL_%s" % unique_id,
 					"kind": "SIGNAL",
+					"eventId": "contract-offer:%d:SIGNAL_%s" % [depth, unique_id],
 					"name": "Целевой контракт · %s" % str(template.get("name", unique_id)),
 					"desc": "Найти указанную уникальную технологию в элитном узле целевого биома.",
 					"targetBiome": biome,
@@ -499,6 +500,7 @@ func start_expedition(seed_value: String = "", use_medical_restore: bool = false
 				return false
 			contract["targetNodeId"] = str(target_cache.get("id", ""))
 		contract["instanceId"] = "contract:%s:%s" % [seed, contract_id]
+		contract["eventId"] = "contract-offer:%d:%s" % [depth, contract_id]
 		contract["status"] = "ACTIVE"
 		contract["combatNodes"] = 0
 		contract["rewardClaimed"] = false
