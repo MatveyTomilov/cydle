@@ -8,13 +8,13 @@ The active strategy is **FULL GAME FIRST**: connect every major Master Spec syst
 
 ### Live combat/campaign checkpoint (2026-11-12)
 
-The direct K3A status-proc path now honors `procWeight` and trigger-owner ICDs. New starter saves use the declared 0–1 HP threshold; the Godot engine/editor preserve compatibility with old saves that stored whole percentages. A settlement clamp prevents fractional max-HP drift from blocking post-battle saves. Godot headless: 22 scripts / 87,501 assertions; TypeScript tests: 206/206; typecheck, Vite build and diff check pass.
+Remote `development/codex` is at `2947e89b30bec33be5a39b08e0ba1662373d9400`. Shared combat targeting now scopes `enemyCasting` to a selected actor, and save checksums are stable across JSON float round-trips while legacy saves remain accepted. The latest d8 save regression was reproduced in campaign, fixed, and the resumed defeat plus reload succeeded without integrity errors. Godot headless: 22 scripts / 87,506 assertions; TypeScript tests 206/206, typecheck and Vite build passed on the immediately preceding combat checkpoint. Windows export has not been rerun after the checksum fix.
 
-Campaign E2E has repeatedly traversed d1–d4, but has not yet cleared BOSS_A. Level11 defensive+shield/EMP dealt 1,688, killed E09 and interrupted once, but died with 1,034 boss HP left. Current uncommitted driver tests a 10-point mixed K/defense tree plus PP_AMMO on the preserved profile. d4 acceptance is pending; d5–d12/endgame remain unverified. No boss balance was altered.
+Campaign E2E has cleared BOSS_A at d4, traversed/extracted at d7, and reached BOSS_B at d8 twice. Both d8 attempts ended in genuine defeat (the second at 125 ticks, leaving 3,468/4,951 boss HP), then saved and resumed correctly. A third retry is active from the d5 checkpoint with a stronger collected build (508 HP, 126 shield, 27 armor, T7 SMG); no d8 clear is confirmed. The external profile is `%APPDATA%\Godot\app_userdata\CYDLE\campaign-e2e-repro`, with a safety copy in `%TEMP%\CYDLE-campaign-e2e-repro-20261112-204651\cylde-main.json`; preserve both. No boss balance values were changed.
 
 ### Live continuation (2026-11-12)
 
-The local WIP wires deterministic direct `ON_HIT` status triggers into the shared Godot simulator, including K3A ARMOR_BREAK, and excludes secondary splash/detonation packets. Victory settlement clamps HP/shield to persisted sortie maxima after fractional max-stat drift caused a save rejection. The forced-proc regression passes. A real saved-profile campaign diagnostic completed three d3 extraction farms and started the next d1–d4 attempt; d4 is unconfirmed. This WIP is pending commit/push; Windows export has not been rerun.
+The campaign driver remains active in the preserved profile and is retrying d5–d8 after legal d7 extraction, loot, repair and garage upgrades. Current task: finish the active attempt, inspect the BOSS_B defeat/build interaction if needed, and continue toward d12 plus the endgame. The checksum fix and regression are pushed; Windows export has not been rerun. Keep the acceptance status explicitly incomplete until the d12 ending and d13+ endgame are played through.
 
 ## Latest implementation checkpoint (2026-11-12)
 
