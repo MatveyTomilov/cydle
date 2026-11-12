@@ -118,7 +118,7 @@ func _supports_basic_auto_step(state: CombatState) -> bool:
 	for rule_value: Variant in state.tactics.get("rules", []):
 		if not rule_value is Dictionary or not bool(rule_value.get("enabled", false)):
 			continue
-		if str(rule_value.get("skillId", "AUTO")) not in ["AUTO", "SK_BURST"] or not rule_value.get("conditions", []).is_empty():
+		if str(rule_value.get("skillId", "AUTO")) not in ["AUTO", "SK_BURST", "SK_PIERCE"] or not rule_value.get("conditions", []).is_empty():
 			return false
 		if str(rule_value.get("skillId", "AUTO")) == "SK_BURST" and str(rule_value.get("target", "nearest")) not in ["nearest", "lowestHPPercent"]:
 			return false
@@ -127,7 +127,7 @@ func _supports_basic_auto_step(state: CombatState) -> bool:
 	for actor: CombatActorState in state.all_actors():
 		if not actor.elite_mod.is_empty() or not actor.ability_next.is_empty() or not actor.buffs.is_empty() or actor.reaction_cast != null:
 			return false
-		if actor.cast != null and (actor.kind != "operator" or not actor.cast is Dictionary or str(actor.cast.get("skillId", "")) != "SK_BURST"):
+		if actor.cast != null and (actor.kind != "operator" or not actor.cast is Dictionary or str(actor.cast.get("skillId", "")) not in ["SK_BURST", "SK_PIERCE"]):
 			return false
 		for status_id: Variant in actor.statuses.keys():
 			if not STEP_STATUS_IDS.has(str(status_id)):
@@ -662,6 +662,8 @@ func _resolve_basic_hit(state: CombatState, rng: DeterministicRng, actor: Combat
 		"energyPen": float(attacker.get("energyPen", 0.0)), "energyPenPercent": float(attacker.get("energyPenPercent", 0.0)),
 		"digitalPen": float(attacker.get("digitalPen", 0.0)), "digitalPenPercent": float(attacker.get("digitalPenPercent", 0.0)),
 	}
+	if skill_id == "SK_PIERCE":
+		penetration["armorPen"] = float(penetration["armorPen"]) + 20.0
 	var mitigation: Dictionary = _damage.mitigate_packet(raw, damage_type, {"armor": defender.get("armor", 0.0), "energyRes": defender.get("energyRes", 0.0), "digitalRes": defender.get("digitalRes", 0.0)}, penetration)
 	var incoming: float = float(mitigation["afterDefense"]) * float(defender.get("incomingAll", 1.0)) * float(defender.get("incomingKinetic" if damage_type == "KINETIC" else "incomingEnergy" if damage_type == "ENERGY" else "incomingDigital", 1.0))
 	if _has_status(target, "MARK"):

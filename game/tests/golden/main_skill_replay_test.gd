@@ -1,25 +1,28 @@
 extends "res://tests/test_case.gd"
 
 const SAVE_FIXTURE: String = "res://tests/fixtures/saves/initial_save.json"
-const REPLAY_FIXTURE: String = "res://tests/fixtures/combat/main_skill_replay.json"
-
 func run(_tree: SceneTree) -> bool:
+	_run_replay("main_skill_replay", "SK_BURST")
+	_run_replay("pierce_skill_replay", "SK_PIERCE")
+	return failure_count == 0
+
+func _run_replay(replay_name: String, skill_id: String) -> void:
 	var meta: Dictionary = _read_dictionary(SAVE_FIXTURE).get("meta", {})
-	var fixture: Dictionary = _read_dictionary(REPLAY_FIXTURE)
-	if not check(not meta.is_empty() and not fixture.is_empty(), "main_skill_replay: starter save or skill replay is missing"):
-		return false
+	var fixture: Dictionary = _read_dictionary("res://tests/fixtures/combat/%s.json" % replay_name)
+	if not check(not meta.is_empty() and not fixture.is_empty(), "%s: starter save or skill replay is missing" % replay_name):
+		return
 	var items_by_id: Dictionary = {}
 	for item_value: Dictionary in meta.get("inventory", []):
 		items_by_id[str(item_value["itemId"])] = item_value
 	var main_item: ItemInstance = ItemInstance.new()
-	if not check(main_item.instantiate_from_dictionary(items_by_id[str(meta["equipment"]["MAIN"])]), "main_skill_replay: starter weapon did not parse"):
-		return false
+	if not check(main_item.instantiate_from_dictionary(items_by_id[str(meta["equipment"]["MAIN"])]), "%s: starter weapon did not parse" % replay_name):
+		return
 	var build: Dictionary = BuildResolver.new().resolve_build({
 		"equipment": {"MAIN": main_item}, "attributes": meta["operator"]["attributes"],
-		"skillIds": ["SK_BURST"], "passiveIds": [], "treeNodeIds": [], "attributePointsEarned": 0, "treePointsEarned": 0,
+		"skillIds": [skill_id], "passiveIds": [], "treeNodeIds": [], "attributePointsEarned": 0, "treePointsEarned": 0,
 	})
-	if not check(bool(build.get("valid", false)), "main_skill_replay: SK_BURST build was rejected"):
-		return false
+	if not check(bool(build.get("valid", false)), "%s: %s build was rejected" % [replay_name, skill_id]):
+		return
 	var config: Dictionary = fixture.get("config", {})
 	var initialized: Dictionary = CombatSimulator.new().create_state({
 		"seed": config.get("seed", ""), "depth": config.get("depth", 0), "biome": config.get("biome", "B01"),
@@ -27,15 +30,15 @@ func run(_tree: SceneTree) -> bool:
 		"enemies": [config.get("enemy", {})], "tactics": config.get("tactics", {}),
 		"maxDurationMs": config.get("maxDurationMs", 180000),
 	})
-	if not check(bool(initialized.get("ok", false)), "main_skill_replay: combat init failed: %s" % initialized.get("error", "")):
-		return false
+	if not check(bool(initialized.get("ok", false)), "%s: combat init failed: %s" % [replay_name, initialized.get("error", "")]):
+		return
 	var simulator: CombatSimulator = CombatSimulator.new()
 	var state: CombatState = initialized["state"] as CombatState
 	for frame: Dictionary in fixture.get("frames", []):
 		var previous_log_length: int = state.log.size()
 		var stepped: Dictionary = simulator.step_combat(state)
-		if not check(bool(stepped.get("ok", false)), "main_skill_replay: step failed at %d ms: %s" % [state.time_ms + 100, stepped.get("error", "")]):
-			return false
+		if not check(bool(stepped.get("ok", false)), "%s: step failed at %d ms: %s" % [replay_name, state.time_ms + 100, stepped.get("error", "")]):
+			return
 		state = stepped["state"] as CombatState
 		var actual: Dictionary = {
 			"timeMs": state.time_ms, "rng": state.rng, "nextEventId": state.next_event_id,
@@ -44,9 +47,8 @@ func run(_tree: SceneTree) -> bool:
 			"events": state.log.slice(previous_log_length),
 		}
 		if not _json_equivalent(actual, frame):
-			print("MAIN_SKILL_REPLAY_MISMATCH t=", frame.get("timeMs", -1), " diff=", _first_difference(actual, frame, "root"), "\nactual=", JSON.stringify(actual), "\nexpected=", JSON.stringify(frame))
-			check(false, "main_skill_replay: mismatch at %d ms" % int(frame.get("timeMs", -1)))
-	return failure_count == 0
+			print("%s_MISMATCH t=" % replay_name.to_upper(), frame.get("timeMs", -1), " diff=", _first_difference(actual, frame, "root"), "\nactual=", JSON.stringify(actual), "\nexpected=", JSON.stringify(frame))
+			check(false, "%s: mismatch at %d ms" % [replay_name, int(frame.get("timeMs", -1))])
 
 func _actor_frame(actor: CombatActorState) -> Dictionary:
 	return {

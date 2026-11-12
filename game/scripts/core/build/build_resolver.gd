@@ -212,7 +212,9 @@ func resolve_build(input: Dictionary) -> Dictionary:
 	for skill: Dictionary in resolved_skills:
 		for effect_index: int in range((skill.get("extraEffects", []) as Array).size()):
 			var effect: Dictionary = skill["extraEffects"][effect_index]
-			_add_static_effect(effect, {"id": skill["id"], "name": skill["name"], "kind": "skill"}, "%s:effect:%d" % [skill["id"], effect_index], effects, trigger_effects, modifiers)
+			effects.append(effect.duplicate(true))
+			if str(effect.get("type", "")) == "trigger":
+				trigger_effects.append({"effect": effect.duplicate(true), "sourceId": skill["id"], "sourceName": skill["name"], "sourceKind": "skill"})
 	for passive: Dictionary in resolved_passives:
 		for effect_index: int in range((passive.get("effects", []) as Array).size()):
 			_add_static_effect(passive["effects"][effect_index], {"id": passive["id"], "name": passive["name"], "kind": "passive"}, "%s:effect:%d" % [passive["id"], effect_index], effects, trigger_effects, modifiers)

@@ -316,6 +316,44 @@ writeFileSync(burstReplayOutput, `${JSON.stringify({
 }, null, 2)}\n`, 'utf8');
 console.log(`Exported ${burstFrames.length} main-skill cast replay frames to ${burstReplayOutput}`);
 
+const pierceBuild = resolveBuild({
+  attributes: initialSaveFixture.meta.operator.attributes, equipment: { MAIN: starterMain },
+  skillIds: ['SK_PIERCE'], passiveIds: [], treeNodeIds: [], attributePointsEarned: 0, treePointsEarned: 0,
+});
+const pierceTactics: TacticalProfile = {
+  id: 'PIERCE_TEST', name: 'Pierce replay', rules: [{
+    id: 'RULE_PIERCE', priority: 100, enabled: true, skillId: 'SK_PIERCE',
+    target: 'nearest', conditions: [], logic: 'AND',
+  }],
+};
+const pierceConfig = { ...basicStateConfig, build: pierceBuild, tactics: pierceTactics };
+let pierceState = createCombatState(pierceConfig);
+const pierceFrames = [];
+for (let tick = 0; tick < 16; tick++) {
+  const previousLogLength = pierceState.log.length;
+  pierceState = stepCombat(pierceState);
+  const actorFrame = (actor: typeof pierceState.operator) => ({
+    id: actor.id, hp: actor.hp, shield: actor.shield, energy: actor.energy, heat: actor.heat,
+    nextAttackAt: actor.nextAttackAt, alive: actor.alive, flags: actor.flags, counters: actor.counters,
+    cooldowns: actor.cooldowns, cast: actor.cast,
+    damageDealt: actor.damageDealt, damageTaken: actor.damageTaken,
+  });
+  pierceFrames.push({
+    timeMs: pierceState.timeMs, rng: pierceState.rng, nextEventId: pierceState.nextEventId,
+    metrics: pierceState.metrics, outcome: pierceState.outcome,
+    operator: actorFrame(pierceState.operator), enemies: pierceState.enemies.map(actorFrame),
+    events: pierceState.log.slice(previousLogLength),
+  });
+}
+const pierceReplayOutput = resolve('game/tests/fixtures/combat/pierce_skill_replay.json');
+writeFileSync(pierceReplayOutput, `${JSON.stringify({
+  config: {
+    seed: pierceConfig.seed, depth: pierceConfig.depth, biome: pierceConfig.biome, nodeType: pierceConfig.nodeType,
+    enemy: pierceConfig.enemies[0], tactics: pierceTactics, maxDurationMs: pierceConfig.maxDurationMs,
+  }, build: pierceBuild, frames: pierceFrames,
+}, null, 2)}\n`, 'utf8');
+console.log(`Exported ${pierceFrames.length} armor-piercing skill replay frames to ${pierceReplayOutput}`);
+
 let dotState = createCombatState(basicStateConfig);
 applyStatus(dotState, dotState.operator, dotState.enemies[0]!, 'BLEED', { snapshot: 100 });
 const dotFrames = [];
