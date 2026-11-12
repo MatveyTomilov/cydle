@@ -140,14 +140,17 @@ func run(_tree: SceneTree) -> bool:
 	if check(escalation_session.start_new_game(1762900000115), "game_session: could not create an endgame escalation profile"):
 		var endgame_unlock: Dictionary = escalation_session.state.to_payload()
 		endgame_unlock["meta"]["unlockedForpost"] = 12
-		endgame_unlock["meta"]["campaignFlags"].append_array(["ENDGAME_UNLOCKED", "ENDING_FACTION:F_CHOIR"])
+		endgame_unlock["meta"]["campaignFlags"].append_array(["ENDGAME_UNLOCKED", "ENDING_SELECTED", "ENDING_FACTION:F_CHOIR"])
 		check(escalation_session._commit_payload(endgame_unlock), "game_session: could not unlock test endgame depth")
 		var endgame_escort: Dictionary = escalation_session.available_contract_offers().filter(func(offer: Dictionary) -> bool: return str(offer.get("id", "")) == "CT_ESCORT")[0]
 		check(str(endgame_escort.get("factionId", "")) == "F_CHOIR", "game_session: faction-control ending did not theme endgame ESCORTs to the controlling faction")
+		var exclusive_offer: Dictionary = escalation_session.available_contract_offers().filter(func(offer: Dictionary) -> bool: return str(offer.get("id", "")) == "CT_CONTROL_F_CHOIR")[0]
+		check(str(exclusive_offer.get("factionId", "")) == "F_CHOIR" and str(exclusive_offer.get("rewardItem", {}).get("tag", "")) == "digital", "game_session: faction-control ending did not expose its exclusive themed HUNT contract")
 		var escalation_ids: Array[String] = ["REPAIR_RARE", "SCAN_DARK", "LONG_RUN"]
 		check(not escalation_session.start_expedition("endgame-escalation-seed", false, "", ["WANTED_PLUS", "HUNT_FAST", "REPAIR_RARE", "SCAN_DARK"]), "game_session: more than three escalations were accepted")
-		if check(escalation_session.start_expedition("endgame-escalation-seed", false, "", escalation_ids), "game_session: selected endgame escalations were rejected: %s" % escalation_session.last_error):
+		if check(escalation_session.start_expedition("endgame-escalation-seed", false, "CT_CONTROL_F_CHOIR", escalation_ids), "game_session: selected endgame escalations were rejected: %s" % escalation_session.last_error):
 			check(escalation_session.state.run.depth == 13 and escalation_session.state.run.escalation_ids == escalation_ids, "game_session: endgame escalation selection did not persist on RUN")
+			check(str(escalation_session.state.run.contract.get("factionId", "")) == "F_CHOIR" and str(escalation_session.state.run.contract.get("kind", "")) == "HUNT", "game_session: accepted exclusive endgame contract lost its faction target")
 			var escalation_round_trip: Dictionary = GameSaveState.new().parse_payload(escalation_session.state.to_payload())
 			check(bool(escalation_round_trip.get("ok", false)) and escalation_round_trip["state"].run.escalation_ids == escalation_ids, "game_session: endgame escalation state did not survive save validation")
 			var normal_route: Dictionary = SectorGenerator.new().generate("endgame-escalation-seed", 13, escalation_session.state.run.biome)

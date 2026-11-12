@@ -419,6 +419,19 @@ func available_contract_offers() -> Array[Dictionary]:
 			"rewardReputation": {favored_faction: 8},
 			"rewardItem": {"rarity": "RARE", "tag": str(biome_tags.get(biome, "weapon"))},
 		})
+	var controlled_faction: String = _campaign_controlled_faction() if depth >= 13 else ""
+	if not controlled_faction.is_empty():
+		offers.append({
+			"id": "CT_CONTROL_%s" % controlled_faction,
+			"kind": "HUNT",
+			"eventId": "contract-offer:%d:CT_CONTROL_%s" % [depth, controlled_faction],
+			"name": "Исключительный заказ · %s" % controlled_faction,
+			"desc": "Устранить элиту в поддержку фракции, получившей контроль над коридором.",
+			"targetBiome": biome,
+			"factionId": controlled_faction,
+			"rewardReputation": {controlled_faction: 8},
+			"rewardItem": {"rarity": "RARE", "tag": _faction_reward_tag(controlled_faction)},
+		})
 	var signal_catalog: ItemCatalog = ItemCatalog.new()
 	if bool(signal_catalog.load_catalog().get("ok", false)):
 		for unique_id: String in ["U09", "U04", "U14", "U07", "U18"]:
@@ -464,6 +477,20 @@ func _favored_faction() -> String:
 
 func _faction_contract_id(faction_id: String) -> String:
 	return "CT_FACTION_%s" % faction_id
+
+func _campaign_controlled_faction() -> String:
+	if state == null or not state.meta.campaign_flags.has("ENDING_SELECTED"):
+		return ""
+	for flag_value: Variant in state.meta.campaign_flags:
+		var flag: String = str(flag_value)
+		if flag.begins_with("ENDING_FACTION:"):
+			var faction_id: String = flag.trim_prefix("ENDING_FACTION:")
+			if ["F_VANTA", "F_RUST", "F_CHOIR", "F_ECHO"].has(faction_id):
+				return faction_id
+	return ""
+
+func _faction_reward_tag(faction_id: String) -> String:
+	return {"F_VANTA": "weapon", "F_RUST": "drone", "F_CHOIR": "digital", "F_ECHO": "digital"}.get(faction_id, "weapon")
 
 func _world_faction(seed_value: String, key: String) -> String:
 	var rng: DeterministicRng = DeterministicRng.new()
@@ -623,6 +650,10 @@ func start_expedition(seed_value: String = "", use_medical_restore: bool = false
 			last_error = "Каталог контрактов недоступен."
 			return false
 		contract = contract_catalog.get_contract(contract_id)
+		if contract.is_empty() and contract_id.begins_with("CT_CONTROL_"):
+			var controlled_faction: String = _campaign_controlled_faction() if depth >= 13 else ""
+			if not controlled_faction.is_empty() and contract_id == "CT_CONTROL_%s" % controlled_faction:
+				contract = {"id": contract_id, "kind": "HUNT", "name": "Исключительный заказ · %s" % controlled_faction, "desc": "Устранить элиту в поддержку фракции, получившей контроль над коридором.", "targetBiome": biome, "factionId": controlled_faction, "rewardReputation": {controlled_faction: 8}, "rewardItem": {"rarity": "RARE", "tag": _faction_reward_tag(controlled_faction)}}
 		if contract.is_empty() and contract_id.begins_with("CT_FACTION_"):
 			var favored_faction: String = _favored_faction()
 			if not favored_faction.is_empty() and contract_id == _faction_contract_id(favored_faction):

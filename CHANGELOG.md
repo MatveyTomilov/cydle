@@ -19,6 +19,7 @@
 - Added route-generation regressions proving Q03's E09, Q04's E12 and Q05's E19 objectives exist in B03/B02/B05 at the correct progression points.
 - Corrected campaign boss assignment to the authored BOSS_A/BOSS_B/BOSS_CORE sequence at d4/d8/d12. Endgame bosses are now seeded from the current biome-compatible catalog, avoid the immediately previous boss when alternatives exist, and persist the last defeated boss across sectors and reloads.
 - Added boss-selection fixtures for all three campaign milestones plus deterministic, compatible, non-repeating endgame selection.
+- A faction-control ending now generates a distinct endgame-exclusive HUNT offer for its controlling faction, with compatible targeted loot and faction reputation; neutral endings and all ordinary contracts remain available. The offer is accepted through the same deterministic contract target/reward pipeline.
 
 ## Unreleased
 
