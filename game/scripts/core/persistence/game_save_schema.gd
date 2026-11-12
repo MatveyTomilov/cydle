@@ -7,6 +7,7 @@ const RARITIES: Array[String] = ["COMMON", "MODIFIED", "RARE", "LEGENDARY", "UNI
 const GARAGE_KEYS: Array[String] = ["WORKSHOP", "NEUROLAB", "SERVER", "HANGAR", "MARKET", "INTEL", "GARAGE_MED", "CALIBRATOR"]
 const ATTRIBUTE_KEYS: Array[String] = ["POW", "REF", "INT", "ENG", "SYN"]
 const FACTION_KEYS: Array[String] = ["F_VANTA", "F_RUST", "F_CHOIR", "F_ECHO"]
+const ESCALATION_IDS: Array[String] = ["WANTED_PLUS", "HUNT_FAST", "REPAIR_RARE", "SCAN_DARK", "DRONE_WAR", "HEAT_FOG", "SHIELD_BREAK", "LONG_RUN"]
 const WALLET_KEYS: Array[String] = ["CREDITS", "SCRAP", "DATA"]
 const SLOT_KEYS: Array[String] = ["MAIN", "OFFHAND", "ARMOR", "IMP_1", "IMP_2", "IMP_3", "IMP_4", "IMP_5", "IMP_6", "DRONE_1", "DRONE_2", "ENGINE", "CHASSIS", "SCANNER", "SERVICE", "CARGO", "SUPPORT"]
 
@@ -148,6 +149,12 @@ func _validate_run(value: Variant, meta: Dictionary) -> Dictionary:
 	var scouted_node_ids: Variant = run.get("scoutedNodeIds", [])
 	if not _string_array(scouted_node_ids) or scouted_node_ids.size() > 128 or not _unique_strings(scouted_node_ids):
 		return _failure("run.scoutedNodeIds: неверный список разведанных узлов.")
+	var escalation_ids: Variant = run.get("escalationIds", [])
+	if not _string_array(escalation_ids) or escalation_ids.size() > 3 or not _unique_strings(escalation_ids):
+		return _failure("run.escalationIds: допускается не более трёх уникальных модификаторов.")
+	for escalation_id: Variant in escalation_ids:
+		if not ESCALATION_IDS.has(str(escalation_id)) or int(run["depth"]) < 13 or not meta.get("campaignFlags", []).has("ENDGAME_UNLOCKED"):
+			return _failure("run.escalationIds: неизвестный модификатор или эскалация вне эндгейма.")
 	if not _string_array(run.get("temporaryMutationIds", [])) or run.get("temporaryMutationIds", []).size() > 2:
 		return _failure("run.temporaryMutationIds: неверный список временных мутаций.")
 	var build_catalog: BuildCatalog = BuildCatalog.new()

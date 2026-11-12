@@ -2,6 +2,7 @@ class_name GameSession
 extends RefCounted
 
 const SLOT_ID: String = "cylde-main"
+const ENDGAME_ESCALATIONS: Array[String] = ["WANTED_PLUS", "HUNT_FAST", "REPAIR_RARE", "SCAN_DARK", "DRONE_WAR", "HEAT_FOG", "SHIELD_BREAK", "LONG_RUN"]
 
 var state: GameSaveState
 var last_error: String = ""
@@ -417,7 +418,7 @@ func available_contract_offers() -> Array[Dictionary]:
 				})
 	return offers
 
-func start_expedition(seed_value: String = "", use_medical_restore: bool = false, contract_id: String = "") -> bool:
+func start_expedition(seed_value: String = "", use_medical_restore: bool = false, contract_id: String = "", escalation_ids: Array[String] = []) -> bool:
 	if state == null:
 		last_error = "Сначала создайте или загрузите профиль."
 		return false
@@ -429,6 +430,7 @@ func start_expedition(seed_value: String = "", use_medical_restore: bool = false
 		last_error = "Сборка не готова к выезду."
 		return false
 	var depth: int = maxi(1, state.meta.unlocked_forpost + 1)
+	if not _validate_escalation_selection(escalation_ids, depth): return false
 	var medical_cost: int = ceili(8.0 * CydleFormula.new().reward_scale(float(depth))) if use_medical_restore else 0
 	if use_medical_restore:
 		if garage_level("GARAGE_MED") < 3:
@@ -445,6 +447,7 @@ func start_expedition(seed_value: String = "", use_medical_restore: bool = false
 		seed, depth, biome,
 		depth == 1 and not bool(state.meta.tutorial.get("firstSectorCompleted", false)) and not bool(state.meta.tutorial.get("starterPrototypeSecured", false)),
 		0.0,
+		[], escalation_ids,
 	)
 	if not bool(generated.get("ok", false)):
 		last_error = str(generated.get("error", "Не удалось создать дорожную карту."))
@@ -512,6 +515,7 @@ func start_expedition(seed_value: String = "", use_medical_restore: bool = false
 		"equipment": state.meta.equipment.duplicate(true), "currentNodeId": "START",
 		"visitedNodeIds": [], "clearedNodeIds": [], "eventsSeen": [], "phase": "ROUTE",
 		"wanted": 0.0, "revealLevel": 1, "pendingTravelDeltaMs": 0,
+		"escalationIds": escalation_ids.duplicate(),
 		"pendingCombatEffects": {"initialTempShield": 0.0, "extraHeat": 0.0},
 		"pendingNextCombat": {
 			"skipOrdinary": false, "forceElite": false, "extraItemRoll": false, "forceBounty": false,
@@ -597,6 +601,21 @@ func _campaign_biome_history(flags: Array) -> Array[String]:
 		history.append(str(entry["biome"]))
 	return history
 
+func _validate_escalation_selection(escalation_ids: Array[String], depth: int) -> bool:
+	var seen: Dictionary = {}
+	if escalation_ids.size() > 3:
+		last_error = "Выберите не более трёх разных договоров эскалации."
+		return false
+	for escalation_id: String in escalation_ids:
+		if not ENDGAME_ESCALATIONS.has(escalation_id) or seen.has(escalation_id):
+			last_error = "Неизвестный договор эскалации: %s." % escalation_id
+			return false
+		seen[escalation_id] = true
+	if not escalation_ids.is_empty() and (depth < 13 or not state.meta.campaign_flags.has("ENDGAME_UNLOCKED")):
+		last_error = "Договоры эскалации доступны после завершения кампании."
+		return false
+	return true
+
 func _record_campaign_biome(meta: Dictionary, depth: int, biome: String) -> void:
 	var flags: Array = meta.get("campaignFlags", [])
 	var prefix: String = "BIOME_HISTORY:%d:" % depth
@@ -657,7 +676,10 @@ func route_intel() -> Dictionary:
 			distances[next_id] = next_distance
 			queue.append(next_id)
 	var intel_level: int = garage_level("INTEL")
-	var effective_intel: int = maxi(0, intel_level - 1) if state.run.biome == "B06" else intel_level
+	var effective_intel: int = intel_level
+	if state.run.biome == "B06": effective_intel -= 1
+	if state.run.escalation_ids.has("SCAN_DARK"): effective_intel -= 1
+	effective_intel = maxi(0, effective_intel)
 	var scan_distance: int = 1 + (1 if effective_intel >= 3 else 0)
 	var result: Dictionary = {"level": intel_level, "effectiveLevel": effective_intel, "nodes": {}}
 	var preview_available: bool = state.run.biome == "B06" and _anomaly_preview_available()
@@ -758,6 +780,7 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
 				for edge: Dictionary in state.run.graph.get("edges", []):
 					if str(edge.get("from", "")) == state.run.current_node_id and str(edge.get("to", "")) == str(choice.get("id", "")):
 						edge_cost += int(edge.get("travelMs", 0))
+						if state.run.escalation_ids.has("LONG_RUN"): edge_cost += 15000
 						if bool(known_choice.get("revealed", false)) and str(known_choice.get("type", "")) == "CHECKPOINT": edge_cost += 8000
 						break
 				if edge_cost > budget - used_time:
@@ -873,7 +896,9 @@ func travel_to(node_id: String) -> bool:
 		return false
 	var payload: Dictionary = state.to_payload()
 	run_payload["resources"]["fuel"] = float(run_payload["resources"]["fuel"]) - cost
-	run_payload["resources"]["gameTimeMs"] = float(run_payload["resources"]["gameTimeMs"]) + 25000.0
+	var travel_time: int = 25000
+	if state.run.escalation_ids.has("LONG_RUN"): travel_time += 15000
+	run_payload["resources"]["gameTimeMs"] = float(run_payload["resources"]["gameTimeMs"]) + travel_time
 	run_payload["currentNodeId"] = node_id
 	run_payload["visitedNodeIds"].append(node_id)
 	var target_node: Dictionary = {}
@@ -1472,7 +1497,10 @@ func _complete_contract(payload: Dictionary, rewards: Dictionary, item_spec: Dic
 		return true
 	var scale: float = CydleFormula.new().reward_scale(float(run_payload.get("depth", 1)))
 	for currency: String in rewards.keys():
-		run_payload["runWallet"][currency] = float(run_payload["runWallet"].get(currency, 0.0)) + float(rewards[currency])
+		var reward_amount: float = float(rewards[currency])
+		if currency == "CREDITS" and run_payload.get("escalationIds", []).has("WANTED_PLUS"):
+			reward_amount = ceili(reward_amount * 1.15)
+		run_payload["runWallet"][currency] = float(run_payload["runWallet"].get(currency, 0.0)) + reward_amount
 	var paid: Dictionary = {}
 	if not item_spec.is_empty():
 		var loaded: Dictionary = _item_catalog.load_catalog()
@@ -1507,7 +1535,7 @@ func _complete_contract(payload: Dictionary, rewards: Dictionary, item_spec: Dic
 	contract["rewardClaimed"] = true
 	return true
 
-func continue_campaign() -> bool:
+func continue_campaign(escalation_ids: Array[String] = []) -> bool:
 	if state == null or state.run == null or state.run.phase != "CHECKPOINT":
 		last_error = "Продолжить кампанию можно только с контрольного узла."
 		return false
@@ -1515,10 +1543,11 @@ func continue_campaign() -> bool:
 		last_error = "Перед эндгеймом необходимо выбрать исход кампании."
 		return false
 	var next_depth: int = state.run.depth + 1
+	if not _validate_escalation_selection(escalation_ids, next_depth): return false
 	var build: Dictionary = build_preview()
 	var seed: String = "%s:sector:%d" % [state.run.seed, next_depth]
 	var biome: String = _generator.campaign_biome(next_depth, seed, _campaign_biome_history(state.meta.campaign_flags))
-	var generated: Dictionary = _generator.generate(seed, next_depth, biome, false, state.run.wanted, state.run.events_seen)
+	var generated: Dictionary = _generator.generate(seed, next_depth, biome, false, state.run.wanted, state.run.events_seen, escalation_ids)
 	if not bool(generated.get("ok", false)):
 		last_error = str(generated.get("error", "Не удалось создать следующий сектор."))
 		return false
@@ -1536,6 +1565,7 @@ func continue_campaign() -> bool:
 	run_payload["phase"] = "ROUTE"
 	run_payload["combatResult"] = null
 	run_payload["pendingTravelDeltaMs"] = 0
+	run_payload["escalationIds"] = escalation_ids.duplicate()
 	run_payload["equipment"] = state.meta.equipment.duplicate(true)
 	if not build.is_empty():
 		var stats: Dictionary = build.get("stats", {})
@@ -1710,6 +1740,11 @@ func begin_combat() -> bool:
 		"startEnergy": float(resources.get("energy", 0.0)), "startHeat": float(resources.get("heat", 0.0)),
 		"initialTempShield": float(pending_effects.get("initialTempShield", 0.0)),
 		"initialExtraHeat": float(pending_effects.get("extraHeat", 0.0)),
+		"coolingPenalty": 2.0 if state.run.escalation_ids.has("HEAT_FOG") else 0.0,
+		"enemyWindupMult": 0.8 if state.run.escalation_ids.has("HUNT_FAST") else 1.0,
+		"minimumEnemyTelegraphMs": 600 if state.run.escalation_ids.has("HUNT_FAST") else 0,
+		"elitePen": 10.0 if state.run.escalation_ids.has("SHIELD_BREAK") and effective_type in ["ELITE", "ANOMALY", "BOUNTY"] else 0.0,
+		"droneWar": state.run.escalation_ids.has("DRONE_WAR"),
 	}
 	var initialized: Dictionary = _simulator.create_state(config)
 	if not bool(initialized.get("ok", false)):
@@ -1766,6 +1801,8 @@ func resolve_active_combat() -> bool:
 		return false
 	if _combat.wanted_delta != 0:
 		run_payload["wanted"] = clampf(float(run_payload.get("wanted", 0.0)) + float(_combat.wanted_delta), 0.0, 100.0)
+	if _active_node_type in ["ELITE", "ANOMALY", "BOUNTY"] and run_payload.get("escalationIds", []).has("WANTED_PLUS"):
+		run_payload["wanted"] = clampf(float(run_payload.get("wanted", 0.0)) + 5.0, 0.0, 100.0)
 	var escaped_cargo: int = 0
 	for escape_value: Dictionary in _combat.metrics.get("escaped", []):
 		escaped_cargo += int(escape_value.get("cargoItems", 1))
@@ -1857,9 +1894,11 @@ func _battle_reward(node_type: String, depth: int, biome: String, node_id: Strin
 		"BOSS":
 			credits = 85.0; scrap = 18.0; data = 8.0; xp = ceili(160.0 * scale)
 			item_chance = 1.0; extra_item_chance = 0.5; core_chance = 1.0; table = "BOSS"
-	credits = ceili(credits * scale * (1.1 if biome == "B02" else 1.0) * (1.0 + float(modifiers.get("bountyCreditsBonus", 0.0))))
-	data = ceili(data * scale * (1.2 if biome == "B04" else 1.0))
-	var wallet: Dictionary = {"CREDITS": credits, "SCRAP": ceili(scrap * scale), "DATA": data}
+	var escalation_ids: Array = run_payload.get("escalationIds", [])
+	credits = ceili(credits * scale * (1.1 if biome == "B02" else 1.0) * (1.0 + float(modifiers.get("bountyCreditsBonus", 0.0))) * (1.15 if escalation_ids.has("WANTED_PLUS") else 1.0))
+	data = ceili(data * scale * (1.2 if biome == "B04" else 1.0) * (1.1 if escalation_ids.has("SCAN_DARK") else 1.0))
+	var scrap_reward: int = ceili(scrap * scale * (1.1 if escalation_ids.has("REPAIR_RARE") else 1.0))
+	var wallet: Dictionary = {"CREDITS": credits, "SCRAP": scrap_reward, "DATA": data}
 	var items: Array[Dictionary] = []
 	var grant_ids: Array[String] = []
 	var rng: DeterministicRng = DeterministicRng.new()
@@ -1869,6 +1908,12 @@ func _battle_reward(node_type: String, depth: int, biome: String, node_id: Strin
 		return {"wallet": wallet, "items": items, "grantIds": grant_ids, "lootRng": run_payload["lootRng"], "xp": xp, "discardedItems": 0}
 	var grants: Array[float] = [item_chance, extra_item_chance]
 	var forced_rarities: Array[String] = ["", ""]
+	if node_type == "ELITE" and escalation_ids.has("DRONE_WAR"):
+		grants.append(0.15)
+		forced_rarities.append("")
+	if node_type == "BOSS" and escalation_ids.has("LONG_RUN"):
+		grants.append(0.25)
+		forced_rarities.append("")
 	if bool(modifiers.get("extraItemRoll", false)):
 		grants.append(1.0)
 		forced_rarities.append("")
@@ -1883,6 +1928,8 @@ func _battle_reward(node_type: String, depth: int, biome: String, node_id: Strin
 			"depth": depth, "biome": biome, "table": table, "secured": false,
 			"grantId": grant_id, "origin": "combat", "acquiredAt": state.updated_at,
 		}
+		if node_type == "ELITE" and escalation_ids.has("SHIELD_BREAK"): roll_options["rareShift"] = 0.1
+		if escalation_ids.has("HEAT_FOG"): roll_options["energyWeightBonus"] = 0.1
 		if not forced_rarities[index].is_empty(): roll_options["forceRarity"] = forced_rarities[index]
 		var rolled: Dictionary = ItemFactory.new().roll_item(rng, _item_catalog, roll_options)
 		if bool(rolled.get("ok", false)):

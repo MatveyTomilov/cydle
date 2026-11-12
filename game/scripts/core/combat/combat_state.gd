@@ -27,6 +27,8 @@ var ambient_heat_per_sec: float = 0.0
 var cooling_penalty: float = 0.0
 var enemy_windup_mult: float = 1.0
 var elite_pen: float = 0.0
+var minimum_enemy_telegraph_ms: int = 0
+var drone_war: bool = false
 var extra_enemy_digital_bonus: float = 0.0
 var trigger_chains: Dictionary = {}
 
@@ -56,6 +58,7 @@ func to_dictionary() -> Dictionary:
 		"wantedDelta": wanted_delta, "revealDelta": reveal_delta, "recordLog": record_log,
 		"ambientHeatPerSec": ambient_heat_per_sec, "coolingPenalty": cooling_penalty,
 		"enemyWindupMult": enemy_windup_mult, "elitePen": elite_pen,
+		"minimumEnemyTelegraphMs": minimum_enemy_telegraph_ms, "droneWar": drone_war,
 		"extraEnemyDigitalBonus": extra_enemy_digital_bonus, "triggerChains": trigger_chains.duplicate(true),
 	}
 
@@ -98,6 +101,8 @@ static func from_dictionary(value: Dictionary, resolved_build: Dictionary) -> Co
 	state.cooling_penalty = float(value.get("coolingPenalty", 0.0))
 	state.enemy_windup_mult = float(value.get("enemyWindupMult", 1.0))
 	state.elite_pen = float(value.get("elitePen", 0.0))
+	state.minimum_enemy_telegraph_ms = int(value.get("minimumEnemyTelegraphMs", 0))
+	state.drone_war = bool(value.get("droneWar", false))
 	state.extra_enemy_digital_bonus = float(value.get("extraEnemyDigitalBonus", 0.0))
 	state.trigger_chains = value.get("triggerChains", {}).duplicate(true)
 	return state if state.operator != null and not state.rng.is_empty() else null

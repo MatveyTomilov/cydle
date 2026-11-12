@@ -23,6 +23,7 @@ var _simulation_slot: String = ""
 var _simulation_item_id: String = ""
 var _simulation_enemy_id: String = "E01"
 var _simulation_report: Dictionary = {}
+var _selected_escalations: Array[String] = []
 
 func _ready() -> void:
 	_session.load_saved_game()
@@ -282,6 +283,7 @@ func _show_garage() -> void:
 		medical_toggle.disabled = meta.protected_bank.credits < float(medical_cost)
 		medical_toggle.toggled.connect(func(value: bool) -> void: _medical_restore_next_run = value)
 		_body.add_child(medical_toggle)
+	_add_escalation_selector()
 	var start_button: Button = _button("НАЧАТЬ ВЫЕЗД", true)
 	start_button.pressed.connect(_on_start_expedition)
 	actions.add_child(start_button)
@@ -950,6 +952,7 @@ func _show_road() -> void:
 	if _session.state.run == null or ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(_session.state.run.phase):
 		_body.add_child(_label("ДОРОГА   /   ВЫЕЗД НЕ НАЧАТ", 12, COLOR_CYAN))
 		_body.add_child(_label("Сформируйте маршрут", 27, COLOR_TEXT))
+		_add_escalation_selector()
 		var start: Button = _button("НАЧАТЬ ВЫЕЗД", true)
 		start.pressed.connect(_on_start_expedition)
 		_body.add_child(start)
@@ -980,6 +983,8 @@ func _show_road() -> void:
 	var active_contract: Dictionary = run.contract
 	if not active_contract.is_empty():
 		_body.add_child(_label("КОНТРАКТ %s · %s · БОЕВЫХ УЗЛОВ %d" % [str(active_contract.get("id", "")), str(active_contract.get("status", "")), int(active_contract.get("combatNodes", 0))], 12, COLOR_CYAN))
+	if not run.escalation_ids.is_empty():
+		_body.add_child(_label("ЭСКАЛАЦИЯ · %s" % " · ".join(run.escalation_ids), 11, COLOR_AMBER))
 	if run.phase == "NODE":
 		_show_current_node(run)
 	elif run.phase == "CHECKPOINT":
@@ -1121,12 +1126,53 @@ func _show_checkpoint(_run: GameSaveState.RunState) -> void:
 			_body.add_child(faction_ending)
 		return
 	_body.add_child(_label("Сектор 12 открыт для бесконечной глубины." if completed else "Выберите: закрепить добычу и выйти или продолжить в следующий сектор с текущими ресурсами и незакреплённым грузом.", 14, COLOR_MUTED))
+	_add_escalation_selector()
 	var continue_button: Button = _button("ВОЙТИ В ЭНДГЕЙМ · СЕКТОР %02d" % (_run.depth + 1) if completed else "ПРОДОЛЖИТЬ КАМПАНИЮ · СЕКТОР %02d" % (_run.depth + 1), false)
 	continue_button.pressed.connect(_on_continue_campaign)
 	_body.add_child(continue_button)
 	var exit_button: Button = _button("ЭВАКУИРОВАТЬСЯ С ГРУЗОМ", true)
 	exit_button.pressed.connect(_on_exit_run)
 	_body.add_child(exit_button)
+
+func _add_escalation_selector() -> void:
+	if _session.state == null or not _session.state.meta.campaign_flags.has("ENDGAME_UNLOCKED"):
+		return
+	var next_depth: int = _session.state.run.depth + 1 if _session.state.run != null and _session.state.run.phase == "CHECKPOINT" else _session.state.meta.unlocked_forpost + 1
+	if next_depth < 13:
+		return
+	_body.add_child(_label("ДОГОВОРЫ ЭСКАЛАЦИИ · ВЫБЕРИТЕ ДО ТРЁХ", 12, COLOR_AMBER))
+	var options: Array[Dictionary] = [
+		{"id": "WANTED_PLUS", "desc": "+5 розыска за элиту, +15% кредитов"},
+		{"id": "HUNT_FAST", "desc": "Телеграфы тяжёлых приёмов быстрее, минимум 0,6 с"},
+		{"id": "REPAIR_RARE", "desc": "Меньше ремонтных узлов, +10% лома"},
+		{"id": "SCAN_DARK", "desc": "−1 уровень разведки, +10% данных"},
+		{"id": "DRONE_WAR", "desc": "Элиты могут глушить дронов, +15% количества добычи"},
+		{"id": "HEAT_FOG", "desc": "Охлаждение боя −2/с, +10% шанс ENERGY-предметов"},
+		{"id": "SHIELD_BREAK", "desc": "+10 пробивания брони элит, +10% шанса RARE"},
+		{"id": "LONG_RUN", "desc": "+15 с переходы, +25% количества добычи босса"},
+	]
+	var row: HFlowContainer = HFlowContainer.new()
+	row.add_theme_constant_override("h_separation", 6)
+	row.add_theme_constant_override("v_separation", 4)
+	_body.add_child(row)
+	for option: Dictionary in options:
+		var escalation_id: String = str(option["id"])
+		var toggle: CheckButton = CheckButton.new()
+		toggle.text = escalation_id
+		toggle.tooltip_text = str(option["desc"])
+		toggle.button_pressed = _selected_escalations.has(escalation_id)
+		toggle.toggled.connect(_on_escalation_toggled.bind(escalation_id, toggle))
+		row.add_child(toggle)
+
+func _on_escalation_toggled(enabled: bool, escalation_id: String, toggle: CheckButton) -> void:
+	if enabled:
+		if _selected_escalations.size() >= 3:
+			toggle.set_pressed_no_signal(false)
+			_footer.text = "Допускается выбрать не более трёх договоров эскалации."
+			return
+		if not _selected_escalations.has(escalation_id): _selected_escalations.append(escalation_id)
+	else:
+		_selected_escalations.erase(escalation_id)
 
 func _show_settings() -> void:
 	_screen = "settings"
@@ -1220,6 +1266,7 @@ func _navigate(destination: String) -> void:
 		"settings": _show_settings()
 
 func _on_new_game() -> void:
+	_selected_escalations.clear()
 	if _session.start_new_game():
 		_show_garage()
 	else:
@@ -1232,7 +1279,7 @@ func _on_continue() -> void:
 		_show_garage()
 
 func _on_start_expedition(contract_id: String = "") -> void:
-	if _session.start_expedition("", _medical_restore_next_run, contract_id):
+	if _session.start_expedition("", _medical_restore_next_run, contract_id, _selected_escalations):
 		_medical_restore_next_run = false
 		_show_road()
 	else:
@@ -1296,7 +1343,7 @@ func _on_event_choice(choice_id: String) -> void:
 		_footer.text = _session.last_error
 
 func _on_continue_campaign() -> void:
-	if _session.continue_campaign():
+	if _session.continue_campaign(_selected_escalations):
 		_show_road()
 	else:
 		_footer.text = _session.last_error

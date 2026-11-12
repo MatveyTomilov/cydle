@@ -59,6 +59,8 @@ func create_state(config: Dictionary) -> Dictionary:
 	state.cooling_penalty = float(config.get("coolingPenalty", 0.0))
 	state.enemy_windup_mult = float(config.get("enemyWindupMult", 1.0))
 	state.elite_pen = float(config.get("elitePen", 0.0))
+	state.minimum_enemy_telegraph_ms = int(config.get("minimumEnemyTelegraphMs", 0))
+	state.drone_war = bool(config.get("droneWar", false))
 	state.extra_enemy_digital_bonus = float(config.get("extraEnemyDigitalBonus", 0.0))
 	state.metrics = _empty_metrics()
 	state.rng = _new_rng(state.seed).serialize()
@@ -691,7 +693,7 @@ func _record_enemy_judge_program(state: CombatState, skill_id: String) -> void:
 		if not judge.alive or judge.template_id != "E24":
 			continue
 		var punish: Dictionary = {}
-		for ability: Dictionary in _enemy_ability_definitions(judge):
+		for ability: Dictionary in _enemy_ability_definitions(judge, state):
 			if str(ability.get("kind", "")) == "jamPunish":
 				punish = ability
 				break
@@ -757,20 +759,20 @@ func _advance_main_skill_cast(state: CombatState, rng: DeterministicRng) -> void
 	if state.time_ms >= float(cast.get("endAt", 0.0)):
 		actor.cast = null
 
-func _enemy_ability_definitions(actor: CombatActorState) -> Array[Dictionary]:
+func _enemy_ability_definitions(actor: CombatActorState, state: CombatState = null) -> Array[Dictionary]:
 	var template: Dictionary = _enemy_ability_template(actor)
 	var abilities: Array[Dictionary] = []
 	for field: String in ["abilities", "rotating"]:
 		for value: Variant in template.get(field, []):
 			if value is Dictionary:
 				abilities.append(value)
-	if actor.elite_mod == "EL_ANTI_DRONE":
+	if actor.elite_mod == "EL_ANTI_DRONE" or state != null and state.drone_war and not actor.elite_mod.is_empty():
 		abilities.append({"id": "EL_ANTI_DRONE_jam", "kind": "applyStatus", "firstAtMs": 8000, "everyMs": 8000, "windupMs": 1200, "telegraphMs": 1200, "interruptible": true, "status": "DRONE_JAM", "statusDurationMs": 2000, "desc": "Элитная помеха дронам"})
 	return abilities
 
 func _ready_enemy_ability(state: CombatState, actor: CombatActorState) -> Dictionary:
 	var ready: Array[Dictionary] = []
-	for ability: Dictionary in _enemy_ability_definitions(actor):
+	for ability: Dictionary in _enemy_ability_definitions(actor, state):
 		var kind: String = str(ability.get("kind", ""))
 		var scheduled_status: bool = kind == "applyStatus" and (float(ability.get("firstAtMs", 0.0)) > 0.0 or float(ability.get("everyMs", 0.0)) > 0.0)
 		if kind not in ["heavyAttack", "shieldBypass", "heal", "heat", "shieldRestore", "mark", "escape", "wantedBoost", "protectAlly"] and not scheduled_status:
@@ -788,6 +790,8 @@ func _start_enemy_ability(state: CombatState, actor: CombatActorState, ability: 
 	var cast_speed: float = maxf(0.0, float(actor.flags.get("bossCastSpeedIncrease", 0.0)))
 	var elite_windup: float = 200.0 if actor.elite_mod == "EL_PEN" else 0.0
 	var windup: float = maxf(0.0, (float(ability.get("windupMs", 0.0)) * state.enemy_windup_mult + elite_windup) / (1.0 + cast_speed))
+	if float(ability.get("telegraphMs", 0.0)) > 0.0:
+		windup = maxf(windup, float(state.minimum_enemy_telegraph_ms))
 	actor.counters["abilities"] = int(actor.counters.get("abilities", 0)) + 1
 	var action_id: String = "%s:ability:%s:%d" % [actor.id, ability_id, int(actor.counters["abilities"])]
 	var target: CombatActorState = state.operator if state.operator.alive else null
@@ -828,7 +832,7 @@ func _advance_enemy_ability_casts(state: CombatState, rng: DeterministicRng) -> 
 
 func _resolve_enemy_ability(state: CombatState, rng: DeterministicRng, actor: CombatActorState, cast: Dictionary) -> void:
 	var ability: Dictionary = {}
-	for candidate: Dictionary in _enemy_ability_definitions(actor):
+	for candidate: Dictionary in _enemy_ability_definitions(actor, state):
 		if str(candidate.get("id", "")) == str(cast.get("abilityId", "")):
 			ability = candidate
 			break
@@ -1531,7 +1535,7 @@ func _resolve_basic_hit(state: CombatState, rng: DeterministicRng, actor: Combat
 		raw *= float(attacker.get("critMultiplier", 1.5)) * float(attacker.get("moreCritDamage", 1.0))
 		state.metrics["crits"] = int(state.metrics.get("crits", 0)) + 1
 	var penetration: Dictionary = {
-		"armorPen": float(attacker.get("armorPen", 0.0)) + state.elite_pen + (10.0 if actor.elite_mod == "EL_PEN" else 0.0),
+		"armorPen": float(attacker.get("armorPen", 0.0)) + (state.elite_pen if actor.side == "enemy" else 0.0) + (10.0 if actor.elite_mod == "EL_PEN" else 0.0),
 		"armorPenPercent": float(attacker.get("armorPenPercent", 0.0)),
 		"energyPen": float(attacker.get("energyPen", 0.0)), "energyPenPercent": float(attacker.get("energyPenPercent", 0.0)),
 		"digitalPen": float(attacker.get("digitalPen", 0.0)), "digitalPenPercent": float(attacker.get("digitalPenPercent", 0.0)),
@@ -1619,7 +1623,7 @@ func _restore_elite_shield(state: CombatState, target: CombatActorState) -> void
 	_emit(state, "SHIELD_GAIN", target.id, {"text": "%s: элитный щит +%s." % [target.display_name, _one_decimal(target.shield - before)], "data": {"amount": target.shield - before, "trigger": "EL_SHIELD"}})
 
 func _resolve_enemy_direct_hit_effects(state: CombatState, actor: CombatActorState, target: CombatActorState, action_id: String, raw_damage: float) -> void:
-	var definitions: Array[Dictionary] = _enemy_ability_definitions(actor)
+	var definitions: Array[Dictionary] = _enemy_ability_definitions(actor, state)
 	if actor.template_id == "E18" and not bool(actor.flags.get("E18_leak_triggered", false)):
 		for ability: Dictionary in definitions:
 			if str(ability.get("id", "")) == "E18_leak":
@@ -1708,7 +1712,7 @@ func _resolve_basic_deaths(state: CombatState) -> void:
 			if actor.elite_mod == "EL_SPLIT":
 				_spawn_summoned_enemy(state, actor, "E20", 0.5)
 				_spawn_summoned_enemy(state, actor, "E20", 0.5)
-			for ability: Dictionary in _enemy_ability_definitions(actor):
+			for ability: Dictionary in _enemy_ability_definitions(actor, state):
 				if str(ability.get("kind", "")) != "deathBurst":
 					continue
 				var action_id: String = "%s:death:%s" % [actor.id, str(ability.get("id", ""))]

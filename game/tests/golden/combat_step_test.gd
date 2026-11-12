@@ -32,6 +32,21 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	var simulator: CombatSimulator = CombatSimulator.new()
 	var state: CombatState = state_result["state"] as CombatState
+	var escalation_state_result: Dictionary = simulator.create_state({
+		"seed": "endgame-escalation-combat", "depth": 13, "biome": "B01", "nodeType": "ELITE",
+		"build": build, "enemies": [{"templateId": "E02", "elite": "EL_FAST"}], "tactics": config.get("tactics", {}),
+		"coolingPenalty": 2.0, "enemyWindupMult": 0.8, "minimumEnemyTelegraphMs": 600,
+		"elitePen": 10.0, "droneWar": true,
+	})
+	if check(bool(escalation_state_result.get("ok", false)), "combat_step: escalation combat state initialization failed"):
+		var escalation_state: CombatState = escalation_state_result["state"] as CombatState
+		var restored_escalation: CombatState = CombatState.from_dictionary(escalation_state.to_dictionary(), build)
+		check(restored_escalation != null and restored_escalation.cooling_penalty == 2.0 and restored_escalation.enemy_windup_mult == 0.8 and restored_escalation.elite_pen == 10.0 and restored_escalation.drone_war, "combat_step: escalation combat modifiers did not survive the combat snapshot roundtrip")
+		var jam_abilities: Array[Dictionary] = simulator._enemy_ability_definitions(escalation_state.enemies[0], escalation_state)
+		check(jam_abilities.any(func(ability: Dictionary) -> bool: return str(ability.get("status", "")) == "DRONE_JAM"), "combat_step: DRONE_WAR elite did not gain its telegraphed drone-jam ability")
+		var telegraph_ability: Dictionary = {"id": "escalation-telegraph", "kind": "heavyAttack", "windupMs": 500, "telegraphMs": 500, "interruptible": true}
+		simulator._start_enemy_ability(escalation_state, escalation_state.enemies[0], telegraph_ability)
+		check(is_equal_approx(float(escalation_state.enemies[0].cast.get("resolveAt", 0.0)), 600.0), "combat_step: HUNT_FAST violated its 600 ms telegraph floor")
 	var expected_frames: Array = fixture.get("frames", [])
 	var initial_payload: Dictionary = state.to_dictionary()
 	for frame: Dictionary in expected_frames:

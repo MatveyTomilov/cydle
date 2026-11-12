@@ -86,6 +86,39 @@ func run(_tree: SceneTree) -> bool:
 			var signal_repeat: Dictionary = signal_session.state.to_payload()
 			signal_session._complete_contract(signal_repeat, {}, {"rarity": "UNIQUE", "templateId": "U09"})
 			check(signal_session._commit_payload(signal_repeat) and signal_session.state.run.unsecured_cargo.size() == 1, "game_session: repeated signal payout duplicated the unique item")
+	var escalation_session: GameSession = GameSession.new()
+	escalation_session.configure_save_directory("user://test-saves/endgame-escalations")
+	if check(escalation_session.start_new_game(1762900000115), "game_session: could not create an endgame escalation profile"):
+		var endgame_unlock: Dictionary = escalation_session.state.to_payload()
+		endgame_unlock["meta"]["unlockedForpost"] = 12
+		endgame_unlock["meta"]["campaignFlags"].append("ENDGAME_UNLOCKED")
+		check(escalation_session._commit_payload(endgame_unlock), "game_session: could not unlock test endgame depth")
+		var escalation_ids: Array[String] = ["REPAIR_RARE", "SCAN_DARK", "LONG_RUN"]
+		check(not escalation_session.start_expedition("endgame-escalation-seed", false, "", ["WANTED_PLUS", "HUNT_FAST", "REPAIR_RARE", "SCAN_DARK"]), "game_session: more than three escalations were accepted")
+		if check(escalation_session.start_expedition("endgame-escalation-seed", false, "", escalation_ids), "game_session: selected endgame escalations were rejected: %s" % escalation_session.last_error):
+			check(escalation_session.state.run.depth == 13 and escalation_session.state.run.escalation_ids == escalation_ids, "game_session: endgame escalation selection did not persist on RUN")
+			var escalation_round_trip: Dictionary = GameSaveState.new().parse_payload(escalation_session.state.to_payload())
+			check(bool(escalation_round_trip.get("ok", false)) and escalation_round_trip["state"].run.escalation_ids == escalation_ids, "game_session: endgame escalation state did not survive save validation")
+			var normal_route: Dictionary = SectorGenerator.new().generate("endgame-escalation-seed", 13, escalation_session.state.run.biome)
+			var normal_repairs: int = 0
+			var reduced_repairs: int = 0
+			for layer: Array in normal_route.get("graph", {}).get("layers", []):
+				for candidate: Dictionary in layer:
+					if str(candidate.get("type", "")) == "REPAIR": normal_repairs += 1
+			for layer: Array in escalation_session.state.run.graph.get("layers", []):
+				for candidate: Dictionary in layer:
+					if str(candidate.get("type", "")) == "REPAIR": reduced_repairs += 1
+			check(reduced_repairs == normal_repairs - 1 if normal_repairs > 0 else reduced_repairs == 0, "game_session: REPAIR_RARE did not replace one repair node while preserving route connectivity")
+			var intel_after_dark: int = int(escalation_session.route_intel().get("effectiveLevel", -1))
+			var expected_intel: int = maxi(0, escalation_session.garage_level("INTEL") - (1 if escalation_session.state.run.biome == "B06" else 0) - 1)
+			check(intel_after_dark == expected_intel, "game_session: SCAN_DARK did not lower disclosed intel")
+			var start_time: float = float(escalation_session.state.run.resources.get("gameTimeMs", 0.0))
+			var route_choices: Array[Dictionary] = escalation_session.reachable_nodes()
+			if not route_choices.is_empty():
+				var destination: Dictionary = route_choices[0]
+				check(escalation_session.travel_to(str(destination.get("id", ""))), "game_session: LONG_RUN route transition failed: %s" % escalation_session.last_error)
+				var expected_time: float = 40000.0 + (8000.0 if str(destination.get("type", "")) == "CHECKPOINT" else 0.0)
+				check(is_equal_approx(float(escalation_session.state.run.resources.get("gameTimeMs", 0.0)) - start_time, expected_time), "game_session: LONG_RUN did not add fifteen seconds to route travel")
 	var ending_session: GameSession = GameSession.new()
 	ending_session.configure_save_directory("user://test-saves/campaign-ending")
 	if check(ending_session.start_new_game(1762900000120), "game_session: could not create a campaign-ending profile"):

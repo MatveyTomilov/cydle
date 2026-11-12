@@ -25,7 +25,7 @@ func campaign_biome(depth: int, seed_value: String, previous_biomes: Array[Strin
 		selected = str(rng.pick(reroll))
 	return selected
 
-func generate(seed_value: String, depth: int, biome: String, tutorial: bool = false, wanted: float = 0.0, used_event_ids: Array[String] = []) -> Dictionary:
+func generate(seed_value: String, depth: int, biome: String, tutorial: bool = false, wanted: float = 0.0, used_event_ids: Array[String] = [], escalation_ids: Array[String] = []) -> Dictionary:
 	if seed_value.strip_edges().is_empty() or depth < 1:
 		return {"ok": false, "graph": {}, "error": "Для маршрута требуется seed и положительная глубина."}
 	if not ["B01", "B02", "B03", "B04", "B05", "B06"].has(biome):
@@ -93,6 +93,15 @@ func generate(seed_value: String, depth: int, biome: String, tutorial: bool = fa
 				node_type = str(rng.pick(["COMBAT", "REPAIR", "FUEL", "CACHE"]))
 			nodes.append(_create_node(seed_value, depth, biome, layer, index, node_type, fixed_enemies, rng, extras))
 		layers.append(nodes)
+	if depth >= 13 and escalation_ids.has("REPAIR_RARE"):
+		var repair_nodes: Array[Dictionary] = []
+		for layer: Array in layers:
+			for node: Dictionary in layer:
+				if str(node.get("type", "")) == "REPAIR": repair_nodes.append(node)
+		if not repair_nodes.is_empty():
+			var replaced: Dictionary = repair_nodes.back()
+			replaced["type"] = "FUEL"
+			replaced["lootHint"] = "топливо"
 	var edges: Array[Dictionary] = _link_layers(layers, rng)
 	return {"ok": true, "graph": {"seed": seed_value, "depth": depth, "biome": biome, "startNodeId": "START", "layers": layers, "edges": edges}, "error": ""}
 

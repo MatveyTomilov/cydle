@@ -82,6 +82,7 @@ class RunState:
 	var service_scrap_fuel_counts: Dictionary = {}
 	var shipped_checkpoint_ids: Array[String] = []
 	var pending_travel_delta_ms: int = 0
+	var escalation_ids: Array[String] = []
 	var pending_combat_effects: Dictionary = {"initialTempShield": 0.0, "extraHeat": 0.0}
 	var pending_next_combat: Dictionary = {
 		"skipOrdinary": false, "forceElite": false, "extraItemRoll": false, "forceBounty": false,
@@ -130,6 +131,8 @@ class RunState:
 		}
 		if not contract.is_empty():
 			result["contract"] = contract.duplicate(true)
+		if not escalation_ids.is_empty():
+			result["escalationIds"] = escalation_ids.duplicate()
 		if not scouted_node_ids.is_empty():
 			result["scoutedNodeIds"] = scouted_node_ids.duplicate()
 		if autopilot_enabled:
@@ -303,6 +306,7 @@ func _run_from_dictionary(value: Dictionary) -> RunState:
 	result.service_scrap_fuel_counts = value.get("serviceScrapFuelCounts", {}).duplicate(true)
 	result.shipped_checkpoint_ids.assign(value.get("shippedCheckpointIds", []))
 	result.pending_travel_delta_ms = int(value.get("pendingTravelDeltaMs", 0))
+	result.escalation_ids.assign(value.get("escalationIds", []))
 	result.pending_combat_effects = value.get("pendingCombatEffects", {"initialTempShield": 0.0, "extraHeat": 0.0}).duplicate(true)
 	result.pending_next_combat = value.get("pendingNextCombat", {
 		"skipOrdinary": false, "forceElite": false, "extraItemRoll": false, "forceBounty": false,
