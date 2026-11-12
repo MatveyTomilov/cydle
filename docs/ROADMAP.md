@@ -11,6 +11,7 @@
 - Local environment verified on 2026-11-12: Godot 4.7.2 stable, Node 24.20.0, npm/npx 11.19.0, Git 2.55.0, matching Windows export templates. Godot MCP 0.1.2 is installed project-locally with a compact tool set, confirmation enabled, and arbitrary game-code evaluation disabled. Context7 is available in Codex.
 - Fresh native checks: headless import exit 0; **11 headless test scripts / 85685 assertions / 0 failures**; the 1628-case differential suite covers conditions, all 85 stats and computational CalcTrace trees, conversions, formulas, and damage. Asset manifest validation passes for 16 entries (all planned, none integrated). A Windows release export completed earlier (exit 0), and the executable survived a 2-second launch smoke after the MCP project plugin was enabled.
 - Legacy reference checks after fixing a readonly-array cast in the fixture generator: typecheck passes; 206/206 tests pass; catalog validation passes; Vite production build passes. `npm run export:godot-items` regenerates the native item/build catalogs and TypeScript oracle fixtures. These checks validate the oracle/reference, not the Godot game.
+- The same exporter now includes 24 enemy definitions, 6 boss definitions, and 6 elite modifiers. Godot's `EnemyCatalog` validates ability and boss phase data; this is a catalog port, not implemented combat behavior.
 - GitHub Actions has been added but has not yet run on GitHub. Check the branch's remote SHA before continuing after the first checkpoint push.
 
 ## Delivery sequence

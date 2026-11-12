@@ -11,6 +11,7 @@ import { TREE_NODES } from '../src/data/tree';
 import { MUTATIONS } from '../src/data/progression';
 import { createInitialSave } from '../src/core/save/initial';
 import { UNIQUE_TEMPLATE_BY_ID } from '../src/data/uniques';
+import { BOSSES, ELITE_MODS, ENEMIES } from '../src/data/enemies';
 
 const templates = [...ITEM_TEMPLATES, ...Object.values(UNIQUE_TEMPLATE_BY_ID)];
 const ids = new Set(templates.map((template) => template.id));
@@ -147,3 +148,8 @@ const initialSaveOutput = resolve('game/tests/fixtures/saves/initial_save.json')
 mkdirSync(dirname(initialSaveOutput), { recursive: true });
 writeFileSync(initialSaveOutput, `${JSON.stringify(initialSaveFixture, null, 2)}\n`, 'utf8');
 console.log(`Exported deterministic initial-save fixture to ${initialSaveOutput}`);
+
+const enemyCatalogOutput = resolve('game/data/catalog/enemy_definitions.json');
+mkdirSync(dirname(enemyCatalogOutput), { recursive: true });
+writeFileSync(enemyCatalogOutput, `${JSON.stringify({ schemaVersion: 1, enemies: ENEMIES, bosses: BOSSES, eliteMods: ELITE_MODS }, null, 2)}\n`, 'utf8');
+console.log(`Exported ${ENEMIES.length} enemies, ${BOSSES.length} bosses, and ${ELITE_MODS.length} elite modifiers to ${enemyCatalogOutput}`);
