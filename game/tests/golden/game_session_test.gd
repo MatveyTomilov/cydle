@@ -487,8 +487,15 @@ func run(_tree: SceneTree) -> bool:
 			for layer: Array in rust_quest_target.state.run.graph.get("layers", []):
 				for node: Dictionary in layer:
 					if str(node.get("type", "")) == "ELITE" and node.get("questTargets", []).has("Q03") and node.get("enemies", []).any(func(enemy: Dictionary) -> bool: return str(enemy.get("templateId", "")) == "E09"): q03_target_found = true
-					if str(node.get("type", "")) == "EVENT" and (node.get("questEventIds", []) as Array).has("Q03_S2"): q03_stage_event_found = true
-			check(rust_quest_target.state.run.biome == "B03" and q03_target_found and q03_stage_event_found, "game_session: active Q03 did not create its E09 technician target and dedicated stage event ID in B03")
+					if str(node.get("type", "")) == "QUEST" and str(node.get("eventId", "")) == "Q03_S2" and str(node.get("questId", "")) == "Q03": q03_stage_event_found = true
+			check(rust_quest_target.state.run.biome == "B03" and q03_target_found and q03_stage_event_found, "game_session: active Q03 did not create its E09 technician target and dedicated route node in B03")
+			var q03_quest_node_id: String = ""
+			for node: Dictionary in rust_quest_target.state.run.graph.get("layers", [[], [], [], [], []])[3]:
+				if str(node.get("type", "")) == "QUEST" and str(node.get("eventId", "")) == "Q03_S2": q03_quest_node_id = str(node.get("id", ""))
+			var q03_has_route_edges: bool = false
+			for edge: Dictionary in rust_quest_target.state.run.graph.get("edges", []):
+				if str(edge.get("to", "")) == q03_quest_node_id and int(edge.get("fromLayer", -1)) == 2: q03_has_route_edges = true
+			check(not q03_quest_node_id.is_empty() and q03_has_route_edges, "game_session: Q03 stage node was not connected to the playable route")
 	var continued_quest_session: GameSession = GameSession.new()
 	continued_quest_session.configure_save_directory("user://test-saves/quest-target-continue")
 	if check(continued_quest_session.start_new_game(1762900000135), "game_session: could not create a continued-quest profile") and check(continued_quest_session.start_expedition("quest-target-continue"), "game_session: could not create the pre-checkpoint outing"):
@@ -510,7 +517,7 @@ func run(_tree: SceneTree) -> bool:
 			for layer: Array in continued_quest_session.state.run.graph.get("layers", []):
 				for node: Dictionary in layer:
 					if str(node.get("type", "")) == "ELITE" and node.get("questTargets", []).has("Q03") and node.get("enemies", []).any(func(enemy: Dictionary) -> bool: return str(enemy.get("templateId", "")) == "E09"): continued_e09_found = true
-					if str(node.get("type", "")) == "EVENT" and (node.get("questEventIds", []) as Array).has("Q03_S2"): continued_stage_event_found = true
+					if str(node.get("type", "")) == "QUEST" and str(node.get("eventId", "")) == "Q03_S2" and str(node.get("questId", "")) == "Q03": continued_stage_event_found = true
 			check(continued_quest_session.state.run.depth == 6 and continued_quest_session.state.run.biome == "B03" and continued_e09_found and continued_stage_event_found, "game_session: continue_campaign omitted the Q03 target or stage event from the next-sector graph")
 	var thermal_quest_target: GameSession = GameSession.new()
 	thermal_quest_target.configure_save_directory("user://test-saves/q05-target-elite")
@@ -526,7 +533,7 @@ func run(_tree: SceneTree) -> bool:
 			for layer: Array in thermal_quest_target.state.run.graph.get("layers", []):
 				for node: Dictionary in layer:
 					if str(node.get("type", "")) == "ELITE" and node.get("questTargets", []).has("Q05") and node.get("enemies", []).any(func(enemy: Dictionary) -> bool: return str(enemy.get("templateId", "")) == "E19"): q05_target_found = true
-					if str(node.get("type", "")) == "EVENT" and (node.get("questEventIds", []) as Array).has("Q05_S2"): q05_event_id_found = true
+					if str(node.get("type", "")) == "QUEST" and str(node.get("eventId", "")) == "Q05_S2" and str(node.get("questId", "")) == "Q05": q05_event_id_found = true
 			check(thermal_quest_target.state.run.biome == "B05" and q05_target_found and q05_event_id_found, "game_session: active Q05 did not create its E19 objective and stage event in B05")
 			var q05_progress_payload: Dictionary = thermal_quest_target.state.to_payload()
 			var q05_layers: Array = q05_progress_payload["run"]["graph"]["layers"]
@@ -540,7 +547,7 @@ func run(_tree: SceneTree) -> bool:
 							q05_anomaly_node = node
 			var q05_event_id: String = ""
 			for node: Dictionary in q05_layers[3]:
-				if str(node.get("type", "")) == "EVENT" and (node.get("questEventIds", []) as Array).has("Q05_S2"):
+				if str(node.get("type", "")) == "QUEST" and str(node.get("eventId", "")) == "Q05_S2" and str(node.get("questId", "")) == "Q05":
 					q05_event_id = str(node.get("id", ""))
 			if not q05_anomaly_node.is_empty():
 				q05_anomaly_node["type"] = "ANOMALY"
@@ -576,10 +583,10 @@ func run(_tree: SceneTree) -> bool:
 							q06_extra_anomaly_id = str(node.get("id", ""))
 						elif q06_main_anomaly_id.is_empty():
 							q06_main_anomaly_id = str(node.get("id", ""))
-					if str(node.get("type", "")) == "EVENT" and (node.get("questEventIds", []) as Array).has("Q06_S2"):
+					if str(node.get("type", "")) == "QUEST" and str(node.get("eventId", "")) == "Q06_S2" and str(node.get("questId", "")) == "Q06":
 						q06_event_found = true
 						q06_event_id = str(node.get("id", ""))
-			check(q06_route_session.state.run.biome == "B06" and q06_anomaly_count == 2 and q06_extra_found and q06_event_found, "game_session: Q06 did not add its extra elite anomaly threat and stage event to the B06 route")
+			check(q06_route_session.state.run.biome == "B06" and q06_anomaly_count == 2 and q06_extra_found and q06_event_found, "game_session: Q06 did not add its extra elite anomaly threat and dedicated quest route node to B06")
 			var q06_objective_payload: Dictionary = q06_route_session.state.to_payload()
 			q06_objective_payload["run"]["currentNodeId"] = q06_event_id
 			q06_objective_payload["run"]["phase"] = "NODE"
@@ -589,6 +596,7 @@ func run(_tree: SceneTree) -> bool:
 			check(q06_route_session.available_quest_stages().is_empty(), "game_session: clearing only B06's default anomaly incorrectly satisfied Q06's extra-threat objective")
 			q06_objective_payload["run"]["clearedNodeIds"].append(q06_extra_anomaly_id)
 			check(q06_route_session._commit_payload(q06_objective_payload) and q06_route_session.available_quest_stages().any(func(opportunity: Dictionary) -> bool: return str(opportunity.get("quest", {}).get("id", "")) == "Q06"), "game_session: clearing the Q06-tagged anomaly did not unlock its stage decision")
+			check(q06_route_session.resolve_quest_choice("Q06", "A") and q06_route_session.state.run.phase == "ROUTE" and q06_route_session.state.run.cleared_node_ids.has(q06_event_id) and int(q06_route_session.state.meta.quest_progress["Q06"].get("stage", 0)) == 3, "game_session: dedicated QUEST node did not resolve its choice, advance progress, and return to route")
 	var session: GameSession = GameSession.new()
 	session.configure_save_directory("user://test-saves/game-session")
 	if not check(session.start_new_game(1762900000000), "game_session: could not create a new game: %s" % session.last_error):

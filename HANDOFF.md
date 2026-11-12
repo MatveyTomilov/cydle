@@ -1,5 +1,13 @@
 # CYDLE — Project handoff and development history
 
+## Live continuation (2026-11-13; physical quest nodes WIP)
+
+- Branch: `development/codex`. Last pushed HEAD before this WIP: `306bdbab29498213000c50e133baca93dd9a059c`. Current local changes are limited to `game/scripts/app/game_session.gd`, `game/scripts/app/app_root.gd`, and `game/tests/golden/game_session_test.gd`.
+- Active quest stages now receive their own connected `QUEST` route nodes in matching biomes. Regular route events remain present. The quest node resolves catalog-authored text/actions, gates on the exact quest/stage and objective, applies the existing quest transaction, marks the node cleared and returns to ROUTE. Existing tagged EVENT graphs retain compatibility.
+- The road UI renders quest-stage choices directly on the QUEST node, avoids duplicating the opportunity list there, and keeps cargo surrender behavior on ordinary events. Route intel identifies task nodes. Autopilot uses its configured quest-choice map when eligible; if the objective is not yet eligible it can leave the node safely.
+- Verification actually run for this WIP: Godot 4.7.2 editor import exit 0; `res://tests/run_tests.gd` exit 0 (22 scripts, 87,646 assertions). `git diff --check` exit 0. Windows export/EXE smoke not rerun yet. TypeScript checks not run.
+- Exact next action: run Windows Desktop export and EXE smoke, inspect the diff, commit/push this checkpoint, verify remote SHA and clean status. Then continue breadth-first across the remaining full-game gaps; do not treat this quest integration as campaign completion. Preserve the external campaign E2E profile and backup recorded below.
+
 ## Current live continuation (2026-11-13; Q06 objective gating regression)
 
 - Latest pushed base: `154e70d3fa3c3a5ce6a75d350c8032287336657d` on `development/codex`; current WIP adds further verification of the Q06 objective gate.

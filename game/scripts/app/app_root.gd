@@ -1361,7 +1361,7 @@ func _show_current_node(run: GameSaveState.RunState) -> void:
 			buy.disabled = bool(offer.get("purchased", false))
 			buy.pressed.connect(_on_buy_shop_item.bind(index))
 			_body.add_child(buy)
-	elif str(node.get("type", "")) == "EVENT":
+	elif str(node.get("type", "")) in ["EVENT", "QUEST"]:
 		var event: Dictionary = _session.current_event()
 		if event.is_empty():
 			_body.add_child(_label("Событие отсутствует в каталоге; выезд остановлен безопасно.", 14, COLOR_RED))
@@ -1369,7 +1369,7 @@ func _show_current_node(run: GameSaveState.RunState) -> void:
 			_body.add_child(_label(str(event.get("name", "СОБЫТИЕ")), 22, COLOR_TEXT))
 			_body.add_child(_label(str(event.get("text", "")), 14, COLOR_MUTED))
 			for choice: Dictionary in event.get("choices", []):
-				if int(choice.get("surrenderCargo", 0)) > 0:
+				if node_type == "EVENT" and int(choice.get("surrenderCargo", 0)) > 0:
 					_body.add_child(_label("%s · %s · выберите предмет для передачи" % [str(choice.get("id", "")), str(choice.get("label", "Выбрать"))], 13, COLOR_AMBER))
 					var cargo_catalog: ItemCatalog = ItemCatalog.new()
 					cargo_catalog.load_catalog()
@@ -1389,13 +1389,17 @@ func _show_current_node(run: GameSaveState.RunState) -> void:
 				else:
 					var choose: Button = _button("%s · %s" % [str(choice.get("id", "")), str(choice.get("label", "Выбрать"))], str(choice.get("id", "")) == "A")
 					choose.custom_minimum_size.x = 370
-					choose.pressed.connect(_on_event_choice.bind(str(choice.get("id", "")), ""))
+					if node_type == "QUEST":
+						choose.pressed.connect(_on_resolve_quest_choice.bind(str(event.get("questId", "")), str(choice.get("id", ""))))
+					else:
+						choose.pressed.connect(_on_event_choice.bind(str(choice.get("id", "")), ""))
 					_body.add_child(choose)
 				var description: Label = _label(str(choice.get("desc", "")), 11, COLOR_MUTED)
 				_body.add_child(description)
 	else:
 		_body.add_child(_label("Этот дорожный узел ещё не получил игровое действие.", 13, COLOR_AMBER))
-	for opportunity: Dictionary in _session.available_quest_stages():
+	var quest_opportunities: Array[Dictionary] = _session.available_quest_stages() if node_type != "QUEST" else []
+	for opportunity: Dictionary in quest_opportunities:
 		var quest: Dictionary = opportunity["quest"]
 		var stage: Dictionary = opportunity["stage"]
 		_body.add_child(_label("ЗАДАНИЕ · %s · ЭТАП %d: %s" % [str(quest.get("name", "")), int(stage.get("stage", 1)), str(stage.get("name", ""))], 16, COLOR_CYAN))

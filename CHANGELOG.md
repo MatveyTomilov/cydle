@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — physical quest route nodes
+
+- Active quest stages now generate dedicated, connected `QUEST` nodes in the authored biome while keeping regular `EVENT` nodes intact. The node presents its real stage text and choices, enforces the quest target/requirements, consumes transactional rewards, persists progress, and returns the run to the route after a decision.
+- Route intel marks quest nodes. Autopilot can resolve a configured eligible choice or safely leave an ineligible quest node. Legacy saved graphs with event-tagged quest stages remain compatible.
+- Godot editor import passed; 22 headless scripts / 87,646 assertions passed, including dedicated-node links, Q06 target gating, and quest resolution/route return. Windows export/smoke not yet rerun for this change.
+
 ## Unreleased — Q06 objective gate regression
 
 - Extended the Q06 route test: the sector's default anomaly alone does not unlock stage 2, while clearing the additional Q06-tagged anomaly does. This guards the objective condition rather than only checking node generation.

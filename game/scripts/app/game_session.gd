@@ -641,21 +641,14 @@ func _apply_active_quest_event_ids(graph: Dictionary, biome: String) -> void:
 	var catalog: QuestCatalog = QuestCatalog.new()
 	if not bool(catalog.load_catalog().get("ok", false)):
 		return
-	var quest_event: Dictionary = {}
-	for layer: Array in graph.get("layers", []):
-		for node: Dictionary in layer:
-			if str(node.get("type", "")) == "EVENT":
-				quest_event = node
-				break
-		if not quest_event.is_empty():
-			break
-	if quest_event.is_empty():
+	var layers: Array = graph.get("layers", [])
+	if layers.size() < 5:
 		return
 	var quest_ids: Array[String] = []
 	for quest_id: Variant in state.meta.quest_progress.keys():
 		quest_ids.append(str(quest_id))
 	quest_ids.sort()
-	var event_ids: Array[String] = []
+	var quest_nodes: Array[Dictionary] = []
 	for quest_id: String in quest_ids:
 		var progress: Dictionary = state.meta.quest_progress[quest_id]
 		if str(progress.get("status", "")) != "ACTIVE":
@@ -666,11 +659,28 @@ func _apply_active_quest_event_ids(graph: Dictionary, biome: String) -> void:
 			continue
 		var stage: Dictionary = quest["stages"][stage_index]
 		var target_biome: String = str(stage.get("biome", quest.get("biome", "")))
-		if target_biome == biome:
-			event_ids.append(str(stage.get("eventId", "")))
-	if not event_ids.is_empty():
-		event_ids.sort()
-		quest_event["questEventIds"] = event_ids
+		if target_biome != biome:
+			continue
+		var event_id: String = str(stage.get("eventId", ""))
+		var node_id: String = "d%d-quest-%s" % [int(graph.get("depth", 1)), event_id.to_lower()]
+		quest_nodes.append({
+			"id": node_id, "layer": 3, "type": "QUEST", "eventId": event_id,
+			"questId": quest_id, "questStage": int(stage.get("stage", stage_index + 1)),
+			"threat": "medium", "enemies": [], "revealLevel": 1, "lootHint": "задание",
+		})
+	if quest_nodes.is_empty():
+		return
+	for quest_node: Dictionary in quest_nodes:
+		(layers[3] as Array).append(quest_node)
+	var edges: Array = graph.get("edges", [])
+	for source: Dictionary in layers[2]:
+		for quest_node: Dictionary in quest_nodes:
+			edges.append({"from": str(source.get("id", "")), "to": str(quest_node.get("id", "")), "fromLayer": 2, "toLayer": 3, "fuelCost": 1})
+	for quest_node: Dictionary in quest_nodes:
+		for destination: Dictionary in layers[4]:
+			edges.append({"from": str(quest_node.get("id", "")), "to": str(destination.get("id", "")), "fromLayer": 3, "toLayer": 4, "fuelCost": 1})
+	graph["layers"] = layers
+	graph["edges"] = edges
 
 func _force_quest_target_node(layers: Array, enemy_id: String, reserved: Dictionary) -> Dictionary:
 	if enemy_id.is_empty():
@@ -1062,7 +1072,7 @@ func route_intel() -> Dictionary:
 			var info: Dictionary = {"revealed": revealed, "visited": visited, "scouted": scouted}
 			if revealed:
 				info["type"] = str(node.get("type", "UNKNOWN"))
-				info["questTarget"] = not (node.get("questTargets", []) as Array).is_empty()
+				info["questTarget"] = str(node.get("type", "")) == "QUEST" or not (node.get("questTargets", []) as Array).is_empty()
 				if effective_intel >= 2 or is_preview:
 					info["threat"] = str(node.get("threat", "unknown"))
 					info["lootHint"] = str(node.get("lootHint", "unknown"))
@@ -1227,6 +1237,9 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
 				elif kind in ["COMBAT", "ELITE", "BOUNTY", "BOSS", "ANOMALY"]:
 					if not begin_combat():
 						return _autopilot_stop("SAFE_ERROR_STOP", "COMBAT_START", last_error, report)
+				elif kind == "QUEST":
+					if not resolve_service_node("LEAVE_NODE"):
+						return _autopilot_stop("SAFE_ERROR_STOP", "QUEST_NODE_EXIT", last_error, report)
 				elif kind == "EVENT":
 					var event: Dictionary = current_event()
 					var event_choice: Dictionary = _autopilot_event_choice(event, pilot_profile)
@@ -1477,7 +1490,22 @@ func current_node() -> Dictionary:
 
 func current_event() -> Dictionary:
 	var node: Dictionary = current_node()
-	if str(node.get("type", "")) != "EVENT":
+	var node_type: String = str(node.get("type", ""))
+	if node_type == "QUEST":
+		var catalog: QuestCatalog = QuestCatalog.new()
+		if not bool(catalog.load_catalog().get("ok", false)):
+			return {}
+		var quest: Dictionary = catalog.get_quest(str(node.get("questId", "")))
+		var stage_index: int = int(node.get("questStage", 1)) - 1
+		if quest.is_empty() or stage_index < 0 or stage_index >= quest.get("stages", []).size():
+			return {}
+		var stage: Dictionary = quest["stages"][stage_index].duplicate(true)
+		stage["id"] = str(stage.get("eventId", ""))
+		stage["name"] = "%s · %s" % [str(quest.get("name", "ЗАДАНИЕ")), str(stage.get("name", "ЭТАП"))]
+		stage["questId"] = str(quest.get("id", ""))
+		stage["questStage"] = int(stage.get("stage", stage_index + 1))
+		return stage
+	if node_type != "EVENT":
 		return {}
 	return EventCatalog.new().get_event(str(node.get("eventId", "")))
 
@@ -1906,11 +1934,19 @@ func resolve_quest_choice(quest_id: String, choice_id: String) -> bool:
 	meta["questProgress"] = all_progress
 	run_payload["resources"]["gameTimeMs"] = float(run_payload["resources"].get("gameTimeMs", 0.0)) + 10000.0
 	run_payload["lastCommandId"] = "quest:%s" % history_key
+	if str(current_node().get("type", "")) == "QUEST":
+		var cleared_nodes: Array = run_payload.get("clearedNodeIds", [])
+		if not cleared_nodes.has(state.run.current_node_id):
+			cleared_nodes.append(state.run.current_node_id)
+		run_payload["clearedNodeIds"] = cleared_nodes
+		run_payload["phase"] = "ROUTE"
 	return _commit_payload(payload)
 
 func _quest_stage_ready(quest: Dictionary, stage: Dictionary, progress: Dictionary) -> bool:
 	var event_node: Dictionary = current_node()
-	if str(event_node.get("type", "")) != "EVENT":
+	if str(event_node.get("type", "")) not in ["EVENT", "QUEST"]:
+		return false
+	if str(event_node.get("type", "")) == "QUEST" and (str(event_node.get("questId", "")) != str(quest.get("id", "")) or str(event_node.get("eventId", "")) != str(stage.get("eventId", ""))):
 		return false
 	if event_node.has("questEventIds") and not (event_node.get("questEventIds", []) as Array).has(str(stage.get("eventId", ""))):
 		return false
