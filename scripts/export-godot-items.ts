@@ -6,6 +6,10 @@ import { RARITY_TABLES, createItem, rollItem, rollRarity } from '../src/core/ite
 import { Rng } from '../src/core/rng';
 import type { CreateItemOptions, LootRollOptions } from '../src/core/items/items';
 import { resolveBuild } from '../src/core/build/build';
+import { SKILLS, PASSIVES } from '../src/data/skills';
+import { TREE_NODES } from '../src/data/tree';
+import { MUTATIONS } from '../src/data/progression';
+import { createInitialSave } from '../src/core/save/initial';
 import { UNIQUE_TEMPLATE_BY_ID } from '../src/data/uniques';
 
 const templates = [...ITEM_TEMPLATES, ...Object.values(UNIQUE_TEMPLATE_BY_ID)];
@@ -65,6 +69,10 @@ const buildFixtureCases = [
     seed: 'build-fixture',
     attributes: { POW: 7, REF: 6, INT: 5, ENG: 5, SYN: 5 },
     attributePointsEarned: 3,
+    skillIds: ['SK_BURST'],
+    passiveIds: ['PP_ACCURACY'],
+    treeNodeIds: ['K1A'],
+    treePointsEarned: 1,
     equipment: { MAIN: { templateId: 'PISTOL_K1', techLevel: 5, rarity: 'COMMON' as const, secured: true, originGrantId: 'build-main', origin: 'garage' } },
   },
   {
@@ -72,6 +80,11 @@ const buildFixtureCases = [
     seed: 'build-fixture',
     attributes: { POW: 5, REF: 5, INT: 5, ENG: 7, SYN: 8 },
     attributePointsEarned: 5,
+    skillIds: ['SK_PLASMA', 'SK_DRONE_REPAIR'],
+    passiveIds: ['PP_DRONE'],
+    treeNodeIds: ['D1A', 'D1B', 'D2A'],
+    treePointsEarned: 3,
+    mutationIds: ['MUT_HEAT'],
     equipment: {
       MAIN: { templateId: 'PLASMA_E1', techLevel: 8, rarity: 'RARE' as const, secured: true, originGrantId: 'build-main-2', origin: 'garage', affixCount: 3 },
       ARMOR: { templateId: 'ARM_HEAVY', techLevel: 5, rarity: 'MODIFIED' as const, secured: true, originGrantId: 'build-armor', origin: 'garage', affixCount: 1 },
@@ -89,12 +102,17 @@ for (const entry of buildFixtureCases) {
     if (slot === 'MAIN' && entry.name === 'armor-implant-drone') item.durability = 20;
     equipment[slot] = item;
   }
-  const build = resolveBuild({ attributes: entry.attributes, attributePointsEarned: entry.attributePointsEarned, equipment });
+  const build = resolveBuild({ attributes: entry.attributes, attributePointsEarned: entry.attributePointsEarned, skillIds: entry.skillIds, passiveIds: entry.passiveIds, treeNodeIds: entry.treeNodeIds, treePointsEarned: entry.treePointsEarned, mutationIds: entry.mutationIds, equipment });
 	buildFixtureOutputData.push({
 		name: entry.name,
 		seed: entry.seed,
 		attributes: entry.attributes,
 		attributePointsEarned: entry.attributePointsEarned,
+		skillIds: entry.skillIds,
+		passiveIds: entry.passiveIds,
+		treeNodeIds: entry.treeNodeIds,
+		treePointsEarned: entry.treePointsEarned,
+		mutationIds: entry.mutationIds ?? [],
 		equipment: Object.fromEntries(Object.entries(equipment).map(([slot, item]) => [slot, item])),
 		expected: {
     valid: build.valid,
@@ -104,9 +122,28 @@ for (const entry of buildFixtureCases) {
     sidearm: build.sidearm,
     drones: build.drones,
 			modifiers: build.modifiers,
+				effects: build.effects,
+				triggerEffects: build.triggerEffects,
+				skills: build.skills,
+				skillIds: build.skillIds,
+				passives: build.passives,
+				passiveIds: build.passiveIds,
+				treeNodes: build.treeNodes,
+				treeNodeIds: build.treeNodeIds,
+				mutationIds: build.mutationIds,
 		},
 	});
 }
 mkdirSync(dirname(buildFixtureOutput), { recursive: true });
 writeFileSync(buildFixtureOutput, `${JSON.stringify({ cases: buildFixtureOutputData }, null, 2)}\n`, 'utf8');
 console.log(`Exported ${buildFixtureCases.length} build resolver fixtures to ${buildFixtureOutput}`);
+
+const buildDefinitionsOutput = resolve('game/data/catalog/build_definitions.json');
+writeFileSync(buildDefinitionsOutput, `${JSON.stringify({ schemaVersion: 1, skills: SKILLS, passives: PASSIVES, treeNodes: TREE_NODES, mutations: MUTATIONS }, null, 2)}\n`, 'utf8');
+console.log(`Exported ${SKILLS.length} skills, ${PASSIVES.length} passives, ${TREE_NODES.length} tree nodes, and ${MUTATIONS.length} mutations to ${buildDefinitionsOutput}`);
+
+const initialSaveFixture = createInitialSave({ saveId: 'native-starter-oracle', now: 1700000000000 });
+const initialSaveOutput = resolve('game/tests/fixtures/saves/initial_save.json');
+mkdirSync(dirname(initialSaveOutput), { recursive: true });
+writeFileSync(initialSaveOutput, `${JSON.stringify(initialSaveFixture, null, 2)}\n`, 'utf8');
+console.log(`Exported deterministic initial-save fixture to ${initialSaveOutput}`);

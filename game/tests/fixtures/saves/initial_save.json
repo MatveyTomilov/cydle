@@ -1,0 +1,364 @@
+{
+  "schemaVersion": 1,
+  "balanceVersion": "1.0.0",
+  "gameVersion": "1.0.0",
+  "saveId": "native-starter-oracle",
+  "createdAt": 1700000000000,
+  "updatedAt": 1700000000000,
+  "revision": 1,
+  "meta": {
+    "operator": {
+      "level": 1,
+      "xp": 0,
+      "attributes": {
+        "POW": 5,
+        "REF": 5,
+        "INT": 5,
+        "ENG": 5,
+        "SYN": 5
+      },
+      "attributePoints": 0,
+      "treePoints": 0
+    },
+    "tutorial": {
+      "firstSectorCompleted": false,
+      "starterPrototypeSecured": false
+    },
+    "reputation": {
+      "F_VANTA": 0,
+      "F_RUST": 0,
+      "F_CHOIR": 0,
+      "F_ECHO": 0
+    },
+    "campaignFlags": [],
+    "transport": {
+      "fuel": 24,
+      "fuelMax": 24,
+      "hull": 100,
+      "hullMax": 100,
+      "cargoCapacity": 20
+    },
+    "protectedBank": {
+      "CREDITS": 120,
+      "SCRAP": 30,
+      "DATA": 20
+    },
+    "unsecuredWallet": {
+      "CREDITS": 0,
+      "SCRAP": 0,
+      "DATA": 0
+    },
+    "inventory": [
+      {
+        "itemId": "it:starter%3Anative-starter-oracle%3AMAIN:PISTOL_K1",
+        "templateId": "PISTOL_K1",
+        "techLevel": 1,
+        "rarity": "COMMON",
+        "affixes": [],
+        "uniqueEffectIds": [],
+        "neuralCost": 0,
+        "durability": 100,
+        "secured": true,
+        "originGrantId": "starter:native-starter-oracle:MAIN",
+        "rollSeed": "loot:1",
+        "tr": 8,
+        "acquiredAt": 1700000000000,
+        "origin": "starter"
+      },
+      {
+        "itemId": "it:starter%3Anative-starter-oracle%3AOFFHAND:OFF_SHIELD",
+        "templateId": "OFF_SHIELD",
+        "techLevel": 1,
+        "rarity": "COMMON",
+        "affixes": [],
+        "uniqueEffectIds": [],
+        "neuralCost": 0,
+        "durability": 100,
+        "secured": true,
+        "originGrantId": "starter:native-starter-oracle:OFFHAND",
+        "rollSeed": "loot:2",
+        "tr": 10,
+        "acquiredAt": 1700000000000,
+        "origin": "starter"
+      },
+      {
+        "itemId": "it:starter%3Anative-starter-oracle%3AARMOR:ARM_CLOTH",
+        "templateId": "ARM_CLOTH",
+        "techLevel": 1,
+        "rarity": "COMMON",
+        "affixes": [],
+        "uniqueEffectIds": [],
+        "neuralCost": 0,
+        "durability": 100,
+        "secured": true,
+        "originGrantId": "starter:native-starter-oracle:ARMOR",
+        "rollSeed": "loot:3",
+        "tr": 11,
+        "acquiredAt": 1700000000000,
+        "origin": "starter"
+      },
+      {
+        "itemId": "it:starter%3Anative-starter-oracle%3AIMP_2:IMP_ARMOR",
+        "templateId": "IMP_ARMOR",
+        "techLevel": 1,
+        "rarity": "COMMON",
+        "affixes": [],
+        "uniqueEffectIds": [],
+        "neuralCost": 16,
+        "durability": 100,
+        "secured": true,
+        "originGrantId": "starter:native-starter-oracle:IMP_2",
+        "rollSeed": "loot:4",
+        "tr": 8,
+        "acquiredAt": 1700000000000,
+        "origin": "starter"
+      },
+      {
+        "itemId": "it:starter%3Anative-starter-oracle%3AIMP_3:IMP_REFLEX",
+        "templateId": "IMP_REFLEX",
+        "techLevel": 1,
+        "rarity": "COMMON",
+        "affixes": [],
+        "uniqueEffectIds": [],
+        "neuralCost": 14,
+        "durability": 100,
+        "secured": true,
+        "originGrantId": "starter:native-starter-oracle:IMP_3",
+        "rollSeed": "loot:5",
+        "tr": 9,
+        "acquiredAt": 1700000000000,
+        "origin": "starter"
+      },
+      {
+        "itemId": "it:starter%3Anative-starter-oracle%3ADRONE_1:DR_GUN",
+        "templateId": "DR_GUN",
+        "techLevel": 1,
+        "rarity": "COMMON",
+        "affixes": [],
+        "uniqueEffectIds": [],
+        "neuralCost": 0,
+        "durability": 100,
+        "secured": true,
+        "originGrantId": "starter:native-starter-oracle:DRONE_1",
+        "rollSeed": "loot:6",
+        "tr": 9,
+        "acquiredAt": 1700000000000,
+        "origin": "starter"
+      },
+      {
+        "itemId": "it:starter%3Anative-starter-oracle%3AENGINE:TR_ENGINE_1",
+        "templateId": "TR_ENGINE_1",
+        "techLevel": 1,
+        "rarity": "COMMON",
+        "affixes": [],
+        "uniqueEffectIds": [],
+        "neuralCost": 0,
+        "durability": 100,
+        "secured": true,
+        "originGrantId": "starter:native-starter-oracle:ENGINE",
+        "rollSeed": "loot:7",
+        "tr": 8,
+        "acquiredAt": 1700000000000,
+        "origin": "starter"
+      },
+      {
+        "itemId": "it:starter%3Anative-starter-oracle%3ACHASSIS:TR_CHASSIS_1",
+        "templateId": "TR_CHASSIS_1",
+        "techLevel": 1,
+        "rarity": "COMMON",
+        "affixes": [],
+        "uniqueEffectIds": [],
+        "neuralCost": 0,
+        "durability": 100,
+        "secured": true,
+        "originGrantId": "starter:native-starter-oracle:CHASSIS",
+        "rollSeed": "loot:8",
+        "tr": 10,
+        "acquiredAt": 1700000000000,
+        "origin": "starter"
+      },
+      {
+        "itemId": "it:starter%3Anative-starter-oracle%3ASCANNER:TR_SCANNER_1",
+        "templateId": "TR_SCANNER_1",
+        "techLevel": 1,
+        "rarity": "COMMON",
+        "affixes": [],
+        "uniqueEffectIds": [],
+        "neuralCost": 0,
+        "durability": 100,
+        "secured": true,
+        "originGrantId": "starter:native-starter-oracle:SCANNER",
+        "rollSeed": "loot:9",
+        "tr": 11,
+        "acquiredAt": 1700000000000,
+        "origin": "starter"
+      },
+      {
+        "itemId": "it:starter%3Anative-starter-oracle%3ASERVICE:TR_SERVICE_1",
+        "templateId": "TR_SERVICE_1",
+        "techLevel": 1,
+        "rarity": "COMMON",
+        "affixes": [],
+        "uniqueEffectIds": [],
+        "neuralCost": 0,
+        "durability": 100,
+        "secured": true,
+        "originGrantId": "starter:native-starter-oracle:SERVICE",
+        "rollSeed": "loot:10",
+        "tr": 12,
+        "acquiredAt": 1700000000000,
+        "origin": "starter"
+      },
+      {
+        "itemId": "it:starter%3Anative-starter-oracle%3ACARGO:TR_CARGO_1",
+        "templateId": "TR_CARGO_1",
+        "techLevel": 1,
+        "rarity": "COMMON",
+        "affixes": [],
+        "uniqueEffectIds": [],
+        "neuralCost": 0,
+        "durability": 100,
+        "secured": true,
+        "originGrantId": "starter:native-starter-oracle:CARGO",
+        "rollSeed": "loot:11",
+        "tr": 11,
+        "acquiredAt": 1700000000000,
+        "origin": "starter"
+      },
+      {
+        "itemId": "it:starter%3Anative-starter-oracle%3ASUPPORT:TR_SUPPORT_1",
+        "templateId": "TR_SUPPORT_1",
+        "techLevel": 1,
+        "rarity": "COMMON",
+        "affixes": [],
+        "uniqueEffectIds": [],
+        "neuralCost": 0,
+        "durability": 100,
+        "secured": true,
+        "originGrantId": "starter:native-starter-oracle:SUPPORT",
+        "rollSeed": "loot:12",
+        "tr": 10,
+        "acquiredAt": 1700000000000,
+        "origin": "starter"
+      }
+    ],
+    "equipment": {
+      "MAIN": "it:starter%3Anative-starter-oracle%3AMAIN:PISTOL_K1",
+      "OFFHAND": "it:starter%3Anative-starter-oracle%3AOFFHAND:OFF_SHIELD",
+      "ARMOR": "it:starter%3Anative-starter-oracle%3AARMOR:ARM_CLOTH",
+      "IMP_2": "it:starter%3Anative-starter-oracle%3AIMP_2:IMP_ARMOR",
+      "IMP_3": "it:starter%3Anative-starter-oracle%3AIMP_3:IMP_REFLEX",
+      "DRONE_1": "it:starter%3Anative-starter-oracle%3ADRONE_1:DR_GUN",
+      "ENGINE": "it:starter%3Anative-starter-oracle%3AENGINE:TR_ENGINE_1",
+      "CHASSIS": "it:starter%3Anative-starter-oracle%3ACHASSIS:TR_CHASSIS_1",
+      "SCANNER": "it:starter%3Anative-starter-oracle%3ASCANNER:TR_SCANNER_1",
+      "SERVICE": "it:starter%3Anative-starter-oracle%3ASERVICE:TR_SERVICE_1",
+      "CARGO": "it:starter%3Anative-starter-oracle%3ACARGO:TR_CARGO_1",
+      "SUPPORT": "it:starter%3Anative-starter-oracle%3ASUPPORT:TR_SUPPORT_1"
+    },
+    "garage": {
+      "WORKSHOP": 1,
+      "NEUROLAB": 1,
+      "SERVER": 1,
+      "HANGAR": 1,
+      "MARKET": 1,
+      "INTEL": 1,
+      "GARAGE_MED": 1,
+      "CALIBRATOR": 1
+    },
+    "unlockedForpost": 0,
+    "maxSectorCleared": 0,
+    "unlockedBiomes": [
+      "B01"
+    ],
+    "skillIds": [
+      "SK_BURST",
+      "SK_SHIELD",
+      "SK_EMP"
+    ],
+    "passiveIds": [
+      "PP_ACCURACY",
+      "PP_SHIELD"
+    ],
+    "treeNodeIds": [],
+    "unlockedImplantSlots": 4,
+    "unlockedDroneSlots": 1,
+    "tactics": [
+      {
+        "id": "DEFAULT",
+        "name": "Тактика по умолчанию",
+        "rules": [
+          {
+            "id": "starter-shield",
+            "priority": 3,
+            "enabled": true,
+            "skillId": "SK_SHIELD",
+            "target": "self",
+            "conditions": [
+              {
+                "kind": "hpBelow",
+                "value": 45
+              }
+            ],
+            "logic": "AND",
+            "note": "Защита при низком HP"
+          },
+          {
+            "id": "starter-emp",
+            "priority": 2,
+            "enabled": true,
+            "skillId": "SK_EMP",
+            "target": "imminentCast",
+            "conditions": [
+              {
+                "kind": "enemyCasting",
+                "interruptibleOnly": true
+              }
+            ],
+            "logic": "AND",
+            "note": "Прерывание опасного каста"
+          },
+          {
+            "id": "starter-burst",
+            "priority": 1,
+            "enabled": true,
+            "skillId": "SK_BURST",
+            "target": "allEnemies",
+            "conditions": [
+              {
+                "kind": "enemiesAtLeast",
+                "value": 2
+              }
+            ],
+            "logic": "AND",
+            "note": "Очередь по группе"
+          },
+          {
+            "id": "starter-auto",
+            "priority": 0,
+            "enabled": true,
+            "skillId": "AUTO",
+            "target": "nearest",
+            "conditions": [
+              {
+                "kind": "always"
+              }
+            ],
+            "logic": "AND",
+            "note": "Базовая атака"
+          }
+        ]
+      }
+    ],
+    "activeTacticId": "DEFAULT",
+    "autopilotProfiles": [
+      {
+        "id": "BALANCED",
+        "name": "Сбалансированный",
+        "startDepth": 1,
+        "enabled": false
+      }
+    ]
+  },
+  "run": null
+}

@@ -25,10 +25,13 @@ const ATTRIBUTE_EFFECTS: Array[Dictionary] = [
 ]
 
 var _catalog: ItemCatalog = ItemCatalog.new()
+var _build_catalog: BuildCatalog = BuildCatalog.new()
 var _stats: StatMath = StatMath.new()
 var _formula: CydleFormula = CydleFormula.new()
 var _catalog_loaded: bool = false
 var _catalog_error: String = ""
+var _build_catalog_loaded: bool = false
+var _build_catalog_error: String = ""
 
 func resolve_build(input: Dictionary) -> Dictionary:
 	var issues: Array[Dictionary] = []
@@ -38,6 +41,13 @@ func resolve_build(input: Dictionary) -> Dictionary:
 		_catalog_error = str(catalog_result.get("error", "")) if not bool(catalog_result.get("ok", false)) else ""
 	if not _catalog_error.is_empty():
 		_add_issue(issues, "DATA_CATALOG", "Каталог предметов не загружен: %s" % _catalog_error)
+		return _result(issues, {}, {}, {}, {}, [], [], [], [], [])
+	if not _build_catalog_loaded:
+		var build_catalog_result: Dictionary = _build_catalog.load_catalog()
+		_build_catalog_loaded = true
+		_build_catalog_error = str(build_catalog_result.get("error", "")) if not bool(build_catalog_result.get("ok", false)) else ""
+	if not _build_catalog_error.is_empty():
+		_add_issue(issues, "BUILD_CATALOG", "Каталог умений/пассивов не загружен: %s" % _build_catalog_error)
 		return _result(issues, {}, {}, {}, {}, [], [], [], [], [])
 	var equipment_input: Variant = input.get("equipment", {})
 	var equipment: Dictionary = equipment_input.duplicate(true) if equipment_input is Dictionary else {}
@@ -51,12 +61,69 @@ func resolve_build(input: Dictionary) -> Dictionary:
 	for attribute: String in ATTRIBUTE_IDS:
 		attributes[attribute] = input_attributes.get(attribute, 5)
 	_validate_attributes(input, attributes, issues)
-	for key: String in ["skillIds", "passiveIds", "treeNodeIds", "mutationIds"]:
-		var selected: Variant = input.get(key, [])
-		if not selected is Array:
-			_add_issue(issues, "INVALID_SELECTION", "%s должен быть массивом." % key, key)
-		elif not selected.is_empty():
-			_add_issue(issues, "UNSUPPORTED_SELECTION", "Система %s ещё не перенесена в Godot." % key, str(selected[0]))
+	var skill_ids: Array[String] = _read_selection(input, "skillIds", issues)
+	var passive_ids: Array[String] = _read_selection(input, "passiveIds", issues)
+	var tree_node_ids: Array[String] = _read_selection(input, "treeNodeIds", issues)
+	var mutation_ids: Array[String] = _read_selection(input, "mutationIds", issues)
+	if skill_ids.size() > 3:
+		_add_issue(issues, "SKILL_LIMIT", "Можно установить не более трёх активных умений.")
+	if passive_ids.size() > 3:
+		_add_issue(issues, "PASSIVE_LIMIT", "Можно установить не более трёх пассивных протоколов.")
+	if mutation_ids.size() > 2:
+		_add_issue(issues, "MUTATION_LIMIT", "Одновременно доступны не более двух мутаций.")
+	var resolved_skills: Array[Dictionary] = []
+	var resolved_passives: Array[Dictionary] = []
+	var resolved_tree_nodes: Array[Dictionary] = []
+	var resolved_mutations: Array[Dictionary] = []
+	var tree_points_earned: Variant = input.get("treePointsEarned", 0)
+	var safe_tree_points: int = int(tree_points_earned) if _is_integer(tree_points_earned) else 0
+	if not _is_integer(tree_points_earned) or int(tree_points_earned) < 0:
+		_add_issue(issues, "TREE_POINTS", "Полученные очки дерева должны быть целыми и неотрицательными.")
+	if _is_integer(tree_points_earned) and int(tree_points_earned) > 60:
+		_add_issue(issues, "TREE_POINTS_CAP", "Нельзя получить более 60 силовых очков дерева.")
+	if tree_node_ids.size() > 60 or _is_integer(tree_points_earned) and tree_node_ids.size() > int(tree_points_earned):
+		_add_issue(issues, "TREE_POINTS", "Распределено %d узлов при %s полученных очках." % [tree_node_ids.size(), str(tree_points_earned)])
+	for skill_id: String in skill_ids:
+		if not _build_catalog.skills.has(skill_id):
+			_add_issue(issues, "UNKNOWN_SKILL", "Неизвестное умение %s." % skill_id, skill_id)
+		else:
+			resolved_skills.append(_build_catalog.skills[skill_id])
+	for passive_id: String in passive_ids:
+		if not _build_catalog.passives.has(passive_id):
+			_add_issue(issues, "UNKNOWN_PASSIVE", "Неизвестный пассивный протокол %s." % passive_id, passive_id)
+		else:
+			resolved_passives.append(_build_catalog.passives[passive_id])
+	var selected_tree_ids: Array[String] = []
+	var unresolved_tree_ids: Dictionary = {}
+	for tree_id: String in tree_node_ids:
+		if not _build_catalog.tree_nodes.has(tree_id):
+			_add_issue(issues, "UNKNOWN_TREE_NODE", "Неизвестный узел дерева %s." % tree_id, tree_id)
+			unresolved_tree_ids[tree_id] = true
+	var tree_progress: bool = true
+	while tree_progress:
+		tree_progress = false
+		for tree_id: String in tree_node_ids:
+			if selected_tree_ids.has(tree_id) or unresolved_tree_ids.has(tree_id):
+				continue
+			if _tree_lock_reason(tree_id, selected_tree_ids, safe_tree_points - selected_tree_ids.size()).is_empty():
+				selected_tree_ids.append(tree_id)
+				tree_progress = true
+	for tree_id: String in tree_node_ids:
+		if selected_tree_ids.has(tree_id) or unresolved_tree_ids.has(tree_id):
+			continue
+		var tree_reason: String = _tree_lock_reason(tree_id, selected_tree_ids, safe_tree_points - selected_tree_ids.size())
+		var tree_node: Dictionary = _build_catalog.tree_nodes.get(tree_id, {})
+		if bool(tree_node.get("keystone", false)) and _keystone_count(selected_tree_ids) >= 2:
+			_add_issue(issues, "KEYSTONE_LIMIT", "%s: %s." % [tree_id, tree_reason if not tree_reason.is_empty() else "достигнут лимит двух keystone"], tree_id)
+		else:
+			_add_issue(issues, "TREE_LOCKED", "%s: %s." % [tree_id, tree_reason if not tree_reason.is_empty() else "не выполнены требования дерева"], tree_id)
+	for tree_id: String in selected_tree_ids:
+		resolved_tree_nodes.append(_build_catalog.tree_nodes[tree_id])
+	for mutation_id: String in mutation_ids:
+		if not _build_catalog.mutations.has(mutation_id):
+			_add_issue(issues, "UNKNOWN_MUTATION", "Неизвестная мутация %s." % mutation_id, mutation_id)
+		else:
+			resolved_mutations.append(_build_catalog.mutations[mutation_id])
 	var unlocked_implants: int = clampi(int(input.get("unlockedImplantSlots", 4)), 0, 6)
 	var unlocked_drones: int = clampi(int(input.get("unlockedDroneSlots", 1)), 0, 2)
 	var valid_templates: Dictionary = {}
@@ -138,6 +205,26 @@ func resolve_build(input: Dictionary) -> Dictionary:
 		var main_source: Dictionary = {"id": "%s:tech-power" % main_item.item_id, "name": str(valid_templates["MAIN"]["name"]), "kind": "item"}
 		var tech_power_modifier: Dictionary = _stats.make_modifier("techPower", "FLAT", _formula.tech_power(float(main_weapon["damage"]), main_item.tech_level), main_source)
 		modifiers.insert(attribute_modifier_count, tech_power_modifier)
+	for skill: Dictionary in resolved_skills:
+		for requirement: Variant in skill.get("requires", []):
+			if not _skill_requirement_met(str(requirement), valid_templates):
+				_add_issue(issues, "SKILL_REQUIREMENT", "%s: не выполнено требование %s." % [str(skill["name"]), str(requirement)], str(skill["id"]))
+	for skill: Dictionary in resolved_skills:
+		for effect_index: int in range((skill.get("extraEffects", []) as Array).size()):
+			var effect: Dictionary = skill["extraEffects"][effect_index]
+			_add_static_effect(effect, {"id": skill["id"], "name": skill["name"], "kind": "skill"}, "%s:effect:%d" % [skill["id"], effect_index], effects, trigger_effects, modifiers)
+	for passive: Dictionary in resolved_passives:
+		for effect_index: int in range((passive.get("effects", []) as Array).size()):
+			_add_static_effect(passive["effects"][effect_index], {"id": passive["id"], "name": passive["name"], "kind": "passive"}, "%s:effect:%d" % [passive["id"], effect_index], effects, trigger_effects, modifiers)
+	for tree_node: Dictionary in resolved_tree_nodes:
+		for effect_index: int in range((tree_node.get("effects", []) as Array).size()):
+			_add_static_effect(tree_node["effects"][effect_index], {"id": tree_node["id"], "name": tree_node["name"], "kind": "tree"}, "%s:effect:%d" % [tree_node["id"], effect_index], effects, trigger_effects, modifiers)
+	for mutation: Dictionary in resolved_mutations:
+		for required_mutation: Variant in mutation.get("requires", []):
+			if not mutation_ids.has(str(required_mutation)):
+				_add_issue(issues, "MUTATION_REQUIREMENT", "%s требует %s." % [str(mutation["name"]), str(required_mutation)], str(mutation["id"]))
+		for effect_index: int in range((mutation.get("effects", []) as Array).size()):
+			_add_static_effect(mutation["effects"][effect_index], {"id": mutation["id"], "name": mutation["name"], "kind": "mutation"}, "%s:effect:%d" % [mutation["id"], effect_index], effects, trigger_effects, modifiers)
 	var unique_ids: Array[String] = []
 	for item_value: Variant in equipment.values():
 		if item_value is ItemInstance:
@@ -160,7 +247,111 @@ func resolve_build(input: Dictionary) -> Dictionary:
 	var sheet: Dictionary = _stats.sheet_of(stat_results)
 	if implant_cost > float(sheet.get("neuralCapacity", 0.0)):
 		_add_issue(issues, "NEURAL_CAPACITY", "Импланты требуют %s нейроёмкости при лимите %s." % [implant_cost, sheet.get("neuralCapacity", 0.0)])
-	return _result(issues, attributes, equipment, sheet, stat_results, modifiers, effects, trigger_effects, drones, [main_weapon, sidearm])
+	var result: Dictionary = _result(issues, attributes, equipment, sheet, stat_results, modifiers, effects, trigger_effects, drones, [main_weapon, sidearm])
+	result["skills"] = resolved_skills
+	result["skillIds"] = skill_ids
+	result["passives"] = resolved_passives
+	result["passiveIds"] = passive_ids
+	result["treeNodes"] = resolved_tree_nodes
+	result["treeNodeIds"] = selected_tree_ids
+	result["mutationIds"] = mutation_ids
+	return result
+
+func _read_selection(input: Dictionary, key: String, issues: Array[Dictionary]) -> Array[String]:
+	var output: Array[String] = []
+	var raw: Variant = input.get(key, [])
+	if not raw is Array:
+		_add_issue(issues, "INVALID_SELECTION", "%s должен быть массивом." % key, key)
+		return output
+	var seen: Dictionary = {}
+	for value: Variant in raw:
+		if not value is String or str(value).is_empty():
+			_add_issue(issues, "INVALID_SELECTION", "В списке %s есть пустой или неверный ID." % key, key)
+			continue
+		var id: String = str(value)
+		if seen.has(id):
+			_add_issue(issues, "DUPLICATE_SELECTION", "Повторяется выбор %s." % id, id)
+		seen[id] = true
+		output.append(id)
+	return output
+
+func _skill_requirement_met(requirement: String, valid_templates: Dictionary) -> bool:
+	match requirement:
+		"MAIN_K":
+			return str(valid_templates.get("MAIN", {}).get("weapon", {}).get("type", "")) == "KINETIC"
+		"SIDEARM":
+			return bool(valid_templates.get("OFFHAND", {}).get("weapon", {}).get("sidearmOnly", false))
+		"DR_MED":
+			return _has_drone_role(valid_templates, "medic")
+		"DR_EMP":
+			return _has_drone_role(valid_templates, "emp")
+		"VIRUS":
+			return true
+	return false
+
+func _has_drone_role(valid_templates: Dictionary, role: String) -> bool:
+	for slot: String in ["DRONE_1", "DRONE_2"]:
+		if str(valid_templates.get(slot, {}).get("drone", {}).get("role", "")) == role:
+			return true
+	return false
+
+func _add_static_effect(effect: Dictionary, source: Dictionary, modifier_id: String, effects: Array[Dictionary], trigger_effects: Array[Dictionary], modifiers: Array[Dictionary]) -> void:
+	effects.append(effect.duplicate(true))
+	if str(effect.get("type", "")) == "trigger":
+		trigger_effects.append({"effect": effect.duplicate(true), "sourceId": source["id"], "sourceName": source["name"], "sourceKind": source["kind"]})
+	elif str(effect.get("type", "")) == "stat":
+		var extra: Dictionary = {"id": modifier_id}
+		for field: String in ["condition", "stackGroup", "synScalable", "note"]:
+			if effect.has(field):
+				extra[field] = effect[field]
+		modifiers.append(_stats.make_modifier(str(effect["stat"]), str(effect["op"]), float(effect["value"]), source, extra))
+
+func _tree_lock_reason(node_id: String, allocated: Array[String], available_points: int) -> String:
+	var node: Dictionary = _build_catalog.tree_nodes.get(node_id, {})
+	if node.is_empty():
+		return "Неизвестный узел"
+	if allocated.has(node_id):
+		return "Уже изучен"
+	if available_points <= 0:
+		return "Нет свободных очков"
+	var branch: String = str(node["branch"])
+	if branch == "X":
+		for requirement: Dictionary in node.get("requires", []):
+			if _branch_points(allocated, str(requirement["branch"])) < int(requirement["points"]):
+				return "Нужно %d очков в ветви %s" % [int(requirement["points"]), str(requirement["branch"])]
+		return ""
+	var tier: int = int(node["tier"])
+	var points: int = _branch_points(allocated, branch)
+	if tier == 2 and (points < 2 or not _has_branch_tier(allocated, branch, 1)):
+		return "Нужно ≥2 очков в ветви и один узел T1"
+	if tier == 3 and (points < 5 or not _has_branch_tier(allocated, branch, 2)):
+		return "Нужно ≥5 очков в ветви и один узел T2"
+	if tier == 4 and (points < 9 or not _has_branch_tier(allocated, branch, 3)):
+		return "Нужно ≥9 очков в ветви и один узел T3"
+	if bool(node["keystone"]) and _keystone_count(allocated) >= 2:
+		return "Достигнут лимит двух keystone"
+	return ""
+
+func _branch_points(allocated: Array[String], branch: String) -> int:
+	var total: int = 0
+	for node_id: String in allocated:
+		if str(_build_catalog.tree_nodes.get(node_id, {}).get("branch", "")) == branch:
+			total += 1
+	return total
+
+func _has_branch_tier(allocated: Array[String], branch: String, tier: int) -> bool:
+	for node_id: String in allocated:
+		var node: Dictionary = _build_catalog.tree_nodes.get(node_id, {})
+		if str(node.get("branch", "")) == branch and int(node.get("tier", 0)) == tier:
+			return true
+	return false
+
+func _keystone_count(allocated: Array[String]) -> int:
+	var total: int = 0
+	for node_id: String in allocated:
+		if bool(_build_catalog.tree_nodes.get(node_id, {}).get("keystone", false)):
+			total += 1
+	return total
 
 func _validate_attributes(input: Dictionary, attributes: Dictionary, issues: Array[Dictionary]) -> void:
 	var earned: Variant = input.get("attributePointsEarned", 0)

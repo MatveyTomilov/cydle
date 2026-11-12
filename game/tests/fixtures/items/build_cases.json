@@ -11,6 +11,17 @@
         "SYN": 5
       },
       "attributePointsEarned": 3,
+      "skillIds": [
+        "SK_BURST"
+      ],
+      "passiveIds": [
+        "PP_ACCURACY"
+      ],
+      "treeNodeIds": [
+        "K1A"
+      ],
+      "treePointsEarned": 1,
+      "mutationIds": [],
       "equipment": {
         "MAIN": {
           "itemId": "it:build-main:PISTOL_K1",
@@ -45,7 +56,7 @@
           "energyRes": 0,
           "digitalRes": 0,
           "evasion": 21.5,
-          "accuracy": 105.3,
+          "accuracy": 115.3,
           "critChance": 5,
           "critMultiplier": 1.5,
           "maxEnergy": 100,
@@ -54,7 +65,7 @@
           "heatCooling": 5,
           "neuralCapacity": 100,
           "shieldRegen": 0,
-          "kineticDamage": 4.0000000000000036,
+          "kineticDamage": 10.000000000000009,
           "energyDamage": 0,
           "digitalDamage": 0,
           "mainDamage": 0,
@@ -197,8 +208,119 @@
             "stat": "accuracy",
             "op": "FLAT",
             "value": 5
+          },
+          {
+            "id": "PP_ACCURACY:effect:0",
+            "sourceId": "PP_ACCURACY",
+            "sourceName": "Протокол наведения",
+            "sourceKind": "passive",
+            "stat": "accuracy",
+            "op": "FLAT",
+            "value": 10
+          },
+          {
+            "id": "K1A:effect:0",
+            "sourceId": "K1A",
+            "sourceName": "Калибровка ствола",
+            "sourceKind": "tree",
+            "stat": "kineticDamage",
+            "op": "INCREASED",
+            "value": 6
           }
-        ]
+        ],
+        "effects": [
+          {
+            "type": "stat",
+            "stat": "accuracy",
+            "op": "FLAT",
+            "value": 5
+          },
+          {
+            "type": "stat",
+            "stat": "accuracy",
+            "op": "FLAT",
+            "value": 10
+          },
+          {
+            "type": "stat",
+            "stat": "kineticDamage",
+            "op": "INCREASED",
+            "value": 6
+          }
+        ],
+        "triggerEffects": [],
+        "skills": [
+          {
+            "id": "SK_BURST",
+            "name": "Очередь",
+            "channel": "main",
+            "tags": [
+              "K",
+              "DIRECT",
+              "MULTI"
+            ],
+            "coefficient": 0.45,
+            "hits": 3,
+            "hitCoefficient": 0.45,
+            "energyCost": 0,
+            "heatDelta": 2,
+            "windupMs": 180,
+            "recoveryMs": 220,
+            "cooldownMs": 900,
+            "targetMode": "nearest",
+            "procWeight": 0.35,
+            "basis": "MAIN_K",
+            "requires": [
+              "MAIN_K"
+            ],
+            "interruptible": false,
+            "desc": "3 пакета по 0.45 основного K-урона, procWeight 0.35 на пакет."
+          }
+        ],
+        "skillIds": [
+          "SK_BURST"
+        ],
+        "passives": [
+          {
+            "id": "PP_ACCURACY",
+            "name": "Протокол наведения",
+            "effects": [
+              {
+                "type": "stat",
+                "stat": "accuracy",
+                "op": "FLAT",
+                "value": 10
+              }
+            ],
+            "desc": "+10 точности."
+          }
+        ],
+        "passiveIds": [
+          "PP_ACCURACY"
+        ],
+        "treeNodes": [
+          {
+            "id": "K1A",
+            "branch": "K",
+            "tier": 1,
+            "pos": "A",
+            "name": "Калибровка ствола",
+            "keystone": false,
+            "effects": [
+              {
+                "type": "stat",
+                "stat": "kineticDamage",
+                "op": "INCREASED",
+                "value": 6
+              }
+            ],
+            "desc": "+6% кинетического урона"
+          }
+        ],
+        "treeNodeIds": [
+          "K1A"
+        ],
+        "mutationIds": []
       }
     },
     {
@@ -212,6 +334,22 @@
         "SYN": 8
       },
       "attributePointsEarned": 5,
+      "skillIds": [
+        "SK_PLASMA",
+        "SK_DRONE_REPAIR"
+      ],
+      "passiveIds": [
+        "PP_DRONE"
+      ],
+      "treeNodeIds": [
+        "D1A",
+        "D1B",
+        "D2A"
+      ],
+      "treePointsEarned": 3,
+      "mutationIds": [
+        "MUT_HEAT"
+      ],
       "equipment": {
         "MAIN": {
           "itemId": "it:build-main-2:PLASMA_E1",
@@ -342,7 +480,7 @@
           "maxEnergy": 100,
           "energyRegen": 8,
           "maxHeat": 100,
-          "heatCooling": 5,
+          "heatCooling": 3,
           "neuralCapacity": 106,
           "shieldRegen": 0,
           "kineticDamage": 0,
@@ -350,7 +488,7 @@
           "digitalDamage": 0,
           "mainDamage": 0,
           "allDamage": 0,
-          "droneDamage": 5.000000000000004,
+          "droneDamage": 25,
           "statusDamage": 0,
           "virusDamage": 0,
           "bleedDamage": 0,
@@ -382,12 +520,12 @@
           "incomingDigital": 1,
           "incomingShield": 1,
           "techPower": 121.35488758496912,
-          "droneHP": 4.0000000000000036,
+          "droneHP": 14.000000000000012,
           "droneShield": 0,
           "droneAccuracy": 0,
           "droneAttackSpeed": 0,
           "repairPower": 2.0000000000000018,
-          "droneJamDurationLess": 0,
+          "droneJamDurationLess": 20,
           "procMultiplier": 1,
           "extractionChance": 0,
           "bountyCurrency": 0,
@@ -571,7 +709,309 @@
             "value": 95.08859657561467,
             "synScalable": true,
             "note": "×D(T)"
+          },
+          {
+            "id": "PP_DRONE:effect:0",
+            "sourceId": "PP_DRONE",
+            "sourceName": "Дроновый протокол",
+            "sourceKind": "passive",
+            "stat": "droneDamage",
+            "op": "INCREASED",
+            "value": 12
+          },
+          {
+            "id": "D1A:effect:0",
+            "sourceId": "D1A",
+            "sourceName": "Боевые подпрограммы",
+            "sourceKind": "tree",
+            "stat": "droneDamage",
+            "op": "INCREASED",
+            "value": 8
+          },
+          {
+            "id": "D1B:effect:0",
+            "sourceId": "D1B",
+            "sourceName": "Усиленный каркас",
+            "sourceKind": "tree",
+            "stat": "droneHP",
+            "op": "INCREASED",
+            "value": 10
+          },
+          {
+            "id": "D2A:effect:0",
+            "sourceId": "D2A",
+            "sourceName": "Помехоустойчивость",
+            "sourceKind": "tree",
+            "stat": "droneJamDurationLess",
+            "op": "FLAT",
+            "value": 20
+          },
+          {
+            "id": "MUT_HEAT:effect:0",
+            "sourceId": "MUT_HEAT",
+            "sourceName": "Форсаж нагрева",
+            "sourceKind": "mutation",
+            "stat": "moreEnergy",
+            "op": "MORE",
+            "value": 1.15,
+            "condition": {
+              "kind": "heatAtLeast",
+              "value": 70
+            }
+          },
+          {
+            "id": "MUT_HEAT:effect:1",
+            "sourceId": "MUT_HEAT",
+            "sourceName": "Форсаж нагрева",
+            "sourceKind": "mutation",
+            "stat": "heatCooling",
+            "op": "FLAT",
+            "value": -2
           }
+        ],
+        "effects": [
+          {
+            "type": "stat",
+            "stat": "critChance",
+            "op": "FLAT",
+            "value": 2.97,
+            "note": "Шанс крита T2"
+          },
+          {
+            "type": "stat",
+            "stat": "energyPen",
+            "op": "FLAT",
+            "value": 2.98,
+            "note": "Пробитие энергии T2"
+          },
+          {
+            "type": "stat",
+            "stat": "critMultiplier",
+            "op": "FLAT",
+            "value": 11.75,
+            "note": "Крит. множитель T2"
+          },
+          {
+            "type": "stat",
+            "stat": "attackSpeed",
+            "op": "INCREASED",
+            "value": -10
+          },
+          {
+            "type": "stat",
+            "stat": "armor",
+            "op": "FLAT",
+            "value": 4,
+            "note": "Бронепластины T2"
+          },
+          {
+            "type": "stat",
+            "stat": "maxHP",
+            "op": "FLAT",
+            "value": 60,
+            "note": "×D(T)",
+            "synScalable": true
+          },
+          {
+            "type": "trigger",
+            "id": "DR_MED_heal",
+            "event": "PERIODIC",
+            "periodMs": 10000,
+            "action": {
+              "kind": "restoreShield",
+              "amount": 18
+            },
+            "desc": "18 щита оператору каждые 10 секунд."
+          },
+          {
+            "type": "stat",
+            "stat": "droneDamage",
+            "op": "INCREASED",
+            "value": 12
+          },
+          {
+            "type": "stat",
+            "stat": "droneDamage",
+            "op": "INCREASED",
+            "value": 8
+          },
+          {
+            "type": "stat",
+            "stat": "droneHP",
+            "op": "INCREASED",
+            "value": 10
+          },
+          {
+            "type": "stat",
+            "stat": "droneJamDurationLess",
+            "op": "FLAT",
+            "value": 20
+          },
+          {
+            "type": "stat",
+            "stat": "moreEnergy",
+            "op": "MORE",
+            "value": 1.15,
+            "condition": {
+              "kind": "heatAtLeast",
+              "value": 70
+            }
+          },
+          {
+            "type": "stat",
+            "stat": "heatCooling",
+            "op": "FLAT",
+            "value": -2
+          }
+        ],
+        "triggerEffects": [
+          {
+            "effect": {
+              "type": "trigger",
+              "id": "DR_MED_heal",
+              "event": "PERIODIC",
+              "periodMs": 10000,
+              "action": {
+                "kind": "restoreShield",
+                "amount": 18
+              },
+              "desc": "18 щита оператору каждые 10 секунд."
+            },
+            "sourceId": "it:build-drone:DR_MED",
+            "sourceName": "«Санитар»",
+            "sourceKind": "item"
+          }
+        ],
+        "skills": [
+          {
+            "id": "SK_PLASMA",
+            "name": "Плазменный",
+            "channel": "main",
+            "tags": [
+              "E",
+              "TECH",
+              "DIRECT"
+            ],
+            "coefficient": 1.45,
+            "hits": 1,
+            "energyCost": 16,
+            "heatDelta": 12,
+            "windupMs": 260,
+            "recoveryMs": 320,
+            "cooldownMs": 3000,
+            "targetMode": "nearest",
+            "procWeight": 1,
+            "basis": "TECH_E",
+            "interruptible": false,
+            "desc": "1.45 TechPower энергетического урона."
+          },
+          {
+            "id": "SK_DRONE_REPAIR",
+            "name": "Техподдержка",
+            "channel": "droneA",
+            "tags": [
+              "DRONE"
+            ],
+            "coefficient": 0,
+            "hits": 0,
+            "energyCost": 0,
+            "heatDelta": 0,
+            "windupMs": 200,
+            "recoveryMs": 0,
+            "cooldownMs": 15000,
+            "targetMode": "self",
+            "procWeight": 0,
+            "basis": "NONE",
+            "special": "DRONE_REPAIR",
+            "requires": [
+              "DR_MED"
+            ],
+            "interruptible": false,
+            "desc": "«Санитар» лечит себя на 25 HP и даёт оператору +20 щита."
+          }
+        ],
+        "skillIds": [
+          "SK_PLASMA",
+          "SK_DRONE_REPAIR"
+        ],
+        "passives": [
+          {
+            "id": "PP_DRONE",
+            "name": "Дроновый протокол",
+            "effects": [
+              {
+                "type": "stat",
+                "stat": "droneDamage",
+                "op": "INCREASED",
+                "value": 12
+              }
+            ],
+            "desc": "+12% INCREASED урона дронов."
+          }
+        ],
+        "passiveIds": [
+          "PP_DRONE"
+        ],
+        "treeNodes": [
+          {
+            "id": "D1A",
+            "branch": "D",
+            "tier": 1,
+            "pos": "A",
+            "name": "Боевые подпрограммы",
+            "keystone": false,
+            "effects": [
+              {
+                "type": "stat",
+                "stat": "droneDamage",
+                "op": "INCREASED",
+                "value": 8
+              }
+            ],
+            "desc": "+8% урона дронов"
+          },
+          {
+            "id": "D1B",
+            "branch": "D",
+            "tier": 1,
+            "pos": "B",
+            "name": "Усиленный каркас",
+            "keystone": false,
+            "effects": [
+              {
+                "type": "stat",
+                "stat": "droneHP",
+                "op": "INCREASED",
+                "value": 10
+              }
+            ],
+            "desc": "+10% HP дронов"
+          },
+          {
+            "id": "D2A",
+            "branch": "D",
+            "tier": 2,
+            "pos": "A",
+            "name": "Помехоустойчивость",
+            "keystone": false,
+            "effects": [
+              {
+                "type": "stat",
+                "stat": "droneJamDurationLess",
+                "op": "FLAT",
+                "value": 20
+              }
+            ],
+            "desc": "Длительность DRONE_JAM −20%"
+          }
+        ],
+        "treeNodeIds": [
+          "D1A",
+          "D1B",
+          "D2A"
+        ],
+        "mutationIds": [
+          "MUT_HEAT"
         ]
       }
     }

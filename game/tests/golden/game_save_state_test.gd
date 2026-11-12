@@ -15,7 +15,7 @@ func run(_tree: SceneTree) -> bool:
 	if not check(state != null, "game_save_state: parsed payload did not produce a typed state"):
 		return false
 	var serialized: Dictionary = state.call("to_payload")
-	check(serialized == payload, "game_save_state: typed round trip changed the payload")
+	check(_json_equivalent(serialized, payload), "game_save_state: typed round trip changed the payload")
 	var repository: Object = load("res://scripts/core/persistence/save_repository.gd").new()
 	var test_directory: String = "user://game_save_test_%d" % Time.get_ticks_usec()
 	repository.call("configure_directory", test_directory)
@@ -77,39 +77,11 @@ func run(_tree: SceneTree) -> bool:
 	return failure_count == 0
 
 func _valid_payload() -> Dictionary:
-	return {
-		"schemaVersion": 1,
-		"balanceVersion": "1.0.0",
-		"gameVersion": "1.0.0",
-		"saveId": "save-native-test",
-		"createdAt": 1000,
-		"updatedAt": 1000,
-		"revision": 1,
-		"meta": {
-			"operator": {"level": 1, "xp": 0, "attributes": {"POW": 5, "REF": 5, "INT": 5, "ENG": 5, "SYN": 5}, "attributePoints": 0, "treePoints": 0},
-			"tutorial": {"firstSectorCompleted": false, "starterPrototypeSecured": false},
-			"reputation": {"F_VANTA": 0, "F_RUST": 0, "F_CHOIR": 0, "F_ECHO": 0},
-			"campaignFlags": [],
-			"transport": {"fuel": 24.0, "fuelMax": 24.0, "hull": 100.0, "hullMax": 100.0, "cargoCapacity": 20.0},
-			"protectedBank": {"CREDITS": 120.0, "SCRAP": 30.0, "DATA": 20.0},
-			"unsecuredWallet": {"CREDITS": 0.0, "SCRAP": 0.0, "DATA": 0.0},
-			"inventory": [],
-			"equipment": {},
-			"garage": {"WORKSHOP": 1, "NEUROLAB": 1, "SERVER": 1, "HANGAR": 1, "MARKET": 1, "INTEL": 1, "GARAGE_MED": 1, "CALIBRATOR": 1},
-			"unlockedForpost": 0,
-			"maxSectorCleared": 0,
-			"unlockedBiomes": ["B01"],
-			"skillIds": [],
-			"passiveIds": [],
-			"treeNodeIds": [],
-			"unlockedImplantSlots": 4,
-			"unlockedDroneSlots": 1,
-			"tactics": [{"id": "DEFAULT", "name": "Тактика", "rules": []}],
-			"activeTacticId": "DEFAULT",
-			"autopilotProfiles": [{"id": "BALANCED", "name": "Сбалансированный", "startDepth": 1, "enabled": false}],
-		},
-		"run": null,
-	}
+	var created: Dictionary = GameSaveFactory.new().create_initial_payload("save-native-test", 1000)
+	if not bool(created.get("ok", false)):
+		push_error("game_save_state: starter factory failed: %s" % str(created.get("error", "")))
+		return {}
+	return created["payload"]
 
 func _valid_run() -> Dictionary:
 	return {

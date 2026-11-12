@@ -7,6 +7,10 @@ func run(_tree: SceneTree) -> bool:
 	var resolver_script: Script = load(RESOLVER_PATH) as Script
 	if not check(resolver_script != null, "build_resolver: implementation is missing"):
 		return false
+	var definitions: Object = BuildCatalog.new()
+	var definitions_result: Dictionary = definitions.call("load_catalog")
+	check(bool(definitions_result.get("ok", false)), "build_resolver: exported skill/passive/tree/mutation data failed validation")
+	check(definitions_result.get("counts", {}) == {"skills": 24, "passives": 10, "treeNodes": 100, "mutations": 12}, "build_resolver: native definition counts differ from the TypeScript source")
 	var file: FileAccess = FileAccess.open(FIXTURE_PATH, FileAccess.READ)
 	if not check(file != null, "build_resolver: TypeScript oracle fixtures are missing"):
 		return false
@@ -21,11 +25,20 @@ func run(_tree: SceneTree) -> bool:
 			var item: ItemInstance = ItemInstance.new()
 			check(item.instantiate_from_dictionary(fixture["equipment"][slot]), "build_resolver: fixture item failed typed parsing")
 			equipment[str(slot)] = item
-		var input: Dictionary = {"attributes": fixture["attributes"], "attributePointsEarned": fixture["attributePointsEarned"], "equipment": equipment}
+		var input: Dictionary = {
+			"attributes": fixture["attributes"],
+			"attributePointsEarned": fixture["attributePointsEarned"],
+			"skillIds": fixture.get("skillIds", []),
+			"passiveIds": fixture.get("passiveIds", []),
+			"treeNodeIds": fixture.get("treeNodeIds", []),
+			"treePointsEarned": fixture.get("treePointsEarned", 0),
+			"mutationIds": fixture.get("mutationIds", []),
+			"equipment": equipment,
+		}
 		var result: Dictionary = resolver.call("resolve_build", input)
 		var expected: Dictionary = fixture["expected"]
 		check(_json_equivalent(result["valid"], expected["valid"]), "build_resolver: %s legality differs from oracle" % str(fixture["name"]))
-		for field: String in ["attributes", "stats", "mainWeapon", "sidearm", "drones", "modifiers"]:
+		for field: String in ["attributes", "stats", "mainWeapon", "sidearm", "drones", "modifiers", "effects", "triggerEffects", "skills", "skillIds", "passives", "passiveIds", "treeNodes", "treeNodeIds", "mutationIds"]:
 			if expected.has(field):
 				if not _json_equivalent(result[field], expected[field]):
 					print("DIFF ", fixture["name"], " ", field)
