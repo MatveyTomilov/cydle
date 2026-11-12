@@ -8,6 +8,7 @@ func run(_tree: SceneTree) -> bool:
 	_run_replay("plasma_skill_replay", "SK_PLASMA")
 	_run_reaction_shield()
 	_run_reaction_emp_interrupt()
+	_run_target_scoped_cast_condition()
 	_run_healer_target_selection()
 	_run_enemy_telegraphed_attack()
 	_run_enemy_death_burst()
@@ -110,6 +111,30 @@ func _run_healer_target_selection() -> void:
 	check(simulator._pick_rule_target(state, operator, "healer") == healer, "tactics_target: healer selector did not prioritize a live healer")
 	healer.alive = false
 	check(simulator._pick_rule_target(state, operator, "healer") == boss, "tactics_target: unavailable healer did not fall back to the first stable enemy")
+
+func _run_target_scoped_cast_condition() -> void:
+	var state: CombatState = CombatState.new()
+	var operator: CombatActorState = CombatActorState.new()
+	operator.id = "operator"
+	operator.side = "player"
+	var boss: CombatActorState = CombatActorState.new()
+	boss.id = "enemy:0"
+	boss.side = "enemy"
+	boss.is_boss = true
+	var healer: CombatActorState = CombatActorState.new()
+	healer.id = "enemy:1"
+	healer.side = "enemy"
+	healer.is_healer = true
+	var cast: Dictionary = {"actionId": "enemy:test-cast", "resolveAt": 1000.0, "endAt": 1200.0, "interruptible": true}
+	healer.cast = cast.duplicate(true)
+	state.operator = operator
+	state.enemies = [boss, healer]
+	var simulator: CombatSimulator = CombatSimulator.new()
+	var condition: Dictionary = {"kind": "enemyCasting", "interruptibleOnly": true}
+	check(not simulator._eval_tactic_condition(state, operator, condition, boss), "tactics_condition: boss scoped cast condition matched a healer cast")
+	check(simulator._eval_tactic_condition(state, operator, condition, healer), "tactics_condition: healer scoped cast condition missed its cast")
+	boss.cast = cast.duplicate(true)
+	check(simulator._eval_tactic_condition(state, operator, condition, boss), "tactics_condition: boss scoped cast condition missed the boss cast")
 
 func _run_enemy_telegraphed_attack() -> void:
 	var meta: Dictionary = _read_dictionary(SAVE_FIXTURE).get("meta", {})

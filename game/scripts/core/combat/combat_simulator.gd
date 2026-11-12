@@ -616,6 +616,8 @@ func _eval_tactic_condition(state: CombatState, actor: CombatActorState, conditi
 		"enemiesAtLeast": return living.size() >= int(value)
 		"enemiesAtMost": return living.size() <= int(value)
 		"enemyCasting":
+			if target != null:
+				return target.cast is Dictionary and (not bool(condition.get("interruptibleOnly", false)) or bool(target.cast.get("interruptible", false)))
 			for enemy: CombatActorState in living:
 				if enemy.cast != null and (not bool(condition.get("interruptibleOnly", false)) or bool(enemy.cast.get("interruptible", false))):
 					return true

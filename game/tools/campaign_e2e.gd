@@ -236,11 +236,18 @@ func _prepare_garage(session: GameSession) -> bool:
 			var candidate_type: String = str(template.get("weapon", {}).get("type", ""))
 			var is_compatible_kinetic: bool = slot == "MAIN" and candidate_type == "KINETIC" and current_weapon_type != "KINETIC" and _item_rank(item) >= current_rank - 15
 			var preferred_rifle: bool = slot == "MAIN" and str(template.get("id", "")) == "RIFLE_K2" and int(item.get("techLevel", 1)) >= 3 and current_template_id != "RIFLE_K2" and _item_rank(item) >= current_rank - 15
+			var preferred_heavy_armor: bool = slot == "ARMOR" and str(template.get("id", "")) == "ARM_HEAVY" and current_template_id != "ARM_HEAVY" and int(item.get("techLevel", 1)) >= maxi(1, current_tech_level - 1)
+			var preserve_heavy_armor: bool = slot == "ARMOR" and current_template_id == "ARM_HEAVY" and str(template.get("id", "")) != "ARM_HEAVY" and _item_rank(item) <= current_rank + 100
 			var preserve_test_rifle: bool = slot == "MAIN" and current_template_id == "RIFLE_K2" and current_tech_level >= 3 and str(template.get("id", "")) != "RIFLE_K2" and _item_rank(item) <= current_rank + 15
-			var ranked_upgrade: bool = _item_rank(item) > current_rank and not preserve_test_rifle
-			if str(template.get("category", "")) == expected_category and (ranked_upgrade or is_compatible_kinetic or preferred_rifle):
+			var ranked_upgrade: bool = _item_rank(item) > current_rank and not preserve_test_rifle and not preserve_heavy_armor
+			if str(template.get("category", "")) == expected_category and (ranked_upgrade or is_compatible_kinetic or preferred_rifle or preferred_heavy_armor):
 				candidates.append(item)
 		candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+			if slot == "ARMOR":
+				var a_heavy: bool = str(catalog.get_template(str(a.get("templateId", ""))).get("id", "")) == "ARM_HEAVY"
+				var b_heavy: bool = str(catalog.get_template(str(b.get("templateId", ""))).get("id", "")) == "ARM_HEAVY"
+				if a_heavy != b_heavy:
+					return a_heavy
 			if slot == "MAIN":
 				var a_template: Dictionary = catalog.get_template(str(a.get("templateId", "")))
 				var b_template: Dictionary = catalog.get_template(str(b.get("templateId", "")))
@@ -268,7 +275,7 @@ func _prepare_garage(session: GameSession) -> bool:
 				break
 			if slot == "MAIN":
 				print("E2E main candidate rejected template=%s T%d rarity=%s error=%s" % [str(item.get("templateId", "")), int(item.get("techLevel", 1)), str(item.get("rarity", "COMMON")), session.last_error])
-	var campaign_tree: Array[String] = ["S1A", "S1B", "S2C", "S1C", "K1A", "K1B", "K2A", "K1C", "K1D", "K3A"]
+	var campaign_tree: Array[String] = ["S1A", "S1B", "S2C", "S1C", "K1A", "K1B", "K2A", "K1C", "K2B", "K3A"]
 	for node_id: String in session.state.meta.tree_node_ids.duplicate():
 		if session.state.meta.tree_node_ids.has(node_id) and not campaign_tree.has(node_id) and not session.set_tree_node_allocated(node_id, false):
 			print("E2E garage rejected: tree removal %s error=%s" % [node_id, session.last_error])
@@ -291,8 +298,8 @@ func _prepare_garage(session: GameSession) -> bool:
 		equipped_ids.append(str(item_id))
 	for item_id: String in equipped_ids:
 		var item: Dictionary = session.state.meta.inventory.filter(func(value: Dictionary) -> bool: return str(value.get("itemId", "")) == item_id)[0]
-		if float(item.get("durability", 100.0)) < 100.0:
-			session.repair_item(item_id)
+		if float(item.get("durability", 100.0)) < 100.0 and not _repair_with_secured_scrap(session, item_id):
+			print("E2E garage could not repair %s: %s" % [item_id, session.last_error])
 	if not _prepare_boss_tactic(session):
 		print("E2E garage rejected: final tactic setup error=%s skills=%s rules=%s" % [session.last_error, str(session.state.meta.skill_ids), str(session.state.meta.tactics)])
 		return false
@@ -305,6 +312,51 @@ func _prepare_garage(session: GameSession) -> bool:
 			print("E2E garage build level=%d POW=%d main=%s T%d rank=%d" % [session.state.meta.operator.level, int(session.state.meta.operator.attributes.get("POW", 5)), str(item.get("templateId", "")), int(item.get("techLevel", 1)), _item_rank(item)])
 			break
 	return bool(build.get("valid", false))
+
+func _repair_with_secured_scrap(session: GameSession, item_id: String) -> bool:
+	while not session.repair_item(item_id):
+		if not session.last_error.contains("SCRAP"):
+			return false
+		var dismantle_id: String = _lowest_safe_dismantle_candidate(session)
+		if dismantle_id.is_empty():
+			return false
+		var quote: Dictionary = session.item_disposal_quote(dismantle_id, "DISMANTLE")
+		if not bool(quote.get("valid", false)) or int(quote.get("scrap", 0)) <= 0:
+			return false
+		if not session.dismantle_item(dismantle_id):
+			return false
+		print("E2E garage dismantled low-rank duplicate %s for %d SCRAP" % [dismantle_id, int(quote.get("scrap", 0))])
+	return true
+
+func _lowest_safe_dismantle_candidate(session: GameSession) -> String:
+	var catalog: ItemCatalog = ItemCatalog.new()
+	if not bool(catalog.load_catalog().get("ok", false)):
+		return ""
+	var equipped_ids: Array[String] = []
+	for value: Variant in session.state.meta.equipment.values():
+		equipped_ids.append(str(value))
+	var best_by_category: Dictionary = {}
+	for item: Dictionary in session.state.meta.inventory:
+		if not bool(item.get("secured", false)):
+			continue
+		var template: Dictionary = catalog.get_template(str(item.get("templateId", "")))
+		var category: String = str(template.get("category", ""))
+		var rank: int = _item_rank(item)
+		best_by_category[category] = maxi(int(best_by_category.get(category, -1)), rank)
+	var candidates: Array[Dictionary] = []
+	for item: Dictionary in session.state.meta.inventory:
+		var item_id: String = str(item.get("itemId", ""))
+		if not bool(item.get("secured", false)) or equipped_ids.has(item_id):
+			continue
+		var template: Dictionary = catalog.get_template(str(item.get("templateId", "")))
+		var category: String = str(template.get("category", ""))
+		if _item_rank(item) >= int(best_by_category.get(category, _item_rank(item))):
+			continue
+		var quote: Dictionary = session.item_disposal_quote(item_id, "DISMANTLE")
+		if bool(quote.get("valid", false)) and int(quote.get("scrap", 0)) > 0:
+			candidates.append(item)
+	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return _item_rank(a) < _item_rank(b))
+	return str(candidates[0].get("itemId", "")) if not candidates.is_empty() else ""
 
 func _prepare_boss_tactic(session: GameSession) -> bool:
 	var main_id: String = str(session.state.meta.equipment.get("MAIN", ""))
@@ -320,20 +372,23 @@ func _prepare_boss_tactic(session: GameSession) -> bool:
 		var auto_skill_ok: bool = session.set_tactic_rule_skill("starter-burst", "AUTO")
 		var auto_condition_ok: bool = session.set_tactic_rule_condition("starter-burst", {"kind": "always"})
 		return auto_skill_ok and auto_condition_ok
-	if session.state.meta.skill_ids.has("SK_GUARD") and not session.state.meta.skill_ids.has("SK_SHIELD"):
+	if session.state.meta.skill_ids.has("SK_SHIELD") and not session.state.meta.skill_ids.has("SK_HEAL"):
+		if not session.set_skill_equipped("SK_SHIELD", false):
+			return false
+	if session.state.meta.skill_ids.has("SK_GUARD") and not session.state.meta.skill_ids.has("SK_HEAL"):
 		if not session.set_skill_equipped("SK_GUARD", false):
 			return false
-	if not session.state.meta.skill_ids.has("SK_SHIELD") and not session.set_skill_equipped("SK_SHIELD", true):
+	if not session.state.meta.skill_ids.has("SK_HEAL") and not session.set_skill_equipped("SK_HEAL", true):
 		return false
-	if session.state.meta.skill_ids.has("SK_HEAL") and not session.state.meta.skill_ids.has("SK_EMP"):
-		if not session.set_skill_equipped("SK_HEAL", false):
+	if session.state.meta.skill_ids.has("SK_SHIELD"):
+		if not session.set_skill_equipped("SK_SHIELD", false):
 			return false
 	if not session.state.meta.skill_ids.has("SK_EMP") and not session.set_skill_equipped("SK_EMP", true):
 		return false
 	for starter_skill: String in ["SK_BURST"]:
 		if not session.state.meta.skill_ids.has(starter_skill) and not session.set_skill_equipped(starter_skill, true):
 			return false
-	return session.set_tactic_rule_skill("starter-shield", "SK_SHIELD") and session.set_tactic_rule_target("starter-shield", "self") and session.set_tactic_rule_condition("starter-shield", {"kind": "hpBelow", "value": 0.75}) and session.set_tactic_rule_skill("starter-emp", "SK_EMP") and session.set_tactic_rule_target("starter-emp", "imminentCast") and session.set_tactic_rule_condition("starter-emp", {"kind": "enemyCasting", "interruptibleOnly": true}) and session.set_tactic_rule_skill("starter-burst", "SK_BURST") and session.set_tactic_rule_target("starter-burst", "healer") and session.set_tactic_rule_condition("starter-burst", {"kind": "enemiesAtLeast", "value": 2})
+	return session.set_tactic_rule_skill("starter-shield", "SK_HEAL") and session.set_tactic_rule_target("starter-shield", "self") and session.set_tactic_rule_condition("starter-shield", {"kind": "hpBelow", "value": 0.75}) and session.set_tactic_rule_skill("starter-emp", "SK_EMP") and session.set_tactic_rule_target("starter-emp", "boss") and session.set_tactic_rule_condition("starter-emp", {"kind": "enemyCasting", "interruptibleOnly": true}) and session.set_tactic_rule_skill("starter-burst", "SK_BURST") and session.set_tactic_rule_target("starter-burst", "healer") and session.set_tactic_rule_condition("starter-burst", {"kind": "always"})
 
 func _item_rank(item: Dictionary) -> int:
 	var rarity_order: Dictionary = {"COMMON": 0, "MODIFIED": 1, "RARE": 2, "LEGENDARY": 3, "UNIQUE": 4}

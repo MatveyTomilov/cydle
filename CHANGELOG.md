@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — targeted boss reactions and d4 campaign win
+
+- Tactic condition `enemyCasting` now scopes to the selected target when one exists; untargeted rules retain group-wide behavior. This fixes boss tactics that previously spent EMP on a healer cast before the boss telegraph. Added a regression covering simultaneous boss/healer targets.
+- The campaign E2E profile now uses the existing K3A→ARMOR_BREAK / K2B damage synergy, heavy armor, a healing reaction, boss-targeted EMP and healer-selecting Burst. The real shared-engine d4 run defeated BOSS_A in 27.2 s, killed E09 and interrupted both rail casts; d4 rewards persisted and an initial d5–d7 pass secured the pre-boss d8 farm. The driver is replaying d5–d7 before continuing to d8. Full campaign completion remains unverified.
+- The isolated diagnostic harness can fund repairs by dismantling secured unequipped duplicates and preserves its heavy armor build. No game balance values changed.
+- Godot 4.7.2 editor import passed; 22 Godot scripts / 87,504 assertions / 0 failures; TypeScript Vitest 206/206; typecheck, production build and `git diff --check` passed. Windows export has not been rerun.
+
 ## Unreleased — tactic thresholds and K3A proc-weight parity
 
 - Corrected the new-game starter shield trigger from invalid whole-percent `45` to the native 0–1 fraction `0.45` in Godot and the TypeScript save oracle. The tactic editor now constrains fractional HP/shield thresholds to 0–1 and displays older whole-percent thresholds as normalized fractions; the combat simulator interprets historical values such as `45` as 45%.
