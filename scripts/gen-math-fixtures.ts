@@ -257,7 +257,7 @@ for (const [b, r] of [[1000, 25], [100, 0], [5000, 80], [200, -50]] as const) fo
 for (const [v, lo, hi] of [[5, 0, 10], [-5, 0, 10], [15, 0, 10], [0.5, 0, 1]] as const) formulaCases.push({ fn: 'clamp_value', args: [v, lo, hi], expected: F.clamp(v, lo, hi) });
 for (const [s, n, z] of [[7, 10, 1.96], [0, 0, 1.96], [10, 10, 1.96], [3, 20, 2.576]] as const) { const r = F.wilsonInterval(s, n, z); formulaCases.push({ fn: 'wilson_interval', args: [s, n, z], expected: r }); }
 for (const vals of [[9, 1, 5, 3], [1], [2, 4], []]) formulaCases.push({ fn: 'median', args: [vals], expected: F.median(vals) });
-for (const [vals, q] of [[[0, 10, 20], 0.25], [[0, 10, 20], 0.5], [[5], 0.9], [[], 0.5]] as const) formulaCases.push({ fn: 'quantile', args: [vals, q], expected: F.quantile(vals as number[], q) });
+for (const [vals, q] of [[[0, 10, 20], 0.25], [[0, 10, 20], 0.5], [[5], 0.9], [[], 0.5]] as const) formulaCases.push({ fn: 'quantile', args: [vals, q], expected: F.quantile(Array.from(vals), q) });
 for (const vals of [[2, 4, 8], [1], []]) formulaCases.push({ fn: 'mean', args: [vals], expected: F.mean(vals) });
 
 /* ---------------- Damage cases ---------------- */

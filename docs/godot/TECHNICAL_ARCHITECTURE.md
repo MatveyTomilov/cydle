@@ -1,6 +1,6 @@
 # CYDLE Godot Technical Architecture
 
-**Status:** approved project direction; the Godot implementation has not started.
+**Status:** approved project direction; native foundations are implemented, but no playable gameplay loop is connected yet.
 **Target:** standalone Windows game, with an architecture that can be exported to Steam and used on Steam Deck.
 **Reviewed:** 2026-11-12.
 

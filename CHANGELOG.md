@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added a native asset-manifest validator and a Windows GitHub Actions workflow for Godot import/tests/export plus the frozen reference checks.
+- Added root agent instructions for the Godot-only product boundary, protected branches, deterministic core, asset provenance, and local verification commands.
+- Fixed TypeScript 5.9 readonly-array typing in the math fixture generator without changing fixture values.
+- Corrected the final planned audio row in the asset manifest so its CSV fields align with the manifest header.
 - Enabled EV05's elite contract. Its RARE reward remains pending through ordinary combat and is granted exactly once at the first later ELITE.
 - Added tests for EV05 event eligibility, persistence through an ordinary combat, guaranteed RARE elite reward, and contract consumption.
 - Enabled EV18's allied turret choice: one E08 joins the next combat with 50% HP and damage through the existing ally simulator path. The log records ally count and the saved effect is consumed once.

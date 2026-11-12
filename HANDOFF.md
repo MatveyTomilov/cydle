@@ -1,8 +1,27 @@
-# CYDLE — Qwen4 development handoff
+# CYDLE — Project handoff and development history
+
+## Current Codex checkpoint (2026-11-12)
+
+This block supersedes the historical Qwen/Luna work notes below for the active checkout.
+
+- Repository: `https://github.com/MatveyTomilov/cydle.git`.
+- Working directory: `E:\cydle\project`.
+- Working branch: `development/codex`, created directly from verified checkpoint `3f28c7926a8c6ea4a99b1291a8c9e0ac8025cc67`. The protected source branches remain unchanged. Current exact HEAD and remote comparison are available from `git rev-parse HEAD` and `git ls-remote origin refs/heads/development/codex`.
+- Platform: Godot 4.7.2 Stable (`4.7.2.stable.official.ed1daf0bf`), typed GDScript, Windows x86_64 export templates installed; Node 24.20.0; npm/npx 11.19.0; Git 2.55.0.
+- Context7 is available in Codex. Godot MCP `@shin2344234/godot-mcp@0.1.2` is installed project-locally in `game/addons/godot_mcp/`, registered by `game/.codex/config.toml`, and enabled in `game/project.godot`. It uses compact mode and the files/scene/node/script/run toolsets; mutation confirmation is enabled (`elicit`); `--allow-eval` is absent. Open the Godot project and start a new Codex session to load its MCP tools. No global Codex config was changed.
+- Implemented native foundations are in `game/scripts/core/math/` and `game/scripts/core/persistence/`: deterministic RNG and named streams, state hashing, scalar formulas, damage/mitigation, 85-stat registry/resolver and CalcTrace, plus a versioned generic JSON save repository with checksums and backup recovery. These are tested foundations, not a playable loop.
+- Native game status: the app is still an explicit technical shell. No native garage/road/combat loop, typed META/RUN/COMBAT save schemas, item/build integration, progression, offline play, or integrated game art/audio exists. The asset manifest has 16 planned entries and 0 integrated assets.
+- Changes made at this takeover checkpoint: root `AGENTS.md`; project-local Godot MCP; `game/tools/validate_assets.gd`; GitHub Actions workflow; one readonly-array TypeScript fixture-generator correction; an asset manifest row corrected to match its header. No gameplay balance or master-spec rules changed.
+- Verified locally after setup: Godot import passes (exit 0); 6 Godot test scripts pass, 85,611 assertions, 0 failures; asset-manifest validator passes (16 entries, 0 integrated); legacy typecheck passes; legacy tests pass (206/206 across 22 files); catalog validation passes; Vite build passes; fixture generator wrote 1,628 cases and no tracked fixture changed. A fresh Windows export completed (exit 0) and its executable stayed running through a 2-second launch smoke. GitHub Actions has been added but has not run remotely.
+- GdUnit4 is not installed and the existing custom runner remains authoritative. Upstream compatibility docs list the v6.2 series for Godot 4.7/4.7.1 and v7 for 4.7/4.7.1/4.8 dev; exact 4.7.2 plugin compatibility has not been confirmed in a throwaway project.
+- First implementation task: define typed, versioned META/RUN/COMBAT save models and validation around the existing `SaveRepository`, with tests that preserve existing envelope/recovery behavior. Then port item instances and a single canonical build resolver against the TypeScript oracle before combat/presentation.
+- Required local commands are in `game/README.md` and root `AGENTS.md`. Native checks use Godot; npm commands validate the frozen legacy reference.
+
+## Historical Qwen checkpoint record
 
 Last updated: 2026-11-12
 
-This section is the authoritative current checkpoint. Sections below “Frozen legacy implementation” preserve historical web-project notes from before the Godot decision; do not treat those as the current implementation plan.
+The following sections record the state on the Qwen branch at SHA `3f28c7926a8c6ea4a99b1291a8c9e0ac8025cc67` and earlier legacy work. They are historical context; the current state and next task are listed above.
 
 ## A. Git state
 
