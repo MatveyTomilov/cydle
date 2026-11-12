@@ -2,13 +2,13 @@
 
 ## Current live continuation (2026-11-13; supersedes checkpoint below)
 
-### Current status override (2026-11-13; loot-filter checkpoint pushed)
+### Current status override (2026-11-13; BuildResolver loot comparison pushed)
 
-- Current pushed HEAD: `bc05701` (`Implement persistent loot filtering and auto salvage`) on `development/codex`; push succeeded. Previous checkpoint `167908d53911d50f869dbb3c3ec81543f935c52a` adds the Act I/II/III campaign chronicle, displaying saved boss milestones, ending choice, and faction standings.
+- Current pushed HEAD: `c395aa6` (`Connect loot filters to BuildResolver previews`) on `development/codex`; push succeeded. Its parent `bc05701` adds persistent loot filtering and auto salvage. Earlier checkpoint `167908d53911d50f869dbb3c3ec81543f935c52a` adds the Act I/II/III campaign chronicle, displaying saved boss milestones, ending choice, and faction standings.
 - The base also contains EV15 A's deterministic enemy codex discovery and EV10 B's sector-boss weakness intel; both effects persist and are exposed through the UI.
 - Current local WIP completes the §19.3 Build Lab comparison predicate in the loot filter. Custom rules can compare a user-selected stat against the active RUN loadout; it builds both candidates with the existing BuildResolver and keeps the item only if the selected stat increases. The comparison uses the run's actual equipment map, including unsecured cargo equipment. Test covers an improved RIFLE_K2 versus the starter weapon and rejects an equal PISTOL_K1 replacement.
 - Latest actual checks for this WIP: Godot 4.7.2 editor import exit 0; 22 scripts / 87,608 assertions / 0 failures; Windows Desktop export exit 0; exported EXE `--headless --quit-after 3` exit 0; `git diff --check` exit 0. TypeScript was not run (native Godot only).
-- Exact continuation: commit/push the BuildResolver comparison WIP, then continue through remaining full-game gaps in cargo/economy and narrative interactions. The full campaign has been exercised through d12 and d13 route/checkpoint in the preserved external E2E profile, but that is not complete 1.0 acceptance. Do not claim all events/quests or release criteria complete.
+- Exact continuation: next close the manual run-cargo dismantle flow (ownership, unsecured reward, history/undo and UI), then continue through remaining full-game gaps in economy and narrative interactions. The full campaign has been exercised through d12 and d13 route/checkpoint in the preserved external E2E profile, but that is not complete 1.0 acceptance. Do not claim all events/quests or release criteria complete.
 - Preserve the external campaign E2E profile and safety copy below; continue full-game coverage without Lab presets, report exports, or polish.
 
 ### Previous connected event/autopilot checkpoints
