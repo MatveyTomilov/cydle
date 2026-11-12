@@ -162,7 +162,17 @@ func travel_to(node_id: String) -> bool:
 	run_payload["resources"]["gameTimeMs"] = float(run_payload["resources"]["gameTimeMs"]) + 25000.0
 	run_payload["currentNodeId"] = node_id
 	run_payload["visitedNodeIds"].append(node_id)
-	run_payload["phase"] = "NODE"
+	var target_node: Dictionary = {}
+	for layer: Array in state.run.graph.get("layers", []):
+		for node: Dictionary in layer:
+			if str(node.get("id", "")) == node_id:
+				target_node = node
+				break
+	if str(target_node.get("type", "")) == "CHECKPOINT":
+		run_payload["phase"] = "CHECKPOINT"
+		run_payload["resources"]["gameTimeMs"] = float(run_payload["resources"].get("gameTimeMs", 0.0)) + 8000.0
+	else:
+		run_payload["phase"] = "NODE"
 	run_payload["combatResult"] = null
 	var payload: Dictionary = state.to_payload()
 	payload["run"] = run_payload
@@ -501,6 +511,7 @@ func resolve_active_combat() -> bool:
 		last_error = "Бой завершился без победы; безопасное восстановление ещё не реализовано."
 		return false
 	var reward: Dictionary = _battle_reward(str(node.get("type", "COMBAT")), state.run.depth, state.run.biome, node_id, run_payload)
+	var payload: Dictionary = state.to_payload()
 	var wallet: Dictionary = run_payload["runWallet"]
 	for currency: String in ["CREDITS", "SCRAP", "DATA"]:
 		wallet[currency] = float(wallet.get(currency, 0.0)) + float(reward["wallet"].get(currency, 0.0))
@@ -513,14 +524,13 @@ func resolve_active_combat() -> bool:
 	run_payload["lootRng"] = reward["lootRng"]
 	var xp_grant_id: String = "combat:%s:%s:xp" % [state.run.seed, node_id]
 	if not run_payload["grantIds"].has(xp_grant_id):
-		_grant_experience(int(reward["xp"]))
+		_grant_experience(payload["meta"]["operator"], int(reward["xp"]))
 		run_payload["grantIds"].append(xp_grant_id)
 	if not run_payload["clearedNodeIds"].has(node_id):
 		run_payload["clearedNodeIds"].append(node_id)
 	run_payload["phase"] = "CHECKPOINT" if int(node.get("layer", 0)) == 5 else "ROUTE"
 	run_payload["combatResult"] = null
 	run_payload["lastCommandId"] = "combat:%s" % node_id
-	var payload: Dictionary = state.to_payload()
 	if str(node.get("type", "")) == "BOSS":
 		var depth: int = int(state.run.depth)
 		if depth % 4 == 0:
@@ -604,35 +614,36 @@ func _cargo_fits(run_payload: Dictionary, candidate: Dictionary) -> bool:
 	var capacity: int = int(state.meta.transport.cargo_capacity)
 	return used + units <= capacity
 
-func _grant_experience(amount: int) -> void:
+func _grant_experience(operator: Dictionary, amount: int) -> void:
 	if amount <= 0:
 		return
-	var operator: GameSaveState.OperatorState = state.meta.operator
-	var xp: int = operator.xp + amount
-	var level: int = operator.level
-	var attribute_points: int = operator.attribute_points
-	var tree_points: int = operator.tree_points
+	var xp: int = int(operator.get("xp", 0)) + amount
+	var level: int = int(operator.get("level", 1))
+	var attribute_points: int = int(operator.get("attributePoints", 0))
+	var tree_points: int = int(operator.get("treePoints", 0))
 	while level < 61 and xp >= CydleFormula.new().xp_required(level):
 		xp -= CydleFormula.new().xp_required(level)
 		level += 1
 		tree_points += 1
 		if level <= 60 and level % 5 == 0:
 			attribute_points += 1
-	operator.xp = xp
-	operator.level = level
-	operator.attribute_points = attribute_points
-	operator.tree_points = tree_points
+	operator["xp"] = xp
+	operator["level"] = level
+	operator["attributePoints"] = attribute_points
+	operator["treePoints"] = tree_points
 
 func _resolve_combat_defeat(run_payload: Dictionary, node_id: String) -> bool:
-	var equipped_ids: Array = state.meta.equipment.values()
-	for index: int in range(state.meta.inventory.size()):
-		var item: Dictionary = state.meta.inventory[index]
+	var payload: Dictionary = state.to_payload()
+	var meta: Dictionary = payload["meta"]
+	var equipped_ids: Array = meta["equipment"].values()
+	for index: int in range(meta["inventory"].size()):
+		var item: Dictionary = meta["inventory"][index]
 		if equipped_ids.has(str(item.get("itemId", ""))):
 			item["durability"] = maxf(0.0, float(item.get("durability", 100.0)) - 20.0)
-		state.meta.inventory[index] = item
-	var paid: bool = state.meta.protected_bank.credits >= 10.0
+		meta["inventory"][index] = item
+	var paid: bool = float(meta["protectedBank"].get("CREDITS", 0.0)) >= 10.0
 	if paid:
-		state.meta.protected_bank.credits -= 10.0
+		meta["protectedBank"]["CREDITS"] = float(meta["protectedBank"]["CREDITS"]) - 10.0
 	var build: Dictionary = build_preview()
 	var stats: Dictionary = build.get("stats", {})
 	var resources: Dictionary = run_payload["resources"]
@@ -645,9 +656,9 @@ func _resolve_combat_defeat(run_payload: Dictionary, node_id: String) -> bool:
 	run_payload["unsecuredCargo"] = []
 	run_payload["shippedCargo"] = []
 	run_payload["runWallet"] = {"CREDITS": 0.0, "SCRAP": 0.0, "DATA": 0.0}
-	run_payload["equipment"] = state.meta.equipment.duplicate(true)
+	run_payload["equipment"] = meta["equipment"].duplicate(true)
 	run_payload["lastCommandId"] = "combat:defeat:%s" % node_id
-	var payload: Dictionary = state.to_payload()
+	payload["meta"] = meta
 	payload["run"] = run_payload
 	if not _commit_payload(payload):
 		return false

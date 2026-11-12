@@ -387,9 +387,10 @@ func _show_current_node(run: GameSaveState.RunState) -> void:
 		_body.add_child(leave)
 
 func _show_checkpoint(_run: GameSaveState.RunState) -> void:
-	_body.add_child(_label("КОНТРОЛЬНЫЙ УЗЕЛ", 20, COLOR_TEXT))
-	_body.add_child(_label("Выберите: закрепить добычу и выйти или продолжить в следующий сектор с текущими ресурсами и незакреплённым грузом.", 14, COLOR_MUTED))
-	var continue_button: Button = _button("ПРОДОЛЖИТЬ КАМПАНИЮ · СЕКТОР %02d" % (_run.depth + 1), false)
+	var completed: bool = _session.state.meta.campaign_flags.has("CAMPAIGN_COMPLETED")
+	_body.add_child(_label("КАМПАНИЯ ПРОЙДЕНА" if completed else "КОНТРОЛЬНЫЙ УЗЕЛ", 20, COLOR_CYAN if completed else COLOR_TEXT))
+	_body.add_child(_label("Сектор 12 открыт для бесконечной глубины." if completed else "Выберите: закрепить добычу и выйти или продолжить в следующий сектор с текущими ресурсами и незакреплённым грузом.", 14, COLOR_MUTED))
+	var continue_button: Button = _button("ВОЙТИ В ЭНДГЕЙМ · СЕКТОР %02d" % (_run.depth + 1) if completed else "ПРОДОЛЖИТЬ КАМПАНИЮ · СЕКТОР %02d" % (_run.depth + 1), false)
 	continue_button.pressed.connect(_on_continue_campaign)
 	_body.add_child(continue_button)
 	var exit_button: Button = _button("ЭВАКУИРОВАТЬСЯ С ГРУЗОМ", true)
