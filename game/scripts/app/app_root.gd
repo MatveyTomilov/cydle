@@ -434,6 +434,15 @@ func _show_inventory() -> void:
 				item_actions.add_child(repair_button)
 			for affix_index: int in range(item_value.get("affixes", []).size()):
 				var affix: Dictionary = item_value["affixes"][affix_index]
+				var item_tech: int = int(item_value.get("techLevel", 1))
+				var max_affix_tier: int = clampi(int(ceil(float(item_tech) / 4.0)), 1, 4)
+				if str(item_value.get("rarity", "")) != "UNIQUE" and int(affix.get("tier", 1)) < max_affix_tier:
+					var tier_scrap: int = ceili(20.0 * reward_formula.reward_scale(float(item_tech)))
+					var tier_data: int = ceili(5.0 * reward_formula.reward_scale(float(item_tech)))
+					var tier_button: Button = _button("TIER UP · 6 TR / %d SCR / %d DATA" % [tier_scrap, tier_data], false)
+					tier_button.disabled = not can_edit_items or float(item_value.get("tr", 0.0)) < 6.0 or _session.state.meta.protected_bank.scrap < tier_scrap or _session.state.meta.protected_bank.data < tier_data
+					tier_button.pressed.connect(_on_upgrade_item_affix_tier.bind(item_id, affix_index))
+					item_actions.add_child(tier_button)
 				var calibration_cost: int = ceili(10.0 * reward_formula.reward_scale(float(item_value.get("techLevel", 1))))
 				var calibrate_button: Button = _button("%s · 3 TR / %d SCRAP" % [str(affix.get("affixId", "AF")), calibration_cost], false)
 				calibrate_button.disabled = not can_edit_items or str(item_value.get("rarity", "")) == "UNIQUE" or float(item_value.get("tr", 0.0)) < 3.0
@@ -812,6 +821,11 @@ func _on_calibrate_item_tech(item_id: String, target_level: int) -> void:
 	var calibrated: bool = _session.calibrate_item_tech_level(item_id, target_level)
 	_show_inventory()
 	_footer.text = "TECHLEVEL T%d · BUILD LAB ПЕРЕСЧИТАН" % target_level if calibrated else _session.last_error
+
+func _on_upgrade_item_affix_tier(item_id: String, affix_index: int) -> void:
+	var upgraded: bool = _session.upgrade_item_affix_tier(item_id, affix_index)
+	_show_inventory()
+	_footer.text = "TIER АФФИКСА ПОВЫШЕН · BUILD LAB ПЕРЕСЧИТАН" if upgraded else _session.last_error
 
 func _contains_node(nodes: Array[Dictionary], node_id: String) -> bool:
 	for node: Dictionary in nodes:

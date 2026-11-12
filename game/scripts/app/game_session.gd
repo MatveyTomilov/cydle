@@ -1265,6 +1265,76 @@ func calibrate_item_affix(item_id: String, affix_index: int) -> bool:
 	last_error = "Предмет не найден в постоянном складе."
 	return false
 
+func upgrade_item_affix_tier(item_id: String, affix_index: int) -> bool:
+	if not _garage_action_allowed():
+		last_error = "Повышение tier доступно только в гараже между выездами."
+		return false
+	var payload: Dictionary = state.to_payload()
+	var inventory: Array = payload["meta"]["inventory"]
+	for item_index: int in range(inventory.size()):
+		var item: Dictionary = inventory[item_index]
+		if str(item.get("itemId", "")) != item_id or not bool(item.get("secured", false)):
+			continue
+		if str(item.get("rarity", "")) == "UNIQUE" or affix_index < 0 or affix_index >= item.get("affixes", []).size():
+			last_error = "Этот предмет нельзя улучшить выбранной операцией."
+			return false
+		if float(item.get("tr", 0.0)) < 6.0:
+			last_error = "Повышение tier требует 6 TR."
+			return false
+		var affix: Dictionary = item["affixes"][affix_index]
+		var catalog_result: Dictionary = _item_catalog.load_catalog()
+		if not bool(catalog_result.get("ok", false)):
+			last_error = str(catalog_result.get("error", "Каталог предметов недоступен."))
+			return false
+		var definition: Dictionary = _item_catalog.get_affix(str(affix.get("affixId", "")))
+		var tiers: Array = definition.get("tiers", [])
+		var tier: int = int(affix.get("tier", 1))
+		var max_tier: int = clampi(int(ceil(float(item.get("techLevel", 1)) / 4.0)), 1, 4)
+		var template: Dictionary = _item_catalog.get_template(str(item.get("templateId", "")))
+		if definition.is_empty() or template.is_empty() or not (definition.get("slots", []) as Array).has(str(template.get("category", ""))) or tier < 1 or tier >= max_tier or tier >= tiers.size():
+			last_error = "Аффикс уже достиг разрешённого tier или несовместим с предметом."
+			return false
+		var scale: float = CydleFormula.new().reward_scale(float(item.get("techLevel", 1)))
+		var scrap_cost: int = ceili(20.0 * scale)
+		var data_cost: int = ceili(5.0 * scale)
+		var scrap: float = float(payload["meta"]["protectedBank"].get("SCRAP", 0.0))
+		var data: float = float(payload["meta"]["protectedBank"].get("DATA", 0.0))
+		if scrap < float(scrap_cost) or data < float(data_cost):
+			last_error = "Повышение tier требует %d SCRAP и %d DATA." % [scrap_cost, data_cost]
+			return false
+		var new_tier: int = tier + 1
+		var center: float = float(tiers[new_tier - 1])
+		var rng: DeterministicRng = DeterministicRng.new()
+		rng.seed("tier:%s:%s:%d:%d" % [state.save_id, item_id, state.revision, affix_index], state.revision)
+		var raw_roll: float = 1.0 if bool(definition.get("fixed", false)) else rng.range_float(0.8, 1.2)
+		var is_integer: bool = bool(definition.get("integer", false))
+		affix["tier"] = new_tier
+		affix["tierBoosted"] = false
+		affix["center"] = center
+		affix["rawRoll"] = floorf(raw_roll * 10000.0 + 0.5) / 10000.0
+		affix["value"] = maxf(1.0, roundf(center * raw_roll)) if is_integer else floorf(center * raw_roll * 100.0 + 0.5) / 100.0
+		affix["min"] = maxf(1.0, roundf(center * 0.8)) if is_integer else floorf(center * 0.8 * 100.0 + 0.5) / 100.0
+		affix["max"] = roundf(center * 1.2) if is_integer else floorf(center * 1.2 * 100.0 + 0.5) / 100.0
+		item["affixes"][affix_index] = affix
+		item["tr"] = float(item.get("tr", 0.0)) - 6.0
+		item["rollSeed"] = "%s:%d" % [rng.stream, rng.calls]
+		inventory[item_index] = item
+		payload["meta"]["inventory"] = inventory
+		payload["meta"]["protectedBank"]["SCRAP"] = scrap - float(scrap_cost)
+		payload["meta"]["protectedBank"]["DATA"] = data - float(data_cost)
+		var parsed: Dictionary = GameSaveState.new().parse_payload(payload)
+		if not bool(parsed.get("ok", false)):
+			last_error = str(parsed.get("error", "Улучшение аффикса не прошло проверку сохранения."))
+			return false
+		var candidate: GameSaveState = parsed["state"] as GameSaveState
+		var resolved: Dictionary = BuildResolver.new().resolve_build(_build_input(candidate))
+		if not bool(resolved.get("valid", false)):
+			last_error = "Улучшение аффикса отклонено BuildResolver: %s" % str(resolved.get("issues", []))
+			return false
+		return _commit(candidate)
+	last_error = "Предмет не найден в постоянном складе."
+	return false
+
 func tech_calibration_quote(item_id: String, target_level: int) -> Dictionary:
 	if not _garage_action_allowed():
 		return {"valid": false, "affordable": false, "error": "Калибровка доступна только в гараже между выездами."}

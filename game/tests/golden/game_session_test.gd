@@ -149,6 +149,29 @@ func run(_tree: SceneTree) -> bool:
 		check(tech_calibration_session.calibrate_item_tech_level(calibrate_id, 4), "game_session: item TechLevel calibration failed: %s" % tech_calibration_session.last_error)
 		check(int(tech_calibration_session.state.meta.inventory[0].get("techLevel", 0)) == 4 and float(tech_calibration_session.state.meta.protected_bank.scrap) == float(100 - int(calibration_quote["scrap"])) and float(tech_calibration_session.state.meta.protected_bank.data) == float(50 - int(calibration_quote["data"])), "game_session: TechLevel calibration did not update the item and charge quoted resources")
 		check(tech_calibration_session.state.meta.inventory.size() == 12, "game_session: consumed CalibrationCore remained in the secured inventory")
+	var tier_upgrade_session: GameSession = GameSession.new()
+	tier_upgrade_session.configure_save_directory("user://test-saves/tier-upgrade")
+	if check(tier_upgrade_session.start_new_game(1762900000500), "game_session: could not create an affix-tier profile"):
+		var tier_payload: Dictionary = tier_upgrade_session.state.to_payload()
+		tier_payload["meta"]["unlockedForpost"] = 8
+		tier_payload["meta"]["protectedBank"]["SCRAP"] = 100.0
+		tier_payload["meta"]["protectedBank"]["DATA"] = 100.0
+		var tier_item: Dictionary = tier_payload["meta"]["inventory"][0]
+		tier_item["techLevel"] = 5
+		tier_item["rarity"] = "RARE"
+		tier_item["tr"] = 18.0
+		tier_item["affixes"] = [{"affixId": "AF_KDM", "tier": 1, "value": 5.0, "rawRoll": 1.0, "tierBoosted": false, "center": 5.0, "min": 4.0, "max": 6.0}]
+		tier_payload["meta"]["inventory"][0] = tier_item
+		check(tier_upgrade_session._commit_payload(tier_payload), "game_session: affix-tier fixture could not be saved")
+		var tier_item_id: String = str(tier_item.get("itemId", ""))
+		var tier_scale: float = CydleFormula.new().reward_scale(5.0)
+		var tier_scrap_cost: int = ceili(20.0 * tier_scale)
+		var tier_data_cost: int = ceili(5.0 * tier_scale)
+		check(tier_upgrade_session.upgrade_item_affix_tier(tier_item_id, 0), "game_session: tier upgrade failed: %s" % tier_upgrade_session.last_error)
+		var upgraded_affix: Dictionary = tier_upgrade_session.state.meta.inventory[0]["affixes"][0]
+		check(str(tier_upgrade_session.state.meta.inventory[0].get("itemId", "")) == tier_item_id and int(upgraded_affix.get("tier", 0)) == 2 and float(upgraded_affix.get("value", 0.0)) >= 7.2 and float(upgraded_affix.get("value", 0.0)) <= 10.8, "game_session: tier upgrade did not preserve identity or use the new tier range")
+		check(float(tier_upgrade_session.state.meta.inventory[0].get("tr", 0.0)) == 12.0 and is_equal_approx(tier_upgrade_session.state.meta.protected_bank.scrap, 100.0 - tier_scrap_cost) and is_equal_approx(tier_upgrade_session.state.meta.protected_bank.data, 100.0 - tier_data_cost), "game_session: tier upgrade did not charge its declared resources")
+		check(not tier_upgrade_session.upgrade_item_affix_tier(tier_item_id, 0), "game_session: affix was upgraded above the TechLevel tier cap")
 	var resumed: GameSession = GameSession.new()
 	resumed.configure_save_directory("user://test-saves/game-session")
 	check(resumed.load_saved_game(), "game_session: persisted state did not reload: %s" % resumed.last_error)
