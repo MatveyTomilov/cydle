@@ -896,6 +896,73 @@ func _show_inventory() -> void:
 		return
 	var can_edit_items: bool = _session.state.run == null or ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(_session.state.run.phase)
 	var reward_formula: CydleFormula = CydleFormula.new()
+	_body.add_child(_label("ФИЛЬТР ДОБЫЧИ · РЕШЕНИЕ О ПОДБОРЕ ПРИМЕНЯЕТСЯ К БОЕВЫМ, КВЕСТОВЫМ И СОБЫТИЙНЫМ НАГРАДАМ", 11, COLOR_CYAN))
+	var loot_filter: Dictionary = _session.loot_filter_settings()
+	var filter_row: HBoxContainer = HBoxContainer.new()
+	_body.add_child(filter_row)
+	var filter_mode: OptionButton = OptionButton.new()
+	var modes: Array[String] = ["ALL", "RARE_PLUS", "TAGS", "CUSTOM"]
+	var mode_names: Array[String] = ["СОХРАНЯТЬ ВСЁ", "RARE И ВЫШЕ", "ТОЛЬКО ТЕГИ", "СВОЙ ФИЛЬТР"]
+	for mode_index: int in range(modes.size()):
+		filter_mode.add_item(mode_names[mode_index])
+		filter_mode.set_item_metadata(mode_index, modes[mode_index])
+		if str(loot_filter.get("preset", "ALL")) == modes[mode_index]: filter_mode.select(mode_index)
+	filter_row.add_child(filter_mode)
+	var minimum_rarity: OptionButton = OptionButton.new()
+	var rarities: Array[String] = ["COMMON", "MODIFIED", "RARE", "LEGENDARY", "UNIQUE"]
+	for rarity_index: int in range(rarities.size()):
+		minimum_rarity.add_item(rarities[rarity_index])
+		minimum_rarity.set_item_metadata(rarity_index, rarities[rarity_index])
+		if str(loot_filter.get("minimumRarity", "COMMON")) == rarities[rarity_index]: minimum_rarity.select(rarity_index)
+	filter_row.add_child(minimum_rarity)
+	var item_type: OptionButton = OptionButton.new()
+	var item_types: Array[String] = ["ANY", "MAIN", "OFFHAND", "ARMOR", "IMPLANT", "DRONE", "ENGINE", "CHASSIS", "SCANNER", "SERVICE", "CARGO", "SUPPORT", "MATERIAL"]
+	for type_index: int in range(item_types.size()):
+		item_type.add_item("ТИП · %s" % item_types[type_index])
+		item_type.set_item_metadata(type_index, item_types[type_index])
+		if str(loot_filter.get("itemType", "ANY")) == item_types[type_index]: item_type.select(type_index)
+	filter_row.add_child(item_type)
+	var item_slot: OptionButton = OptionButton.new()
+	var item_slots: Array[String] = ["ANY", "MAIN", "OFFHAND", "ARMOR", "IMP_1", "IMP_2", "IMP_3", "IMP_4", "IMP_5", "IMP_6", "DRONE_1", "DRONE_2", "ENGINE", "CHASSIS", "SCANNER", "SERVICE", "CARGO", "SUPPORT"]
+	for slot_index: int in range(item_slots.size()):
+		item_slot.add_item("СЛОТ · %s" % item_slots[slot_index])
+		item_slot.set_item_metadata(slot_index, item_slots[slot_index])
+		if str(loot_filter.get("slot", "ANY")) == item_slots[slot_index]: item_slot.select(slot_index)
+	filter_row.add_child(item_slot)
+	var required_tags: LineEdit = LineEdit.new()
+	required_tags.placeholder_text = "Теги через запятую: weapon, digital"
+	var saved_tags: PackedStringArray = PackedStringArray()
+	for saved_tag: Variant in loot_filter.get("requiredTags", []):
+		saved_tags.append(str(saved_tag))
+	required_tags.text = ", ".join(saved_tags)
+	required_tags.custom_minimum_size.x = 210
+	filter_row.add_child(required_tags)
+	var min_affix_tier: SpinBox = SpinBox.new()
+	min_affix_tier.min_value = 1
+	min_affix_tier.max_value = 4
+	min_affix_tier.value = int(loot_filter.get("minimumAffixTier", 1))
+	min_affix_tier.prefix = "TIER ≥ "
+	filter_row.add_child(min_affix_tier)
+	var required_affix: LineEdit = LineEdit.new()
+	required_affix.placeholder_text = "ID аффикса (необязательно)"
+	required_affix.text = str(loot_filter.get("affixId", ""))
+	required_affix.custom_minimum_size.x = 170
+	filter_row.add_child(required_affix)
+	var auto_dismantle: CheckBox = CheckBox.new()
+	auto_dismantle.text = "АВТОРАЗБОР"
+	auto_dismantle.button_pressed = bool(loot_filter.get("autoDismantle", false))
+	auto_dismantle.disabled = not _session.auto_dismantle_available()
+	auto_dismantle.tooltip_text = "Нужен установленный SCANNER или WORKSHOP L3. Выручка остаётся незакреплённой до эвакуации."
+	filter_row.add_child(auto_dismantle)
+	var save_filter: Button = _button("СОХРАНИТЬ ФИЛЬТР", false)
+	save_filter.pressed.connect(_on_save_loot_filter.bind(filter_mode, minimum_rarity, item_type, item_slot, required_tags, min_affix_tier, required_affix, auto_dismantle))
+	filter_row.add_child(save_filter)
+	_body.add_child(_label("АВТОРАЗБОР: %s · UNIQUE без защищённой копии всегда сохраняются. Текущее правило не меняет уже выпавший груз." % ("ГОТОВ" if _session.auto_dismantle_available() else "ЗАКРЫТ · НУЖЕН SCANNER ИЛИ WORKSHOP L3"), 10, COLOR_MUTED))
+	if _session.can_undo_last_dismantle():
+		var undo_loot: Button = _button("ОТМЕНИТЬ ПОСЛЕДНИЙ РАЗБОР", true)
+		undo_loot.tooltip_text = "Вернёт предмет в текущий груз и снимет незакреплённый SCRAP/DATA, пока не начат следующий узел."
+		undo_loot.pressed.connect(_on_undo_last_dismantle)
+		_body.add_child(undo_loot)
 	for item_value: Dictionary in _session.state.meta.inventory:
 		var template: Dictionary = inventory_catalog.get_template(str(item_value.get("templateId", "")))
 		var name: String = str(template.get("name", item_value.get("templateId", "Предмет")))
@@ -1877,8 +1944,33 @@ func _on_confirm_item_disposal(item_id: String, method: String) -> void:
 
 func _on_undo_last_dismantle() -> void:
 	var restored: bool = _session.undo_last_dismantle()
-	_show_inventory()
+	if _screen == "road":
+		_show_road()
+	else:
+		_show_inventory()
 	_footer.text = "РАЗБОР ОТМЕНЁН · ПРЕДМЕТ ВОССТАНОВЛЕН" if restored else _session.last_error
+
+func _on_save_loot_filter(mode: OptionButton, rarity: OptionButton, item_type: OptionButton, item_slot: OptionButton, tags: LineEdit, affix_tier: SpinBox, affix: LineEdit, auto_dismantle: CheckBox) -> void:
+	var selected_tags: Array[String] = []
+	for tag_value: String in tags.text.split(",", false):
+		var normalized: String = tag_value.strip_edges().to_lower()
+		if not normalized.is_empty() and not selected_tags.has(normalized):
+			selected_tags.append(normalized)
+	var settings: Dictionary = {
+		"preset": str(mode.get_item_metadata(mode.selected)),
+		"minimumRarity": str(rarity.get_item_metadata(rarity.selected)),
+		"itemType": str(item_type.get_item_metadata(item_type.selected)),
+		"slot": str(item_slot.get_item_metadata(item_slot.selected)),
+		"requiredTags": selected_tags,
+		"minimumAffixTier": int(affix_tier.value),
+		"affixId": affix.text.strip_edges(),
+		"autoDismantle": auto_dismantle.button_pressed,
+	}
+	if _session.set_loot_filter_settings(settings):
+		_show_inventory()
+		_footer.text = "ФИЛЬТР ДОБЫЧИ СОХРАНЁН · %s" % str(settings["preset"])
+	else:
+		_footer.text = _session.last_error
 
 func _refresh_base_craft_button(_index: int, template_id: String, tech_picker: OptionButton, craft_button: Button, can_edit: bool) -> void:
 	var tech_level: int = tech_picker.get_selected_id()

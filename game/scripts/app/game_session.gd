@@ -1523,10 +1523,10 @@ func resolve_event(choice_id: String) -> bool:
 			last_error = str(rolled.get("error", "Предмет события не удалось создать."))
 			return false
 		item_values.append((rolled["item"] as ItemInstance).to_dictionary())
-		if not _cargo_fits(run_payload, item_values[0]):
-			last_error = "В грузовом отсеке нет места для предмета события."
+		var received: Dictionary = _receive_run_item(payload, item_values[0], "EVENT")
+		if not bool(received.get("accepted", false)) and not bool(received.get("salvaged", false)):
+			last_error = "Фильтр добычи пропустил предмет события, а груз не помещается."
 			return false
-		run_payload["unsecuredCargo"].append_array(item_values)
 		run_payload["grantIds"].append(grant_id)
 		run_payload["lootRng"] = loot.serialize()
 	if choice.has("grantMutation"):
@@ -1760,10 +1760,10 @@ func resolve_quest_choice(quest_id: String, choice_id: String) -> bool:
 				last_error = str(rolled.get("error", "Квестовую награду нельзя создать."))
 				return false
 			var item: Dictionary = (rolled["item"] as ItemInstance).to_dictionary()
-			if not _cargo_fits(run_payload, item):
-				last_error = "Для квестовой награды нет места в грузовом отсеке."
+			var received: Dictionary = _receive_run_item(payload, item, "QUEST")
+			if not bool(received.get("accepted", false)) and not bool(received.get("salvaged", false)):
+				last_error = "Для квестовой награды нет места в грузовом отсеке или её отсёк фильтр."
 				return false
-			run_payload["unsecuredCargo"].append(item)
 			run_payload["grantIds"].append(grant_id)
 			run_payload["lootRng"] = loot.serialize()
 	var flags: Array = progress.get("flags", [])
@@ -1781,10 +1781,10 @@ func resolve_quest_choice(quest_id: String, choice_id: String) -> bool:
 			var core_item: ItemInstance = core["item"] as ItemInstance
 			core_item.core_group = clampi(int(ceil(float(state.run.depth) / 4.0)), 1, 4)
 			var core_value: Dictionary = core_item.to_dictionary()
-			if not _cargo_fits(run_payload, core_value):
-				last_error = "Для калибровочного ядра нет места в грузовом отсеке."
+			var received_core: Dictionary = _receive_run_item(payload, core_value, "QUEST_CORE")
+			if not bool(received_core.get("accepted", false)) and not bool(received_core.get("salvaged", false)):
+				last_error = "Для калибровочного ядра нет места в грузовом отсеке или его отсёк фильтр."
 				return false
-			run_payload["unsecuredCargo"].append(core_value)
 			run_payload["grantIds"].append(str(core_value.get("originGrantId", "")))
 	var choices: Array = progress.get("choiceHistory", [])
 	choices.append({"stage": int(progress.get("stage", 1)), "choiceId": choice_id, "nodeId": state.run.current_node_id})
@@ -1995,8 +1995,8 @@ func resolve_service_node(action: String, prototype_id: String = "", autopilot_r
 				var created: Dictionary = ItemFactory.new().create_item(rng, _item_catalog, {"templateId": prototype, "techLevel": 1, "rarity": "MODIFIED", "secured": false, "originGrantId": grant_id, "origin": "tutorial-cache"})
 				if bool(created.get("ok", false)):
 					item_value = (created["item"] as ItemInstance).to_dictionary()
-			if not item_value.is_empty() and _cargo_fits(run_payload, item_value):
-				run_payload["unsecuredCargo"].append(item_value)
+			if not item_value.is_empty():
+				_receive_run_item(payload, item_value, "CACHE")
 			run_payload["grantIds"].append(grant_id)
 			run_payload["lootRng"] = rng.serialize()
 		if str(run_payload.get("contract", {}).get("status", "")) == "ACTIVE" and str(run_payload["contract"].get("kind", "")) == "TECH" and str(run_payload["contract"].get("targetNodeId", "")) == node_id:
@@ -2057,10 +2057,10 @@ func _complete_contract(payload: Dictionary, rewards: Dictionary, item_spec: Dic
 			last_error = str(rolled.get("error", "Награду контракта нельзя создать."))
 			return false
 		paid = (rolled["item"] as ItemInstance).to_dictionary()
-		if not _cargo_fits(run_payload, paid):
-			last_error = "Для гарантированной награды контракта нет места в грузовом отсеке. Освободите место и повторите действие."
+		var received: Dictionary = _receive_run_item(payload, paid, "CONTRACT")
+		if not bool(received.get("accepted", false)) and not bool(received.get("salvaged", false)):
+			last_error = "Для гарантированной награды контракта нет места в грузовом отсеке или её отсёк фильтр."
 			return false
-		run_payload["unsecuredCargo"].append(paid)
 		run_payload["lootRng"] = rng.serialize()
 	for faction: String in reputation.keys():
 		payload["meta"]["reputation"][faction] = clampi(int(payload["meta"]["reputation"].get(faction, 0)) + int(reputation[faction]), -100, 100)
@@ -2510,9 +2510,8 @@ func resolve_active_combat() -> bool:
 	for currency: String in ["CREDITS", "SCRAP", "DATA"]:
 		wallet[currency] = float(wallet.get(currency, 0.0)) + float(reward["wallet"].get(currency, 0.0))
 	for item_value: Dictionary in reward["items"]:
-		if _cargo_fits(run_payload, item_value):
-			run_payload["unsecuredCargo"].append(item_value)
-		else:
+		var received: Dictionary = _receive_run_item(payload, item_value, "COMBAT")
+		if not bool(received.get("accepted", false)) and not bool(received.get("salvaged", false)):
 			reward["discardedItems"] += 1
 	run_payload["grantIds"].append_array(reward["grantIds"])
 	var xp_grant_id: String = "combat:%s:%s:xp" % [state.run.seed, node_id]
@@ -2847,6 +2846,134 @@ func item_disposal_quote(item_id: String, method: String) -> Dictionary:
 	var data_gain: int = mini(1 if digital else 0, data_cap)
 	return {"valid": true, "itemId": item_id, "method": method, "credits": 0, "scrap": scrap_gain, "data": data_gain, "error": ""}
 
+func loot_filter_settings() -> Dictionary:
+	if state == null:
+		return {"preset": "ALL", "minimumRarity": "COMMON", "itemType": "ANY", "slot": "ANY", "requiredTags": [], "minimumAffixTier": 1, "affixId": "", "autoDismantle": false}
+	return state.meta.loot_filter.duplicate(true)
+
+func set_loot_filter_settings(settings: Dictionary) -> bool:
+	if state == null or not _garage_action_allowed():
+		last_error = "Фильтр добычи настраивается в гараже между выездами."
+		return false
+	var candidate: Dictionary = settings.duplicate(true)
+	if not GameSaveSchema.new()._validate_loot_filter(candidate):
+		last_error = "Параметры фильтра добычи не прошли проверку."
+		return false
+	var payload: Dictionary = state.to_payload()
+	payload["meta"]["lootFilter"] = candidate
+	return _commit_payload(payload)
+
+func auto_dismantle_available() -> bool:
+	if state == null:
+		return false
+	if garage_level("WORKSHOP") >= 3:
+		return true
+	var loaded: Dictionary = _item_catalog.load_catalog()
+	if not bool(loaded.get("ok", false)):
+		return false
+	var scanner_id: String = str(state.meta.equipment.get("SCANNER", ""))
+	if scanner_id.is_empty():
+		return false
+	var item: Dictionary = _secured_inventory_item(scanner_id)
+	if item.is_empty():
+		return false
+	var template: Dictionary = _item_catalog.get_template(str(item.get("templateId", "")))
+	return (template.get("tags", []) as Array).has("scanner")
+
+func _loot_item_matches_filter(item: Dictionary, meta_payload: Dictionary) -> bool:
+	var filter: Dictionary = meta_payload.get("lootFilter", {})
+	var preset: String = str(filter.get("preset", "ALL"))
+	var rarity_order: Array[String] = ["COMMON", "MODIFIED", "RARE", "LEGENDARY", "UNIQUE"]
+	var rarity: String = str(item.get("rarity", "COMMON"))
+	if item.has("uniqueEffectIds") and not (item.get("uniqueEffectIds", []) as Array).is_empty():
+		var known: bool = false
+		for secured_value: Dictionary in meta_payload.get("inventory", []):
+			if bool(secured_value.get("secured", false)) and str(secured_value.get("templateId", "")) == str(item.get("templateId", "")):
+				known = true
+				break
+		if not known:
+			return true
+	if preset == "ALL":
+		return true
+	var loaded: Dictionary = _item_catalog.load_catalog()
+	if not bool(loaded.get("ok", false)):
+		return true
+	var template: Dictionary = _item_catalog.get_template(str(item.get("templateId", "")))
+	var item_tags: Array = template.get("tags", [])
+	var category: String = str(template.get("category", ""))
+	var selected_type: String = str(filter.get("itemType", "ANY"))
+	if selected_type != "ANY" and category != selected_type:
+		return false
+	var selected_slot: String = str(filter.get("slot", "ANY"))
+	if selected_slot != "ANY":
+		var slots_by_category: Dictionary = {
+			"MAIN": ["MAIN"], "OFFHAND": ["OFFHAND"], "ARMOR": ["ARMOR"], "IMPLANT": ["IMP_1", "IMP_2", "IMP_3", "IMP_4", "IMP_5", "IMP_6"],
+			"DRONE": ["DRONE_1", "DRONE_2"], "ENGINE": ["ENGINE"], "CHASSIS": ["CHASSIS"], "SCANNER": ["SCANNER"], "SERVICE": ["SERVICE"], "CARGO": ["CARGO"], "SUPPORT": ["SUPPORT"]
+		}
+		if not (slots_by_category.get(category, []) as Array).has(selected_slot):
+			return false
+	if preset == "RARE_PLUS":
+		return rarity_order.find(rarity) >= rarity_order.find("RARE")
+	var required_tags: Array = filter.get("requiredTags", [])
+	if preset == "TAGS":
+		for tag_value: Variant in required_tags:
+			if item_tags.has(str(tag_value)):
+				return true
+		return false
+	if rarity_order.find(rarity) < rarity_order.find(str(filter.get("minimumRarity", "COMMON"))):
+		return false
+	if not required_tags.is_empty():
+		var has_required_tag: bool = false
+		for tag_value: Variant in required_tags:
+			if item_tags.has(str(tag_value)):
+				has_required_tag = true
+				break
+		if not has_required_tag:
+			return false
+	var affix_id: String = str(filter.get("affixId", ""))
+	var min_tier: int = int(filter.get("minimumAffixTier", 1))
+	var matching_affix: bool = affix_id.is_empty() and min_tier <= 1
+	for affix_value: Dictionary in item.get("affixes", []):
+		if int(affix_value.get("tier", 1)) >= min_tier and (affix_id.is_empty() or str(affix_value.get("affixId", "")) == affix_id):
+			matching_affix = true
+			break
+	return matching_affix
+
+func _receive_run_item(payload: Dictionary, item_value: Dictionary, reason: String = "LOOT") -> Dictionary:
+	var run_payload: Dictionary = payload.get("run", {})
+	var meta_payload: Dictionary = payload.get("meta", {})
+	if run_payload.is_empty() or item_value.is_empty():
+		return {"accepted": false, "salvaged": false, "discarded": true}
+	var item: Dictionary = item_value.duplicate(true)
+	item["secured"] = false
+	if _loot_item_matches_filter(item, meta_payload):
+		if _cargo_fits(run_payload, item):
+			run_payload["unsecuredCargo"].append(item)
+			return {"accepted": true, "salvaged": false, "discarded": false}
+		return {"accepted": false, "salvaged": false, "discarded": true, "reason": "CARGO_FULL"}
+	var filter: Dictionary = meta_payload.get("lootFilter", {})
+	if not bool(filter.get("autoDismantle", false)) or not auto_dismantle_available():
+		return {"accepted": false, "salvaged": false, "discarded": true, "reason": "FILTERED"}
+	var loaded: Dictionary = _item_catalog.load_catalog()
+	if not bool(loaded.get("ok", false)):
+		return {"accepted": false, "salvaged": false, "discarded": true, "reason": "CATALOG_ERROR"}
+	var template: Dictionary = _item_catalog.get_template(str(item.get("templateId", "")))
+	var scale: float = CydleFormula.new().reward_scale(float(item.get("techLevel", 1)))
+	var scrap_cap: int = floori(18.0 * scale * 0.6)
+	var scrap_gain: int = mini(ceili(3.0 * scale), scrap_cap)
+	var data_gain: int = 1 if (template.get("tags", []) as Array).has("digital") else 0
+	var wallet: Dictionary = run_payload.get("runWallet", {})
+	wallet["SCRAP"] = float(wallet.get("SCRAP", 0.0)) + float(scrap_gain)
+	wallet["DATA"] = float(wallet.get("DATA", 0.0)) + float(data_gain)
+	run_payload["runWallet"] = wallet
+	var history: Array = meta_payload.get("disassemblyHistory", []).duplicate(true)
+	history.append({"itemId": str(item.get("itemId", "")), "templateId": str(item.get("templateId", "")), "seed": str(item.get("rollSeed", "")), "reason": "AUTO_FILTER:%s" % reason, "scrap": scrap_gain, "data": data_gain, "createdAt": int(Time.get_unix_time_from_system()), "undone": false})
+	while history.size() > 100:
+		history.pop_front()
+	meta_payload["disassemblyHistory"] = history
+	meta_payload["disassemblyUndo"] = {"item": item, "scrap": scrap_gain, "data": data_gain, "createdAt": int(Time.get_unix_time_from_system()), "source": "RUN", "runSeed": str(run_payload.get("seed", "")), "nodeId": str(run_payload.get("currentNodeId", ""))}
+	return {"accepted": false, "salvaged": true, "discarded": false, "scrap": scrap_gain, "data": data_gain}
+
 func base_item_craft_quote(template_id: String, tech_level: int) -> Dictionary:
 	if not _garage_action_allowed():
 		return {"valid": false, "affordable": false, "error": "Изготовление доступно только в гараже между выездами."}
@@ -2913,11 +3040,23 @@ func dismantle_item(item_id: String) -> bool:
 func can_undo_last_dismantle() -> bool:
 	if state == null or state.meta.disassembly_undo.is_empty():
 		return false
-	if state.run != null and not ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(state.run.phase):
-		if state.run.phase != "ROUTE" or not state.run.visited_node_ids.is_empty():
+	var source: String = str(state.meta.disassembly_undo.get("source", "SECURED"))
+	if source == "RUN":
+		if state.run == null or state.run.phase != "ROUTE" or str(state.meta.disassembly_undo.get("runSeed", "")) != state.run.seed or str(state.meta.disassembly_undo.get("nodeId", "")) != state.run.current_node_id:
 			return false
+	else:
+		if state.run != null and not ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(state.run.phase):
+			if state.run.phase != "ROUTE" or not state.run.visited_node_ids.is_empty():
+				return false
 	var undo_item: Dictionary = state.meta.disassembly_undo.get("item", {})
-	return not undo_item.is_empty() and _secured_inventory_item(str(undo_item.get("itemId", ""))).is_empty()
+	if undo_item.is_empty():
+		return false
+	if source == "RUN":
+		for cargo_item: Dictionary in state.run.unsecured_cargo:
+			if str(cargo_item.get("itemId", "")) == str(undo_item.get("itemId", "")):
+				return false
+		return float(state.run.wallet.scrap) >= float(state.meta.disassembly_undo.get("scrap", 0.0)) and float(state.run.wallet.data) >= float(state.meta.disassembly_undo.get("data", 0.0))
+	return _secured_inventory_item(str(undo_item.get("itemId", ""))).is_empty()
 
 func undo_last_dismantle() -> bool:
 	if not can_undo_last_dismantle():
@@ -2926,19 +3065,30 @@ func undo_last_dismantle() -> bool:
 	var payload: Dictionary = state.to_payload()
 	var undo: Dictionary = payload["meta"].get("disassemblyUndo", {}).duplicate(true)
 	var item: Dictionary = undo.get("item", {}).duplicate(true)
-	if item.is_empty() or _inventory_has(payload["meta"]["inventory"], str(item.get("itemId", ""))):
+	var source: String = str(undo.get("source", "SECURED"))
+	if item.is_empty() or (source == "SECURED" and _inventory_has(payload["meta"]["inventory"], str(item.get("itemId", "")))):
 		last_error = "Предмет разбора уже присутствует в профиле."
 		return false
 	var scrap: float = float(undo.get("scrap", 0.0))
 	var data: float = float(undo.get("data", 0.0))
-	var bank: Dictionary = payload["meta"]["protectedBank"]
-	if float(bank.get("SCRAP", 0.0)) < scrap or float(bank.get("DATA", 0.0)) < data:
-		last_error = "Ресурсы разбора уже потрачены; отмена не может создать отрицательный баланс."
-		return false
-	bank["SCRAP"] = float(bank.get("SCRAP", 0.0)) - scrap
-	bank["DATA"] = float(bank.get("DATA", 0.0)) - data
-	payload["meta"]["inventory"].append(item)
-	payload["meta"]["protectedBank"] = bank
+	if source == "RUN":
+		var run_payload: Dictionary = payload["run"]
+		var wallet: Dictionary = run_payload["runWallet"]
+		if float(wallet.get("SCRAP", 0.0)) < scrap or float(wallet.get("DATA", 0.0)) < data or not _cargo_fits(run_payload, item):
+			last_error = "Груз или незакреплённые ресурсы изменились; отмена невозможна без потери предмета."
+			return false
+		wallet["SCRAP"] = float(wallet.get("SCRAP", 0.0)) - scrap
+		wallet["DATA"] = float(wallet.get("DATA", 0.0)) - data
+		run_payload["unsecuredCargo"].append(item)
+	else:
+		var bank: Dictionary = payload["meta"]["protectedBank"]
+		if float(bank.get("SCRAP", 0.0)) < scrap or float(bank.get("DATA", 0.0)) < data:
+			last_error = "Ресурсы разбора уже потрачены; отмена не может создать отрицательный баланс."
+			return false
+		bank["SCRAP"] = float(bank.get("SCRAP", 0.0)) - scrap
+		bank["DATA"] = float(bank.get("DATA", 0.0)) - data
+		payload["meta"]["inventory"].append(item)
+		payload["meta"]["protectedBank"] = bank
 	var history: Array = payload["meta"].get("disassemblyHistory", [])
 	for index: int in range(history.size() - 1, -1, -1):
 		if str(history[index].get("itemId", "")) == str(item.get("itemId", "")) and not bool(history[index].get("undone", false)):

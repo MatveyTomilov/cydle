@@ -1,6 +1,28 @@
 extends "res://tests/test_case.gd"
 
 func run(_tree: SceneTree) -> bool:
+	var loot_filter_session: GameSession = GameSession.new()
+	loot_filter_session.configure_save_directory("user://test-saves/loot-filter")
+	if check(loot_filter_session.start_new_game(1762900000046), "game_session: could not create a loot-filter profile"):
+		var filter_settings: Dictionary = {"preset": "CUSTOM", "minimumRarity": "RARE", "itemType": "ANY", "slot": "ANY", "requiredTags": [], "minimumAffixTier": 1, "affixId": "", "autoDismantle": true}
+		check(loot_filter_session.auto_dismantle_available(), "game_session: starter scanner did not enable auto dismantle")
+		check(loot_filter_session.set_loot_filter_settings(filter_settings), "game_session: valid custom loot filter was rejected: %s" % loot_filter_session.last_error)
+		check(loot_filter_session.start_expedition("loot-filter-seed"), "game_session: could not start loot-filter sortie")
+		var loot_catalog: ItemCatalog = ItemCatalog.new()
+		check(bool(loot_catalog.load_catalog().get("ok", false)), "game_session: item catalog could not load for loot-filter test")
+		var loot_rng: DeterministicRng = DeterministicRng.new()
+		loot_rng.seed("loot-filter-seed", "filtered-item")
+		var filtered_result: Dictionary = ItemFactory.new().create_item(loot_rng, loot_catalog, {"templateId": "PISTOL_K1", "techLevel": 1, "rarity": "COMMON", "secured": false, "originGrantId": "loot-filter:filtered", "origin": "test", "acquiredAt": 0})
+		if check(bool(filtered_result.get("ok", false)), "game_session: filtered common item fixture could not be created"):
+			var filtered_item: Dictionary = (filtered_result["item"] as ItemInstance).to_dictionary()
+			var loot_payload: Dictionary = loot_filter_session.state.to_payload()
+			var loot_receipt: Dictionary = loot_filter_session._receive_run_item(loot_payload, filtered_item, "TEST")
+			check(bool(loot_receipt.get("salvaged", false)) and not bool(loot_receipt.get("accepted", false)), "game_session: custom filter did not salvage an excluded item into run resources")
+			check(float(loot_payload["run"]["runWallet"]["SCRAP"]) > 0.0 and loot_payload["meta"]["protectedBank"]["SCRAP"] == loot_filter_session.state.meta.protected_bank.scrap, "game_session: auto dismantle incorrectly protected SCRAP before extraction")
+			check(loot_filter_session._commit_payload(loot_payload), "game_session: auto dismantle save was rejected: %s" % loot_filter_session.last_error)
+			check(loot_filter_session.can_undo_last_dismantle() and loot_filter_session.undo_last_dismantle(), "game_session: auto dismantle could not be undone before the next node: %s" % loot_filter_session.last_error)
+			check(loot_filter_session.state.run.unsecured_cargo.any(func(entry: Dictionary) -> bool: return str(entry.get("itemId", "")) == str(filtered_item.get("itemId", ""))), "game_session: undo did not restore filtered cargo item")
+
 	var terminal_build_session: GameSession = GameSession.new()
 	terminal_build_session.configure_save_directory("user://test-saves/terminal-build-history")
 	if check(terminal_build_session.start_new_game(1762900000048), "game_session: could not create a terminal-build regression profile") and check(terminal_build_session.start_expedition("terminal-build-history"), "game_session: could not start terminal-build regression sortie"):

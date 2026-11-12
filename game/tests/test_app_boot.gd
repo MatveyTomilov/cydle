@@ -49,6 +49,9 @@ func run(tree: SceneTree) -> bool:
 		check(pilot_session._commit_payload(checkpoint_payload), "test_app_boot: could not prepare the checkpoint-shipping UI")
 		app.call("_show_road")
 		check(_has_button(body, "ОТПРАВИТЬ НА СКЛАД И ПРОДОЛЖИТЬ"), "test_app_boot: checkpoint did not expose protected cargo shipping")
+		app.call("_show_inventory")
+		check(_has_label(app, "ФИЛЬТР ДОБЫЧИ · РЕШЕНИЕ О ПОДБОРЕ ПРИМЕНЯЕТСЯ К БОЕВЫМ, КВЕСТОВЫМ И СОБЫТИЙНЫМ НАГРАДАМ"), "test_app_boot: inventory omitted the persistent loot filter controls")
+		check(_has_button(body, "СОХРАНИТЬ ФИЛЬТР"), "test_app_boot: inventory did not expose the loot filter save action")
 
 	app.queue_free()
 	await tree.process_frame

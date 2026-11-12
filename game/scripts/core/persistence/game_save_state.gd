@@ -176,6 +176,7 @@ class MetaState:
 	var quest_progress: Dictionary = {}
 	var disassembly_history: Array[Dictionary] = []
 	var disassembly_undo: Dictionary = {}
+	var loot_filter: Dictionary = {"preset": "ALL", "minimumRarity": "COMMON", "itemType": "ANY", "slot": "ANY", "requiredTags": [], "minimumAffixTier": 1, "affixId": "", "autoDismantle": false}
 
 	func to_dictionary() -> Dictionary:
 		var result: Dictionary = {
@@ -210,6 +211,9 @@ class MetaState:
 			result["codexEnemyIds"] = codex_enemy_ids.duplicate()
 		if not disassembly_undo.is_empty():
 			result["disassemblyUndo"] = disassembly_undo.duplicate(true)
+		var default_loot_filter: Dictionary = {"preset": "ALL", "minimumRarity": "COMMON", "itemType": "ANY", "slot": "ANY", "requiredTags": [], "minimumAffixTier": 1, "affixId": "", "autoDismantle": false}
+		if loot_filter != default_loot_filter:
+			result["lootFilter"] = loot_filter.duplicate(true)
 		if not active_autopilot_profile_id.is_empty():
 			result["activeAutopilotProfileId"] = active_autopilot_profile_id
 		if quest_progress.is_empty():
@@ -297,6 +301,7 @@ func _meta_from_dictionary(value: Dictionary) -> MetaState:
 	result.quest_progress = value.get("questProgress", {}).duplicate(true)
 	result.disassembly_history.assign(value.get("disassemblyHistory", []))
 	result.disassembly_undo = value.get("disassemblyUndo", {}).duplicate(true)
+	result.loot_filter = value.get("lootFilter", {"preset": "ALL", "minimumRarity": "COMMON", "itemType": "ANY", "slot": "ANY", "requiredTags": [], "minimumAffixTier": 1, "affixId": "", "autoDismantle": false}).duplicate(true)
 	return result
 
 func _run_from_dictionary(value: Dictionary) -> RunState:

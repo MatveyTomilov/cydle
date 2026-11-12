@@ -50,6 +50,7 @@ func _validate_meta(value: Variant) -> Dictionary:
 	meta_allowed.append("activeAutopilotProfileId")
 	meta_allowed.append("autopilotReportHistory")
 	meta_allowed.append("codexEnemyIds")
+	meta_allowed.append("lootFilter")
 	if not _has_keys(meta, keys) or not _has_only_keys(meta, meta_allowed):
 		return _failure("meta: отсутствуют обязательные поля или есть неизвестные поля.")
 	if meta.has("questProgress") and not _validate_quest_progress(meta["questProgress"]):
@@ -62,6 +63,8 @@ func _validate_meta(value: Variant) -> Dictionary:
 		return _failure("meta.autopilotReportHistory: история автопилота повреждена.")
 	if meta.has("codexEnemyIds") and not _validate_codex_enemy_ids(meta["codexEnemyIds"]):
 		return _failure("meta.codexEnemyIds: список записей кодекса повреждён.")
+	if meta.has("lootFilter") and not _validate_loot_filter(meta["lootFilter"]):
+		return _failure("meta.lootFilter: настройки фильтра добычи повреждены.")
 	var operator_value: Variant = meta["operator"]
 	if not operator_value is Dictionary or not _has_exact_keys(operator_value, ["level", "xp", "attributes", "attributePoints", "treePoints"]):
 		return _failure("meta.operator: неверная структура.")
@@ -172,6 +175,28 @@ func _validate_codex_enemy_ids(value: Variant) -> bool:
 	for enemy_id: Variant in value:
 		if not catalog.enemies.has(str(enemy_id)):
 			return false
+	return true
+
+func _validate_loot_filter(value: Variant) -> bool:
+	if not value is Dictionary:
+		return false
+	var filter: Dictionary = value
+	if not _has_exact_keys(filter, ["preset", "minimumRarity", "itemType", "slot", "requiredTags", "minimumAffixTier", "affixId", "autoDismantle"]):
+		return false
+	if not ["ALL", "RARE_PLUS", "TAGS", "CUSTOM"].has(str(filter["preset"])) or not RARITIES.has(str(filter["minimumRarity"])):
+		return false
+	if str(filter["itemType"]) != "ANY" and not ItemCatalog.CATEGORIES.has(str(filter["itemType"])):
+		return false
+	if str(filter["slot"]) != "ANY" and not SLOT_KEYS.has(str(filter["slot"])):
+		return false
+	if not filter["requiredTags"] is Array or filter["requiredTags"].size() > 32 or not _string_array(filter["requiredTags"]) or not _unique_strings(filter["requiredTags"]):
+		return false
+	if str(filter["preset"]) == "TAGS" and filter["requiredTags"].is_empty():
+		return false
+	if not _is_integer(filter["minimumAffixTier"]) or int(filter["minimumAffixTier"]) < 1 or int(filter["minimumAffixTier"]) > 4:
+		return false
+	if not filter["affixId"] is String or not filter["autoDismantle"] is bool:
+		return false
 	return true
 
 func _validate_run(value: Variant, meta: Dictionary) -> Dictionary:
@@ -489,11 +514,14 @@ func _validate_disassembly_history(value: Variant) -> bool:
 	return true
 
 func _validate_disassembly_undo(value: Variant) -> bool:
-	if not value is Dictionary or not _has_exact_keys(value, ["item", "scrap", "data", "createdAt"]):
+	if not value is Dictionary or not _has_keys(value, ["item", "scrap", "data", "createdAt"]) or not _has_only_keys(value, ["item", "scrap", "data", "createdAt", "source", "runSeed", "nodeId"]):
 		return false
 	if not value["item"] is Dictionary or not _validate_item(value["item"]):
 		return false
-	if not bool(value["item"].get("secured", false)):
+	var source: String = str(value.get("source", "SECURED"))
+	if not ["SECURED", "RUN"].has(source) or bool(value["item"].get("secured", false)) != (source == "SECURED"):
+		return false
+	if source == "RUN" and (not _nonempty_string(value.get("runSeed", "")) or not _nonempty_string(value.get("nodeId", ""))):
 		return false
 	for key: String in ["scrap", "data", "createdAt"]:
 		if not _is_finite_number(value[key]) or float(value[key]) < 0.0:

@@ -1,13 +1,14 @@
 # CYDLE — Project handoff and development history
 
-## Current live continuation (2026-11-12; supersedes checkpoint below)
+## Current live continuation (2026-11-13; supersedes checkpoint below)
 
-### Current status override (2026-11-13; campaign chronicle WIP)
+### Current status override (2026-11-13; campaign chronicle pushed, loot-filter WIP)
 
-- Pushed base: `610f5469005e0197aa590c9c466910a613d2e033` on `development/codex`. Current local WIP adds an Act I/II/III campaign chronicle that renders boss milestones, ending choice, and faction standings from saved campaign flags.
-- EV15 A now grants a deterministic, previously undiscovered enemy codex entry eligible for the current run depth/biome, persists it in validated META, and exposes an enemy archive screen from the garage/quest journal. EV10 B records the actual sector boss and lower ENERGY/DIGITAL resistance as weakness intel; the road map shows it next to that boss. The generic event flags remain for compatibility.
-- Actual checks for chronicle WIP: Godot 4.7.2 editor import exit 0; 22 scripts / 87,593 assertions / 0 failures; Windows Desktop export exit 0; exported EXE `--headless --quit-after 3` exit 0; `git diff --check` exit 0. TypeScript was not run (native Godot only).
-- Next action: commit/push the chronicle, then continue the event/quest audit for remaining player-invisible effects. Do not claim the full story complete.
+- Pushed base: `167908d53911d50f869dbb3c3ec81543f935c52a` on `development/codex`; remote matched at session start. This base adds the Act I/II/III campaign chronicle, displaying saved boss milestones, ending choice, and faction standings.
+- The base also contains EV15 A's deterministic enemy codex discovery and EV10 B's sector-boss weakness intel; both effects persist and are exposed through the UI.
+- Current local WIP implements the Master Spec §19.3 loot filter across combat, cache, event, quest, and contract item grants. It supports ALL, RARE+, tag and custom rarity/item-type/slot/affix rules; never auto-discards an undiscovered UNIQUE; optional auto-dismantle requires an installed SCANNER or WORKSHOP L3, adds scrap/data to unsecured RUN currency, records the item seed and reason, and allows one undo before entering another node. Inventory UI exposes the saved rules and their equipment gate. The new optional META field is backward-compatible: the default policy is omitted from serialized saves. Build Lab comparison as a filter predicate is still outstanding.
+- Latest actual checks for this WIP: Godot 4.7.2 editor import exit 0; 22 scripts / 87,606 assertions / 0 failures; Windows Desktop export exit 0; exported EXE `--headless --quit-after 3` exit 0; `git diff --check` exit 0. TypeScript was not run (native Godot only).
+- Exact continuation: save this WIP in a checkpoint commit and push `development/codex`; then continue breadth-first through remaining full-game gaps in cargo/economy and narrative interactions. The full campaign has been exercised through d12 and d13 route/checkpoint in the preserved external E2E profile, but that is not complete 1.0 acceptance. Do not claim all events/quests or release criteria complete.
 - Preserve the external campaign E2E profile and safety copy below; continue full-game coverage without Lab presets, report exports, or polish.
 
 ### Previous connected event/autopilot checkpoints
