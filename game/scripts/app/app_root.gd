@@ -186,6 +186,22 @@ func _show_garage() -> void:
 		summary.add_child(_label("УРОН K %s   E %s   D %s     БРОНЯ %s" % [_fmt(sheet.get("kineticDamage", 0)), _fmt(sheet.get("energyDamage", 0)), _fmt(sheet.get("digitalDamage", 0)), _fmt(sheet.get("armor", 0))], 14, COLOR_TEXT))
 		summary.add_child(_label("ЗАЩИЩЁННЫЙ СЧЁТ   ¤ %d   ·   scrap %d   ·   data %d" % [int(meta.protected_bank.credits), int(meta.protected_bank.scrap), int(meta.protected_bank.data)], 13, COLOR_AMBER))
 		summary.add_child(_label("ФОРПОСТ %d   ·   МАКСИМАЛЬНЫЙ СЕКТОР %d" % [meta.unlocked_forpost, meta.max_sector_cleared], 12, COLOR_MUTED))
+	var points_available: int = _session.attribute_points_available()
+	_body.add_child(_label("АТРИБУТЫ   ·   %d ОЧК. ДОСТУПНО" % points_available, 13, COLOR_CYAN))
+	var attribute_row: HBoxContainer = HBoxContainer.new()
+	attribute_row.add_theme_constant_override("separation", 7)
+	_body.add_child(attribute_row)
+	var attribute_names: Dictionary = {"POW": "МОЩЬ", "REF": "РЕАКЦИЯ", "INT": "ИНТЕЛЛЕКТ", "ENG": "ИНЖЕНЕРИЯ", "SYN": "СИНХРОНИЗАЦИЯ"}
+	for attribute_id: String in ["POW", "REF", "INT", "ENG", "SYN"]:
+		var attribute_button: Button = _button("%s  %d  +1" % [str(attribute_names[attribute_id]), int(meta.operator.attributes.get(attribute_id, 5))], false)
+		attribute_button.disabled = points_available <= 0
+		attribute_button.pressed.connect(_on_allocate_attribute.bind(attribute_id))
+		attribute_row.add_child(attribute_button)
+	var spent_points: int = int(meta.operator.attribute_points) - points_available
+	var respec_button: Button = _button("СБРОСИТЬ · %d ¤" % (spent_points * 10), false)
+	respec_button.disabled = spent_points <= 0 or meta.protected_bank.credits < spent_points * 10
+	respec_button.pressed.connect(_on_respec_attributes)
+	attribute_row.add_child(respec_button)
 	var equipped: HBoxContainer = HBoxContainer.new()
 	equipped.add_theme_constant_override("separation", 8)
 	_body.add_child(equipped)
@@ -593,6 +609,16 @@ func _on_save() -> void:
 		_footer.text = "СОХРАНЕНО · РЕВИЗИЯ %d" % _session.state.revision
 	else:
 		_footer.text = _session.last_error
+
+func _on_allocate_attribute(attribute_id: String) -> void:
+	var allocated: bool = _session.allocate_attribute(attribute_id)
+	_show_garage()
+	_footer.text = "АТРИБУТ РАСПРЕДЕЛЁН · BUILD RESOLVER ПЕРЕСЧИТАН" if allocated else _session.last_error
+
+func _on_respec_attributes() -> void:
+	var reset: bool = _session.respec_attributes()
+	_show_garage()
+	_footer.text = "АТРИБУТЫ СБРОШЕНЫ · ОЧКИ ВОЗВРАЩЕНЫ" if reset else _session.last_error
 
 func _on_equip_item(slot: String, item_id: String) -> void:
 	if _session.equip_item(slot, item_id):

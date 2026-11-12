@@ -85,6 +85,65 @@ func build_preview() -> Dictionary:
 		"unlockedDroneSlots": state.meta.unlocked_drone_slots,
 	})
 
+func attribute_points_available() -> int:
+	if state == null:
+		return 0
+	var spent: int = 0
+	for value: Variant in state.meta.operator.attributes.values():
+		spent += maxi(0, int(value) - 5)
+	return maxi(0, state.meta.operator.attribute_points - spent)
+
+func allocate_attribute(attribute_id: String) -> bool:
+	if state == null:
+		last_error = "Нет активного профиля."
+		return false
+	if not ["POW", "REF", "INT", "ENG", "SYN"].has(attribute_id):
+		last_error = "Неизвестный атрибут %s." % attribute_id
+		return false
+	if attribute_points_available() <= 0:
+		last_error = "Нет свободных очков атрибутов."
+		return false
+	if state.run != null and not ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(state.run.phase):
+		last_error = "Атрибуты можно распределять только в гараже между выездами."
+		return false
+	var payload: Dictionary = state.to_payload()
+	var operator: Dictionary = payload["meta"]["operator"]
+	var attributes: Dictionary = operator["attributes"]
+	attributes[attribute_id] = int(attributes.get(attribute_id, 5)) + 1
+	operator["attributes"] = attributes
+	payload["meta"]["operator"] = operator
+	if not _commit_payload(payload):
+		return false
+	var build: Dictionary = build_preview()
+	if not bool(build.get("valid", false)):
+		last_error = "Распределение отклонено BuildResolver: %s" % str(build.get("issues", []))
+		return false
+	return true
+
+func respec_attributes() -> bool:
+	if state == null:
+		last_error = "Нет активного профиля."
+		return false
+	if state.run != null and not ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(state.run.phase):
+		last_error = "Перераспределение доступно только в гараже между выездами."
+		return false
+	var spent: int = 0
+	for value: Variant in state.meta.operator.attributes.values():
+		spent += maxi(0, int(value) - 5)
+	if spent <= 0:
+		last_error = "Нет распределённых очков для сброса."
+		return false
+	var cost: int = spent * 10
+	if state.meta.protected_bank.credits < cost:
+		last_error = "Для сброса требуется %d защищённых кредитов." % cost
+		return false
+	var payload: Dictionary = state.to_payload()
+	var operator: Dictionary = payload["meta"]["operator"]
+	operator["attributes"] = {"POW": 5, "REF": 5, "INT": 5, "ENG": 5, "SYN": 5}
+	payload["meta"]["operator"] = operator
+	payload["meta"]["protectedBank"]["CREDITS"] = float(payload["meta"]["protectedBank"].get("CREDITS", 0.0)) - float(cost)
+	return _commit_payload(payload)
+
 func start_expedition(seed_value: String = "") -> bool:
 	if state == null:
 		last_error = "Сначала создайте или загрузите профиль."

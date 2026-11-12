@@ -58,6 +58,23 @@ func run(_tree: SceneTree) -> bool:
 				if str(item.get("templateId", "")) == "IMP_HEAT":
 					found_prototype = true
 			check(found_prototype, "game_session: chosen tutorial prototype was not added to run cargo")
+	var attribute_session: GameSession = GameSession.new()
+	attribute_session.configure_save_directory("user://test-saves/attribute-investment")
+	if check(attribute_session.start_new_game(1762900000200), "game_session: could not create an attribute-investment profile"):
+		var attribute_payload: Dictionary = attribute_session.state.to_payload()
+		attribute_payload["meta"]["operator"]["attributePoints"] = 2
+		attribute_payload["meta"]["protectedBank"]["CREDITS"] = 50.0
+		check(attribute_session._commit_payload(attribute_payload), "game_session: attribute-investment fixture could not be saved")
+		var base_kinetic: float = float(attribute_session.build_preview().get("stats", {}).get("kineticDamage", 0.0))
+		check(attribute_session.attribute_points_available() == 2, "game_session: free attribute points were calculated incorrectly")
+		check(attribute_session.allocate_attribute("POW"), "game_session: POW could not be allocated: %s" % attribute_session.last_error)
+		check(int(attribute_session.state.meta.operator.attributes.get("POW", 0)) == 6 and attribute_session.attribute_points_available() == 1, "game_session: attribute allocation was not persisted")
+		check(float(attribute_session.build_preview().get("stats", {}).get("kineticDamage", 0.0)) > base_kinetic, "game_session: allocated POW did not affect the resolved build")
+		check(attribute_session.respec_attributes(), "game_session: attribute respec failed: %s" % attribute_session.last_error)
+		check(int(attribute_session.state.meta.operator.attributes.get("POW", 0)) == 5 and attribute_session.attribute_points_available() == 2, "game_session: respec did not return its point")
+		check(is_equal_approx(attribute_session.state.meta.protected_bank.credits, 40.0), "game_session: attribute respec did not charge 10 credits per allocated point")
+		check(attribute_session.start_expedition("attribute-lock-test"), "game_session: attribute test expedition failed to start")
+		check(not attribute_session.allocate_attribute("REF") and int(attribute_session.state.meta.operator.attributes.get("REF", 0)) == 5, "game_session: attribute allocation was allowed during an active expedition")
 	var resumed: GameSession = GameSession.new()
 	resumed.configure_save_directory("user://test-saves/game-session")
 	check(resumed.load_saved_game(), "game_session: persisted state did not reload: %s" % resumed.last_error)
