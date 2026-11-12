@@ -278,6 +278,44 @@ const weaponReplayOutput = resolve('game/tests/fixtures/combat/weapon_packet_rep
 writeFileSync(weaponReplayOutput, `${JSON.stringify(weaponPacketReplays, null, 2)}\n`, 'utf8');
 console.log(`Exported ${weaponPacketReplays.length} multi-channel/packet combat replays to ${weaponReplayOutput}`);
 
+const burstBuild = resolveBuild({
+  attributes: initialSaveFixture.meta.operator.attributes, equipment: { MAIN: starterMain },
+  skillIds: ['SK_BURST'], passiveIds: [], treeNodeIds: [], attributePointsEarned: 0, treePointsEarned: 0,
+});
+const burstTactics: TacticalProfile = {
+  id: 'BURST_TEST', name: 'Burst replay', rules: [{
+    id: 'RULE_BURST', priority: 100, enabled: true, skillId: 'SK_BURST',
+    target: 'nearest', conditions: [], logic: 'AND',
+  }],
+};
+const burstConfig = { ...basicStateConfig, build: burstBuild, tactics: burstTactics };
+let burstState = createCombatState(burstConfig);
+const burstFrames = [];
+for (let tick = 0; tick < 14; tick++) {
+  const previousLogLength = burstState.log.length;
+  burstState = stepCombat(burstState);
+  const actorFrame = (actor: typeof burstState.operator) => ({
+    id: actor.id, hp: actor.hp, shield: actor.shield, energy: actor.energy, heat: actor.heat,
+    nextAttackAt: actor.nextAttackAt, alive: actor.alive, flags: actor.flags, counters: actor.counters,
+    cooldowns: actor.cooldowns, cast: actor.cast,
+    damageDealt: actor.damageDealt, damageTaken: actor.damageTaken,
+  });
+  burstFrames.push({
+    timeMs: burstState.timeMs, rng: burstState.rng, nextEventId: burstState.nextEventId,
+    metrics: burstState.metrics, outcome: burstState.outcome,
+    operator: actorFrame(burstState.operator), enemies: burstState.enemies.map(actorFrame),
+    events: burstState.log.slice(previousLogLength),
+  });
+}
+const burstReplayOutput = resolve('game/tests/fixtures/combat/main_skill_replay.json');
+writeFileSync(burstReplayOutput, `${JSON.stringify({
+  config: {
+    seed: burstConfig.seed, depth: burstConfig.depth, biome: burstConfig.biome, nodeType: burstConfig.nodeType,
+    enemy: burstConfig.enemies[0], tactics: burstTactics, maxDurationMs: burstConfig.maxDurationMs,
+  }, build: burstBuild, frames: burstFrames,
+}, null, 2)}\n`, 'utf8');
+console.log(`Exported ${burstFrames.length} main-skill cast replay frames to ${burstReplayOutput}`);
+
 let dotState = createCombatState(basicStateConfig);
 applyStatus(dotState, dotState.operator, dotState.enemies[0]!, 'BLEED', { snapshot: 100 });
 const dotFrames = [];

@@ -88,11 +88,18 @@ func step_combat(state: CombatState) -> Dictionary:
 	_apply_basic_continuous(next)
 	_tick_dot_statuses(next)
 	_expire_dot_statuses(next)
+	_advance_main_skill_cast(next, rng)
 	var ready: Array[CombatActorState] = next.all_actors()
 	ready.sort_custom(func(left: CombatActorState, right: CombatActorState) -> bool: return left.id < right.id)
 	for actor: CombatActorState in ready:
 		if not actor.alive or actor.next_attack_at > float(next.time_ms):
 			continue
+		if actor.kind == "operator":
+			if actor.cast != null:
+				continue
+			var chosen: Dictionary = _choose_main_skill(next, rng, actor)
+			if bool(chosen.get("started", false)):
+				continue
 		var target: CombatActorState = _pick_auto_target(next, actor)
 		if target == null:
 			continue
@@ -106,12 +113,21 @@ func step_combat(state: CombatState) -> Dictionary:
 	return {"ok": true, "state": next, "error": ""}
 
 func _supports_basic_auto_step(state: CombatState) -> bool:
-	if not state.tactics.get("rules", []).is_empty() or not state.build.get("triggerEffects", []).is_empty():
+	if not state.build.get("triggerEffects", []).is_empty():
 		return false
+	for rule_value: Variant in state.tactics.get("rules", []):
+		if not rule_value is Dictionary or not bool(rule_value.get("enabled", false)):
+			continue
+		if str(rule_value.get("skillId", "AUTO")) not in ["AUTO", "SK_BURST"] or not rule_value.get("conditions", []).is_empty():
+			return false
+		if str(rule_value.get("skillId", "AUTO")) == "SK_BURST" and str(rule_value.get("target", "nearest")) not in ["nearest", "lowestHPPercent"]:
+			return false
 	if state.extra_enemy_digital_bonus != 0.0:
 		return false
 	for actor: CombatActorState in state.all_actors():
-		if not actor.elite_mod.is_empty() or not actor.ability_next.is_empty() or not actor.buffs.is_empty() or actor.cast != null or actor.reaction_cast != null:
+		if not actor.elite_mod.is_empty() or not actor.ability_next.is_empty() or not actor.buffs.is_empty() or actor.reaction_cast != null:
+			return false
+		if actor.cast != null and (actor.kind != "operator" or not actor.cast is Dictionary or str(actor.cast.get("skillId", "")) != "SK_BURST"):
 			return false
 		for status_id: Variant in actor.statuses.keys():
 			if not STEP_STATUS_IDS.has(str(status_id)):
@@ -121,6 +137,149 @@ func _supports_basic_auto_step(state: CombatState) -> bool:
 			if not template.get("passives", []).is_empty() or not template.get("rotating", []).is_empty():
 				return false
 	return true
+
+func _choose_main_skill(state: CombatState, _rng: DeterministicRng, actor: CombatActorState) -> Dictionary:
+	var rules: Array = state.tactics.get("rules", []).duplicate(true)
+	rules = rules.filter(func(rule: Variant) -> bool: return rule is Dictionary and bool(rule.get("enabled", false)))
+	rules.sort_custom(func(left: Dictionary, right: Dictionary) -> bool:
+		var left_priority: int = int(left.get("priority", 0))
+		var right_priority: int = int(right.get("priority", 0))
+		return left_priority > right_priority if left_priority != right_priority else str(left.get("id", "")) < str(right.get("id", "")))
+	for rule: Dictionary in rules:
+		var skill_id: String = str(rule.get("skillId", "AUTO"))
+		if skill_id == "AUTO":
+			return {"started": false}
+		var skill: Dictionary = _equipped_skill(state, skill_id)
+		var rule_id: String = str(rule.get("id", ""))
+		if skill.is_empty():
+			_record_rule_failure(state, rule_id, "not_equipped")
+			continue
+		if float(actor.cooldowns.get(skill_id, 0.0)) > float(state.time_ms):
+			_record_rule_failure(state, rule_id, "cooldown")
+			continue
+		var energy_cost: float = float(skill.get("energyCost", 0.0))
+		if float(actor.energy) < energy_cost:
+			_record_rule_failure(state, rule_id, "energy")
+			continue
+		var target: CombatActorState = _pick_rule_target(state, actor, str(rule.get("target", skill.get("targetMode", "nearest"))))
+		if target == null and str(skill.get("targetMode", "")) != "self":
+			_record_rule_failure(state, rule_id, "no_target")
+			continue
+		if skill.get("requires", []).has("VIRUS") and (target == null or not _has_status(target, "VIRUS")):
+			_record_rule_failure(state, rule_id, "requirement")
+			continue
+		_start_main_skill(state, actor, skill, target)
+		return {"started": true}
+	return {"started": false}
+
+func _equipped_skill(state: CombatState, skill_id: String) -> Dictionary:
+	for skill: Variant in state.build.get("skills", []):
+		if skill is Dictionary and str(skill.get("id", "")) == skill_id:
+			return skill
+	return {}
+
+func _pick_rule_target(state: CombatState, actor: CombatActorState, mode: String) -> CombatActorState:
+	if mode == "self":
+		return actor
+	var enemies: Array[CombatActorState] = []
+	for enemy: CombatActorState in state.enemies:
+		if enemy.alive:
+			enemies.append(enemy)
+	enemies.sort_custom(func(left: CombatActorState, right: CombatActorState) -> bool: return left.id < right.id)
+	if enemies.is_empty():
+		return null
+	if mode == "lowestHPPercent":
+		enemies.sort_custom(func(left: CombatActorState, right: CombatActorState) -> bool:
+			var left_fraction: float = left.hp / maxf(1.0, float(left.base_sheet.get("maxHP", 1.0)))
+			var right_fraction: float = right.hp / maxf(1.0, float(right.base_sheet.get("maxHP", 1.0)))
+			return left_fraction < right_fraction if not is_equal_approx(left_fraction, right_fraction) else left.id < right.id)
+	return enemies[0]
+
+func _start_main_skill(state: CombatState, actor: CombatActorState, skill: Dictionary, target: CombatActorState) -> void:
+	var skill_id: String = str(skill.get("id", ""))
+	var cost: float = float(skill.get("energyCost", 0.0))
+	actor.energy = clampf(actor.energy - cost, 0.0, float(actor.base_sheet.get("maxEnergy", 0.0)))
+	state.metrics["energySpent"] = float(state.metrics.get("energySpent", 0.0)) + cost
+	_gain_basic_heat(state, actor, float(skill.get("heatDelta", 0.0)))
+	var cooldown: float = _formula.cooldown_ms(float(skill.get("cooldownMs", 0.0)), float(_effective_sheet(state, actor).get("cooldownRecovery", 0.0)))
+	actor.cooldowns[skill_id] = float(state.time_ms) + cooldown
+	actor.counters["casts"] = int(actor.counters.get("casts", 0)) + 1
+	var action_id: String = "%s:skill:%s:%d" % [actor.id, skill_id, int(actor.counters["casts"])]
+	var windup: float = float(skill.get("windupMs", 0.0))
+	var recovery: float = float(skill.get("recoveryMs", 0.0))
+	var end_at: float = float(state.time_ms) + windup + recovery
+	actor.cast = {
+		"actionId": action_id, "skillId": skill_id, "startedAt": state.time_ms,
+		"resolveAt": float(state.time_ms) + windup, "endAt": end_at,
+		"targetId": target.id if target != null else "", "interruptible": bool(skill.get("interruptible", false)),
+		"telegraph": false, "channel": "main",
+	}
+	actor.last_skill_id = skill_id
+	if target != null:
+		actor.last_target_id = target.id
+	actor.next_attack_at = end_at
+	actor.last_main_attack_at = state.time_ms
+	_emit(state, "CAST_START", actor.id, {
+		"skillId": skill_id, "targetId": target.id if target != null else "", "actionId": action_id,
+		"text": "%s: %s." % [actor.display_name, str(skill.get("name", skill_id))],
+		"data": {"channel": "main", "windupMs": windup, "recoveryMs": recovery, "cooldownMs": cooldown, "emergency": false},
+	})
+
+func _advance_main_skill_cast(state: CombatState, rng: DeterministicRng) -> void:
+	var actor: CombatActorState = state.operator
+	if actor.cast == null or not actor.cast is Dictionary:
+		return
+	var cast: Dictionary = actor.cast
+	if _has_status(actor, "STUN"):
+		cast["resolveAt"] = float(cast.get("resolveAt", 0.0)) + TICK_MS
+		cast["endAt"] = float(cast.get("endAt", 0.0)) + TICK_MS
+		actor.next_attack_at += TICK_MS
+		return
+	if not bool(cast.get("resolved", false)) and state.time_ms >= float(cast.get("resolveAt", 0.0)):
+		cast["resolved"] = true
+		_resolve_main_skill(state, rng, actor, cast)
+	if state.time_ms >= float(cast.get("endAt", 0.0)):
+		actor.cast = null
+
+func _resolve_main_skill(state: CombatState, rng: DeterministicRng, actor: CombatActorState, cast: Dictionary) -> void:
+	var skill_id: String = str(cast.get("skillId", ""))
+	var skill: Dictionary = _equipped_skill(state, skill_id)
+	if skill.is_empty():
+		return
+	var target: CombatActorState = _actor_by_id(state, str(cast.get("targetId", "")))
+	state.metrics["skillUses"][skill_id] = int(state.metrics["skillUses"].get(skill_id, 0)) + 1
+	_emit(state, "SKILL_USE", actor.id, {
+		"skillId": skill_id, "targetId": target.id if target != null else "", "actionId": str(cast.get("actionId", "")),
+		"originActionId": str(cast.get("actionId", "")), "text": "%s: %s." % [actor.display_name, str(skill.get("name", skill_id))],
+		"data": {"channel": "main"},
+	})
+	var weapon: Dictionary = state.build.get("mainWeapon", {})
+	var basis: String = str(skill.get("basis", ""))
+	var damage_type: String = "KINETIC" if basis == "MAIN_K" else str(weapon.get("type", "KINETIC"))
+	var coefficient: float = float(skill.get("hitCoefficient", skill.get("coefficient", 1.0)))
+	var hits: int = maxi(1, int(skill.get("hits", 1)))
+	for hit_index: int in range(hits):
+		var current_target: CombatActorState = _actor_by_id(state, str(cast.get("targetId", "")))
+		if current_target == null or not current_target.alive:
+			current_target = _pick_auto_target(state, actor)
+		if current_target == null:
+			break
+		var hit: Dictionary = _resolve_basic_hit(
+			state, rng, actor, current_target, float(weapon.get("damage", 0.0)) * coefficient,
+			damage_type, str(cast.get("actionId", "")), true, skill_id,
+		)
+		if not bool(hit.get("ok", false)):
+			return
+
+func _record_rule_failure(state: CombatState, rule_id: String, reason: String) -> void:
+	var failures: Array = state.metrics.get("ruleFailures", [])
+	for entry: Dictionary in failures:
+		if str(entry.get("ruleId", "")) == rule_id and str(entry.get("reason", "")) == reason:
+			entry["count"] = int(entry.get("count", 0)) + 1
+			return
+	failures.append({"ruleId": rule_id, "reason": reason, "count": 1, "firstAt": state.time_ms})
+	state.metrics["ruleFailures"] = failures
+	_emit(state, "RULE_FAIL", "operator", {"reason": reason, "text": "Правило %s: %s." % [rule_id, reason], "data": {"ruleId": rule_id}})
 
 func apply_status(state: CombatState, source_id: String, target_id: String, status_id: String, options: Dictionary = {}) -> Dictionary:
 	if state == null:
@@ -464,7 +623,7 @@ func _attack_packets(actor: CombatActorState, weapon: Dictionary) -> Array[Dicti
 		packets.append({"type": actor.attack_type, "amount": actor.attack_damage})
 	return packets
 
-func _resolve_basic_hit(state: CombatState, rng: DeterministicRng, actor: CombatActorState, target: CombatActorState, raw_base: float, damage_type: String, action_id: String, is_main: bool) -> Dictionary:
+func _resolve_basic_hit(state: CombatState, rng: DeterministicRng, actor: CombatActorState, target: CombatActorState, raw_base: float, damage_type: String, action_id: String, is_main: bool, skill_id: String = "") -> Dictionary:
 	var attacker: Dictionary = _effective_sheet(state, actor, target)
 	var defender: Dictionary = _effective_sheet(state, target, actor)
 	var accuracy: float = float(attacker.get("accuracy", 100.0))
@@ -475,10 +634,13 @@ func _resolve_basic_hit(state: CombatState, rng: DeterministicRng, actor: Combat
 		state.metrics["misses"] = int(state.metrics.get("misses", 0)) + 1
 		if target.kind == "operator":
 			state.metrics["dodgesTaken"] = int(state.metrics.get("dodgesTaken", 0)) + 1
-		_emit(state, "MISS", actor.id, {
+		var miss_event: Dictionary = {
 			"targetId": target.id, "actionId": action_id, "damageType": damage_type,
 			"originActionId": action_id, "text": "%s: промах по %s." % [actor.display_name, target.display_name], "roll": chance_to_hit,
-		})
+		}
+		if not skill_id.is_empty():
+			miss_event["skillId"] = skill_id
+		_emit(state, "MISS", actor.id, miss_event)
 		return {"ok": true, "error": ""}
 	var crit: bool = rng.chance(_damage.crit_probability(float(attacker.get("critChance", 0.0))))
 	var raw: float = raw_base * _outgoing_multiplier(attacker, damage_type, is_main)
@@ -525,13 +687,16 @@ func _resolve_basic_hit(state: CombatState, rng: DeterministicRng, actor: Combat
 		taken_by_source[actor.id] = float(taken_by_source.get(actor.id, 0.0)) + dealt
 		if target.kind == "operator":
 			state.metrics["hpLost"] = float(state.metrics.get("hpLost", 0.0)) + float(partition["hpLost"])
-	_emit(state, "DAMAGE", actor.id, {
+	var damage_event: Dictionary = {
 		"targetId": target.id, "actionId": action_id, "damageType": damage_type, "crit": crit,
 		"originActionId": action_id, "amountBeforeDefense": raw, "amountAfterDefense": incoming,
 		"shieldConsumed": partition["shieldConsumed"], "hpLost": partition["hpLost"], "bypassed": partition["bypassed"],
 		"text": "%s → %s: %s %s%s, щит −%s, HP −%s." % [actor.display_name, target.display_name, _one_decimal(incoming), damage_type, " (крит)" if crit else "", _one_decimal(float(partition["shieldConsumed"])), _one_decimal(float(partition["hpLost"]))],
 		"data": {"overkill": partition["overkill"]},
-	})
+	}
+	if not skill_id.is_empty():
+		damage_event["skillId"] = skill_id
+	_emit(state, "DAMAGE", actor.id, damage_event)
 	return {"ok": true, "error": ""}
 
 func _outgoing_multiplier(sheet: Dictionary, damage_type: String, is_main: bool) -> float:
