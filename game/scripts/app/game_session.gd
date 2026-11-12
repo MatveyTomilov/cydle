@@ -388,6 +388,21 @@ func available_contract_offers() -> Array[Dictionary]:
 		var definition: Dictionary = catalog.get_contract(id)
 		if not definition.is_empty() and str(definition.get("targetBiome", "")) == biome:
 			offers.append(definition)
+	var signal_catalog: ItemCatalog = ItemCatalog.new()
+	if bool(signal_catalog.load_catalog().get("ok", false)):
+		for unique_id: String in ["U09", "U04", "U14", "U07", "U18"]:
+			var unlock: String = "quest-unlock:signalContract:%s" % unique_id
+			var template: Dictionary = signal_catalog.get_template(unique_id)
+			if state.meta.campaign_flags.has(unlock) and not template.is_empty() and (template.get("biomes", []) as Array).has(biome):
+				offers.append({
+					"id": "SIGNAL_%s" % unique_id,
+					"kind": "SIGNAL",
+					"name": "Целевой контракт · %s" % str(template.get("name", unique_id)),
+					"desc": "Найти указанную уникальную технологию в элитном узле целевого биома.",
+					"targetBiome": biome,
+					"targetUniqueId": unique_id,
+					"rewardItem": {"rarity": "UNIQUE", "templateId": unique_id},
+				})
 	return offers
 
 func start_expedition(seed_value: String = "", use_medical_restore: bool = false, contract_id: String = "") -> bool:
@@ -429,11 +444,19 @@ func start_expedition(seed_value: String = "", use_medical_restore: bool = false
 			last_error = "Каталог контрактов недоступен."
 			return false
 		contract = contract_catalog.get_contract(contract_id)
+		if contract.is_empty() and contract_id.begins_with("SIGNAL_"):
+			var unique_id: String = contract_id.trim_prefix("SIGNAL_")
+			var unlock: String = "quest-unlock:signalContract:%s" % unique_id
+			var item_catalog: ItemCatalog = ItemCatalog.new()
+			if state.meta.campaign_flags.has(unlock) and bool(item_catalog.load_catalog().get("ok", false)):
+				var unique_template: Dictionary = item_catalog.get_template(unique_id)
+				if not unique_template.is_empty() and str(unique_template.get("uniqueEffectId", "")) == unique_id and (unique_template.get("biomes", []) as Array).has(biome):
+					contract = {"id": contract_id, "kind": "SIGNAL", "name": "Целевой контракт · %s" % str(unique_template.get("name", unique_id)), "desc": "Найти указанную уникальную технологию в элитном узле целевого биома.", "targetBiome": biome, "targetUniqueId": unique_id, "rewardItem": {"rarity": "UNIQUE", "templateId": unique_id}}
 		if contract.is_empty() or str(contract.get("targetBiome", "")) != biome:
 			last_error = "Контракт недоступен для биома текущего сектора."
 			return false
 		var layers: Array = generated["graph"].get("layers", [])
-		if str(contract.get("kind", "")) == "HUNT":
+		if str(contract.get("kind", "")) in ["HUNT", "SIGNAL"]:
 			var target_node: Dictionary = _force_contract_node(layers, "ELITE", 1)
 			if target_node.is_empty():
 				last_error = "Для контракта охоты не удалось создать узел элиты."
@@ -1444,7 +1467,9 @@ func _complete_contract(payload: Dictionary, rewards: Dictionary, item_spec: Dic
 			return false
 		var rng: DeterministicRng = DeterministicRng.new()
 		rng.restore(run_payload["lootRng"])
-		var options: Dictionary = {"depth": int(run_payload["depth"]), "biome": str(run_payload["biome"]), "table": "ELITE" if str(contract.get("kind", "")) == "HUNT" else "ORDINARY", "secured": false, "grantId": completion_id + ":item", "origin": "contract", "acquiredAt": state.updated_at, "forceRarity": str(item_spec.get("rarity", "RARE")), "forceTag": str(item_spec.get("tag", ""))}
+		var options: Dictionary = {"depth": int(run_payload["depth"]), "biome": str(run_payload["biome"]), "table": "ELITE" if str(contract.get("kind", "")) in ["HUNT", "SIGNAL"] else "ORDINARY", "secured": false, "grantId": completion_id + ":item", "origin": "contract", "acquiredAt": state.updated_at, "forceRarity": str(item_spec.get("rarity", "RARE")), "forceTag": str(item_spec.get("tag", ""))}
+		if item_spec.has("templateId"):
+			options["forceTemplateId"] = str(item_spec["templateId"])
 		var rolled: Dictionary = ItemFactory.new().roll_item(rng, _item_catalog, options)
 		if not bool(rolled.get("ok", false)):
 			last_error = str(rolled.get("error", "Награду контракта нельзя создать."))
@@ -1740,15 +1765,20 @@ func resolve_active_combat() -> bool:
 	payload["run"] = run_payload
 	var contract: Dictionary = run_payload.get("contract", {})
 	if not contract.is_empty() and str(contract.get("status", "")) == "ACTIVE":
-		if str(contract.get("kind", "")) == "HUNT" and str(contract.get("targetNodeId", "")) == node_id and str(node.get("type", "")) == "ELITE":
+		if str(contract.get("kind", "")) in ["HUNT", "SIGNAL"] and str(contract.get("targetNodeId", "")) == node_id and str(node.get("type", "")) == "ELITE":
 			var target_scale: float = CydleFormula.new().reward_scale(float(state.run.depth))
-			if not _complete_contract(payload, {"CREDITS": ceili(30.0 * target_scale)}, {"rarity": str(contract.get("rewardItem", {}).get("rarity", "RARE")), "tag": str(contract.get("targetTechTag", "weapon"))}):
+			var contract_item: Dictionary = {"rarity": str(contract.get("rewardItem", {}).get("rarity", "RARE")), "tag": str(contract.get("targetTechTag", "weapon"))}
+			var credits_reward: Dictionary = {"CREDITS": ceili(30.0 * target_scale)}
+			if str(contract.get("kind", "")) == "SIGNAL":
+				contract_item = {"rarity": "UNIQUE", "templateId": str(contract.get("targetUniqueId", ""))}
+				credits_reward = {}
+			if not _complete_contract(payload, credits_reward, contract_item):
 				return false
 		elif str(contract.get("kind", "")) == "TECH" and str(contract.get("targetNodeId", "")) == node_id and str(node.get("type", "")) == "ANOMALY":
 			var target_scale: float = CydleFormula.new().reward_scale(float(state.run.depth))
 			if not _complete_contract(payload, {"DATA": ceili(15.0 * target_scale)}, {"rarity": "MODIFIED", "tag": str(contract.get("targetTechTag", "tech"))}):
 				return false
-		elif str(contract.get("kind", "")) in ["ESCORT", "HUNT", "TECH"] and str(node.get("type", "")) in ["COMBAT", "ELITE", "BOUNTY", "BOSS", "ANOMALY"]:
+		elif str(contract.get("kind", "")) in ["ESCORT", "HUNT", "TECH", "SIGNAL"] and str(node.get("type", "")) in ["COMBAT", "ELITE", "BOUNTY", "BOSS", "ANOMALY"]:
 			contract["combatNodes"] = int(contract.get("combatNodes", 0)) + 1
 	var wallet: Dictionary = run_payload["runWallet"]
 	for currency: String in ["CREDITS", "SCRAP", "DATA"]:

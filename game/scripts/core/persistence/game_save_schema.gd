@@ -211,10 +211,15 @@ func _validate_contract_instance(value: Variant) -> bool:
 	var contract: Dictionary = value
 	if not _nonempty_string(contract.get("id")) or not _nonempty_string(contract.get("instanceId")) or not _nonempty_string(contract.get("kind")):
 		return false
-	if not ["HUNT", "TECH", "ESCORT"].has(str(contract["kind"])) or not ["ACTIVE", "COMPLETE", "FAILED"].has(str(contract.get("status", ""))):
+	if not ["HUNT", "TECH", "ESCORT", "SIGNAL"].has(str(contract["kind"])) or not ["ACTIVE", "COMPLETE", "FAILED"].has(str(contract.get("status", ""))):
 		return false
 	if not BIOMES.has(str(contract.get("targetBiome", ""))) or not _is_integer(contract.get("combatNodes", 0)) or int(contract.get("combatNodes", 0)) < 0:
 		return false
+	if str(contract["kind"]) == "SIGNAL":
+		if not ["U04", "U07", "U09", "U14", "U18"].has(str(contract.get("targetUniqueId", ""))):
+			return false
+		if str(contract.get("status", "")) == "ACTIVE" and (not _nonempty_string(contract.get("targetNodeId")) or str(contract.get("id", "")) != "SIGNAL_%s" % str(contract.get("targetUniqueId", ""))):
+			return false
 	return true
 
 func _validate_run_ownership(run: Dictionary, meta: Dictionary) -> Dictionary:

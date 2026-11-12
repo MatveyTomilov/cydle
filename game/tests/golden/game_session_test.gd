@@ -44,6 +44,31 @@ func run(_tree: SceneTree) -> bool:
 			var repeat_payout: Dictionary = contract_session.state.to_payload()
 			contract_session._complete_contract(repeat_payout, {"CREDITS": 30}, {"rarity": "RARE", "tag": "weapon"})
 			check(contract_session._commit_payload(repeat_payout) and is_equal_approx(contract_session.state.run.wallet.credits, credits_before + 30.0) and contract_session.state.run.unsecured_cargo.size() == 1, "game_session: repeated contract payout duplicated its grant")
+	var signal_session: GameSession = GameSession.new()
+	signal_session.configure_save_directory("user://test-saves/signal-contract")
+	if check(signal_session.start_new_game(1762900000110), "game_session: could not create a signal-contract profile"):
+		var signal_unlock_payload: Dictionary = signal_session.state.to_payload()
+		signal_unlock_payload["meta"]["unlockedForpost"] = 4
+		signal_unlock_payload["meta"]["campaignFlags"].append("quest-unlock:signalContract:U09")
+		check(signal_session._commit_payload(signal_unlock_payload), "game_session: could not prepare the unlocked signal contract")
+		var signal_offers: Array[Dictionary] = signal_session.available_contract_offers()
+		var signal_offer_found: bool = false
+		for offer: Dictionary in signal_offers:
+			if str(offer.get("id", "")) == "SIGNAL_U09" and str(offer.get("targetBiome", "")) == "B04": signal_offer_found = true
+		check(signal_offer_found, "game_session: unlocked U09 signal contract was not offered in its source biome")
+		if signal_session.start_expedition("signal-contract-seed", false, "SIGNAL_U09"):
+			var signal_contract: Dictionary = signal_session.state.run.contract
+			check(str(signal_contract.get("kind", "")) == "SIGNAL" and str(signal_contract.get("targetUniqueId", "")) == "U09" and not str(signal_contract.get("targetNodeId", "")).is_empty(), "game_session: signal contract did not create a targeted elite encounter")
+			var signal_round_trip: Dictionary = GameSaveState.new().parse_payload(signal_session.state.to_payload())
+			check(bool(signal_round_trip.get("ok", false)) and str(signal_round_trip["state"].run.contract.get("kind", "")) == "SIGNAL", "game_session: active signal contract did not survive save validation")
+			var signal_payout: Dictionary = signal_session.state.to_payload()
+			check(signal_session._complete_contract(signal_payout, {}, {"rarity": "UNIQUE", "templateId": "U09"}), "game_session: unique signal contract reward failed: %s" % signal_session.last_error)
+			check(signal_session._commit_payload(signal_payout), "game_session: unique signal contract reward could not be saved: %s" % signal_session.last_error)
+			var signal_cargo: Array = signal_session.state.run.unsecured_cargo
+			check(str(signal_session.state.run.contract.get("status", "")) == "COMPLETE" and signal_cargo.size() == 1 and str(signal_cargo[0].get("templateId", "")) == "U09", "game_session: signal contract did not grant its exact unique item")
+			var signal_repeat: Dictionary = signal_session.state.to_payload()
+			signal_session._complete_contract(signal_repeat, {}, {"rarity": "UNIQUE", "templateId": "U09"})
+			check(signal_session._commit_payload(signal_repeat) and signal_session.state.run.unsecured_cargo.size() == 1, "game_session: repeated signal payout duplicated the unique item")
 	var ending_session: GameSession = GameSession.new()
 	ending_session.configure_save_directory("user://test-saves/campaign-ending")
 	if check(ending_session.start_new_game(1762900000120), "game_session: could not create a campaign-ending profile"):

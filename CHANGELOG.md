@@ -8,6 +8,7 @@
 - Q06 stage two now becomes reachable after surviving an anomaly and arriving at a B06 event. Contract loot advances from the post-combat RNG state, avoiding replaying the same loot stream.
 - Added route generation, INTEL/preview, anomaly settlement, Q06 progress, and TECH-contract regressions.
 - EV06 now stores its three nearest forward node disclosures in the RUN save; the road map exposes those node types to both the player and autopilot, including after reload.
+- Connected quest `signalContract:U09/U04/U14/U07/U18` unlocks to biome-gated SIGNAL offers and generated elite objectives; successful target fights grant the exact unique template through the shared item factory with save validation and duplicate-reward protection.
 
 ## Unreleased
 
