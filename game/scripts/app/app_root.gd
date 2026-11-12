@@ -276,6 +276,29 @@ func _show_build() -> void:
 	if selector.item_count > 0:
 		selector.select(0)
 		render_stat.call(0)
+	_body.add_child(_label("АКТИВНЫЕ УМЕНИЯ · %d / 3" % _session.state.meta.skill_ids.size(), 16, COLOR_CYAN))
+	var skill_catalog: BuildCatalog = BuildCatalog.new()
+	if bool(skill_catalog.load_catalog().get("ok", false)):
+		var skill_ids: Array = skill_catalog.skills.keys()
+		skill_ids.sort()
+		for skill_id_value: Variant in skill_ids:
+			var skill_id: String = str(skill_id_value)
+			var skill: Dictionary = skill_catalog.skills[skill_id]
+			var skill_row: HBoxContainer = HBoxContainer.new()
+			skill_row.add_theme_constant_override("separation", 10)
+			_body.add_child(skill_row)
+			var skill_info: VBoxContainer = VBoxContainer.new()
+			skill_info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			skill_row.add_child(skill_info)
+			skill_info.add_child(_label("%s · %s · %s" % [skill_id, str(skill.get("name", skill_id)), str(skill.get("channel", "main")).to_upper()], 13, COLOR_TEXT))
+			var description: Label = _label(str(skill.get("desc", "")), 11, COLOR_MUTED)
+			description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			skill_info.add_child(description)
+			var is_equipped: bool = _session.state.meta.skill_ids.has(skill_id)
+			var skill_button: Button = _button("СНЯТЬ" if is_equipped else "УСТАНОВИТЬ", is_equipped)
+			skill_button.disabled = not is_equipped and _session.state.meta.skill_ids.size() >= 3
+			skill_button.pressed.connect(_on_set_skill_equipped.bind(skill_id, not is_equipped))
+			skill_row.add_child(skill_button)
 	var back: Button = _button("НАЗАД В ГАРАЖ", false)
 	back.pressed.connect(_show_garage)
 	_body.add_child(back)
@@ -619,6 +642,11 @@ func _on_respec_attributes() -> void:
 	var reset: bool = _session.respec_attributes()
 	_show_garage()
 	_footer.text = "АТРИБУТЫ СБРОШЕНЫ · ОЧКИ ВОЗВРАЩЕНЫ" if reset else _session.last_error
+
+func _on_set_skill_equipped(skill_id: String, equipped: bool) -> void:
+	var changed: bool = _session.set_skill_equipped(skill_id, equipped)
+	_show_build()
+	_footer.text = "АКТИВНЫЕ УМЕНИЯ ОБНОВЛЕНЫ · %d / 3" % _session.state.meta.skill_ids.size() if changed else _session.last_error
 
 func _on_equip_item(slot: String, item_id: String) -> void:
 	if _session.equip_item(slot, item_id):

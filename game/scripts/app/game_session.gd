@@ -144,6 +144,45 @@ func respec_attributes() -> bool:
 	payload["meta"]["protectedBank"]["CREDITS"] = float(payload["meta"]["protectedBank"].get("CREDITS", 0.0)) - float(cost)
 	return _commit_payload(payload)
 
+func set_skill_equipped(skill_id: String, equipped: bool) -> bool:
+	if state == null:
+		last_error = "Нет активного профиля."
+		return false
+	if state.run != null and not ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(state.run.phase):
+		last_error = "Активные умения меняются только в гараже между выездами."
+		return false
+	var catalog: BuildCatalog = BuildCatalog.new()
+	var loaded: Dictionary = catalog.load_catalog()
+	if not bool(loaded.get("ok", false)) or not catalog.skills.has(skill_id):
+		last_error = "Неизвестное умение %s." % skill_id
+		return false
+	var skill_ids: Array[String] = state.meta.skill_ids.duplicate()
+	if equipped:
+		if skill_ids.has(skill_id):
+			last_error = "Умение уже установлено."
+			return false
+		if skill_ids.size() >= 3:
+			last_error = "Доступны только три слота умений. Снимите одно умение перед заменой."
+			return false
+		skill_ids.append(skill_id)
+	else:
+		if not skill_ids.has(skill_id):
+			last_error = "Умение не установлено."
+			return false
+		skill_ids.erase(skill_id)
+	var payload: Dictionary = state.to_payload()
+	payload["meta"]["skillIds"] = skill_ids
+	var parsed: Dictionary = GameSaveState.new().parse_payload(payload)
+	if not bool(parsed.get("ok", false)):
+		last_error = str(parsed.get("error", "Изменение слотов не прошло проверку."))
+		return false
+	var candidate: GameSaveState = parsed["state"] as GameSaveState
+	var resolved: Dictionary = BuildResolver.new().resolve_build(_build_input(candidate))
+	if not bool(resolved.get("valid", false)):
+		last_error = "Умение нельзя установить в эту сборку: %s" % str(resolved.get("issues", []))
+		return false
+	return _commit(candidate)
+
 func start_expedition(seed_value: String = "") -> bool:
 	if state == null:
 		last_error = "Сначала создайте или загрузите профиль."
