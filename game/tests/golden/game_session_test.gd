@@ -70,6 +70,46 @@ func run(_tree: SceneTree) -> bool:
 		var expected_escort_faction: String = str(escort_session.available_contract_offers().filter(func(offer: Dictionary) -> bool: return str(offer.get("id", "")) == "CT_ESCORT")[0].get("factionId", ""))
 		if check(escort_session.start_expedition("escort-faction-contract", false, "CT_ESCORT"), "game_session: faction ESCORT contract did not start: %s" % escort_session.last_error):
 			check(str(escort_session.state.run.contract.get("factionId", "")) == expected_escort_faction and int(escort_session.state.run.contract.get("rewardReputation", {}).get(expected_escort_faction, 0)) == 8, "game_session: accepted ESCORT instance lost its themed faction reward")
+	var favored_session: GameSession = GameSession.new()
+	favored_session.configure_save_directory("user://test-saves/faction-threshold-contract")
+	if check(favored_session.start_new_game(1762900000108), "game_session: could not create a favored faction profile"):
+		var favored_payload: Dictionary = favored_session.state.to_payload()
+		favored_payload["meta"]["reputation"]["F_CHOIR"] = 60
+		check(favored_session._commit_payload(favored_payload), "game_session: could not set favored faction reputation")
+		var favored_offer: Dictionary = favored_session.available_contract_offers().filter(func(offer: Dictionary) -> bool: return str(offer.get("id", "")) == "CT_FACTION_F_CHOIR")[0]
+		check(str(favored_offer.get("factionId", "")) == "F_CHOIR" and int(favored_offer.get("rewardReputation", {}).get("F_CHOIR", 0)) == 8, "game_session: +60 reputation did not unlock its thematic contract")
+		if check(favored_session.start_expedition("faction-hunt-contract", false, "CT_FACTION_F_CHOIR"), "game_session: thematic faction hunt was rejected: %s" % favored_session.last_error):
+			check(str(favored_session.state.run.contract.get("factionId", "")) == "F_CHOIR" and str(favored_session.state.run.contract.get("kind", "")) == "HUNT", "game_session: accepted thematic contract lost its faction target")
+	var hostile_session: GameSession = GameSession.new()
+	hostile_session.configure_save_directory("user://test-saves/faction-hostile-bounty")
+	if check(hostile_session.start_new_game(1762900000109), "game_session: could not create a hostile faction profile"):
+		var hostile_payload: Dictionary = hostile_session.state.to_payload()
+		hostile_payload["meta"]["reputation"]["F_ECHO"] = -60
+		check(hostile_session._commit_payload(hostile_payload), "game_session: could not set hostile faction reputation")
+		if check(hostile_session.start_expedition("faction-hostile-route"), "game_session: hostile faction route could not start: %s" % hostile_session.last_error):
+			var themed_bounty_found: bool = false
+			for layer: Array in hostile_session.state.run.graph.get("layers", []):
+				for node: Dictionary in layer:
+					if str(node.get("type", "")) == "BOUNTY" and str(node.get("factionId", "")) == "F_ECHO" and bool(node.get("factionBounty", false)): themed_bounty_found = true
+			check(themed_bounty_found, "game_session: -60 faction reputation did not add a themed bounty to the route")
+	var shop_session: GameSession = GameSession.new()
+	shop_session.configure_save_directory("user://test-saves/faction-shop-discount")
+	if check(shop_session.start_new_game(1762900000111), "game_session: could not create a faction shop profile"):
+		if check(shop_session.start_expedition("faction-shop-discount"), "game_session: faction shop route could not start: %s" % shop_session.last_error):
+			var shop_node_id: String = ""
+			var shop_faction: String = ""
+			var shop_payload: Dictionary = shop_session.state.to_payload()
+			for layer: Array in shop_payload["run"]["graph"].get("layers", []):
+				for node: Dictionary in layer:
+					if str(node.get("type", "")) == "SHOP":
+						shop_node_id = str(node.get("id", ""))
+						shop_faction = shop_session._world_faction("faction-shop-discount", shop_node_id)
+			shop_payload["meta"]["reputation"][shop_faction] = 60
+			shop_payload["run"]["phase"] = "NODE"
+			shop_payload["run"]["currentNodeId"] = shop_node_id
+			if check(shop_session._commit_payload(shop_payload), "game_session: could not prepare faction shop visit"):
+				var discounted_offers: Array[Dictionary] = shop_session.shop_offers()
+				check(not discounted_offers.is_empty() and int(discounted_offers[0].get("discountPercent", 0)) == 15 and int(discounted_offers[0].get("price", 0)) < int(discounted_offers[0].get("basePrice", 0)), "game_session: +60 faction standing did not reduce themed shop prices")
 	var signal_session: GameSession = GameSession.new()
 	signal_session.configure_save_directory("user://test-saves/signal-contract")
 	if check(signal_session.start_new_game(1762900000110), "game_session: could not create a signal-contract profile"):
@@ -194,6 +234,8 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	var battle_payload: Dictionary = session.state.to_payload()
 	battle_payload["run"]["graph"]["layers"][0][0]["enemies"] = [{"templateId": "E01"}, {"templateId": "E01"}]
+	battle_payload["run"]["graph"]["layers"][0][0]["factionId"] = "F_ECHO"
+	battle_payload["meta"]["reputation"]["F_ECHO"] = -30
 	check(session._commit_payload(battle_payload), "game_session: could not install the tactical-rule test encounter")
 	if not check(session.travel_to(str(choices[0]["id"])), "game_session: reachable node travel failed: %s" % session.last_error):
 		return false
@@ -224,8 +266,11 @@ func run(_tree: SceneTree) -> bool:
 		ticks += 1
 	check(used_burst, "game_session: supported conditional SK_BURST rule never fired on the two-enemy encounter")
 	check(session.combat_state() != null and not session.combat_state().outcome.is_empty(), "game_session: combat did not resolve within its simulation limit")
+	var wanted_before_faction_fight: float = session.state.run.wanted
 	if session.combat_state() != null and not session.combat_state().outcome.is_empty():
 		check(session.resolve_active_combat(), "game_session: combat reward/defeat transaction failed: %s" % session.last_error)
+	if session.state.run != null and session.state.run.phase == "ROUTE":
+		check(is_equal_approx(session.state.run.wanted, wanted_before_faction_fight + 3.0), "game_session: hostile faction encounter did not add the specified 3 wanted")
 	if session.state.run != null and session.state.run.phase == "ROUTE":
 		var next_nodes: Array[Dictionary] = session.reachable_nodes()
 		if not next_nodes.is_empty() and str(next_nodes[0].get("type", "")) == "CACHE":

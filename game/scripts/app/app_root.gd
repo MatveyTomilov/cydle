@@ -1026,6 +1026,12 @@ func _show_current_node(run: GameSaveState.RunState) -> void:
 	_body.add_child(_label("УЗЕЛ · %s" % str(node.get("type", "UNKNOWN")), 20, COLOR_TEXT))
 	_body.add_child(_label("Угроза: %s     ·     %s" % [str(node.get("threat", "?")), str(node.get("lootHint", ""))], 13, COLOR_MUTED))
 	var node_type: String = str(node.get("type", ""))
+	if ["COMBAT", "ELITE", "BOUNTY"].has(node_type) and not str(node.get("factionId", "")).is_empty():
+		var faction_id: String = str(node.get("factionId", ""))
+		var reputation: int = int(_session.state.meta.reputation.get(faction_id, 0))
+		var hostility: String = " · +3 РОЗЫСК ЗА ПОБЕДУ" if reputation <= -30 else ""
+		var bounty_label: String = "ЦЕЛЬ ВОЗМЕЗДИЯ" if bool(node.get("factionBounty", false)) else "ГРУППИРОВКА"
+		_body.add_child(_label("%s · %s%s" % [bounty_label, faction_id, hostility], 12, COLOR_RED if reputation <= -30 else COLOR_AMBER))
 	if ["COMBAT", "ELITE", "BOUNTY", "BOSS", "ANOMALY"].has(node_type):
 		if node_type == "ANOMALY":
 			_body.add_child(_label("НУЛЕВАЯ ЗОНА · ПРОТОКОЛ %s" % str(node.get("anomalyProtocol", "UNKNOWN")), 13, COLOR_AMBER))
@@ -1072,6 +1078,10 @@ func _show_current_node(run: GameSaveState.RunState) -> void:
 	elif str(node.get("type", "")) == "SHOP":
 		_body.add_child(_label("Ассортимент этого магазина закреплён за узлом и не меняется при перезагрузке.", 12, COLOR_MUTED))
 		var offers: Array[Dictionary] = _session.shop_offers()
+		if not offers.is_empty():
+			var shop_faction: String = str(offers[0].get("factionId", node.get("shopFactionId", "")))
+			var discount_percent: int = int(offers[0].get("discountPercent", 0))
+			_body.add_child(_label("ТОРГОВЕЦ · %s · СКИДКА РЕПУТАЦИИ %d%%" % [shop_faction, discount_percent], 12, COLOR_AMBER))
 		for index: int in range(offers.size()):
 			var offer: Dictionary = offers[index]
 			var item: Dictionary = offer.get("item", {})

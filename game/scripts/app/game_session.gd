@@ -406,6 +406,19 @@ func available_contract_offers() -> Array[Dictionary]:
 				definition["rewardReputation"] = {escort_faction: 8}
 				definition["name"] = "%s · %s" % [str(definition.get("name", "Сопровождение")), escort_faction]
 			offers.append(definition)
+	var favored_faction: String = _favored_faction()
+	if not favored_faction.is_empty():
+		offers.append({
+			"id": _faction_contract_id(favored_faction),
+			"kind": "HUNT",
+			"eventId": "contract-offer:%d:%s" % [depth, _faction_contract_id(favored_faction)],
+			"name": "Заказ фракции · %s" % favored_faction,
+			"desc": "Устранить элиту в целевом секторе. Награда: редкое снаряжение и репутация заказчика.",
+			"targetBiome": biome,
+			"factionId": favored_faction,
+			"rewardReputation": {favored_faction: 8},
+			"rewardItem": {"rarity": "RARE", "tag": str(biome_tags.get(biome, "weapon"))},
+		})
 	var signal_catalog: ItemCatalog = ItemCatalog.new()
 	if bool(signal_catalog.load_catalog().get("ok", false)):
 		for unique_id: String in ["U09", "U04", "U14", "U07", "U18"]:
@@ -436,6 +449,63 @@ func _contract_offer_faction(depth: int, contract_id: String) -> String:
 	rng.seed("contract-faction", "%s:%d:%s" % [state.save_id, depth, contract_id])
 	var factions: Array[String] = ["F_VANTA", "F_RUST", "F_CHOIR", "F_ECHO"]
 	return factions[rng.int_range(0, factions.size() - 1)]
+
+func _favored_faction() -> String:
+	if state == null:
+		return ""
+	var selected: String = ""
+	var highest: int = 59
+	for faction_id: String in ["F_VANTA", "F_RUST", "F_CHOIR", "F_ECHO"]:
+		var reputation: int = int(state.meta.reputation.get(faction_id, 0))
+		if reputation > highest:
+			highest = reputation
+			selected = faction_id
+	return selected
+
+func _faction_contract_id(faction_id: String) -> String:
+	return "CT_FACTION_%s" % faction_id
+
+func _world_faction(seed_value: String, key: String) -> String:
+	var rng: DeterministicRng = DeterministicRng.new()
+	rng.seed("world-faction", "%s:%s" % [seed_value, key])
+	var factions: Array[String] = ["F_VANTA", "F_RUST", "F_CHOIR", "F_ECHO"]
+	return factions[rng.int_range(0, factions.size() - 1)]
+
+func _apply_faction_world_effects(graph: Dictionary, seed_value: String) -> void:
+	var hostile_nodes: Array[Dictionary] = []
+	var hated_faction: String = ""
+	var lowest_reputation: int = -59
+	for faction_id: String in ["F_VANTA", "F_RUST", "F_CHOIR", "F_ECHO"]:
+		var reputation: int = int(state.meta.reputation.get(faction_id, 0))
+		if reputation < lowest_reputation:
+			lowest_reputation = reputation
+			hated_faction = faction_id
+	for layer: Array in graph.get("layers", []):
+		for node: Dictionary in layer:
+			var kind: String = str(node.get("type", ""))
+			if kind in ["COMBAT", "ELITE", "BOUNTY"]:
+				node["factionId"] = _world_faction(seed_value, str(node.get("id", "")))
+				hostile_nodes.append(node)
+	# At hostile standing the route presents a real named bounty even when wanted
+	# alone would not have rolled one; the underlying enemy and battle pipeline remain shared.
+	if not hated_faction.is_empty() and not hostile_nodes.is_empty():
+		var target: Dictionary = {}
+		for node: Dictionary in hostile_nodes:
+			if str(node.get("type", "")) == "BOUNTY":
+				target = node
+				break
+		if target.is_empty():
+			target = hostile_nodes[0]
+			target["type"] = "BOUNTY"
+			target["factionId"] = hated_faction
+			target["factionBounty"] = true
+		var enemies: Array = target.get("enemies", [])
+		if not enemies.is_empty() and not target.has("factionBounty"):
+			target["factionId"] = hated_faction
+			target["factionBounty"] = true
+		if not enemies.is_empty():
+			enemies[0]["elite"] = "EL_PEN"
+			target["enemies"] = enemies
 
 func start_expedition(seed_value: String = "", use_medical_restore: bool = false, contract_id: String = "", escalation_ids: Array[String] = []) -> bool:
 	if state == null:
@@ -471,6 +541,7 @@ func start_expedition(seed_value: String = "", use_medical_restore: bool = false
 	if not bool(generated.get("ok", false)):
 		last_error = str(generated.get("error", "Не удалось создать дорожную карту."))
 		return false
+	_apply_faction_world_effects(generated["graph"], seed)
 	var contract: Dictionary = {}
 	if not contract_id.is_empty():
 		var contract_catalog: QuestCatalog = QuestCatalog.new()
@@ -478,6 +549,11 @@ func start_expedition(seed_value: String = "", use_medical_restore: bool = false
 			last_error = "Каталог контрактов недоступен."
 			return false
 		contract = contract_catalog.get_contract(contract_id)
+		if contract.is_empty() and contract_id.begins_with("CT_FACTION_"):
+			var favored_faction: String = _favored_faction()
+			if not favored_faction.is_empty() and contract_id == _faction_contract_id(favored_faction):
+				var faction_biome_tags: Dictionary = {"B01": "weapon", "B02": "armor", "B03": "drone", "B04": "digital", "B05": "energy", "B06": "hybrid"}
+				contract = {"id": contract_id, "kind": "HUNT", "name": "Заказ фракции · %s" % favored_faction, "desc": "Устранить элиту по заказу фракции.", "targetBiome": biome, "factionId": favored_faction, "rewardReputation": {favored_faction: 8}, "rewardItem": {"rarity": "RARE", "tag": str(faction_biome_tags.get(biome, "weapon"))}}
 		if contract.is_empty() and contract_id.begins_with("SIGNAL_"):
 			var unique_id: String = contract_id.trim_prefix("SIGNAL_")
 			var unlock: String = "quest-unlock:signalContract:%s" % unique_id
@@ -1647,6 +1723,9 @@ func shop_offers() -> Array[Dictionary]:
 				continue
 			if node.has("shopStock"):
 				return (node["shopStock"] as Array).duplicate(true)
+			var shop_faction: String = _world_faction(state.run.seed, node_id)
+			var shop_reputation: int = int(state.meta.reputation.get(shop_faction, 0))
+			var discount: float = 0.15 if shop_reputation >= 60 else 0.10 if shop_reputation >= 30 else 0.0
 			var catalog_result: Dictionary = _item_catalog.load_catalog()
 			if not bool(catalog_result.get("ok", false)):
 				last_error = str(catalog_result.get("error", "Каталог предметов недоступен."))
@@ -1679,11 +1758,13 @@ func shop_offers() -> Array[Dictionary]:
 				var rarity: String = str(item.get("rarity", "COMMON"))
 				var multiplier: float = {"COMMON": 1.0, "MODIFIED": 1.3, "RARE": 2.0, "LEGENDARY": 4.0, "UNIQUE": 10.0}.get(rarity, 1.0)
 				var tech: int = int(item.get("techLevel", state.run.depth))
-				var price: int = ceili((25.0 + 7.0 * tech) * multiplier * CydleFormula.new().reward_scale(float(tech)))
-				stock.append({"item": item, "price": price, "purchased": false})
+				var base_price: int = ceili((25.0 + 7.0 * tech) * multiplier * CydleFormula.new().reward_scale(float(tech)))
+				var price: int = maxi(1, ceili(float(base_price) * (1.0 - discount)))
+				stock.append({"item": item, "basePrice": base_price, "price": price, "purchased": false, "factionId": shop_faction, "discountPercent": int(round(discount * 100.0))})
 			if stock.is_empty():
 				last_error = "Не удалось сформировать ассортимент магазина."
 				return []
+			node["shopFactionId"] = shop_faction
 			node["shopStock"] = stock
 			var payload: Dictionary = state.to_payload()
 			payload["run"]["graph"] = graph
@@ -1859,6 +1940,9 @@ func resolve_active_combat() -> bool:
 		return false
 	if _combat.wanted_delta != 0:
 		run_payload["wanted"] = clampf(float(run_payload.get("wanted", 0.0)) + float(_combat.wanted_delta), 0.0, 100.0)
+	var encounter_faction: String = str(node.get("factionId", ""))
+	if ["F_VANTA", "F_RUST", "F_CHOIR", "F_ECHO"].has(encounter_faction) and int(state.meta.reputation.get(encounter_faction, 0)) <= -30:
+		run_payload["wanted"] = clampf(float(run_payload.get("wanted", 0.0)) + 3.0, 0.0, 100.0)
 	if _active_node_type in ["ELITE", "ANOMALY", "BOUNTY"] and run_payload.get("escalationIds", []).has("WANTED_PLUS"):
 		run_payload["wanted"] = clampf(float(run_payload.get("wanted", 0.0)) + 5.0, 0.0, 100.0)
 	var escaped_cargo: int = 0
@@ -1881,7 +1965,8 @@ func resolve_active_combat() -> bool:
 			if str(contract.get("kind", "")) == "SIGNAL":
 				contract_item = {"rarity": "UNIQUE", "templateId": str(contract.get("targetUniqueId", ""))}
 				credits_reward = {}
-			if not _complete_contract(payload, credits_reward, contract_item):
+			var contract_reputation: Dictionary = contract.get("rewardReputation", {})
+			if not _complete_contract(payload, credits_reward, contract_item, contract_reputation):
 				return false
 		elif str(contract.get("kind", "")) == "TECH" and str(contract.get("targetNodeId", "")) == node_id and str(node.get("type", "")) == "ANOMALY":
 			var target_scale: float = CydleFormula.new().reward_scale(float(state.run.depth))

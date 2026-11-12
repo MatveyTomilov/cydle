@@ -13,6 +13,8 @@
 - Connected Q03's SERVICE choice to paid hull repair at checkpoints (+15% repair amount) and gated Q01/Q02 visit-biome and Q04 elimination follow-ups until their next matching sector.
 - Persisted and validated each accepted world-seeded contract offer's event ID, with old RUN saves remaining compatible.
 - ESCORT offers now reveal their deterministic faction reputation reward; campaign faction-control endings theme endgame ESCORTs to the controlling faction, and the accepted reward survives save/load validation.
+- Reputation thresholds now affect the world loop: +30/+60 discounts faction shop stock by 10%/15%, +60 exposes one faction HUNT contract, ≤−30 adds 3 wanted after a matching faction victory, and ≤−60 adds a marked elite bounty to the route. The encounter faction, discount, contract, and bounty are visible in the interface.
+- Added session regressions for threshold contract acceptance, discounted persisted shop stock, hostile route bounty, and wanted gained from a hostile faction fight.
 
 ## Unreleased
 
