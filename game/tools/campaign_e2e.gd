@@ -55,7 +55,16 @@ func _run_campaign() -> void:
 			"ROUTE":
 				var target: Dictionary = _choose_node(session)
 				if target.is_empty():
-					_fail("Нет доступного перехода в секторе %d, слой узла %s, топливо %d; маршруты: %s" % [session.state.run.depth, str(session.state.run.current_node_id), int(session.state.run.resources.get("fuel", 0)), _route_diagnostics(session)])
+					var emergency: Dictionary = session.emergency_exit_quote()
+					if bool(emergency.get("valid", false)):
+						var emergency_ok: bool = session.call_evacuation_tow() if bool(emergency.get("towAffordable", false)) else session.abandon_run()
+						if not emergency_ok:
+							_fail("Нет топлива для перехода, аварийный выход не завершился в секторе %d: %s; маршруты: %s" % [session.state.run.depth, session.last_error, _route_diagnostics(session)])
+							return
+						print("E2E emergency d%d phase=%s report=%s" % [session.state.run.depth, session.state.run.phase, str(session.last_emergency_report)])
+						processed_nodes += 1
+						continue
+					_fail("Нет доступного перехода в секторе %d, слой узла %s, топливо %d; аварийный выход недоступен: %s; маршруты: %s" % [session.state.run.depth, str(session.state.run.current_node_id), int(session.state.run.resources.get("fuel", 0)), str(emergency.get("error", "нет причины")), _route_diagnostics(session)])
 					return
 				if not session.travel_to(str(target.get("id", ""))):
 					_fail("Переход отклонён в секторе %d: %s" % [session.state.run.depth, session.last_error])

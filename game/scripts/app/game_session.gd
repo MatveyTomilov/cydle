@@ -8,6 +8,7 @@ var state: GameSaveState
 var last_error: String = ""
 var combat_notice: String = ""
 var last_autopilot_report: Dictionary = {}
+var last_emergency_report: Dictionary = {}
 var _repository: SaveRepository = SaveRepository.new()
 var _generator: SectorGenerator = SectorGenerator.new()
 var _stats: StatMath = StatMath.new()
@@ -3304,6 +3305,125 @@ func extract_run() -> bool:
 	run_payload["phase"] = "EXTRACTED"
 	run_payload["lastCommandId"] = "extract:%s" % str(run_payload["seed"])
 	return _commit_payload(payload)
+
+func emergency_exit_quote() -> Dictionary:
+	if not _emergency_exit_allowed():
+		return {"valid": false, "towAffordable": false, "error": "Аварийный выход доступен на карте, когда топлива не хватает для любого перехода."}
+	var scale: float = CydleFormula.new().reward_scale(float(state.run.depth))
+	var tow_cost: int = ceili(30.0 * scale)
+	var available_credits: float = float(state.run.wallet.credits) + float(state.meta.protected_bank.credits)
+	return {
+		"valid": true,
+		"towCost": tow_cost,
+		"towAffordable": available_credits >= float(tow_cost),
+		"cargoItems": state.run.unsecured_cargo.size(),
+		"wallet": state.run.wallet.to_dictionary(),
+		"error": "",
+	}
+
+func call_evacuation_tow() -> bool:
+	var quote: Dictionary = emergency_exit_quote()
+	if not bool(quote.get("valid", false)):
+		last_error = str(quote.get("error", "Тягач сейчас недоступен."))
+		return false
+	if not bool(quote.get("towAffordable", false)):
+		last_error = "Для вызова тягача нужно %d CREDITS. Можно бросить выезд с потерей всего незакреплённого груза." % int(quote.get("towCost", 0))
+		return false
+	var payload: Dictionary = state.to_payload()
+	var run_payload: Dictionary = payload["run"]
+	var meta: Dictionary = payload["meta"]
+	var wallet: Dictionary = run_payload["runWallet"]
+	var bank: Dictionary = meta["protectedBank"]
+	var tow_cost: float = float(quote["towCost"])
+	var run_credit_payment: float = minf(float(wallet.get("CREDITS", 0.0)), tow_cost)
+	wallet["CREDITS"] = float(wallet.get("CREDITS", 0.0)) - run_credit_payment
+	var protected_payment: float = tow_cost - run_credit_payment
+	bank["CREDITS"] = float(bank.get("CREDITS", 0.0)) - protected_payment
+	var rng: DeterministicRng = DeterministicRng.new()
+	if not rng.restore(run_payload.get("lootRng", {})):
+		last_error = "Состояние генератора добычи повреждено; тягач не вызван."
+		return false
+	var cargo: Array = run_payload.get("unsecuredCargo", []).duplicate(true)
+	var dropped_item_id: String = ""
+	var inventory: Array = meta["inventory"]
+	if not cargo.is_empty():
+		var dropped_index: int = rng.int_range(0, cargo.size() - 1)
+		dropped_item_id = str(cargo[dropped_index].get("itemId", ""))
+		cargo.remove_at(dropped_index)
+		for item_value: Dictionary in cargo:
+			var secured: Dictionary = item_value.duplicate(true)
+			secured["secured"] = true
+			secured["origin"] = "emergency-tow"
+			if not _inventory_has(inventory, str(secured.get("itemId", ""))):
+				inventory.append(secured)
+	meta["inventory"] = inventory
+	var lost_wallet: Dictionary = {}
+	var banked_wallet: Dictionary = {}
+	for currency: String in ["CREDITS", "SCRAP", "DATA"]:
+		var amount: float = maxf(0.0, float(wallet.get(currency, 0.0)))
+		var retained: float = floorf(amount * 0.7)
+		lost_wallet[currency] = amount - retained
+		banked_wallet[currency] = retained
+		bank[currency] = float(bank.get(currency, 0.0)) + retained
+	run_payload["runWallet"] = {"CREDITS": 0.0, "SCRAP": 0.0, "DATA": 0.0}
+	run_payload["lootRng"] = rng.serialize()
+	run_payload["unsecuredCargo"] = []
+	run_payload["shippedCargo"] = []
+	run_payload["temporaryMutationIds"] = []
+	run_payload["combatResult"] = null
+	run_payload["combatSnapshot"] = null
+	run_payload["pendingCombatEffects"] = {"initialTempShield": 0.0, "extraHeat": 0.0}
+	run_payload["equipment"] = meta["equipment"].duplicate(true)
+	run_payload["phase"] = "TOWED"
+	run_payload["lastCommandId"] = "emergency:tow:%s" % str(run_payload.get("seed", ""))
+	if not _commit_payload(payload):
+		return false
+	last_emergency_report = {"type": "TOWED", "towCost": int(tow_cost), "droppedItemId": dropped_item_id, "cargoSecured": cargo.size(), "currencyLost": lost_wallet, "currencySecured": banked_wallet}
+	_combat = null
+	_active_node_type = ""
+	_active_reward_modifiers = {}
+	return true
+
+func abandon_run() -> bool:
+	if not _emergency_exit_allowed():
+		last_error = "Выезд можно бросить только на карте, когда топлива не хватает для любого перехода."
+		return false
+	var payload: Dictionary = state.to_payload()
+	var run_payload: Dictionary = payload["run"]
+	var meta: Dictionary = payload["meta"]
+	var equipped_ids: Array = meta["equipment"].values()
+	for index: int in range(meta["inventory"].size()):
+		var item: Dictionary = meta["inventory"][index]
+		if bool(item.get("secured", false)) and equipped_ids.has(str(item.get("itemId", ""))):
+			item["durability"] = maxf(0.0, float(item.get("durability", 100.0)) - 10.0)
+		meta["inventory"][index] = item
+	run_payload["runWallet"] = {"CREDITS": 0.0, "SCRAP": 0.0, "DATA": 0.0}
+	run_payload["unsecuredCargo"] = []
+	run_payload["shippedCargo"] = []
+	run_payload["temporaryMutationIds"] = []
+	run_payload["combatResult"] = null
+	run_payload["combatSnapshot"] = null
+	run_payload["pendingCombatEffects"] = {"initialTempShield": 0.0, "extraHeat": 0.0}
+	run_payload["equipment"] = meta["equipment"].duplicate(true)
+	run_payload["phase"] = "ABANDONED"
+	run_payload["lastCommandId"] = "emergency:abandon:%s" % str(run_payload.get("seed", ""))
+	if not _commit_payload(payload):
+		return false
+	last_emergency_report = {"type": "ABANDONED", "currencyLost": true, "cargoLost": true, "equippedDurabilityLoss": 10.0}
+	_combat = null
+	_active_node_type = ""
+	_active_reward_modifiers = {}
+	return true
+
+func _emergency_exit_allowed() -> bool:
+	if state == null or state.run == null or state.run.phase != "ROUTE" or _combat != null:
+		return false
+	var available_fuel: float = float(state.run.resources.get("fuel", 0.0))
+	for node: Dictionary in reachable_nodes():
+		for edge: Dictionary in state.run.graph.get("edges", []):
+			if str(edge.get("from", "")) == state.run.current_node_id and str(edge.get("to", "")) == str(node.get("id", "")) and available_fuel >= float(edge.get("fuelCost", 1)):
+				return false
+	return true
 
 func _build_input(save_state: GameSaveState) -> Dictionary:
 	var items_by_id: Dictionary = {}

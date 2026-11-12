@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — emergency recovery for no-fuel routes
+
+- Implemented Master Spec §16.4 evacuation tow and ABANDON_RUN through persisted `GameSession` transactions and a route-screen confirmation flow. Tow pays `ceil(30×R(d))` credits, drops one deterministic random unsecured item, loses 30% of remaining unsecured currencies and secures the rest; abandon loses all unsecured cargo/currency and damages permanently equipped gear by 10 durability.
+- Added tow/abandon regressions and taught the campaign E2E driver to invoke these real session actions when it has no affordable outgoing edge. The preserved d12 no-fuel route was recovered by tow; the campaign then cleared d9–d11 and began another d12 gate attempt. Ending and d13 remain unverified.
+- Godot editor import passed; 22 scripts / 87,529 assertions / 0 failures. TypeScript and Windows export were not rerun for this Godot-only WIP.
+
 ## Unreleased — high-rarity generated gear remains equipable
 
 - TypeScript and Godot BuildResolver no longer reject distinct generated affixes solely because they share a broad pool group; duplicate affix IDs still fail validation. The item catalog permits up to five affixes while some slots, including MAIN, expose fewer groups, so strict group validation made valid T12 drops unusable. Item generation and numeric rolls are unchanged.

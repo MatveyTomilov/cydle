@@ -866,4 +866,42 @@ func run(_tree: SceneTree) -> bool:
 		check(event_session.travel_to("mutation-test"), "game_session: mutation event travel failed")
 		check(event_session.resolve_event("A"), "game_session: temporary mutation event failed: %s" % event_session.last_error)
 		check(event_session.state.run.temporary_mutation_ids == ["MUT_REGEN"], "game_session: event mutation did not enter the temporary run build")
+	var tow_session: GameSession = GameSession.new()
+	tow_session.configure_save_directory("user://test-saves/emergency-tow")
+	if check(tow_session.start_new_game(1762900000102), "game_session: could not create an emergency-tow profile") and check(tow_session.start_expedition("emergency-tow"), "game_session: could not start emergency-tow sortie"):
+		var tow_catalog: ItemCatalog = ItemCatalog.new()
+		var tow_loaded: Dictionary = tow_catalog.load_catalog()
+		var tow_payload: Dictionary = tow_session.state.to_payload()
+		tow_payload["run"]["resources"]["fuel"] = 0
+		tow_payload["run"]["runWallet"] = {"CREDITS": 100.0, "SCRAP": 30.0, "DATA": 10.0}
+		var cargo: Array[Dictionary] = []
+		for cargo_index: int in range(3):
+			var cargo_rng: DeterministicRng = DeterministicRng.new()
+			cargo_rng.seed("emergency-tow", "cargo-%d" % cargo_index)
+			var created: Dictionary = ItemFactory.new().create_item(cargo_rng, tow_catalog, {"templateId": "ARM_CLOTH", "techLevel": 1, "rarity": "COMMON", "secured": false, "originGrantId": "emergency-tow:cargo:%d" % cargo_index, "origin": "test", "acquiredAt": 0})
+			if bool(created.get("ok", false)):
+				cargo.append((created["item"] as ItemInstance).to_dictionary())
+		check(bool(tow_loaded.get("ok", false)) and cargo.size() == 3, "game_session: tow fixture could not build its unsecured cargo")
+		tow_payload["run"]["unsecuredCargo"] = cargo
+		check(tow_session._commit_payload(tow_payload), "game_session: tow fixture could not be saved: %s" % tow_session.last_error)
+		var tow_quote: Dictionary = tow_session.emergency_exit_quote()
+		check(bool(tow_quote.get("valid", false)) and bool(tow_quote.get("towAffordable", false)) and int(tow_quote.get("towCost", 0)) > 0, "game_session: stranded route did not offer the spec-priced tow")
+		check(tow_session.call_evacuation_tow(), "game_session: emergency tow failed: %s" % tow_session.last_error)
+		check(tow_session.state.run.phase == "TOWED" and tow_session.state.run.unsecured_cargo.is_empty() and tow_session.state.run.wallet.credits == 0.0, "game_session: tow did not end the run and clear temporary cargo/wallet")
+		check(tow_session.last_emergency_report.get("cargoSecured", 0) == 2 and not str(tow_session.last_emergency_report.get("droppedItemId", "")).is_empty(), "game_session: tow did not save exactly all but one random item")
+		check(tow_session.state.meta.inventory.filter(func(item: Dictionary) -> bool: return str(item.get("origin", "")) == "emergency-tow").size() == 2, "game_session: tow failed to secure the surviving cargo exactly once")
+		check(not tow_session.emergency_exit_quote().get("valid", false) and not tow_session.call_evacuation_tow(), "game_session: terminal tow could be awarded repeatedly")
+	var abandon_session: GameSession = GameSession.new()
+	abandon_session.configure_save_directory("user://test-saves/emergency-abandon")
+	if check(abandon_session.start_new_game(1762900000103), "game_session: could not create an abandon-run profile") and check(abandon_session.start_expedition("emergency-abandon"), "game_session: could not start abandon-run sortie"):
+		var abandon_payload: Dictionary = abandon_session.state.to_payload()
+		abandon_payload["run"]["resources"]["fuel"] = 0
+		abandon_payload["run"]["runWallet"] = {"CREDITS": 100.0, "SCRAP": 30.0, "DATA": 10.0}
+		var equipped_main_id: String = str(abandon_payload["meta"]["equipment"].get("MAIN", ""))
+		check(abandon_session._commit_payload(abandon_payload), "game_session: abandon fixture could not be saved")
+		check(bool(abandon_session.emergency_exit_quote().get("valid", false)) and abandon_session.abandon_run(), "game_session: abandoning a stranded sortie failed: %s" % abandon_session.last_error)
+		var abandoned_main: Dictionary = abandon_session.state.meta.inventory.filter(func(item: Dictionary) -> bool: return str(item.get("itemId", "")) == equipped_main_id)[0]
+		check(abandon_session.state.run.phase == "ABANDONED" and abandon_session.state.run.wallet.credits == 0.0 and abandon_session.state.run.unsecured_cargo.is_empty(), "game_session: abandoned cargo/currency were not lost")
+		check(float(abandoned_main.get("durability", 100.0)) == 90.0, "game_session: abandonment did not damage permanent equipped gear by 10 durability")
+		check(not abandon_session.abandon_run(), "game_session: abandonment could be settled more than once")
 	return failure_count == 0

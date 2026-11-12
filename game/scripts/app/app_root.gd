@@ -1019,6 +1019,19 @@ func _show_road() -> void:
 				if reachable:
 					button.pressed.connect(_on_travel.bind(node_id))
 				row.add_child(button)
+		var emergency_quote: Dictionary = _session.emergency_exit_quote()
+		if bool(emergency_quote.get("valid", false)):
+			_body.add_child(_label("ТОПЛИВА НЕ ХВАТАЕТ ДЛЯ ЛЮБОГО ПЕРЕХОДА · ВЫБЕРИТЕ АВАРИЙНЫЙ ВЫХОД", 12, COLOR_RED))
+			var tow_cost: int = int(emergency_quote.get("towCost", 0))
+			var tow_button: Button = _button("ВЫЗВАТЬ ТЯГАЧ · %d CR · −30%% ВАЛЮТЫ И 1 СЛУЧАЙНЫЙ ПРЕДМЕТ" % tow_cost, bool(emergency_quote.get("towAffordable", false)))
+			tow_button.disabled = not bool(emergency_quote.get("towAffordable", false))
+			tow_button.pressed.connect(_confirm_emergency_exit.bind("TOWED", tow_cost))
+			_body.add_child(tow_button)
+			if not bool(emergency_quote.get("towAffordable", false)):
+				_body.add_child(_label("Кредитов на тягач не хватает; доступно оставить весь незакреплённый груз.", 11, COLOR_MUTED))
+			var abandon_button: Button = _button("БРОСИТЬ ВЫЕЗД · ПОТЕРЯТЬ ВСЁ НЕЗАКРЕПЛЁННОЕ · ЭКИПИРОВКА −10 ПРОЧНОСТИ", false)
+			abandon_button.pressed.connect(_confirm_emergency_exit.bind("ABANDONED", 0))
+			_body.add_child(abandon_button)
 	var back: Button = _button("В ГАРАЖ", false)
 	back.pressed.connect(_show_garage)
 	_body.add_child(back)
@@ -1359,6 +1372,29 @@ func _on_resolve_combat() -> void:
 func _on_exit_run() -> void:
 	if _session.extract_run():
 		_show_garage()
+	else:
+		_footer.text = _session.last_error
+
+func _confirm_emergency_exit(exit_type: String, tow_cost: int) -> void:
+	var dialog: ConfirmationDialog = ConfirmationDialog.new()
+	dialog.title = "АВАРИЙНЫЙ ТЯГАЧ" if exit_type == "TOWED" else "БРОСИТЬ ВЫЕЗД"
+	if exit_type == "TOWED":
+		dialog.dialog_text = "Тягач стоит %d CREDITS. Он вернёт оставшиеся предметы и 70%% незакреплённой валюты, но потеряет один случайный предмет и 30%% валюты. Продолжить?" % tow_cost
+	else:
+		dialog.dialog_text = "Весь незакреплённый груз и валюты будут потеряны. Прочность постоянной экипировки снизится на 10. Бросить выезд?"
+	dialog.ok_button_text = "ПОДТВЕРДИТЬ"
+	dialog.cancel_button_text = "ОТМЕНА"
+	dialog.confirmed.connect(_on_confirm_emergency_exit.bind(exit_type))
+	dialog.confirmed.connect(dialog.queue_free)
+	dialog.canceled.connect(dialog.queue_free)
+	add_child(dialog)
+	dialog.popup_centered()
+
+func _on_confirm_emergency_exit(exit_type: String) -> void:
+	var completed: bool = _session.call_evacuation_tow() if exit_type == "TOWED" else _session.abandon_run()
+	_show_road()
+	if completed:
+		_footer.text = "ВЫЕЗД ЗАВЕРШЁН · %s" % ("ТЯГАЧ ВЕРНУЛ СОХРАНЁННЫЙ ГРУЗ" if exit_type == "TOWED" else "ВЫЕЗД БРОШЕН · НЕЗАКРЕПЛЁННОЕ ПОТЕРЯНО")
 	else:
 		_footer.text = _session.last_error
 
