@@ -97,6 +97,28 @@ func run(_tree: SceneTree) -> bool:
 		check(attribute_session.start_expedition("attribute-lock-test"), "game_session: attribute test expedition failed to start")
 		check(not attribute_session.allocate_attribute("REF") and int(attribute_session.state.meta.operator.attributes.get("REF", 0)) == 5, "game_session: attribute allocation was allowed during an active expedition")
 		check(not attribute_session.set_tree_node_allocated("K1C", true), "game_session: tree allocation was allowed during an active expedition")
+	var item_ops_session: GameSession = GameSession.new()
+	item_ops_session.configure_save_directory("user://test-saves/item-operations")
+	if check(item_ops_session.start_new_game(1762900000300), "game_session: could not create an item-operation profile"):
+		var item_ops_payload: Dictionary = item_ops_session.state.to_payload()
+		var starter_item: Dictionary = item_ops_payload["meta"]["inventory"][0]
+		starter_item["durability"] = 50.0
+		starter_item["rarity"] = "MODIFIED"
+		starter_item["tr"] = 12.0
+		starter_item["affixes"] = [{"affixId": "AF_KDM", "tier": 1, "value": 5.0, "rawRoll": 1.0, "tierBoosted": false, "center": 5.0, "min": 4.0, "max": 6.0}]
+		item_ops_payload["meta"]["inventory"][0] = starter_item
+		item_ops_payload["meta"]["protectedBank"]["SCRAP"] = 30.0
+		check(item_ops_session._commit_payload(item_ops_payload), "game_session: item-operation fixture could not be saved: %s" % item_ops_session.last_error)
+		var item_id: String = str(starter_item.get("itemId", ""))
+		check(item_ops_session.repair_item(item_id), "game_session: secured item repair failed: %s" % item_ops_session.last_error)
+		check(is_equal_approx(float(item_ops_session.state.meta.inventory[0].get("durability", 0.0)), 100.0) and is_equal_approx(item_ops_session.state.meta.protected_bank.scrap, 19.0), "game_session: item repair did not restore durability and charge the formula cost")
+		check(item_ops_session.calibrate_item_affix(item_id, 0), "game_session: TechResource calibration failed: %s" % item_ops_session.last_error)
+		var calibrated_item: Dictionary = item_ops_session.state.meta.inventory[0]
+		var calibrated_affix: Dictionary = calibrated_item["affixes"][0]
+		check(float(calibrated_item.get("tr", 0.0)) == 9.0 and is_equal_approx(item_ops_session.state.meta.protected_bank.scrap, 9.0), "game_session: affix calibration did not charge TR and TechLevel-scaled scrap")
+		check(float(calibrated_affix.get("value", 0.0)) >= 4.0 and float(calibrated_affix.get("value", 0.0)) <= 6.0 and float(calibrated_affix.get("rawRoll", 0.0)) >= 0.8 and float(calibrated_affix.get("rawRoll", 0.0)) <= 1.2, "game_session: calibrated roll escaped its same-tier range")
+		check(item_ops_session.start_expedition("item-operations-lock"), "game_session: item-operation lock test run could not start")
+		check(not item_ops_session.repair_item(item_id) and not item_ops_session.calibrate_item_affix(item_id, 0), "game_session: garage crafting was allowed during an active run")
 	var resumed: GameSession = GameSession.new()
 	resumed.configure_save_directory("user://test-saves/game-session")
 	check(resumed.load_saved_game(), "game_session: persisted state did not reload: %s" % resumed.last_error)

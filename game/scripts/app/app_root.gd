@@ -385,17 +385,50 @@ func _show_inventory() -> void:
 	_body.add_child(_label("Инвентарь", 28, COLOR_TEXT))
 	if _session.state == null:
 		return
+	var inventory_catalog: ItemCatalog = ItemCatalog.new()
+	var inventory_catalog_result: Dictionary = inventory_catalog.load_catalog()
+	if not bool(inventory_catalog_result.get("ok", false)):
+		_body.add_child(_label("Каталог предметов недоступен: %s" % str(inventory_catalog_result.get("error", "")), 13, COLOR_RED))
+		return
+	var can_edit_items: bool = _session.state.run == null or ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(_session.state.run.phase)
+	var reward_formula: CydleFormula = CydleFormula.new()
 	for item_value: Dictionary in _session.state.meta.inventory:
-		var template: Dictionary = ItemCatalog.new().get_template(str(item_value.get("templateId", "")))
+		var template: Dictionary = inventory_catalog.get_template(str(item_value.get("templateId", "")))
 		var name: String = str(template.get("name", item_value.get("templateId", "Предмет")))
 		var row: HBoxContainer = HBoxContainer.new()
 		_body.add_child(row)
-		row.add_child(_label("%s  ·  T%d  ·  %s  ·  прочность %d%%" % [name, int(item_value.get("techLevel", 1)), str(item_value.get("rarity", "COMMON")), int(item_value.get("durability", 100))], 13, COLOR_TEXT))
+		var item_info: VBoxContainer = VBoxContainer.new()
+		item_info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(item_info)
+		var item_actions: VBoxContainer = VBoxContainer.new()
+		row.add_child(item_actions)
+		item_info.add_child(_label("%s  ·  T%d  ·  %s  ·  прочность %d%%  ·  TR %d" % [name, int(item_value.get("techLevel", 1)), str(item_value.get("rarity", "COMMON")), int(item_value.get("durability", 100)), int(item_value.get("tr", 0))], 13, COLOR_TEXT))
+		for affix_index: int in range(item_value.get("affixes", []).size()):
+			var affix: Dictionary = item_value["affixes"][affix_index]
+			var affix_label: Label = _label("%s T%d · %s (%.2f; диапазон %.2f–%.2f)" % [str(affix.get("affixId", "?")), int(affix.get("tier", 1)), str(inventory_catalog.get_affix(str(affix.get("affixId", ""))).get("name", "Аффикс")), float(affix.get("value", 0.0)), float(affix.get("min", 0.0)), float(affix.get("max", 0.0))], 10, COLOR_MUTED)
+			affix_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			item_info.add_child(affix_label)
 		var slot: String = _compatible_slot(str(template.get("category", "")))
 		if not slot.is_empty() and bool(item_value.get("secured", false)):
 			var equip_button: Button = _button("НАДЕТЬ %s" % slot, false)
+			equip_button.disabled = not can_edit_items
 			equip_button.pressed.connect(_on_equip_item.bind(slot, str(item_value.get("itemId", ""))))
-			row.add_child(equip_button)
+			item_actions.add_child(equip_button)
+		if bool(item_value.get("secured", false)):
+			if float(item_value.get("durability", 100.0)) < 100.0:
+				var repair_tech: int = int(item_value.get("techLevel", 1))
+				var repair_cost: int = mini(ceili((100.0 - float(item_value.get("durability", 100.0))) / 10.0 * (2.0 + float(repair_tech) / 5.0)), ceili((25.0 + 7.0 * float(repair_tech)) * reward_formula.reward_scale(float(repair_tech))))
+				var repair_button: Button = _button("РЕМОНТ · %d SCRAP" % repair_cost, false)
+				repair_button.disabled = not can_edit_items
+				repair_button.pressed.connect(_on_repair_item.bind(str(item_value.get("itemId", ""))))
+				item_actions.add_child(repair_button)
+			for affix_index: int in range(item_value.get("affixes", []).size()):
+				var affix: Dictionary = item_value["affixes"][affix_index]
+				var calibration_cost: int = ceili(10.0 * reward_formula.reward_scale(float(item_value.get("techLevel", 1))))
+				var calibrate_button: Button = _button("%s · 3 TR / %d SCRAP" % [str(affix.get("affixId", "AF")), calibration_cost], false)
+				calibrate_button.disabled = not can_edit_items or str(item_value.get("rarity", "")) == "UNIQUE" or float(item_value.get("tr", 0.0)) < 3.0
+				calibrate_button.pressed.connect(_on_calibrate_item_affix.bind(str(item_value.get("itemId", "")), affix_index))
+				item_actions.add_child(calibrate_button)
 	var back: Button = _button("НАЗАД В ГАРАЖ", false)
 	back.pressed.connect(_show_garage)
 	_body.add_child(back)
@@ -737,6 +770,16 @@ func _on_equip_item(slot: String, item_id: String) -> void:
 		_show_inventory()
 	else:
 		_footer.text = _session.last_error
+
+func _on_repair_item(item_id: String) -> void:
+	var repaired: bool = _session.repair_item(item_id)
+	_show_inventory()
+	_footer.text = "ПРЕДМЕТ ОТРЕМОНТИРОВАН" if repaired else _session.last_error
+
+func _on_calibrate_item_affix(item_id: String, affix_index: int) -> void:
+	var calibrated: bool = _session.calibrate_item_affix(item_id, affix_index)
+	_show_inventory()
+	_footer.text = "АФФИКС ПЕРЕКАЛИБРОВАН · BUILD LAB ПЕРЕСЧИТАН" if calibrated else _session.last_error
 
 func _compatible_slot(category: String) -> String:
 	match category:

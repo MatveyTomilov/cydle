@@ -1098,6 +1098,101 @@ func equip_item(slot: String, item_id: String) -> bool:
 		return false
 	return _commit(validation["state"] as GameSaveState)
 
+func repair_item(item_id: String) -> bool:
+	if not _garage_action_allowed():
+		last_error = "Экипировку можно ремонтировать только в гараже между выездами."
+		return false
+	var payload: Dictionary = state.to_payload()
+	var inventory: Array = payload["meta"]["inventory"]
+	for index: int in range(inventory.size()):
+		var item: Dictionary = inventory[index]
+		if str(item.get("itemId", "")) != item_id or not bool(item.get("secured", false)):
+			continue
+		var durability: float = float(item.get("durability", 100.0))
+		if durability >= 100.0:
+			last_error = "Предмет уже полностью исправен."
+			return false
+		var tech_level: int = int(item.get("techLevel", 1))
+		var formula: CydleFormula = CydleFormula.new()
+		var repair_cost: int = ceili((100.0 - durability) / 10.0 * (2.0 + float(tech_level) / 5.0))
+		var replacement_cap: int = ceili((25.0 + 7.0 * float(tech_level)) * formula.reward_scale(float(tech_level)))
+		repair_cost = mini(repair_cost, replacement_cap)
+		var scrap: float = float(payload["meta"]["protectedBank"].get("SCRAP", 0.0))
+		if scrap < float(repair_cost):
+			last_error = "Ремонт требует %d SCRAP, доступно %d." % [repair_cost, int(scrap)]
+			return false
+		item["durability"] = 100.0
+		inventory[index] = item
+		payload["meta"]["inventory"] = inventory
+		payload["meta"]["protectedBank"]["SCRAP"] = scrap - float(repair_cost)
+		return _commit_payload(payload)
+	last_error = "Предмет не найден в постоянном складе."
+	return false
+
+func calibrate_item_affix(item_id: String, affix_index: int) -> bool:
+	if not _garage_action_allowed():
+		last_error = "Калибровка доступна только в гараже между выездами."
+		return false
+	var payload: Dictionary = state.to_payload()
+	var inventory: Array = payload["meta"]["inventory"]
+	for item_index: int in range(inventory.size()):
+		var item: Dictionary = inventory[item_index]
+		if str(item.get("itemId", "")) != item_id or not bool(item.get("secured", false)):
+			continue
+		if affix_index < 0 or affix_index >= item.get("affixes", []).size():
+			last_error = "У предмета нет выбранного аффикса."
+			return false
+		if str(item.get("rarity", "")) == "UNIQUE":
+			last_error = "Уникальные эффекты нельзя калибровать обычной операцией."
+			return false
+		if float(item.get("tr", 0.0)) < 3.0:
+			last_error = "Недостаточно TR: требуется 3."
+			return false
+		var tech_level: int = int(item.get("techLevel", 1))
+		var scrap_cost: int = ceili(10.0 * CydleFormula.new().reward_scale(float(tech_level)))
+		var scrap: float = float(payload["meta"]["protectedBank"].get("SCRAP", 0.0))
+		if scrap < float(scrap_cost):
+			last_error = "Калибровка требует %d SCRAP, доступно %d." % [scrap_cost, int(scrap)]
+			return false
+		var affix: Dictionary = item["affixes"][affix_index]
+		var catalog_result: Dictionary = _item_catalog.load_catalog()
+		if not bool(catalog_result.get("ok", false)):
+			last_error = str(catalog_result.get("error", "Каталог предметов недоступен."))
+			return false
+		var definition: Dictionary = _item_catalog.get_affix(str(affix.get("affixId", "")))
+		if definition.is_empty():
+			last_error = "Аффикс отсутствует в каталоге."
+			return false
+		var tier: int = int(affix.get("tier", 1))
+		var tiers: Array = definition.get("tiers", [])
+		var template: Dictionary = _item_catalog.get_template(str(item.get("templateId", "")))
+		if tier < 1 or tier > tiers.size() or template.is_empty() or not (definition.get("slots", []) as Array).has(str(template.get("category", ""))):
+			last_error = "Аффикс или его tier несовместимы с шаблоном предмета."
+			return false
+		var center: float = float(tiers[tier - 1])
+		var rng: DeterministicRng = DeterministicRng.new()
+		rng.seed("craft:%s:%s:%d:%d" % [state.save_id, item_id, state.revision, affix_index], state.revision)
+		var raw_roll: float = 1.0 if bool(definition.get("fixed", false)) else rng.range_float(0.8, 1.2)
+		var integer_value: bool = bool(definition.get("integer", false))
+		var value: float = maxf(1.0, roundf(center * raw_roll)) if integer_value else floorf(center * raw_roll * 100.0 + 0.5) / 100.0
+		affix["rawRoll"] = floorf(raw_roll * 10000.0 + 0.5) / 10000.0
+		affix["center"] = center
+		affix["value"] = value
+		affix["min"] = maxf(1.0, roundf(center * 0.8)) if integer_value else floorf(center * 0.8 * 100.0 + 0.5) / 100.0
+		affix["max"] = roundf(center * 1.2) if integer_value else floorf(center * 1.2 * 100.0 + 0.5) / 100.0
+		item["affixes"][affix_index] = affix
+		item["tr"] = float(item.get("tr", 0.0)) - 3.0
+		item["rollSeed"] = "%s:%d" % [rng.stream, rng.calls]
+		inventory[item_index] = item
+		payload["meta"]["inventory"] = inventory
+		payload["meta"]["protectedBank"]["SCRAP"] = scrap - float(scrap_cost)
+		return _commit_payload(payload)
+	last_error = "Предмет не найден в постоянном складе."
+	return false
+
+func _garage_action_allowed() -> bool:
+	return state != null and (state.run == null or ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(state.run.phase))
+
 func extract_run() -> bool:
 	if state == null or state.run == null:
 		last_error = "Нет активного выезда для эвакуации."
