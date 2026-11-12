@@ -64,6 +64,12 @@ func create_state(config: Dictionary) -> Dictionary:
 	state.rng = _new_rng(state.seed).serialize()
 	state.rules_hash = _hash.hash_string(_hash.stable_stringify({"version": COMBAT_RULES_VERSION, "tactics": state.tactics}))
 	state.next_event_id = 1
+	for trigger_value: Dictionary in state.build.get("triggerEffects", []):
+		var effect: Dictionary = trigger_value.get("effect", {})
+		if str(effect.get("event", "")) != "PERIODIC" or float(effect.get("periodMs", 0.0)) <= 0.0:
+			continue
+		var owner: CombatActorState = _trigger_owner(state, str(trigger_value.get("sourceId", "")))
+		owner.ability_next["periodic:%s" % str(effect.get("id", ""))] = float(effect.get("periodMs", 0.0))
 	var enemy_names: PackedStringArray = PackedStringArray()
 	for enemy: CombatActorState in state.enemies:
 		enemy_names.append(enemy.display_name)
@@ -79,6 +85,9 @@ func step_combat(state: CombatState) -> Dictionary:
 	if not state.outcome.is_empty():
 		return {"ok": true, "state": state, "error": ""}
 	if not _supports_basic_auto_step(state):
+		for actor: CombatActorState in state.all_actors():
+			if actor.cast != null or actor.reaction_cast != null: print("UNSUPPORTED_CAST actor=", actor.id, " kind=", actor.kind, " cast=", actor.cast, " reaction=", actor.reaction_cast)
+		if not _supports_skill_trigger_effects(state): print("UNSUPPORTED_TRIGGERS ", state.build.get("triggerEffects", []))
 		return _failure("Эта боевая конфигурация требует ещё не перенесённые способности, статусы, триггеры или тактические правила.")
 	var next: CombatState = state.clone()
 	var rng: DeterministicRng = DeterministicRng.new()
@@ -88,7 +97,9 @@ func step_combat(state: CombatState) -> Dictionary:
 	_apply_basic_continuous(next)
 	_tick_dot_statuses(next)
 	_expire_dot_statuses(next)
+	_run_periodic_drone_triggers(next, rng)
 	_advance_reaction_cast(next, rng)
+	_advance_drone_skill_casts(next, rng)
 	_advance_main_skill_cast(next, rng)
 	_advance_enemy_ability_casts(next, rng)
 	_choose_reaction_skill(next)
@@ -102,6 +113,8 @@ func step_combat(state: CombatState) -> Dictionary:
 			if not scheduled_ability.is_empty():
 				_start_enemy_ability(next, actor, scheduled_ability)
 				continue
+		if actor.kind == "drone" and actor.reaction_cast == null and _try_start_drone_skill(next, actor):
+			continue
 		if actor.next_attack_at > float(next.time_ms):
 			continue
 		if actor.side == "enemy" and actor.cast != null:
@@ -143,8 +156,16 @@ func _supports_basic_auto_step(state: CombatState) -> bool:
 	for actor: CombatActorState in state.all_actors():
 		if not actor.buffs.is_empty():
 			return false
-		if actor.reaction_cast != null and (actor.kind != "operator" or not actor.reaction_cast is Dictionary or str(actor.reaction_cast.get("skillId", "")) not in ["SK_SHIELD", "SK_EMP", "SK_GUARD", "SK_VENT", "SK_HEAL", "SK_DRONE_MARK"]):
-			return false
+		if actor.reaction_cast != null:
+			if not actor.reaction_cast is Dictionary:
+				return false
+			var reaction_id: String = str(actor.reaction_cast.get("skillId", ""))
+			if actor.kind == "operator" and reaction_id not in ["SK_SHIELD", "SK_EMP", "SK_GUARD", "SK_VENT", "SK_HEAL", "SK_DRONE_MARK"]:
+				return false
+			if actor.kind == "drone" and reaction_id not in ["SK_DRONE_REPAIR", "SK_DRONE_EMP"]:
+				return false
+			if actor.kind not in ["operator", "drone"]:
+				return false
 		if actor.cast != null:
 			if actor.kind == "operator":
 				if not actor.cast is Dictionary or str(actor.cast.get("skillId", "")) not in ["SK_BURST", "SK_PIERCE", "SK_EXEC", "SK_BLADE", "SK_PLASMA", "SK_ARC", "SK_OVR", "SK_NEURO", "SK_SEED", "SK_DETONATE", "SK_BREAK", "SK_SCAN", "SK_LEECH", "SK_CHAIN", "SK_KINETIC", "SK_SIDE_FIRE"]:
@@ -168,9 +189,59 @@ func _supports_skill_trigger_effects(state: CombatState) -> bool:
 		if not trigger_value is Dictionary:
 			return false
 		var source_id: String = str(trigger_value.get("sourceId", ""))
-		if source_id not in ["SK_BLADE", "SK_NEURO", "SK_SEED", "SK_BREAK"]:
+		var effect: Dictionary = trigger_value.get("effect", {})
+		var effect_id: String = str(effect.get("id", ""))
+		var skill_trigger: bool = source_id in ["SK_BLADE", "SK_NEURO", "SK_SEED", "SK_BREAK"]
+		var drone_trigger: bool = effect_id in ["DR_MED_heal", "DR_EMP_interrupt"] and str(effect.get("event", "")) == "PERIODIC" and str(trigger_value.get("sourceKind", "")) == "item"
+		if not skill_trigger and not drone_trigger:
 			return false
 	return true
+
+func _trigger_owner(state: CombatState, source_id: String) -> CombatActorState:
+	for drone: CombatActorState in state.drones:
+		if drone.drone_item_id == source_id:
+			return drone
+	return state.operator
+
+func _run_periodic_drone_triggers(state: CombatState, rng: DeterministicRng) -> void:
+	for trigger_value: Dictionary in state.build.get("triggerEffects", []):
+		var effect: Dictionary = trigger_value.get("effect", {})
+		var effect_id: String = str(effect.get("id", ""))
+		if effect_id not in ["DR_MED_heal", "DR_EMP_interrupt"]:
+			continue
+		var owner: CombatActorState = _trigger_owner(state, str(trigger_value.get("sourceId", "")))
+		var schedule_key: String = "periodic:%s" % effect_id
+		var period_ms: float = float(effect.get("periodMs", 0.0))
+		if not owner.alive or period_ms <= 0.0 or float(owner.ability_next.get(schedule_key, period_ms)) > float(state.time_ms):
+			continue
+		owner.ability_next[schedule_key] = float(owner.ability_next.get(schedule_key, period_ms)) + period_ms
+		var action_id: String = "%s:periodic:%s:%d" % [owner.id, effect_id, int(owner.counters.get(effect_id, 0)) + 1]
+		owner.counters[effect_id] = int(owner.counters.get(effect_id, 0)) + 1
+		_emit(state, "TRIGGER", owner.id, {"actionId": action_id, "text": "%s: периодический триггер %s." % [owner.display_name, effect_id], "data": {"periodMs": period_ms}})
+		if effect_id == "DR_MED_heal":
+			var max_shield: float = float(_effective_sheet(state, state.operator).get("maxShield", 0.0))
+			var restored: float = minf(float(effect.get("action", {}).get("amount", 18.0)), maxf(0.0, max_shield - state.operator.shield))
+			state.operator.shield += restored
+			if restored > 0.0:
+				_emit(state, "SHIELD_GAIN", owner.id, {"targetId": state.operator.id, "actionId": action_id, "text": "%s: оператору +%s щита." % [owner.display_name, _one_decimal(restored)], "data": {"amount": restored, "source": effect_id}})
+		elif effect_id == "DR_EMP_interrupt":
+			var target: CombatActorState = null
+			for enemy: CombatActorState in state.enemies:
+				if enemy.alive and enemy.cast is Dictionary and bool(enemy.cast.get("interruptible", false)):
+					target = enemy
+					break
+			if target != null:
+				var emp_available: bool = false
+				for skill: Dictionary in state.build.get("skills", []):
+					if str(skill.get("special", "")) == "DRONE_EMP":
+						emp_available = true
+						break
+				if emp_available and owner.reaction_cast == null:
+					_try_start_drone_skill(state, owner)
+				else:
+					target.cast = null
+					state.metrics["interrupts"] = int(state.metrics.get("interrupts", 0)) + 1
+					_emit(state, "CAST_INTERRUPT", owner.id, {"targetId": target.id, "actionId": action_id, "text": "%s: каст прерван." % target.display_name})
 
 func _has_enabled_tactic(state: CombatState, skill_id: String) -> bool:
 	for rule_value: Variant in state.tactics.get("rules", []):
@@ -327,6 +398,87 @@ func _advance_reaction_cast(state: CombatState, rng: DeterministicRng) -> void:
 		_resolve_reaction_skill(state, rng, actor, cast)
 	if state.time_ms >= float(cast.get("endAt", 0.0)):
 		actor.reaction_cast = null
+
+func _advance_drone_skill_casts(state: CombatState, rng: DeterministicRng) -> void:
+	for drone: CombatActorState in state.drones:
+		if drone.reaction_cast == null or not drone.reaction_cast is Dictionary:
+			continue
+		var cast: Dictionary = drone.reaction_cast
+		if _has_status(drone, "STUN"):
+			cast["resolveAt"] = float(cast.get("resolveAt", 0.0)) + TICK_MS
+			cast["endAt"] = float(cast.get("endAt", 0.0)) + TICK_MS
+			continue
+		if not bool(cast.get("resolved", false)) and state.time_ms >= float(cast.get("resolveAt", 0.0)):
+			cast["resolved"] = true
+			_resolve_drone_skill(state, rng, drone, cast)
+		if state.time_ms >= float(cast.get("endAt", 0.0)):
+			drone.reaction_cast = null
+
+func _try_start_drone_skill(state: CombatState, drone: CombatActorState) -> bool:
+	var skill: Dictionary = {}
+	var target: CombatActorState = null
+	if drone.drone_role == "medic" and state.operator.alive:
+		for candidate: Dictionary in state.build.get("skills", []):
+			if str(candidate.get("special", "")) == "DRONE_REPAIR":
+				skill = candidate
+				break
+		if not skill.is_empty():
+			var drone_hp: float = float(_effective_sheet(state, drone).get("maxHP", 0.0))
+			var operator_shield: float = float(_effective_sheet(state, state.operator).get("maxShield", 0.0))
+			if drone.hp >= drone_hp and state.operator.shield >= operator_shield:
+				skill = {}
+	elif drone.drone_role == "emp":
+			for enemy: CombatActorState in state.enemies:
+				if enemy.alive and enemy.cast is Dictionary and bool(enemy.cast.get("interruptible", false)):
+					target = enemy
+					break
+			if target != null:
+				for candidate: Dictionary in state.build.get("skills", []):
+					if str(candidate.get("special", "")) == "DRONE_EMP":
+						skill = candidate
+						break
+	if skill.is_empty() or float(drone.cooldowns.get(str(skill.get("id", "")), 0.0)) > float(state.time_ms):
+		return false
+	var skill_id: String = str(skill.get("id", ""))
+	drone.cooldowns[skill_id] = float(state.time_ms) + float(skill.get("cooldownMs", 0.0))
+	drone.counters["casts"] = int(drone.counters.get("casts", 0)) + 1
+	var action_id: String = "%s:skill:%s:%d" % [drone.id, skill_id, int(drone.counters["casts"])]
+	var windup: float = float(skill.get("windupMs", 0.0))
+	drone.reaction_cast = {"actionId": action_id, "skillId": skill_id, "startedAt": state.time_ms, "resolveAt": float(state.time_ms) + windup, "endAt": float(state.time_ms) + windup + float(skill.get("recoveryMs", 0.0)), "targetId": target.id if target != null else drone.id, "interruptible": false, "telegraph": false, "channel": str(skill.get("channel", "droneA"))}
+	_emit(state, "CAST_START", drone.id, {"skillId": skill_id, "targetId": drone.reaction_cast["targetId"], "actionId": action_id, "text": "%s: %s." % [drone.display_name, str(skill.get("name", skill_id))], "data": {"channel": drone.reaction_cast["channel"], "windupMs": windup, "recoveryMs": skill.get("recoveryMs", 0), "cooldownMs": skill.get("cooldownMs", 0)}})
+	return true
+
+func _resolve_drone_skill(state: CombatState, rng: DeterministicRng, drone: CombatActorState, cast: Dictionary) -> void:
+	var skill_id: String = str(cast.get("skillId", ""))
+	var skill: Dictionary = _equipped_skill(state, skill_id)
+	if skill.is_empty():
+		return
+	state.metrics["skillUses"][skill_id] = int(state.metrics["skillUses"].get(skill_id, 0)) + 1
+	var action_id: String = str(cast.get("actionId", ""))
+	if str(skill.get("special", "")) == "DRONE_REPAIR":
+		var max_hp: float = float(_effective_sheet(state, drone).get("maxHP", 0.0))
+		var healed: float = minf(25.0, maxf(0.0, max_hp - drone.hp))
+		drone.hp += healed
+		if healed > 0.0:
+			state.metrics["healingDone"] = float(state.metrics.get("healingDone", 0.0)) + healed
+			_emit(state, "HEAL", drone.id, {"targetId": drone.id, "actionId": action_id, "text": "%s: восстановлено %s HP." % [drone.display_name, _one_decimal(healed)], "data": {"amount": healed, "source": skill_id}})
+		var max_shield: float = float(_effective_sheet(state, state.operator).get("maxShield", 0.0))
+		var restored: float = minf(20.0, maxf(0.0, max_shield - state.operator.shield))
+		state.operator.shield += restored
+		if restored > 0.0:
+			_emit(state, "SHIELD_GAIN", drone.id, {"targetId": state.operator.id, "actionId": action_id, "text": "%s: оператору +%s щита." % [drone.display_name, _one_decimal(restored)], "data": {"amount": restored, "source": skill_id}})
+		return
+	if str(skill.get("special", "")) == "DRONE_EMP":
+		var target: CombatActorState = _actor_by_id(state, str(cast.get("targetId", "")))
+		if target == null or not target.alive:
+			return
+		if target.cast is Dictionary and bool(target.cast.get("interruptible", false)):
+			target.cast = null
+			state.metrics["interrupts"] = int(state.metrics.get("interrupts", 0)) + 1
+			_emit(state, "CAST_INTERRUPT", drone.id, {"targetId": target.id, "actionId": action_id, "text": "%s: каст прерван." % target.display_name})
+		var hit: Dictionary = _resolve_basic_hit(state, rng, drone, target, drone.attack_damage * float(skill.get("coefficient", 0.75)), "DIGITAL", action_id, false, skill_id)
+		if bool(hit.get("ok", false)) and bool(hit.get("hit", false)):
+			_add_simple_status(state, drone, target, "JAM", 2000.0)
 
 func _resolve_reaction_skill(state: CombatState, rng: DeterministicRng, actor: CombatActorState, cast: Dictionary) -> void:
 	var skill_id: String = str(cast.get("skillId", ""))
@@ -1223,6 +1375,10 @@ func _pick_auto_target(state: CombatState, actor: CombatActorState) -> CombatAct
 		if enemy.alive:
 			enemies.append(enemy)
 	enemies.sort_custom(func(left: CombatActorState, right: CombatActorState) -> bool: return left.id < right.id)
+	if actor.kind == "drone" and actor.drone_role == "mark":
+		for enemy: CombatActorState in enemies:
+			if _has_status(enemy, "DRONE_MARK"):
+				return enemy
 	return enemies[0] if not enemies.is_empty() else null
 
 func _resolve_basic_attack(state: CombatState, rng: DeterministicRng, actor: CombatActorState, target: CombatActorState) -> Dictionary:
@@ -1266,6 +1422,9 @@ func _attack_packets(actor: CombatActorState, weapon: Dictionary) -> Array[Dicti
 	elif actor.kind == "operator":
 		var count: int = int(weapon.get("pelletCount", 1))
 		for _index: int in range(count):
+			packets.append({"type": actor.attack_type, "amount": actor.attack_damage})
+	elif actor.kind == "drone" and actor.drone_role == "swarm":
+		for _index: int in range(maxi(1, actor.drone_pellets)):
 			packets.append({"type": actor.attack_type, "amount": actor.attack_damage})
 	else:
 		packets.append({"type": actor.attack_type, "amount": actor.attack_damage})

@@ -14,6 +14,7 @@ func run(_tree: SceneTree) -> bool:
 	_run_elite_split()
 	_run_main_skill_effects()
 	_run_enemy_escape_wanted_protection()
+	_run_drone_roles()
 	return failure_count == 0
 
 func _run_reaction_shield() -> void:
@@ -282,6 +283,94 @@ func _make_enemy_state(enemy_specs: Array[Dictionary], seed_value: String) -> Di
 	if not main_item.instantiate_from_dictionary(items_by_id[str(meta["equipment"]["MAIN"])]):
 		return {}
 	var build: Dictionary = BuildResolver.new().resolve_build({"equipment": {"MAIN": main_item}, "attributes": meta["operator"]["attributes"], "skillIds": [], "passiveIds": [], "treeNodeIds": [], "attributePointsEarned": 0, "treePointsEarned": 0})
+	if not bool(build.get("valid", false)):
+		return {}
+	var simulator: CombatSimulator = CombatSimulator.new()
+	var initialized: Dictionary = simulator.create_state({"seed": seed_value, "depth": 1, "biome": "B01", "nodeType": "COMBAT", "build": build, "enemies": enemy_specs, "tactics": {"rules": []}, "startEnergy": 100})
+	return {"simulator": simulator, "state": initialized.get("state")} if bool(initialized.get("ok", false)) else {}
+
+func _run_drone_roles() -> void:
+	var mark_data: Dictionary = _make_drone_state("DR_GUN", [], "drone-mark-test", [{"templateId": "E01"}, {"templateId": "E02"}])
+	var mark_state: CombatState = mark_data.get("state") as CombatState
+	if mark_state != null:
+		var marked: Dictionary = CombatSimulator.new().apply_status(mark_state, "operator", mark_state.enemies[1].id, "DRONE_MARK", {"durationMs": 5000})
+		if bool(marked.get("ok", false)):
+			mark_state = marked["state"] as CombatState
+			var selected: CombatActorState = CombatSimulator.new()._pick_auto_target(mark_state, mark_state.drones[0])
+			check(selected != null and selected.id == mark_state.enemies[1].id, "drone_mark: marker drone did not prioritize marked enemy")
+	var swarm_data: Dictionary = _make_drone_state("DR_SWARM", [], "drone-swarm-test", [{"templateId": "E01"}])
+	var swarm_state: CombatState = swarm_data.get("state") as CombatState
+	if swarm_state != null:
+		check(CombatSimulator.new()._attack_packets(swarm_state.drones[0], {}).size() == 3, "drone_swarm: swarm did not create three attack packets")
+	var medic_data: Dictionary = _make_drone_state("DR_MED", ["SK_DRONE_REPAIR"], "drone-medic-test", [{"templateId": "E01"}])
+	var medic_state: CombatState = medic_data.get("state") as CombatState
+	var medic_simulator: CombatSimulator = medic_data.get("simulator") as CombatSimulator
+	if medic_state != null and medic_simulator != null:
+		medic_state.operator.next_attack_at = 999999.0
+		medic_state.drones[0].next_attack_at = 999999.0
+		medic_state.drones[0].hp -= 30.0
+		medic_state.operator.shield -= 30.0
+		var drone_hp_before: float = medic_state.drones[0].hp
+		var shield_before: float = medic_state.operator.shield
+		for _tick: int in range(3):
+			var step: Dictionary = medic_simulator.step_combat(medic_state)
+			if not bool(step.get("ok", false)):
+				check(false, "drone_medic: step failed: %s" % step.get("error", ""))
+				break
+			medic_state = step["state"] as CombatState
+		check(medic_state.drones[0].hp == drone_hp_before + 25.0 and medic_state.operator.shield == shield_before + 20.0, "drone_medic: repair did not heal the drone and restore operator shields")
+	var medic_periodic_data: Dictionary = _make_drone_state("DR_MED", [], "drone-medic-periodic-test", [{"templateId": "E01"}])
+	var medic_periodic_state: CombatState = medic_periodic_data.get("state") as CombatState
+	var medic_periodic_simulator: CombatSimulator = medic_periodic_data.get("simulator") as CombatSimulator
+	if medic_periodic_state != null and medic_periodic_simulator != null:
+		medic_periodic_state.operator.next_attack_at = 999999.0
+		medic_periodic_state.drones[0].next_attack_at = 999999.0
+		medic_periodic_state.enemies[0].next_attack_at = 999999.0
+		medic_periodic_state.operator.shield -= 30.0
+		var shield_before: float = medic_periodic_state.operator.shield
+		while medic_periodic_state.time_ms < 10100:
+			var step: Dictionary = medic_periodic_simulator.step_combat(medic_periodic_state)
+			if not bool(step.get("ok", false)):
+				check(false, "drone_medic: periodic step failed: %s" % step.get("error", ""))
+				break
+			medic_periodic_state = step["state"] as CombatState
+		check(medic_periodic_state.operator.shield == shield_before + 18.0, "drone_medic: periodic support did not restore 18 operator shields after 10 seconds")
+	var emp_data: Dictionary = _make_drone_state("DR_EMP", ["SK_DRONE_EMP"], "drone-emp-test", [{"templateId": "E02"}])
+	var emp_state: CombatState = emp_data.get("state") as CombatState
+	var emp_simulator: CombatSimulator = emp_data.get("simulator") as CombatSimulator
+	if emp_state != null and emp_simulator != null:
+		emp_state.operator.next_attack_at = 999999.0
+		emp_state.drones[0].next_attack_at = 999999.0
+		emp_state.enemies[0].cast = {"actionId": "enemy:drone-emp-test", "abilityId": "E02_snipe", "startedAt": 0.0, "resolveAt": 1000.0, "endAt": 1000.0, "targetId": "operator", "interruptible": true, "telegraph": true, "channel": "main"}
+		for _tick: int in range(3):
+			var step: Dictionary = emp_simulator.step_combat(emp_state)
+			if not bool(step.get("ok", false)):
+				check(false, "drone_emp: step failed: %s" % step.get("error", ""))
+				break
+			emp_state = step["state"] as CombatState
+		check(int(emp_state.metrics.get("interrupts", 0)) == 1 and emp_state.enemies[0].cast == null and emp_state.enemies[0].statuses.has("JAM"), "drone_emp: drone failed to interrupt, damage, and jam the caster")
+
+func _make_drone_state(drone_template_id: String, skill_ids: Array[String], seed_value: String, enemy_specs: Array[Dictionary]) -> Dictionary:
+	var meta: Dictionary = _read_dictionary(SAVE_FIXTURE).get("meta", {})
+	var items_by_id: Dictionary = {}
+	for item_value: Dictionary in meta.get("inventory", []):
+		items_by_id[str(item_value["itemId"])] = item_value
+	var equipment: Dictionary = {}
+	for slot: String in ["MAIN", "DRONE_1"]:
+		var raw_item: Dictionary = items_by_id[str(meta["equipment"][slot])].duplicate(true)
+		if slot == "DRONE_1":
+			var item_catalog: ItemCatalog = ItemCatalog.new()
+			if not bool(item_catalog.load_catalog().get("ok", false)):
+				return {}
+			raw_item["templateId"] = drone_template_id
+			raw_item["itemId"] = "test:%s" % drone_template_id
+			raw_item["neuralCost"] = float(item_catalog.get_template(drone_template_id).get("neuralCost", 0.0))
+			raw_item["affixes"] = []
+		var item: ItemInstance = ItemInstance.new()
+		if not item.instantiate_from_dictionary(raw_item):
+			return {}
+		equipment[slot] = item
+	var build: Dictionary = BuildResolver.new().resolve_build({"equipment": equipment, "attributes": meta["operator"]["attributes"], "skillIds": skill_ids, "passiveIds": [], "treeNodeIds": [], "attributePointsEarned": 0, "treePointsEarned": 0})
 	if not bool(build.get("valid", false)):
 		return {}
 	var simulator: CombatSimulator = CombatSimulator.new()
