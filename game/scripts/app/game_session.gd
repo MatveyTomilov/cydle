@@ -1985,11 +1985,9 @@ func checkpoint_shipping_quote(item_ids: Array[String], currency_percent: int = 
 	var shipped_wallet: Dictionary = {}
 	for currency: String in ["CREDITS", "SCRAP", "DATA"]:
 		var balance: float = float(wallet.get(currency, 0.0))
-		if currency == "CREDITS":
-			balance = maxf(0.0, balance - float(shipping_cost))
 		shipped_wallet[currency] = floorf(balance * float(currency_percent) / 100.0)
 	var has_value: bool = not item_ids.is_empty() or float(shipped_wallet["CREDITS"]) > 0.0 or float(shipped_wallet["SCRAP"]) > 0.0 or float(shipped_wallet["DATA"]) > 0.0
-	var affordable: bool = state.run.wallet.credits >= float(shipping_cost) and has_value
+	var affordable: bool = state.run.wallet.credits >= float(shipping_cost) + float(shipped_wallet["CREDITS"]) and has_value
 	var error: String = "" if affordable else "Нужно %d незакреплённых кредитов и выбрать груз или валюту." % shipping_cost
 	return {"valid": true, "affordable": affordable, "credits": shipping_cost, "cargoUnits": cargo_units, "items": selected_items, "wallet": shipped_wallet, "currencyPercent": currency_percent, "checkpointId": checkpoint_id, "error": error}
 

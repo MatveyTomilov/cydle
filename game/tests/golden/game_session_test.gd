@@ -308,13 +308,17 @@ func run(_tree: SceneTree) -> bool:
 			var shipment_ids: Array[String] = [shipped_item.item_id]
 			var shipping_quote: Dictionary = checkpoint_ship_session.checkpoint_shipping_quote(shipment_ids, 50)
 			check(bool(shipping_quote.get("valid", false)) and bool(shipping_quote.get("affordable", false)) and int(shipping_quote.get("cargoUnits", 0)) == 2 and int(shipping_quote.get("credits", 0)) == 10, "game_session: checkpoint shipment did not quote the authored cargo cap/cost: %s" % shipping_quote)
+			var insufficient_fee_payload: Dictionary = checkpoint_ship_session.state.to_payload()
+			insufficient_fee_payload["run"]["runWallet"]["CREDITS"] = 18.0
+			check(checkpoint_ship_session._commit_payload(insufficient_fee_payload) and not bool(checkpoint_ship_session.checkpoint_shipping_quote(shipment_ids, 50).get("affordable", false)), "game_session: shipment allowed transferring half the credits when fee plus transfer exceeded the wallet")
+			check(checkpoint_ship_session._commit_payload(shipping_payload), "game_session: could not restore the affordable checkpoint shipping fixture")
 			var protected_credits_before: float = checkpoint_ship_session.state.meta.protected_bank.credits
 			var protected_scrap_before: float = checkpoint_ship_session.state.meta.protected_bank.scrap
 			var protected_data_before: float = checkpoint_ship_session.state.meta.protected_bank.data
 			check(checkpoint_ship_session.ship_checkpoint_cargo(shipment_ids, 50), "game_session: checkpoint shipment failed: %s" % checkpoint_ship_session.last_error)
 			check(checkpoint_ship_session.state.run.unsecured_cargo.is_empty() and checkpoint_ship_session.state.meta.inventory.any(func(item: Dictionary) -> bool: return str(item.get("itemId", "")) == shipped_item.item_id and bool(item.get("secured", false))), "game_session: checkpoint shipment did not secure cargo into the permanent inventory")
-			check(is_equal_approx(checkpoint_ship_session.state.meta.protected_bank.credits, protected_credits_before + 45.0) and is_equal_approx(checkpoint_ship_session.state.meta.protected_bank.scrap, protected_scrap_before + 20.0) and is_equal_approx(checkpoint_ship_session.state.meta.protected_bank.data, protected_data_before + 10.0), "game_session: shipment did not bank the selected maximum half of run currency")
-			check(is_equal_approx(checkpoint_ship_session.state.run.wallet.credits, 45.0) and is_equal_approx(checkpoint_ship_session.state.run.wallet.scrap, 20.0) and is_equal_approx(checkpoint_ship_session.state.run.wallet.data, 10.0), "game_session: shipment failed to charge the fee and deduct banked currency")
+			check(is_equal_approx(checkpoint_ship_session.state.meta.protected_bank.credits, protected_credits_before + 50.0) and is_equal_approx(checkpoint_ship_session.state.meta.protected_bank.scrap, protected_scrap_before + 20.0) and is_equal_approx(checkpoint_ship_session.state.meta.protected_bank.data, protected_data_before + 10.0), "game_session: shipment did not bank the selected maximum half of run currency")
+			check(is_equal_approx(checkpoint_ship_session.state.run.wallet.credits, 40.0) and is_equal_approx(checkpoint_ship_session.state.run.wallet.scrap, 20.0) and is_equal_approx(checkpoint_ship_session.state.run.wallet.data, 10.0), "game_session: shipment failed to charge the fee and deduct banked currency")
 			check(not checkpoint_ship_session.ship_checkpoint_cargo(shipment_ids, 50), "game_session: checkpoint shipment could be repeated to duplicate banked value")
 			var autopilot_ship_session: GameSession = GameSession.new()
 			autopilot_ship_session.configure_save_directory("user://test-saves/checkpoint-autopilot-shipping")
