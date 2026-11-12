@@ -12,6 +12,7 @@
 - Added all eight endgame escalation contracts with a three-contract maximum, saved per-sector selection, picker UI after campaign ending, and actual route, combat, INTEL, loot, wanted, data, scrap, and travel effects.
 - Connected Q03's SERVICE choice to paid hull repair at checkpoints (+15% repair amount) and gated Q01/Q02 visit-biome and Q04 elimination follow-ups until their next matching sector.
 - Persisted and validated each accepted world-seeded contract offer's event ID, with old RUN saves remaining compatible.
+- ESCORT offers now reveal their deterministic faction reputation reward; campaign faction-control endings theme endgame ESCORTs to the controlling faction, and the accepted reward survives save/load validation.
 
 ## Unreleased
 

@@ -31,6 +31,9 @@ func run(_tree: SceneTree) -> bool:
 			if str(offers[offer_index].get("targetBiome", "")) != "B01" or str(offers_repeat[offer_index].get("id", "")) != str(offers[offer_index].get("id", "")):
 				offer_targets_match = false
 		check(offer_targets_match and offer_ids.has("CT_HUNT") and offer_ids.has("CT_TECH") and offer_ids.has("CT_ESCORT"), "game_session: world-seeded offers did not expose all contract types for the current biome")
+		var escort_offer: Dictionary = offers.filter(func(offer: Dictionary) -> bool: return str(offer.get("id", "")) == "CT_ESCORT")[0]
+		var escort_faction: String = str(escort_offer.get("factionId", ""))
+		check(["F_VANTA", "F_RUST", "F_CHOIR", "F_ECHO"].has(escort_faction) and int(escort_offer.get("rewardReputation", {}).get(escort_faction, 0)) == 8, "game_session: ESCORT offer did not select and disclose its faction reputation reward")
 		check(str(offers[0].get("eventId", "")) == "contract-offer:1:%s" % str(offers[0].get("id", "")), "game_session: generated offer did not retain its world event identifier")
 		check(contract_session.start_expedition("contract-fixed-seed", false, "CT_HUNT"), "game_session: HUNT contract failed to start: %s" % contract_session.last_error)
 		if contract_session.state.run != null:
@@ -61,6 +64,12 @@ func run(_tree: SceneTree) -> bool:
 				for candidate: Dictionary in layer:
 					if str(candidate.get("id", "")) == str(tech_offer_session.state.run.contract.get("targetNodeId", "")): tech_target = candidate
 			check(str(tech_offer_session.state.run.biome) == "B01" and str(tech_offer_session.state.run.contract.get("targetBiome", "")) == "B01" and str(tech_target.get("type", "")) == "CACHE", "game_session: cross-biome TECH offer did not inject its target cache")
+	var escort_session: GameSession = GameSession.new()
+	escort_session.configure_save_directory("user://test-saves/contracts-escort-faction")
+	if check(escort_session.start_new_game(1762900000107), "game_session: could not create a faction ESCORT profile"):
+		var expected_escort_faction: String = str(escort_session.available_contract_offers().filter(func(offer: Dictionary) -> bool: return str(offer.get("id", "")) == "CT_ESCORT")[0].get("factionId", ""))
+		if check(escort_session.start_expedition("escort-faction-contract", false, "CT_ESCORT"), "game_session: faction ESCORT contract did not start: %s" % escort_session.last_error):
+			check(str(escort_session.state.run.contract.get("factionId", "")) == expected_escort_faction and int(escort_session.state.run.contract.get("rewardReputation", {}).get(expected_escort_faction, 0)) == 8, "game_session: accepted ESCORT instance lost its themed faction reward")
 	var signal_session: GameSession = GameSession.new()
 	signal_session.configure_save_directory("user://test-saves/signal-contract")
 	if check(signal_session.start_new_game(1762900000110), "game_session: could not create a signal-contract profile"):
@@ -91,8 +100,10 @@ func run(_tree: SceneTree) -> bool:
 	if check(escalation_session.start_new_game(1762900000115), "game_session: could not create an endgame escalation profile"):
 		var endgame_unlock: Dictionary = escalation_session.state.to_payload()
 		endgame_unlock["meta"]["unlockedForpost"] = 12
-		endgame_unlock["meta"]["campaignFlags"].append("ENDGAME_UNLOCKED")
+		endgame_unlock["meta"]["campaignFlags"].append_array(["ENDGAME_UNLOCKED", "ENDING_FACTION:F_CHOIR"])
 		check(escalation_session._commit_payload(endgame_unlock), "game_session: could not unlock test endgame depth")
+		var endgame_escort: Dictionary = escalation_session.available_contract_offers().filter(func(offer: Dictionary) -> bool: return str(offer.get("id", "")) == "CT_ESCORT")[0]
+		check(str(endgame_escort.get("factionId", "")) == "F_CHOIR", "game_session: faction-control ending did not theme endgame ESCORTs to the controlling faction")
 		var escalation_ids: Array[String] = ["REPAIR_RARE", "SCAN_DARK", "LONG_RUN"]
 		check(not escalation_session.start_expedition("endgame-escalation-seed", false, "", ["WANTED_PLUS", "HUNT_FAST", "REPAIR_RARE", "SCAN_DARK"]), "game_session: more than three escalations were accepted")
 		if check(escalation_session.start_expedition("endgame-escalation-seed", false, "", escalation_ids), "game_session: selected endgame escalations were rejected: %s" % escalation_session.last_error):

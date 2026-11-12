@@ -400,6 +400,11 @@ func available_contract_offers() -> Array[Dictionary]:
 			definition["targetBiome"] = biome
 			definition["targetTechTag"] = str(biome_tags.get(biome, "tech"))
 			definition["eventId"] = "contract-offer:%d:%s" % [depth, id]
+			if str(definition.get("kind", "")) == "ESCORT":
+				var escort_faction: String = _contract_offer_faction(depth, id)
+				definition["factionId"] = escort_faction
+				definition["rewardReputation"] = {escort_faction: 8}
+				definition["name"] = "%s · %s" % [str(definition.get("name", "Сопровождение")), escort_faction]
 			offers.append(definition)
 	var signal_catalog: ItemCatalog = ItemCatalog.new()
 	if bool(signal_catalog.load_catalog().get("ok", false)):
@@ -418,6 +423,19 @@ func available_contract_offers() -> Array[Dictionary]:
 					"rewardItem": {"rarity": "UNIQUE", "templateId": unique_id},
 				})
 	return offers
+
+func _contract_offer_faction(depth: int, contract_id: String) -> String:
+	if depth >= 13:
+		for flag_value: Variant in state.meta.campaign_flags:
+			var flag: String = str(flag_value)
+			if flag.begins_with("ENDING_FACTION:"):
+				var controlled_faction: String = flag.trim_prefix("ENDING_FACTION:")
+				if ["F_VANTA", "F_RUST", "F_CHOIR", "F_ECHO"].has(controlled_faction):
+					return controlled_faction
+	var rng: DeterministicRng = DeterministicRng.new()
+	rng.seed("contract-faction", "%s:%d:%s" % [state.save_id, depth, contract_id])
+	var factions: Array[String] = ["F_VANTA", "F_RUST", "F_CHOIR", "F_ECHO"]
+	return factions[rng.int_range(0, factions.size() - 1)]
 
 func start_expedition(seed_value: String = "", use_medical_restore: bool = false, contract_id: String = "", escalation_ids: Array[String] = []) -> bool:
 	if state == null:
@@ -470,6 +488,10 @@ func start_expedition(seed_value: String = "", use_medical_restore: bool = false
 					contract = {"id": contract_id, "kind": "SIGNAL", "name": "Целевой контракт · %s" % str(unique_template.get("name", unique_id)), "desc": "Найти указанную уникальную технологию в элитном узле целевого биома.", "targetBiome": biome, "targetUniqueId": unique_id, "rewardItem": {"rarity": "UNIQUE", "templateId": unique_id}}
 		elif not contract.is_empty():
 			contract["targetBiome"] = biome
+		if not contract.is_empty() and str(contract.get("kind", "")) == "ESCORT":
+			var escort_faction: String = _contract_offer_faction(depth, contract_id)
+			contract["factionId"] = escort_faction
+			contract["rewardReputation"] = {escort_faction: 8}
 		if contract.is_empty() or str(contract.get("targetBiome", "")) != biome:
 			last_error = "Контракт недоступен для биома текущего сектора."
 			return false
@@ -1489,7 +1511,9 @@ func _settle_escort_contract(payload: Dictionary) -> void:
 	var resources: Dictionary = run_payload.get("resources", {})
 	if int(contract.get("combatNodes", 0)) >= 2 and float(run_payload.get("wanted", 0.0)) <= 40.0 and float(resources.get("fuel", 0.0)) >= 3.0:
 		var rewards: Dictionary = {"CREDITS": ceili(50.0 * CydleFormula.new().reward_scale(float(run_payload.get("depth", 1))))}
-		_complete_contract(payload, rewards, {}, {"F_RUST": 8})
+		var faction_id: String = str(contract.get("factionId", "F_RUST"))
+		var reputation: Dictionary = {faction_id: 8} if ["F_VANTA", "F_RUST", "F_CHOIR", "F_ECHO"].has(faction_id) else {"F_RUST": 8}
+		_complete_contract(payload, rewards, {}, reputation)
 	else:
 		contract["status"] = "FAILED"
 

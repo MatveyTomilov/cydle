@@ -2,11 +2,17 @@
 
 `CYDLE_MASTER_SPEC.md` is the normative source for game design and release requirements. `docs/godot/` records the current engine, architecture, visual direction, and asset production rules. This roadmap records what actually exists; a plan or catalog entry is not working gameplay.
 
+## Development strategy (2026-11-12)
+
+The active strategy is **FULL GAME FIRST**: connect every major Master Spec system into a campaign that can be completed, then deepen edge cases, balance, and presentation. The entries below report implementation status; they are not a queue of isolated feature slices. A checkpoint commit is a safety measure, so continue to the next missing campaign-critical system while the session permits. Defer saved Simulation Lab presets, report exports, cosmetic polish, secondary settings, and redundant tests until functional campaign coverage exists.
+
 ## Current migration checkpoint (2026-11-12)
 
 ### Latest native delta (changes after commit `95f25e6`)
 
 The pushed native checkpoint connects B06's required ANOMALY encounter to route generation, reduced INTEL disclosure, Q06's one-time modifier preview, the shared deterministic combat pipeline, elite-band rewards, and targeted TECH contract completion. The player can revisit the node after victory to leave it; duplicate combat/reward processing is rejected. It also persists EV06's three forward route disclosures for player and autopilot, emits all three HUNT/TECH/ESCORT templates in stable world-seeded order for every sector biome, makes the five authored `signalContract:Uxx` rewards playable, and adds all eight endgame escalation modifiers with 0–3 selection and real route/combat/reward effects. Q03 checkpoint repair and Q01/Q02/Q04 next-sector gates are wired. This continuation stores the offer's world `eventId` in the active contract and validates it compatibly. The broader campaign story, event-specific quest triggers, faction-exclusive endgame content and some quest outcomes remain incomplete.
+
+Current local WIP adds deterministic faction identity and visible +8 reputation to ESCORT offers, persists it on acceptance, pays that faction on completion, and uses the campaign-control ending for endgame ESCORT faction theming. Master Spec §20's reputation threshold effects (themed shop discount, +60 contract, hostile encounter wanted, −60 bounty) are still not implemented. This WIP passed 22 Godot test scripts / 87,420 assertions, TypeScript typecheck, Windows export, and `git diff --check`; its commit/push and exported EXE smoke are pending.
 
 The same local WIP closes EV06's `reveal: 3` data-only gap. It selects the next three reachable forward nodes in deterministic graph order, persists their IDs in an optional RUN field, and exposes their types to the player and autopilot. The save field is backward compatible with older runs.
 
@@ -50,8 +56,8 @@ The preserved web implementation on `development/luna` through `739ff3654317d19d
 
 ## Commit gates
 
-- Make one focused commit per complete feature slice; keep documentation and implementation commits separate when requested.
+- Commit coherent safety checkpoints regularly, but do not treat a feature commit as a reason to stop or wait for another instruction.
 - Every ported calculation has a checked reference fixture before downstream consumers are connected.
-- Run the relevant tests after each slice; run full import, headless tests, and Windows build at each release gate.
+- Run relevant checks after gameplay integration changes; run full import, headless tests, and Windows export at release gates.
 - Preserve the reference code and baseline; do not mark a subsystem complete based on file presence.
 - Do not claim 1.0 until the master-spec release checklist is verified on a real native build.
