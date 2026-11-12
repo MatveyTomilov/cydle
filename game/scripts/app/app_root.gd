@@ -277,6 +277,9 @@ func _show_garage() -> void:
 	var inventory_button: Button = _button("СКЛАД · %d ПРЕДМЕТОВ" % meta.inventory.size(), false)
 	inventory_button.pressed.connect(_show_inventory)
 	actions.add_child(inventory_button)
+	var tactics_button: Button = _button("ТАКТИКА · %d ПРОФИЛЬ(Я)" % meta.tactics.size(), false)
+	tactics_button.pressed.connect(_show_tactics)
+	actions.add_child(tactics_button)
 	var save_button: Button = _button("СОХРАНИТЬ", false)
 	save_button.pressed.connect(_on_save)
 	actions.add_child(save_button)
@@ -427,6 +430,190 @@ func _show_build() -> void:
 	back.pressed.connect(_show_garage)
 	_body.add_child(back)
 	_footer.text = "CALCTRACE · %d СТАТОВ · ИСТОЧНИКИ, УСЛОВИЯ И ПРОМЕЖУТОЧНЫЕ ЭТАПЫ" % stat_ids.size()
+
+func _show_tactics() -> void:
+	_screen = "tactics"
+	_clear_body()
+	_body.add_child(_label("SERVER · РЕДАКТОР ТАКТИКИ", 12, COLOR_CYAN))
+	_body.add_child(_label("Боевой профиль", 27, COLOR_TEXT))
+	if _session.state == null:
+		return
+	if _session.garage_level("SERVER") < 1:
+		_body.add_child(_label("Редактор требует SERVER уровня 1.", 13, COLOR_AMBER))
+	else:
+		var profiles_row: HFlowContainer = HFlowContainer.new()
+		_body.add_child(profiles_row)
+		for profile: Dictionary in _session.state.meta.tactics:
+			var selected: bool = str(profile.get("id", "")) == _session.state.meta.active_tactic_id
+			var profile_button: Button = _button("%s%s" % [str(profile.get("name", profile.get("id", ""))), " · АКТИВЕН" if selected else ""], selected)
+			profile_button.disabled = selected
+			profile_button.pressed.connect(_on_select_tactic.bind(str(profile.get("id", ""))))
+			profiles_row.add_child(profile_button)
+		if _session.garage_level("SERVER") >= 2:
+			var duplicate_button: Button = _button("КОПИРОВАТЬ ПРОФИЛЬ", false)
+			duplicate_button.disabled = _session.state.meta.tactics.size() >= 5
+			duplicate_button.pressed.connect(_on_duplicate_tactic)
+			profiles_row.add_child(duplicate_button)
+		var tactic: Dictionary = _session.active_tactic()
+		var rules: Array = tactic.get("rules", []).duplicate(true)
+		rules.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.get("priority", 0)) > int(b.get("priority", 0)))
+		_body.add_child(_label("АКТИВНЫЙ ПРОФИЛЬ · %d / 12 ПРАВИЛ" % rules.size(), 14, COLOR_CYAN))
+		for rule_value: Variant in rules:
+			if not rule_value is Dictionary:
+				continue
+			var rule: Dictionary = rule_value
+			var rule_id: String = str(rule.get("id", ""))
+			var card: PanelContainer = PanelContainer.new()
+			card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			_body.add_child(card)
+			var content: VBoxContainer = VBoxContainer.new()
+			card.add_child(content)
+			var order_row: HBoxContainer = HBoxContainer.new()
+			content.add_child(order_row)
+			var enabled: CheckButton = CheckButton.new()
+			enabled.text = "P%d · %s" % [int(rule.get("priority", 0)), str(rule.get("note", rule.get("skillId", "Правило")))]
+			enabled.button_pressed = bool(rule.get("enabled", false))
+			enabled.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			enabled.toggled.connect(_on_tactic_rule_enabled.bind(rule_id))
+			order_row.add_child(enabled)
+			var up: Button = _button("↑", false)
+			up.custom_minimum_size.x = 45
+			up.pressed.connect(_on_move_tactic_rule.bind(rule_id, -1))
+			order_row.add_child(up)
+			var down: Button = _button("↓", false)
+			down.custom_minimum_size.x = 45
+			down.pressed.connect(_on_move_tactic_rule.bind(rule_id, 1))
+			order_row.add_child(down)
+			var editors: HBoxContainer = HBoxContainer.new()
+			content.add_child(editors)
+			var skill_selector: OptionButton = OptionButton.new()
+			skill_selector.custom_minimum_size.x = 220
+			var available_skills: Array[String] = ["AUTO"]
+			available_skills.append_array(_session.state.meta.skill_ids)
+			for skill_id: String in available_skills:
+				skill_selector.add_item(skill_id)
+				skill_selector.set_item_metadata(skill_selector.item_count - 1, skill_id)
+				if skill_id == str(rule.get("skillId", "AUTO")):
+					skill_selector.select(skill_selector.item_count - 1)
+			skill_selector.item_selected.connect(_on_tactic_skill_selected.bind(rule_id, skill_selector))
+			editors.add_child(skill_selector)
+			var target_selector: OptionButton = OptionButton.new()
+			target_selector.custom_minimum_size.x = 190
+			var targets: Dictionary = {"nearest": "Ближайшая", "lowestHPPercent": "Мало HP %", "self": "Себя", "imminentCast": "Кастует", "boss": "Босс", "infected": "Заражённая", "marked": "Помеченная", "otherEnemy": "Другая цель", "secondary": "Вторичная"}
+			for target_id: String in ["nearest", "lowestHPPercent", "self", "imminentCast", "boss", "infected", "marked", "otherEnemy", "secondary"]:
+				target_selector.add_item(str(targets[target_id]))
+				target_selector.set_item_metadata(target_selector.item_count - 1, target_id)
+				if target_id == str(rule.get("target", "nearest")):
+					target_selector.select(target_selector.item_count - 1)
+			target_selector.item_selected.connect(_on_tactic_target_selected.bind(rule_id, target_selector))
+			editors.add_child(target_selector)
+			var condition: Dictionary = rule.get("conditions", [{}])[0] if not rule.get("conditions", []).is_empty() else {"kind": "always"}
+			var condition_row: HBoxContainer = HBoxContainer.new()
+			content.add_child(condition_row)
+			condition_row.add_child(_label("ЕСЛИ", 11, COLOR_MUTED))
+			var condition_selector: OptionButton = OptionButton.new()
+			condition_selector.custom_minimum_size.x = 220
+			var condition_kinds: Dictionary = {"always": "Всегда", "hpBelow": "HP ниже доли", "hpAbove": "HP выше доли", "shieldBelow": "Щит ниже доли", "energyAtLeast": "Энергия ≥", "energyBelow": "Энергия <", "heatAtLeast": "Нагрев ≥", "heatBelow": "Нагрев <", "heatLocked": "Перегрев блокирует", "enemiesAtLeast": "Врагов ≥", "enemiesAtMost": "Врагов ≤", "enemyCasting": "Враг кастует", "droneAlive": "Дронов активно ≥", "timeAtLeast": "Время боя ≥ мс"}
+			var condition_order: Array[String] = ["always", "hpBelow", "hpAbove", "shieldBelow", "energyAtLeast", "energyBelow", "heatAtLeast", "heatBelow", "heatLocked", "enemiesAtLeast", "enemiesAtMost", "enemyCasting", "droneAlive", "timeAtLeast"]
+			for condition_kind: String in condition_order:
+				condition_selector.add_item(str(condition_kinds[condition_kind]))
+				condition_selector.set_item_metadata(condition_selector.item_count - 1, condition_kind)
+				if condition_kind == str(condition.get("kind", "always")):
+					condition_selector.select(condition_selector.item_count - 1)
+			condition_selector.item_selected.connect(_on_tactic_condition_selected.bind(rule_id, condition_selector, condition))
+			condition_row.add_child(condition_selector)
+			if condition.has("value"):
+				var threshold: SpinBox = SpinBox.new()
+				threshold.min_value = 0.0
+				threshold.max_value = 100000.0
+				threshold.step = 0.05 if str(condition.get("kind", "")) in ["hpBelow", "hpAbove", "shieldBelow"] else 1.0
+				threshold.value = float(condition.get("value", 0.0))
+				threshold.value_changed.connect(_on_tactic_condition_value.bind(rule_id, condition_selector, threshold))
+				condition_row.add_child(threshold)
+			var details: Label = _label("Примечание: %s" % str(rule.get("note", "нет")), 10, COLOR_MUTED)
+			details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			content.add_child(details)
+		var add_row: HBoxContainer = HBoxContainer.new()
+		_body.add_child(add_row)
+		var add_selector: OptionButton = OptionButton.new()
+		add_selector.add_item("AUTO")
+		add_selector.set_item_metadata(0, "AUTO")
+		for skill_id: String in _session.state.meta.skill_ids:
+			add_selector.add_item(skill_id)
+			add_selector.set_item_metadata(add_selector.item_count - 1, skill_id)
+		add_row.add_child(add_selector)
+		var add_rule: Button = _button("ДОБАВИТЬ ПРАВИЛО", false)
+		add_rule.disabled = rules.size() >= 12
+		add_rule.pressed.connect(_on_add_tactic_rule.bind(add_selector))
+		add_row.add_child(add_rule)
+	_body.add_child(_button("НАЗАД В ГАРАЖ", false))
+	var back_button: Button = _body.get_child(_body.get_child_count() - 1) as Button
+	back_button.pressed.connect(_show_garage)
+	_footer.text = "ПРИОРИТЕТЫ · ЭКИПИРОВАННЫЕ УМЕНИЯ · СЕЛЕКТОРЫ ЦЕЛИ · УСЛОВИЯ"
+
+func _on_select_tactic(profile_id: String) -> void:
+	if _session.select_tactic(profile_id):
+		_show_tactics()
+	else:
+		_footer.text = _session.last_error
+
+func _on_duplicate_tactic() -> void:
+	if _session.duplicate_active_tactic():
+		_show_tactics()
+	else:
+		_footer.text = _session.last_error
+
+func _on_tactic_rule_enabled(enabled: bool, rule_id: String) -> void:
+	if _session.set_tactic_rule_enabled(rule_id, enabled):
+		_show_tactics()
+	else:
+		_footer.text = _session.last_error
+
+func _on_move_tactic_rule(rule_id: String, direction: int) -> void:
+	if _session.move_tactic_rule(rule_id, direction):
+		_show_tactics()
+	else:
+		_footer.text = _session.last_error
+
+func _on_tactic_skill_selected(index: int, rule_id: String, selector: OptionButton) -> void:
+	var skill_id: String = str(selector.get_item_metadata(index))
+	if _session.set_tactic_rule_skill(rule_id, skill_id):
+		_show_tactics()
+	else:
+		_footer.text = _session.last_error
+
+func _on_tactic_target_selected(index: int, rule_id: String, selector: OptionButton) -> void:
+	var target_id: String = str(selector.get_item_metadata(index))
+	if _session.set_tactic_rule_target(rule_id, target_id):
+		_show_tactics()
+	else:
+		_footer.text = _session.last_error
+
+func _on_tactic_condition_selected(index: int, rule_id: String, selector: OptionButton, previous: Dictionary) -> void:
+	var kind: String = str(selector.get_item_metadata(index))
+	var condition: Dictionary = {"kind": kind}
+	if kind in ["hpBelow", "hpAbove", "shieldBelow"]:
+		condition["value"] = float(previous.get("value", 0.5))
+	elif kind in ["energyAtLeast", "energyBelow", "heatAtLeast", "heatBelow", "enemiesAtLeast", "enemiesAtMost", "droneAlive", "timeAtLeast"]:
+		condition["value"] = float(previous.get("value", 1.0))
+	if _session.set_tactic_rule_condition(rule_id, condition):
+		_show_tactics()
+	else:
+		_footer.text = _session.last_error
+
+func _on_tactic_condition_value(value: float, rule_id: String, selector: OptionButton, _spinbox: SpinBox) -> void:
+	var kind: String = str(selector.get_item_metadata(selector.selected))
+	if _session.set_tactic_rule_condition(rule_id, {"kind": kind, "value": value}):
+		_show_tactics()
+	else:
+		_footer.text = _session.last_error
+
+func _on_add_tactic_rule(selector: OptionButton) -> void:
+	var skill_id: String = str(selector.get_item_metadata(selector.selected))
+	if _session.add_tactic_rule(skill_id):
+		_show_tactics()
+	else:
+		_footer.text = _session.last_error
 
 func _show_inventory() -> void:
 	_screen = "inventory"

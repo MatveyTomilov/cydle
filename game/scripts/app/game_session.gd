@@ -1503,6 +1503,205 @@ func garage_level(object_id: String) -> int:
 		return 0
 	return int(state.meta.garage.get(object_id, 0))
 
+func active_tactic() -> Dictionary:
+	if state == null:
+		return {}
+	for profile: Dictionary in state.meta.tactics:
+		if str(profile.get("id", "")) == state.meta.active_tactic_id:
+			return profile.duplicate(true)
+	return {}
+
+func select_tactic(profile_id: String) -> bool:
+	if not _tactic_edit_allowed():
+		return false
+	for profile: Dictionary in state.meta.tactics:
+		if str(profile.get("id", "")) == profile_id:
+			var payload: Dictionary = state.to_payload()
+			payload["meta"]["activeTacticId"] = profile_id
+			return _commit_tactic_payload(payload)
+	last_error = "Профиль тактики не найден."
+	return false
+
+func duplicate_active_tactic() -> bool:
+	if not _tactic_edit_allowed():
+		return false
+	if garage_level("SERVER") < 2:
+		last_error = "Дополнительные профили требуют SERVER уровня 2."
+		return false
+	if state.meta.tactics.size() >= 5:
+		last_error = "SERVER хранит не более пяти профилей тактики."
+		return false
+	var payload: Dictionary = state.to_payload()
+	var profiles: Array = payload["meta"]["tactics"]
+	var copy: Dictionary = active_tactic()
+	var suffix: int = 1
+	var new_id: String = "TACTIC_%02d" % suffix
+	while _profile_exists(profiles, new_id):
+		suffix += 1
+		new_id = "TACTIC_%02d" % suffix
+	copy["id"] = new_id
+	copy["name"] = "Тактика %d" % suffix
+	for rule_index: int in range(copy.get("rules", []).size()):
+		copy["rules"][rule_index]["id"] = "%s:copy:%d" % [str(copy["rules"][rule_index].get("id", "rule")), suffix]
+	profiles.append(copy)
+	payload["meta"]["tactics"] = profiles
+	payload["meta"]["activeTacticId"] = new_id
+	return _commit_tactic_payload(payload)
+
+func add_tactic_rule(skill_id: String) -> bool:
+	if not _tactic_edit_allowed():
+		return false
+	if skill_id != "AUTO" and not state.meta.skill_ids.has(skill_id):
+		last_error = "Тактика может использовать только экипированное умение."
+		return false
+	var payload: Dictionary = state.to_payload()
+	var profile: Dictionary = _payload_tactic(payload)
+	if profile.is_empty():
+		last_error = "Активный профиль тактики не найден."
+		return false
+	var rules: Array = profile.get("rules", [])
+	if rules.size() >= 12:
+		last_error = "Тактильная программа ограничена двенадцатью правилами."
+		return false
+	var next_priority: int = 1
+	var rule_id: String = "USER_%02d" % rules.size()
+	while _rule_exists(rules, rule_id):
+		next_priority += 1
+		rule_id = "USER_%02d" % (rules.size() + next_priority)
+	var lowest_priority: int = 1
+	for rule_value: Variant in rules:
+		if rule_value is Dictionary:
+			lowest_priority = mini(lowest_priority, int(rule_value.get("priority", 0)) - 1)
+	rules.append({"id": rule_id, "priority": lowest_priority, "enabled": true, "skillId": skill_id, "target": "self" if skill_id in ["SK_SHIELD", "SK_GUARD", "SK_VENT", "SK_HEAL"] else "nearest", "conditions": [{"kind": "always"}], "logic": "AND", "note": "Пользовательское правило"})
+	profile["rules"] = rules
+	return _commit_tactic_profile(payload, profile)
+
+func set_tactic_rule_enabled(rule_id: String, enabled: bool) -> bool:
+	return _update_tactic_rule(rule_id, func(rule: Dictionary) -> void: rule["enabled"] = enabled)
+
+func set_tactic_rule_skill(rule_id: String, skill_id: String) -> bool:
+	if skill_id != "AUTO" and (state == null or not state.meta.skill_ids.has(skill_id)):
+		last_error = "Тактика может использовать только экипированное умение."
+		return false
+	return _update_tactic_rule(rule_id, func(rule: Dictionary) -> void: rule["skillId"] = skill_id)
+
+func set_tactic_rule_target(rule_id: String, target: String) -> bool:
+	if not ["self", "nearest", "lowestHPPercent", "imminentCast", "boss", "infected", "marked", "otherEnemy", "secondary"].has(target):
+		last_error = "Неизвестный селектор цели."
+		return false
+	return _update_tactic_rule(rule_id, func(rule: Dictionary) -> void: rule["target"] = target)
+
+func set_tactic_rule_condition(rule_id: String, condition: Dictionary) -> bool:
+	var kind: String = str(condition.get("kind", ""))
+	var simple_kinds: Array[String] = ["always", "hpBelow", "hpAbove", "shieldBelow", "energyAtLeast", "energyBelow", "heatAtLeast", "heatBelow", "heatLocked", "enemiesAtLeast", "enemiesAtMost", "enemyCasting", "droneAlive", "timeAtLeast"]
+	if not simple_kinds.has(kind):
+		last_error = "Этот тип условия пока нельзя редактировать в интерфейсе."
+		return false
+	if ["hpBelow", "hpAbove", "shieldBelow"].has(kind):
+		var fraction: Variant = condition.get("value", 0.0)
+		if not (fraction is int or fraction is float) or not is_finite(float(fraction)) or float(fraction) < 0.0 or float(fraction) > 1.0:
+			last_error = "Порог доли должен находиться в диапазоне 0–1."
+			return false
+	elif ["energyAtLeast", "energyBelow", "heatAtLeast", "heatBelow", "enemiesAtLeast", "enemiesAtMost", "droneAlive", "timeAtLeast"].has(kind):
+		var number: Variant = condition.get("value", 0.0)
+		if not (number is int or number is float) or not is_finite(float(number)) or float(number) < 0.0:
+			last_error = "Порог условия должен быть конечным неотрицательным числом."
+			return false
+	return _update_tactic_rule(rule_id, func(rule: Dictionary) -> void:
+		rule["conditions"] = [condition.duplicate(true)]
+		rule["logic"] = "AND"
+	)
+
+func move_tactic_rule(rule_id: String, direction: int) -> bool:
+	if direction != -1 and direction != 1:
+		last_error = "Перемещение правила требует направления −1 или 1."
+		return false
+	if not _tactic_edit_allowed():
+		return false
+	var payload: Dictionary = state.to_payload()
+	var profile: Dictionary = _payload_tactic(payload)
+	var rules: Array = profile.get("rules", [])
+	var index: int = -1
+	for rule_index: int in range(rules.size()):
+		if str(rules[rule_index].get("id", "")) == rule_id:
+			index = rule_index
+			break
+	if index < 0:
+		last_error = "Правило тактики не найдено."
+		return false
+	var ordered: Array = rules.duplicate()
+	ordered.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.get("priority", 0)) > int(b.get("priority", 0)))
+	var ordered_index: int = -1
+	for rule_index: int in range(ordered.size()):
+		if str(ordered[rule_index].get("id", "")) == rule_id:
+			ordered_index = rule_index
+			break
+	var neighbor: int = ordered_index + direction
+	if neighbor < 0 or neighbor >= ordered.size():
+		last_error = "Правило уже находится на этом краю списка."
+		return false
+	var current_priority: int = int(ordered[ordered_index].get("priority", 0))
+	ordered[ordered_index]["priority"] = int(ordered[neighbor].get("priority", 0))
+	ordered[neighbor]["priority"] = current_priority
+	profile["rules"] = rules
+	return _commit_tactic_profile(payload, profile)
+
+func _update_tactic_rule(rule_id: String, update: Callable) -> bool:
+	if not _tactic_edit_allowed():
+		return false
+	var payload: Dictionary = state.to_payload()
+	var profile: Dictionary = _payload_tactic(payload)
+	for rule_value: Variant in profile.get("rules", []):
+		if rule_value is Dictionary and str(rule_value.get("id", "")) == rule_id:
+			update.call(rule_value)
+			return _commit_tactic_profile(payload, profile)
+	last_error = "Правило тактики не найдено."
+	return false
+
+func _tactic_edit_allowed() -> bool:
+	if state == null or not _garage_action_allowed():
+		last_error = "Тактику можно менять только в гараже между выездами."
+		return false
+	if garage_level("SERVER") < 1:
+		last_error = "Редактор тактики требует SERVER уровня 1."
+		return false
+	return true
+
+func _payload_tactic(payload: Dictionary) -> Dictionary:
+	var meta: Dictionary = payload.get("meta", {})
+	for profile: Dictionary in meta.get("tactics", []):
+		if str(profile.get("id", "")) == str(meta.get("activeTacticId", "")):
+			return profile
+	return {}
+
+func _commit_tactic_profile(payload: Dictionary, profile: Dictionary) -> bool:
+	var meta: Dictionary = payload["meta"]
+	for index: int in range(meta["tactics"].size()):
+		if str(meta["tactics"][index].get("id", "")) == str(profile.get("id", "")):
+			meta["tactics"][index] = profile
+			return _commit_tactic_payload(payload)
+	last_error = "Профиль тактики не найден."
+	return false
+
+func _commit_tactic_payload(payload: Dictionary) -> bool:
+	var parsed: Dictionary = GameSaveState.new().parse_payload(payload)
+	if not bool(parsed.get("ok", false)):
+		last_error = str(parsed.get("error", "Тактильная программа не прошла проверку сохранения."))
+		return false
+	return _commit(parsed["state"] as GameSaveState)
+
+func _profile_exists(profiles: Array, profile_id: String) -> bool:
+	for profile_value: Variant in profiles:
+		if profile_value is Dictionary and str(profile_value.get("id", "")) == profile_id:
+			return true
+	return false
+
+func _rule_exists(rules: Array, rule_id: String) -> bool:
+	for rule_value: Variant in rules:
+		if rule_value is Dictionary and str(rule_value.get("id", "")) == rule_id:
+			return true
+	return false
+
 func garage_upgrade_quote(object_id: String) -> Dictionary:
 	if not _garage_action_allowed():
 		return {"valid": false, "affordable": false, "error": "Гаражные объекты улучшаются между выездами."}
