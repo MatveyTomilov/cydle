@@ -1471,6 +1471,16 @@ func _resolve_basic_hit(state: CombatState, rng: DeterministicRng, actor: Combat
 	}
 	if skill_id == "SK_PIERCE":
 		penetration["armorPen"] = float(penetration["armorPen"]) + 20.0
+	var redirected_raw: float = 0.0
+	var bulwark: CombatActorState = null
+	if actor.side == "enemy" and target.kind == "operator":
+		for drone: CombatActorState in state.drones:
+			if drone.alive and drone.drone_role == "bulwark":
+				bulwark = drone
+				break
+		if bulwark != null:
+			redirected_raw = minf(raw * 0.1, 20.0)
+			raw -= redirected_raw
 	var mitigation: Dictionary = _damage.mitigate_packet(raw, damage_type, {"armor": defender.get("armor", 0.0), "energyRes": defender.get("energyRes", 0.0), "digitalRes": defender.get("digitalRes", 0.0)}, penetration)
 	var incoming: float = float(mitigation["afterDefense"]) * float(defender.get("incomingAll", 1.0)) * float(defender.get("incomingKinetic" if damage_type == "KINETIC" else "incomingEnergy" if damage_type == "ENERGY" else "incomingDigital", 1.0))
 	if target.side == "enemy" and not str(target.flags.get("protectedBy", "")).is_empty():
@@ -1513,7 +1523,25 @@ func _resolve_basic_hit(state: CombatState, rng: DeterministicRng, actor: Combat
 	_emit(state, "DAMAGE", actor.id, damage_event)
 	if actor.side == "enemy" and target.side == "player":
 		_resolve_enemy_direct_hit_effects(state, actor, target, action_id, raw)
+	if bulwark != null and redirected_raw > 0.0:
+		_apply_redirected_damage(state, actor, bulwark, redirected_raw, damage_type, action_id, skill_id, penetration, crit)
 	return {"ok": true, "hit": true, "damage": dealt, "raw": raw, "error": ""}
+
+func _apply_redirected_damage(state: CombatState, source: CombatActorState, target: CombatActorState, raw: float, damage_type: String, action_id: String, skill_id: String, penetration: Dictionary, crit: bool) -> void:
+	var defender: Dictionary = _effective_sheet(state, target, source)
+	var mitigation: Dictionary = _damage.mitigate_packet(raw, damage_type, {"armor": defender.get("armor", 0.0), "energyRes": defender.get("energyRes", 0.0), "digitalRes": defender.get("digitalRes", 0.0)}, penetration)
+	var incoming: float = float(mitigation["afterDefense"]) * float(defender.get("incomingAll", 1.0)) * float(defender.get("incomingKinetic" if damage_type == "KINETIC" else "incomingEnergy" if damage_type == "ENERGY" else "incomingDigital", 1.0))
+	var partition: Dictionary = _damage.partition_damage(incoming, {"hp": target.hp, "shield": target.shield, "temp": target.temp_shields}, 0.0, float(defender.get("incomingShield", 1.0)))
+	_apply_partition(target, partition)
+	target.flags["lastDamagedAt"] = float(state.time_ms)
+	var dealt: float = float(partition["shieldConsumed"]) + float(partition["hpLost"])
+	source.damage_dealt += dealt
+	target.damage_taken += dealt
+	state.metrics["damageTaken"] = float(state.metrics.get("damageTaken", 0.0)) + dealt
+	var taken_by_source: Dictionary = state.metrics.get("takenBySource", {})
+	taken_by_source[source.id] = float(taken_by_source.get(source.id, 0.0)) + dealt
+	state.metrics["takenBySource"] = taken_by_source
+	_emit(state, "DAMAGE", source.id, {"targetId": target.id, "actionId": action_id, "skillId": skill_id if not skill_id.is_empty() else "", "damageType": damage_type, "crit": crit, "amountBeforeDefense": raw, "amountAfterDefense": incoming, "shieldConsumed": partition["shieldConsumed"], "hpLost": partition["hpLost"], "bypassed": 0.0, "text": "%s → %s: %s перенаправленного урона." % [source.display_name, target.display_name, _one_decimal(incoming)], "data": {"overkill": partition["overkill"], "redirected": true}})
 
 func _restore_elite_shield(state: CombatState, target: CombatActorState) -> void:
 	if target.side != "enemy" or target.elite_mod != "EL_SHIELD" or target.hp <= 0.0 or target.hp / maxf(1.0, float(target.base_sheet.get("maxHP", 1.0))) >= 0.5 or bool(target.flags.get("eliteShieldRestored", false)):

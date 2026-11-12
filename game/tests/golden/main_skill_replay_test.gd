@@ -302,6 +302,16 @@ func _run_drone_roles() -> void:
 	var swarm_state: CombatState = swarm_data.get("state") as CombatState
 	if swarm_state != null:
 		check(CombatSimulator.new()._attack_packets(swarm_state.drones[0], {}).size() == 3, "drone_swarm: swarm did not create three attack packets")
+	var bulwark_data: Dictionary = _make_drone_state("DR_BULWARK", [], "drone-bulwark-test", [{"templateId": "E01"}])
+	var bulwark_state: CombatState = bulwark_data.get("state") as CombatState
+	if bulwark_state != null:
+		var bulwark_rng: DeterministicRng = DeterministicRng.new()
+		bulwark_rng.seed("combat", "drone-bulwark-hit")
+		CombatSimulator.new()._resolve_basic_hit(bulwark_state, bulwark_rng, bulwark_state.enemies[0], bulwark_state.operator, 100.0, "KINETIC", "bulwark-check", false)
+		var redirected: bool = false
+		for event: Dictionary in bulwark_state.log:
+			redirected = redirected or bool(event.get("data", {}).get("redirected", false)) and str(event.get("targetId", "")) == bulwark_state.drones[0].id
+		check(redirected, "drone_bulwark: part of enemy damage was not redirected to the bulwark drone")
 	var medic_data: Dictionary = _make_drone_state("DR_MED", ["SK_DRONE_REPAIR"], "drone-medic-test", [{"templateId": "E01"}])
 	var medic_state: CombatState = medic_data.get("state") as CombatState
 	var medic_simulator: CombatSimulator = medic_data.get("simulator") as CombatSimulator
