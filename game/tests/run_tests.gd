@@ -5,6 +5,7 @@ const TEST_PATHS: Array[String] = [
 	"res://tests/golden/rng_golden_test.gd",
 	"res://tests/golden/save_repository_test.gd",
 	"res://tests/golden/game_save_state_test.gd",
+	"res://tests/golden/item_catalog_test.gd",
 	"res://tests/golden/math_golden_test.gd",
 	"res://tests/golden/stats_golden_test.gd",
 	"res://tests/golden/math_differential_test.gd",
