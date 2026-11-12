@@ -1,12 +1,12 @@
 # CYDLE — Project handoff and development history
 
-## Live continuation (2026-11-13; paused-quest resume WIP)
+## Live continuation (2026-11-13; paused-quest resume)
 
-- Branch: `development/codex`. Latest pushed checkpoint `a01652d780b2e9a4de91ae484d3edd87aecf0f1f` adds physical QUEST route nodes and is verified against origin. Current local WIP fixes paused-chain access in the quest journal (`game/scripts/app/app_root.gd`) and adds a saved-stage resume regression (`game/tests/golden/game_session_test.gd`).
+- Branch: `development/codex`. Latest pushed checkpoint `06e59921dfaf8c8c7f2a444865d304debce52f39` is verified against origin; working tree clean after the checkpoint.
 - Active quest stages now receive their own connected `QUEST` route nodes in matching biomes. Regular route events remain present. Quest nodes resolve catalog-authored text/actions, gate on the exact quest/stage and objective, apply the existing quest transaction, mark the node cleared and return to ROUTE. Existing tagged EVENT graphs retain compatibility. UI and autopilot handle these nodes; route intel identifies them.
 - Found and fixed the quest journal's PAUSED-state control-flow bug: it displayed stage details but never offered resume. Session regression checks the paused quest remains eligible and resumes with saved progress.
-- Verification for the current WIP: Godot 4.7.2 editor import exit 0; `res://tests/run_tests.gd` exit 0 (22 scripts, 87,649 assertions). Windows Desktop export and EXE headless smoke passed immediately before this small journal change; `git diff --check` not yet rerun for this WIP. TypeScript checks not run.
-- Exact next action: run `git diff --check`, Windows export/EXE smoke, then commit/push and verify remote SHA. Continue breadth-first over the remaining campaign/content/combat gaps; none of this means 1.0 is complete. Preserve the external campaign E2E profile and backup recorded below.
+- Verification for this checkpoint: Godot 4.7.2 editor import exit 0; `res://tests/run_tests.gd` exit 0 (22 scripts, 87,649 assertions); Windows Desktop export exit 0; exported EXE `--headless --quit-after 3` exit 0; `git diff --check` exit 0. TypeScript checks not run.
+- Exact next action: continue breadth-first over remaining campaign/content/combat gaps, beginning with campaign-path playability across all quest chains/contracts and the simulator's unsupported authored interactions. Do not treat the current quest integration as 1.0 completion. Preserve the external campaign E2E profile and backup recorded below.
 
 ## Current live continuation (2026-11-13; Q06 objective gating regression)
 

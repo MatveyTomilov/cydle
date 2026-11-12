@@ -3,7 +3,7 @@
 ## Unreleased — resume paused quest chains
 
 - The quest journal now offers “resume” for PAUSED chains while still showing the current stage. Previously the stage details branch swallowed the resume-button branch, leaving valid paused quests permanently inaccessible through the UI.
-- Regression verifies a paused Q02 remains eligible and can resume from its saved stage. Godot editor import passed; 22 headless scripts / 87,649 assertions passed. Windows export/EXE smoke not rerun for this small UI/session regression.
+- Regression verifies a paused Q02 remains eligible and can resume from its saved stage. Godot editor import passed; 22 headless scripts / 87,649 assertions passed; Windows Desktop export and EXE smoke passed; `git diff --check` passed.
 
 ## Unreleased — physical quest route nodes
 

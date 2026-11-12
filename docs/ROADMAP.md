@@ -8,7 +8,7 @@ The active strategy is **FULL GAME FIRST**: connect every major Master Spec syst
 
 ### Current status override (2026-11-13)
 
-Active quest stages now generate their own connected `QUEST` route nodes; ordinary events remain separate. Quest-node actions use the authored quest transaction, and paused chains can resume from the journal. The 22-script Godot suite passes at 87,649 assertions. Windows export and EXE smoke passed before the latest small journal WIP. This supersedes historical roadmap notes below that say stage IDs only annotate generic event nodes; the earlier checkpoints remain as history. Six-chain conditions/deadlines, contract breadth, full campaign acceptance, and major combat coverage remain incomplete.
+Active quest stages now generate their own connected `QUEST` route nodes; ordinary events remain separate. Quest-node actions use the authored quest transaction, and paused chains can resume from the journal. The 22-script Godot suite passes at 87,649 assertions; Windows export, EXE smoke, and diff check pass. This supersedes historical roadmap notes below that say stage IDs only annotate generic event nodes; the earlier checkpoints remain as history. Six-chain conditions/deadlines, contract breadth, full campaign acceptance, and major combat coverage remain incomplete.
 
 ### 2026-11-13 continuation — event consequence audit
 
