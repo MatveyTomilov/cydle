@@ -15,29 +15,31 @@ func run(tree: SceneTree) -> bool:
 		return false
 	tree.root.add_child(app)
 	await tree.process_frame
-
-	var title: Label = app.get_node_or_null("SafeMargin/Content/Title") as Label
-	if not check(title != null, "test_app_boot: CYDLE title is missing after launch"):
+	var body: VBoxContainer = app.get("_body") as VBoxContainer
+	if not check(body != null, "test_app_boot: game shell did not create its content area"):
 		app.queue_free()
 		return false
-	check(title.text == "CYDLE", "test_app_boot: launch title is not CYDLE")
-
-	var status: Label = app.get_node_or_null("SafeMargin/Content/RuntimeStatus") as Label
-	if not check(status != null, "test_app_boot: runtime status is missing"):
-		app.queue_free()
-		return false
-	check(status.text.contains("ИГРОВОЙ ЦИКЛ ЕЩЁ НЕ ПОДКЛЮЧЁН"), "test_app_boot: boot screen does not disclose the incomplete gameplay state")
-
-	var quit_button: Button = app.get_node_or_null("SafeMargin/Content/QuitButton") as Button
-	if not check(quit_button != null, "test_app_boot: quit action is missing"):
-		app.queue_free()
-		return false
-	check(quit_button.focus_mode == Control.FOCUS_ALL, "test_app_boot: quit action cannot receive keyboard/controller focus")
-
-	if not check(quit_button.pressed.is_connected(Callable(app, "_on_quit_button_pressed")), "test_app_boot: quit action is not connected"):
-		app.queue_free()
-		return false
+	check(str(app.get("_screen")) == "menu", "test_app_boot: new profile should open the main menu")
+	check(_has_label(app, "CYDLE"), "test_app_boot: CYDLE title is missing from the game shell")
+	check(_has_button(body, "НОВАЯ ИГРА"), "test_app_boot: new game action is missing")
+	check(_has_button(body, "ПРОДОЛЖИТЬ"), "test_app_boot: continue action is missing")
 
 	app.queue_free()
 	await tree.process_frame
 	return failure_count == 0
+
+func _has_label(node: Node, text: String) -> bool:
+	if node is Label and (node as Label).text == text:
+		return true
+	for child: Node in node.get_children():
+		if _has_label(child, text):
+			return true
+	return false
+
+func _has_button(node: Node, text: String) -> bool:
+	if node is Button and (node as Button).text == text:
+		return true
+	for child: Node in node.get_children():
+		if _has_button(child, text):
+			return true
+	return false
