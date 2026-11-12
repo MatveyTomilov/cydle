@@ -287,6 +287,9 @@ func _show_garage() -> void:
 	var simulation_button: Button = _button("SIMULATION LAB", false)
 	simulation_button.pressed.connect(_show_simulation_lab)
 	actions.add_child(simulation_button)
+	var journal_button: Button = _button("ЖУРНАЛ ЗАДАНИЙ", false)
+	journal_button.pressed.connect(_show_quest_journal)
+	actions.add_child(journal_button)
 	var save_button: Button = _button("СОХРАНИТЬ", false)
 	save_button.pressed.connect(_on_save)
 	actions.add_child(save_button)
@@ -728,6 +731,48 @@ func _on_simulation_compare(runs: SpinBox) -> void:
 	_simulation_report = _session.simulate_equipment_comparison(_simulation_slot, _simulation_item_id, _simulation_enemy_id, int(runs.value))
 	_show_simulation_lab()
 
+func _show_quest_journal() -> void:
+	_screen = "quest_journal"
+	_clear_body()
+	_body.add_child(_label("КАМПАНИЯ · ФРАКЦИИ · ЗАДАНИЯ", 12, COLOR_CYAN))
+	_body.add_child(_label("Журнал", 28, COLOR_TEXT))
+	if _session.state == null:
+		return
+	var can_accept: bool = _session.state.run == null or ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(_session.state.run.phase)
+	_body.add_child(_label("VANTA %d · RUST %d · CHOIR %d · ECHO %d" % [int(_session.state.meta.reputation.get("F_VANTA", 0)), int(_session.state.meta.reputation.get("F_RUST", 0)), int(_session.state.meta.reputation.get("F_CHOIR", 0)), int(_session.state.meta.reputation.get("F_ECHO", 0))], 13, COLOR_AMBER))
+	for quest: Dictionary in _session.quest_journal():
+		var status: String = str(quest.get("status", "AVAILABLE"))
+		var card: PanelContainer = PanelContainer.new()
+		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_body.add_child(card)
+		var content: VBoxContainer = VBoxContainer.new()
+		card.add_child(content)
+		content.add_child(_label("%s · %s · СЕКТОР %d+" % [str(quest.get("name", quest.get("id", "Квест"))), status, int(quest.get("minDepth", 1))], 15, COLOR_CYAN if status == "ACTIVE" else COLOR_TEXT))
+		content.add_child(_label(str(quest.get("desc", "")), 11, COLOR_MUTED))
+		if status in ["ACTIVE", "PAUSED"]:
+			var stage_index: int = clampi(int(quest.get("currentStage", 1)) - 1, 0, 2)
+			var stage: Dictionary = quest.get("stages", [])[stage_index]
+			content.add_child(_label("ЭТАП %d · %s" % [stage_index + 1, str(stage.get("name", ""))], 12, COLOR_AMBER))
+			content.add_child(_label(str(stage.get("text", "")), 11, COLOR_MUTED))
+		elif status in ["AVAILABLE", "PAUSED", "FAILED"] and bool(quest.get("available", false)) and can_accept:
+			var accept: Button = _button("ВОЗОБНОВИТЬ ЗАДАНИЕ" if status == "PAUSED" else "НАЧАТЬ ЗАНОВО" if status == "FAILED" else "ПРИНЯТЬ ЗАДАНИЕ", false)
+			accept.pressed.connect(_on_accept_quest.bind(str(quest.get("id", ""))))
+			content.add_child(accept)
+	_body.add_child(_button("НАЗАД В ГАРАЖ", false))
+	var back: Button = _body.get_child(_body.get_child_count() - 1) as Button
+	back.pressed.connect(_show_garage)
+	_footer.text = "РЕШЕНИЯ И РЕПУТАЦИЯ СОХРАНЯЮТСЯ В META"
+
+func _on_accept_quest(quest_id: String) -> void:
+	if not _session.accept_quest(quest_id):
+		_footer.text = _session.last_error
+	_show_quest_journal()
+
+func _on_resolve_quest_choice(quest_id: String, choice_id: String) -> void:
+	if not _session.resolve_quest_choice(quest_id, choice_id):
+		_footer.text = _session.last_error
+	_show_road()
+
 func _show_inventory() -> void:
 	_screen = "inventory"
 	_clear_body()
@@ -932,6 +977,17 @@ func _show_current_node(run: GameSaveState.RunState) -> void:
 				_body.add_child(description)
 	else:
 		_body.add_child(_label("Этот дорожный узел ещё не получил игровое действие.", 13, COLOR_AMBER))
+	for opportunity: Dictionary in _session.available_quest_stages():
+		var quest: Dictionary = opportunity["quest"]
+		var stage: Dictionary = opportunity["stage"]
+		_body.add_child(_label("ЗАДАНИЕ · %s · ЭТАП %d: %s" % [str(quest.get("name", "")), int(stage.get("stage", 1)), str(stage.get("name", ""))], 16, COLOR_CYAN))
+		_body.add_child(_label(str(stage.get("text", "")), 12, COLOR_MUTED))
+		for choice: Dictionary in stage.get("choices", []):
+			var quest_choice: Button = _button("%s · %s" % [str(choice.get("id", "")), str(choice.get("label", "Решить"))], false)
+			quest_choice.custom_minimum_size.x = 370
+			quest_choice.pressed.connect(_on_resolve_quest_choice.bind(str(quest.get("id", "")), str(choice.get("id", ""))))
+			_body.add_child(quest_choice)
+			_body.add_child(_label(str(choice.get("desc", "")), 11, COLOR_MUTED))
 	if not ["COMBAT", "ELITE", "BOUNTY", "BOSS"].has(str(node.get("type", ""))):
 		var leave: Button = _button("ПОКИНУТЬ УЗЕЛ", false)
 		leave.pressed.connect(_on_service_action.bind("LEAVE_NODE", ""))

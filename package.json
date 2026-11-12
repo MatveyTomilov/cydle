@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "validate": "tsx scripts/validate-data.ts",
     "export:godot-items": "tsx scripts/export-godot-items.ts",
+    "export:godot-quests": "tsx scripts/export-godot-quests.ts",
     "sim": "tsx scripts/sim-lab.ts",
     "balance": "tsx scripts/balance-batch.ts",
     "e2e": "playwright test"

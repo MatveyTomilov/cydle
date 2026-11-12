@@ -42,8 +42,12 @@ func _validate_meta(value: Variant) -> Dictionary:
 		return _failure("meta: ожидался объект.")
 	var meta: Dictionary = value
 	var keys: Array[String] = ["operator", "tutorial", "reputation", "campaignFlags", "transport", "protectedBank", "unsecuredWallet", "inventory", "equipment", "garage", "unlockedForpost", "maxSectorCleared", "unlockedBiomes", "skillIds", "passiveIds", "treeNodeIds", "unlockedImplantSlots", "unlockedDroneSlots", "tactics", "activeTacticId", "autopilotProfiles"]
-	if not _has_exact_keys(meta, keys):
+	var meta_allowed: Array[String] = keys.duplicate()
+	meta_allowed.append("questProgress")
+	if not _has_keys(meta, keys) or not _has_only_keys(meta, meta_allowed):
 		return _failure("meta: отсутствуют обязательные поля или есть неизвестные поля.")
+	if meta.has("questProgress") and not _validate_quest_progress(meta["questProgress"]):
+		return _failure("meta.questProgress: состояние заданий повреждено.")
 	var operator_value: Variant = meta["operator"]
 	if not operator_value is Dictionary or not _has_exact_keys(operator_value, ["level", "xp", "attributes", "attributePoints", "treePoints"]):
 		return _failure("meta.operator: неверная структура.")
@@ -363,6 +367,24 @@ func _validate_profiles(value: Variant, active_id: Variant, label: String) -> bo
 			return false
 		ids[str(profile["id"])] = true
 	return ids.has(str(active_id))
+
+func _validate_quest_progress(value: Variant) -> bool:
+	if not value is Dictionary:
+		return false
+	for quest_id: Variant in value.keys():
+		var progress: Variant = value[quest_id]
+		if not _nonempty_string(quest_id) or not progress is Dictionary or not _has_exact_keys(progress, ["status", "stage", "startedDepth", "stageStartedDepth", "completedStages", "choiceHistory", "flags"]):
+			return false
+		if not ["ACTIVE", "PAUSED", "COMPLETE", "FAILED"].has(str(progress["status"])):
+			return false
+		if not _is_integer(progress["stage"]) or int(progress["stage"]) < 1 or int(progress["stage"]) > 3 or not _is_integer(progress["startedDepth"]) or int(progress["startedDepth"]) < 1 or not _is_integer(progress["stageStartedDepth"]) or int(progress["stageStartedDepth"]) < 1:
+			return false
+		if not _string_array(progress["completedStages"]) or not _string_array(progress["flags"]) or not progress["choiceHistory"] is Array:
+			return false
+		for choice: Variant in progress["choiceHistory"]:
+			if not choice is Dictionary or not _has_exact_keys(choice, ["stage", "choiceId", "nodeId"]) or not _is_integer(choice["stage"]) or int(choice["stage"]) < 1 or int(choice["stage"]) > 3 or not _nonempty_string(choice["choiceId"]) or not _nonempty_string(choice["nodeId"]):
+				return false
+	return true
 
 func _is_number_map(value: Variant, expected_keys: Array[String], minimum: float, maximum: float, must_be_int: bool) -> bool:
 	if not value is Dictionary or not _has_exact_keys(value, expected_keys):

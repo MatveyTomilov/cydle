@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Imported the six three-stage quest chains and three contract templates from the frozen TypeScript data into Godot. Added a quest journal, backward-compatible persisted quest-stage progress, faction reputation display, eligible event-stage choices, transactional rewards, deadlines, and repeat-choice protection. Contract runtime, some quest special-choice semantics, and anomaly-node coverage remain incomplete.
+- Updated implementation guidance and roadmap to FULL GAME FIRST: integrate the full campaign and all major systems before Simulation Lab extras or polish.
 - Implemented the first native main-channel skill cast (`SK_BURST`) with energy/heat costs, cooldown, immutable windup and recovery timing, three shared damage-pipeline hits, tactical-priority selection, and AUTO fallback. Added a 14-frame TypeScript-oracle replay; other skills and conditional tactical rules remain explicitly unsupported.
 - Added native `SK_PIERCE` cast replay with its +20 armor penetration applied only to the skill hit. Corrected BuildResolver so skill-local stat effects do not leak into permanent build modifiers; verified a 16-frame TypeScript-oracle replay including intervening AUTO attacks.
 - Added native `SK_EXEC` low-HP execute multiplier and lowest-HP target selection, covered by a 16-frame TypeScript-oracle replay against a wounded enemy.

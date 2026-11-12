@@ -283,6 +283,30 @@ func run(_tree: SceneTree) -> bool:
 			var paired_results: Array = simulation_result["results"]
 			check(paired_results[0] == paired_results[1], "game_session: identical builds diverged under a shared deterministic seed")
 		check(str(simulation_session.state.meta.equipment.get("MAIN", "")) != "lab-comparison-pistol", "game_session: Simulation Lab mutated the saved equipment loadout")
+	var quest_session: GameSession = GameSession.new()
+	quest_session.configure_save_directory("user://test-saves/quest-chain")
+	if check(quest_session.start_new_game(1762900000970), "game_session: could not create a quest-chain profile"):
+		var quest_payload: Dictionary = quest_session.state.to_payload()
+		quest_payload["meta"]["maxSectorCleared"] = 1
+		quest_payload["meta"]["unlockedForpost"] = 1
+		check(quest_session._commit_payload(quest_payload), "game_session: quest unlock fixture could not be saved")
+		var quest_catalog: QuestCatalog = QuestCatalog.new()
+		var quest_catalog_result: Dictionary = quest_catalog.load_catalog()
+		check(bool(quest_catalog_result.get("ok", false)) and int(quest_catalog_result.get("questCount", 0)) == 6 and int(quest_catalog_result.get("contractCount", 0)) == 3, "game_session: all quest chains and contracts were not imported from the legacy data catalog")
+		check(quest_session.accept_quest("Q02") and not quest_session.accept_quest("Q02"), "game_session: quest acceptance or duplicate-acceptance protection failed: %s" % quest_session.last_error)
+		check(quest_session.start_expedition("quest-chain-seed"), "game_session: quest test expedition could not start")
+		var quest_run_payload: Dictionary = quest_session.state.to_payload()
+		quest_run_payload["run"]["biome"] = "B01"
+		quest_run_payload["run"]["graph"] = {"layers": [[{"id": "quest-event", "layer": 0, "type": "EVENT", "eventId": "EV02", "threat": "medium", "enemies": [], "revealLevel": 1, "lootHint": "event"}]], "edges": [{"from": "START", "to": "quest-event", "fromLayer": -1, "toLayer": 0, "fuelCost": 1}]}
+		check(quest_session._commit_payload(quest_run_payload), "game_session: quest event fixture could not be saved: %s" % quest_session.last_error)
+		check(quest_session.travel_to("quest-event") and quest_session.available_quest_stages().size() == 1, "game_session: active quest stage was not offered at its matching story event")
+		check(quest_session.resolve_quest_choice("Q02", "A"), "game_session: quest choice transaction failed: %s" % quest_session.last_error)
+		var quest_progress: Dictionary = quest_session.state.meta.quest_progress.get("Q02", {})
+		check(str(quest_progress.get("status", "")) == "ACTIVE" and int(quest_progress.get("stage", 0)) == 2 and int(quest_session.state.run.wanted) == 5, "game_session: quest choice did not persist stage, status, and wanted consequence")
+		check(not quest_session.resolve_quest_choice("Q02", "A"), "game_session: quest choice could be claimed twice or repeated at the same story node")
+		var quest_reload: GameSession = GameSession.new()
+		quest_reload.configure_save_directory("user://test-saves/quest-chain")
+		check(quest_reload.load_saved_game() and int(quest_reload.state.meta.quest_progress.get("Q02", {}).get("stage", 0)) == 2, "game_session: quest stage did not survive save reload")
 	var resumed: GameSession = GameSession.new()
 	resumed.configure_save_directory("user://test-saves/game-session")
 	check(resumed.load_saved_game(), "game_session: persisted state did not reload: %s" % resumed.last_error)

@@ -152,9 +152,10 @@ class MetaState:
 	var tactics: Array[Dictionary] = []
 	var active_tactic_id: String = ""
 	var autopilot_profiles: Array[Dictionary] = []
+	var quest_progress: Dictionary = {}
 
 	func to_dictionary() -> Dictionary:
-		return {
+		var result: Dictionary = {
 			"operator": operator.to_dictionary(),
 			"tutorial": tutorial.duplicate(true),
 			"reputation": reputation.duplicate(true),
@@ -176,7 +177,11 @@ class MetaState:
 			"tactics": tactics.duplicate(true),
 			"activeTacticId": active_tactic_id,
 			"autopilotProfiles": autopilot_profiles.duplicate(true),
+			"questProgress": quest_progress.duplicate(true),
 		}
+		if quest_progress.is_empty():
+			result.erase("questProgress")
+		return result
 
 var schema_version: int = SAVE_SCHEMA_VERSION
 var balance_version: String = BALANCE_VERSION
@@ -253,6 +258,7 @@ func _meta_from_dictionary(value: Dictionary) -> MetaState:
 	result.tactics.assign(value["tactics"])
 	result.active_tactic_id = str(value["activeTacticId"])
 	result.autopilot_profiles.assign(value["autopilotProfiles"])
+	result.quest_progress = value.get("questProgress", {}).duplicate(true)
 	return result
 
 func _run_from_dictionary(value: Dictionary) -> RunState:

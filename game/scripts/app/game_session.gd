@@ -654,6 +654,252 @@ func resolve_event(choice_id: String) -> bool:
 	run_payload["lastCommandId"] = "event:%s:%s" % [node_id, choice_id]
 	return _commit_payload(payload)
 
+func quest_journal() -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	var catalog: QuestCatalog = QuestCatalog.new()
+	var loaded: Dictionary = catalog.load_catalog()
+	if not bool(loaded.get("ok", false)) or state == null:
+		return result
+	for quest_id: String in catalog.quests.keys():
+		var definition: Dictionary = catalog.get_quest(quest_id)
+		var progress: Dictionary = state.meta.quest_progress.get(quest_id, {})
+		definition["progress"] = progress.duplicate(true)
+		definition["status"] = str(progress.get("status", "AVAILABLE"))
+		definition["currentStage"] = int(progress.get("stage", 1))
+		definition["available"] = state.meta.max_sector_cleared + 1 >= int(definition.get("minDepth", 1))
+		result.append(definition)
+	return result
+
+func accept_quest(quest_id: String) -> bool:
+	if state == null or not _garage_action_allowed():
+		last_error = "Задание принимается в гараже между выездами."
+		return false
+	var catalog: QuestCatalog = QuestCatalog.new()
+	var loaded: Dictionary = catalog.load_catalog()
+	if not bool(loaded.get("ok", false)):
+		last_error = str(loaded.get("error", "Каталог заданий недоступен."))
+		return false
+	var quest: Dictionary = catalog.get_quest(quest_id)
+	if quest.is_empty():
+		last_error = "Квест не найден."
+		return false
+	if state.meta.max_sector_cleared + 1 < int(quest.get("minDepth", 1)):
+		last_error = "Квест откроется после сектора %d." % maxi(0, int(quest.get("minDepth", 1)) - 1)
+		return false
+	var previous: Dictionary = state.meta.quest_progress.get(quest_id, {})
+	if str(previous.get("status", "")) in ["ACTIVE", "COMPLETE"]:
+		last_error = "Этот квест уже принят или завершён."
+		return false
+	var payload: Dictionary = state.to_payload()
+	var depth: int = state.meta.max_sector_cleared + 1
+	var progress: Dictionary = previous.duplicate(true) if str(previous.get("status", "")) == "PAUSED" else {"stage": 1, "startedDepth": depth, "stageStartedDepth": depth, "completedStages": [], "choiceHistory": [], "flags": []}
+	progress["status"] = "ACTIVE"
+	if previous.is_empty():
+		progress["stage"] = 1
+		progress["startedDepth"] = depth
+		progress["stageStartedDepth"] = depth
+	var all_progress: Dictionary = payload["meta"].get("questProgress", {})
+	all_progress[quest_id] = progress
+	payload["meta"]["questProgress"] = all_progress
+	return _commit_payload(payload)
+
+func available_quest_stages() -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	if state == null or state.run == null or state.run.phase != "NODE":
+		return result
+	var catalog: QuestCatalog = QuestCatalog.new()
+	if not bool(catalog.load_catalog().get("ok", false)):
+		return result
+	for quest_id: String in state.meta.quest_progress.keys():
+		var progress: Dictionary = state.meta.quest_progress[quest_id]
+		if str(progress.get("status", "")) != "ACTIVE":
+			continue
+		var definition: Dictionary = catalog.get_quest(quest_id)
+		var stage_index: int = int(progress.get("stage", 1)) - 1
+		if definition.is_empty() or stage_index < 0 or stage_index >= definition.get("stages", []).size():
+			continue
+		var stage: Dictionary = definition["stages"][stage_index]
+		if _quest_stage_ready(definition, stage, progress):
+			result.append({"quest": definition, "stage": stage, "progress": progress.duplicate(true)})
+	return result
+
+func resolve_quest_choice(quest_id: String, choice_id: String) -> bool:
+	if state == null or state.run == null or state.run.phase != "NODE":
+		last_error = "Квестовое решение доступно только в дорожном узле."
+		return false
+	var opportunities: Array[Dictionary] = available_quest_stages()
+	var opportunity: Dictionary = {}
+	for candidate: Dictionary in opportunities:
+		if str(candidate.get("quest", {}).get("id", "")) == quest_id:
+			opportunity = candidate
+			break
+	if opportunity.is_empty():
+		last_error = "Цель задания пока не выполнена или узел не подходит."
+		return false
+	var quest: Dictionary = opportunity["quest"]
+	var stage: Dictionary = opportunity["stage"]
+	var progress: Dictionary = opportunity["progress"]
+	var choice: Dictionary = {}
+	for candidate: Dictionary in stage.get("choices", []):
+		if str(candidate.get("id", "")) == choice_id:
+			choice = candidate
+			break
+	if choice.is_empty():
+		last_error = "Выбор отсутствует в текущем этапе задания."
+		return false
+	var history_key: String = "%s:%d:%s" % [quest_id, int(progress.get("stage", 1)), choice_id]
+	if progress.get("choiceHistory", []).any(func(entry: Dictionary) -> bool: return "%s:%d:%s" % [quest_id, int(entry.get("stage", 0)), str(entry.get("choiceId", ""))] == history_key):
+		last_error = "Этот выбор задания уже был обработан."
+		return false
+	var payload: Dictionary = state.to_payload()
+	var meta: Dictionary = payload["meta"]
+	var run_payload: Dictionary = payload["run"]
+	var wallet: Dictionary = run_payload["runWallet"]
+	var scale: float = CydleFormula.new().reward_scale(float(state.run.depth))
+	var costs: Dictionary = choice.get("cost", {}).duplicate(true)
+	var special: String = str(choice.get("special", ""))
+	if special == "buyEngine":
+		costs["CREDITS"] = ceili(20.0 * scale)
+	for currency: String in ["CREDITS", "SCRAP", "DATA"]:
+		if float(wallet.get(currency, 0.0)) < float(costs.get(currency, 0.0)):
+			last_error = "Для квестового выбора недостаточно незакреплённых средств: %s." % currency
+			return false
+	for currency: String in ["CREDITS", "SCRAP", "DATA"]:
+		wallet[currency] = float(wallet.get(currency, 0.0)) - float(costs.get(currency, 0.0))
+		var gain: float = float(choice.get("gains", {}).get(currency, 0.0))
+		wallet[currency] = maxf(0.0, float(wallet[currency]) + (ceili(gain * scale) if bool(choice.get("scaled", false)) else gain))
+	if choice.has("reputation"):
+		for faction: Variant in choice["reputation"].keys():
+			meta["reputation"][str(faction)] = clampi(int(meta["reputation"].get(str(faction), 0)) + int(choice["reputation"][faction]), -100, 100)
+	if choice.has("wanted"):
+		run_payload["wanted"] = clampf(float(run_payload.get("wanted", 0.0)) + float(choice["wanted"]), 0.0, 100.0)
+	if choice.has("hull"):
+		run_payload["resources"]["hull"] = clampf(float(run_payload["resources"].get("hull", 0.0)) + float(choice["hull"]), 0.0, float(run_payload["resources"].get("maxHull", 0.0)))
+	var grant: Dictionary = choice.get("grantItem", {}).duplicate(true)
+	if special == "buyEngine":
+		grant = {"templateId": "TR_ENGINE_1", "count": 1}
+	if not grant.is_empty():
+		var loaded_items: Dictionary = _item_catalog.load_catalog()
+		if not bool(loaded_items.get("ok", false)):
+			last_error = str(loaded_items.get("error", "Каталог предметов недоступен."))
+			return false
+		var loot: DeterministicRng = DeterministicRng.new()
+		loot.restore(run_payload["lootRng"])
+		for grant_index: int in range(maxi(1, int(grant.get("count", 1)))):
+			var grant_id: String = "quest:%s:%s:%d" % [str(run_payload["seed"]), history_key, grant_index]
+			var options: Dictionary = {"depth": state.run.depth, "biome": state.run.biome, "table": "ORDINARY", "secured": false, "grantId": grant_id, "origin": "quest", "acquiredAt": state.updated_at}
+			if grant.has("templateId"): options["forceTemplateId"] = grant["templateId"]
+			if grant.has("category"): options["forceCategory"] = grant["category"]
+			if grant.has("tag"): options["forceTag"] = grant["tag"]
+			if grant.has("rarity"): options["forceRarity"] = grant["rarity"]
+			var rolled: Dictionary = ItemFactory.new().roll_item(loot, _item_catalog, options)
+			if not bool(rolled.get("ok", false)):
+				last_error = str(rolled.get("error", "Квестовую награду нельзя создать."))
+				return false
+			var item: Dictionary = (rolled["item"] as ItemInstance).to_dictionary()
+			if not _cargo_fits(run_payload, item):
+				last_error = "Для квестовой награды нет места в грузовом отсеке."
+				return false
+			run_payload["unsecuredCargo"].append(item)
+			run_payload["grantIds"].append(grant_id)
+			run_payload["lootRng"] = loot.serialize()
+	var flags: Array = progress.get("flags", [])
+	if choice.has("flag") and not flags.has(str(choice["flag"])): flags.append(str(choice["flag"]))
+	if special.begins_with("schematic:") or special.begins_with("signalContract:"):
+		var unlock: String = "quest-unlock:%s" % special
+		if not meta["campaignFlags"].has(unlock): meta["campaignFlags"].append(unlock)
+	if special == "serviceUpgrade": meta["campaignFlags"].append("quest-service-upgrade")
+	if special == "anomalyPreview": meta["campaignFlags"].append("quest-anomaly-preview")
+	if special == "grantCore":
+		var core_rng: DeterministicRng = DeterministicRng.new()
+		core_rng.seed("quest-core", "%s:%s" % [str(run_payload["seed"]), history_key])
+		var core: Dictionary = ItemFactory.new().create_item(core_rng, _item_catalog, {"templateId": "MAT_CORE", "techLevel": state.run.depth, "rarity": "COMMON", "secured": false, "originGrantId": "quest:%s:%s:core" % [str(run_payload["seed"]), history_key], "origin": "quest", "acquiredAt": state.updated_at})
+		if bool(core.get("ok", false)):
+			var core_item: ItemInstance = core["item"] as ItemInstance
+			core_item.core_group = clampi(int(ceil(float(state.run.depth) / 4.0)), 1, 4)
+			var core_value: Dictionary = core_item.to_dictionary()
+			if not _cargo_fits(run_payload, core_value):
+				last_error = "Для калибровочного ядра нет места в грузовом отсеке."
+				return false
+			run_payload["unsecuredCargo"].append(core_value)
+			run_payload["grantIds"].append(str(core_value.get("originGrantId", "")))
+	var choices: Array = progress.get("choiceHistory", [])
+	choices.append({"stage": int(progress.get("stage", 1)), "choiceId": choice_id, "nodeId": state.run.current_node_id})
+	progress["choiceHistory"] = choices
+	if special == "questPause":
+		progress["status"] = "PAUSED"
+	else:
+		if not progress["completedStages"].has("S%d" % int(progress.get("stage", 1))): progress["completedStages"].append("S%d" % int(progress.get("stage", 1)))
+		if bool(choice.get("questAdvance", false)):
+			progress["stage"] = int(progress.get("stage", 1)) + 1
+			progress["stageStartedDepth"] = state.run.depth
+		else:
+			progress["status"] = "COMPLETE" if int(progress.get("stage", 1)) >= 3 or special == "questAltComplete" else "ACTIVE"
+			if progress["status"] == "ACTIVE":
+				progress["stage"] = int(progress.get("stage", 1)) + 1
+				progress["stageStartedDepth"] = state.run.depth
+	var all_progress: Dictionary = meta.get("questProgress", {})
+	all_progress[quest_id] = progress
+	meta["questProgress"] = all_progress
+	run_payload["resources"]["gameTimeMs"] = float(run_payload["resources"].get("gameTimeMs", 0.0)) + 10000.0
+	run_payload["lastCommandId"] = "quest:%s" % history_key
+	return _commit_payload(payload)
+
+func _quest_stage_ready(quest: Dictionary, stage: Dictionary, progress: Dictionary) -> bool:
+	if str(current_node().get("type", "")) != "EVENT":
+		return false
+	var history: Array = progress.get("choiceHistory", [])
+	if not history.is_empty() and str(history[-1].get("nodeId", "")) == state.run.current_node_id:
+		return false
+	var required_biome: String = str(stage.get("biome", quest.get("biome", "")))
+	if not required_biome.is_empty() and state.run.biome != required_biome:
+		return false
+	var deadline: int = int(stage.get("deadlineSectors", 0))
+	if deadline > 0 and state.run.depth > int(progress.get("stageStartedDepth", progress.get("startedDepth", state.run.depth))) + deadline:
+		return false
+	var requirement: Dictionary = stage.get("requirement", {"kind": "none"})
+	match str(requirement.get("kind", "none")):
+		"none": return true
+		"visitBiome": return state.run.biome == str(requirement.get("biome", ""))
+		"killElite":
+			for layer: Array in state.run.graph.get("layers", []):
+				for node: Dictionary in layer:
+					if str(node.get("type", "")) != "ELITE" or not state.run.cleared_node_ids.has(str(node.get("id", ""))): continue
+					for enemy: Dictionary in node.get("enemies", []):
+						if str(enemy.get("templateId", "")) == str(requirement.get("enemyId", "")): return true
+			return false
+		"biomeCombat":
+			var count: int = 0
+			for layer: Array in state.run.graph.get("layers", []):
+				for node: Dictionary in layer:
+					if str(node.get("type", "")) in ["COMBAT", "ELITE", "BOUNTY"] and state.run.cleared_node_ids.has(str(node.get("id", ""))): count += 1
+			return state.run.biome == str(requirement.get("biome", "")) and count >= int(requirement.get("count", 1))
+		"anomaly":
+			for layer: Array in state.run.graph.get("layers", []):
+				for node: Dictionary in layer:
+					if str(node.get("type", "")) == "ANOMALY" and state.run.cleared_node_ids.has(str(node.get("id", ""))): return true
+	return false
+
+func _expire_quest_deadlines(meta: Dictionary, next_depth: int) -> void:
+	var catalog: QuestCatalog = QuestCatalog.new()
+	if not bool(catalog.load_catalog().get("ok", false)):
+		return
+	var all_progress: Dictionary = meta.get("questProgress", {})
+	for quest_id: String in all_progress.keys():
+		var progress: Dictionary = all_progress[quest_id]
+		if str(progress.get("status", "")) != "ACTIVE":
+			continue
+		var quest: Dictionary = catalog.get_quest(quest_id)
+		var stage_index: int = int(progress.get("stage", 1)) - 1
+		if quest.is_empty() or stage_index < 0 or stage_index >= quest.get("stages", []).size():
+			continue
+		var deadline: int = int(quest["stages"][stage_index].get("deadlineSectors", 0))
+		if deadline > 0 and next_depth > int(progress.get("stageStartedDepth", progress.get("startedDepth", next_depth))) + deadline:
+			progress["status"] = "FAILED"
+			if not progress["flags"].has("deadline-expired"): progress["flags"].append("deadline-expired")
+			all_progress[quest_id] = progress
+	meta["questProgress"] = all_progress
+
 func resolve_service_node(action: String, prototype_id: String = "") -> bool:
 	if state == null or state.run == null or state.run.phase != "NODE":
 		last_error = "Сервисное действие доступно только в дорожном узле."
@@ -783,6 +1029,7 @@ func continue_campaign() -> bool:
 		last_error = str(generated.get("error", "Не удалось создать следующий сектор."))
 		return false
 	var payload: Dictionary = state.to_payload()
+	_expire_quest_deadlines(payload["meta"], next_depth)
 	var run_payload: Dictionary = payload["run"]
 	run_payload["seed"] = seed
 	run_payload["depth"] = next_depth

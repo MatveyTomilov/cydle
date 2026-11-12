@@ -15,11 +15,11 @@
 
 ## Implementation rules
 
-- Prefer small vertical slices that produce real behavior. A file, interface, catalog row, or screen is not evidence that a system works.
+- Follow FULL GAME FIRST: prioritize end-to-end integration of all major systems and a campaign that can reach its ending, then deepen correctness, balance, and presentation. Do not stop after a narrow feature slice or treat a checkpoint as task completion. A file, interface, catalog row, or screen is not evidence that a system works.
 - Do not create duplicate math/combat rules or silently alter formulas, economy, progression, or probabilities. Add oracle/golden tests for ports and use the existing deterministic RNG/state hashing.
 - Keep saved data versioned and backward-compatible. Validate imports and transactions before changing live or persisted state; never silently reset a damaged save.
 - Use original or verified licensed assets only. Record source and license in the manifest. No paid assets without owner approval; do not generate graphics unless asked.
-- Do not add a test framework or runtime dependency without a demonstrated need. Preserve the in-repository Godot runner and golden fixtures.
+- Do not add a test framework or runtime dependency without a demonstrated need. Preserve the in-repository Godot runner and golden fixtures. Add or extend tests for new system boundaries, critical rules, persistence, or concrete regressions; avoid retesting already-proven functions without a reason.
 - Update `CHANGELOG.md`, `docs/ROADMAP.md`, and the current section of `HANDOFF.md` when a meaningful implementation checkpoint changes.
 
 ## Verification commands
