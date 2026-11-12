@@ -4,9 +4,9 @@
 
 ## Current migration checkpoint (2026-11-12)
 
-### Latest native delta (local WIP after commit `be527d7`)
+### Latest native delta (local WIP after commit `419fb09`)
 
-Permanent inventory crafting now supports previewed affix replacement/addition and item sale/dismantling, with atomic ownership/resource transactions and UI confirmation for destructive operations. META retains the last 100 dismantles and supports undo until the next road node, including exact item restoration and material reversal checks. Remaining inventory-economy gaps include blueprinted base-item crafting, cargo auto-salvage policies, and run-cargo dismantling. A catalog/BuildResolver conflict around repeated broad affix groups is recorded in HANDOFF. Current WIP checks: editor import and 22 headless scripts / 87,337 assertions pass, legacy typecheck passes, and Windows export plus executable smoke pass.
+Permanent inventory crafting now includes blueprinted COMMON base-item recipes with selectable TechLevel and spec-priced SCRAP/DATA, plus previewed affix replacement/addition. Sale and dismantling use atomic ownership/resource transactions and UI confirmation. META retains the last 100 dismantles and supports undo until the next road node. Remaining inventory-economy gaps include cargo auto-salvage policies and run-cargo dismantling. A catalog/BuildResolver conflict around repeated broad affix groups is recorded in HANDOFF. Current WIP checks: editor import and 22 headless scripts / 87,345 assertions pass, legacy typecheck passes, and Windows export plus executable smoke pass.
 
 The earlier checkpoint bullets in this section capture the earlier baseline; this update is the current combat status. The shared 100 ms `CombatSimulator` now resolves all 16 main-channel catalog skills (including their implemented targeting/cost/cast/damage/special effects), all six defensive reactions, selected timed enemy abilities and passives, boss threshold phase mechanics, and elite modifiers. Regression coverage includes skill specials/statuses, E19 delayed death burst, E02 telegraph resolution, a boss phase summon, and EL_SPLIT. This remains a partial catalog port: unsupported trigger sources and several combat, campaign, save, offline, quest, faction, Simulation Lab, and art requirements remain. Presence of data is not behavior coverage.
 

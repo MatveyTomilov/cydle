@@ -899,6 +899,32 @@ func _show_inventory() -> void:
 				tech_button.tooltip_text = str(quote.get("error", "CalibrationCore group %d" % int(quote["coreGroup"])))
 				tech_button.pressed.connect(_on_calibrate_item_tech.bind(item_id, target_tech))
 				item_actions.add_child(tech_button)
+	_body.add_child(_label("ЧЕРТЕЖИ   /   ИЗГОТОВЛЕНИЕ БАЗОВОГО СНАРЯЖЕНИЯ", 12, COLOR_CYAN))
+	var blueprint_count: int = 0
+	var craft_max_tech: int = maxi(4, _session.state.meta.unlocked_forpost)
+	for craft_template: Dictionary in inventory_catalog.all_templates():
+		var template_id: String = str(craft_template.get("id", ""))
+		var quote: Dictionary = _session.base_item_craft_quote(template_id, 1)
+		if not bool(quote.get("valid", false)):
+			continue
+		blueprint_count += 1
+		var craft_row: HBoxContainer = HBoxContainer.new()
+		_body.add_child(craft_row)
+		var craft_name: Label = _label("%s · %s" % [str(craft_template.get("name", template_id)), template_id], 11, COLOR_TEXT)
+		craft_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		craft_row.add_child(craft_name)
+		var tech_picker: OptionButton = OptionButton.new()
+		for tech: int in range(1, craft_max_tech + 1):
+			tech_picker.add_item("T%d" % tech, tech)
+		craft_row.add_child(tech_picker)
+		var craft_button: Button = _button("ИЗГОТОВИТЬ · %d SCR / %d DATA" % [int(quote.get("scrap", 0)), int(quote.get("data", 0))], true)
+		craft_button.disabled = not can_edit_items or not bool(quote.get("affordable", false))
+		craft_button.tooltip_text = str(quote.get("error", "COMMON · требуется постоянный чертёж"))
+		craft_row.add_child(craft_button)
+		craft_button.pressed.connect(_on_craft_base_item.bind(template_id, tech_picker))
+		tech_picker.item_selected.connect(_refresh_base_craft_button.bind(template_id, tech_picker, craft_button, can_edit_items))
+	if blueprint_count == 0:
+		_body.add_child(_label("Постоянные чертежи выдаются решениями квестов и завершением технических контрактов.", 11, COLOR_MUTED))
 	if not _session.state.meta.disassembly_history.is_empty():
 		_body.add_child(_label("ИСТОРИЯ РАЗБОРА · %d / 100" % _session.state.meta.disassembly_history.size(), 12, COLOR_CYAN))
 		if _session.can_undo_last_dismantle():
@@ -1356,6 +1382,19 @@ func _on_undo_last_dismantle() -> void:
 	var restored: bool = _session.undo_last_dismantle()
 	_show_inventory()
 	_footer.text = "РАЗБОР ОТМЕНЁН · ПРЕДМЕТ ВОССТАНОВЛЕН" if restored else _session.last_error
+
+func _refresh_base_craft_button(_index: int, template_id: String, tech_picker: OptionButton, craft_button: Button, can_edit: bool) -> void:
+	var tech_level: int = tech_picker.get_selected_id()
+	var quote: Dictionary = _session.base_item_craft_quote(template_id, tech_level)
+	craft_button.text = "ИЗГОТОВИТЬ · %d SCR / %d DATA" % [int(quote.get("scrap", 0)), int(quote.get("data", 0))]
+	craft_button.disabled = not can_edit or not bool(quote.get("valid", false)) or not bool(quote.get("affordable", false))
+	craft_button.tooltip_text = str(quote.get("error", "COMMON · требуется постоянный чертёж"))
+
+func _on_craft_base_item(template_id: String, tech_picker: OptionButton) -> void:
+	var tech_level: int = tech_picker.get_selected_id()
+	var crafted: bool = _session.craft_base_item(template_id, tech_level)
+	_show_inventory()
+	_footer.text = "ИЗГОТОВЛЕНО · %s T%d" % [template_id, tech_level] if crafted else _session.last_error
 
 func _on_calibrate_item_affix(item_id: String, affix_index: int) -> void:
 	var calibrated: bool = _session.calibrate_item_affix(item_id, affix_index)

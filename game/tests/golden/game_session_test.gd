@@ -279,6 +279,25 @@ func run(_tree: SceneTree) -> bool:
 					break
 			check(not first_route_node.is_empty() and disposal_session.travel_to(first_route_node), "game_session: undo boundary could not enter the first route node")
 			check(not disposal_session.can_undo_last_dismantle() and disposal_session.state.meta.disassembly_undo.is_empty(), "game_session: entering the next node did not expire dismantle undo")
+	var base_craft_session: GameSession = GameSession.new()
+	base_craft_session.configure_save_directory("user://test-saves/base-crafting")
+	if check(base_craft_session.start_new_game(1762900000370), "game_session: could not create a base-crafting profile"):
+		var base_payload: Dictionary = base_craft_session.state.to_payload()
+		base_payload["meta"]["protectedBank"]["SCRAP"] = 100.0
+		base_payload["meta"]["protectedBank"]["DATA"] = 100.0
+		check(base_craft_session._commit_payload(base_payload), "game_session: base-craft resources could not be saved")
+		var no_blueprint: Dictionary = base_craft_session.base_item_craft_quote("ARM_NET", 1)
+		check(not bool(no_blueprint.get("valid", false)) and no_blueprint.get("error", "").contains("схема"), "game_session: base item crafting did not require a blueprint")
+		var blueprint_payload: Dictionary = base_craft_session.state.to_payload()
+		blueprint_payload["meta"]["campaignFlags"].append("quest-unlock:schematic:ARM_NET")
+		check(base_craft_session._commit_payload(blueprint_payload), "game_session: unlocked blueprint fixture could not be saved")
+		var base_quote: Dictionary = base_craft_session.base_item_craft_quote("ARM_NET", 1)
+		check(bool(base_quote.get("valid", false)) and bool(base_quote.get("affordable", false)) and int(base_quote.get("scrap", 0)) == ceili(18.0 * CydleFormula.new().reward_scale(1.0)) and int(base_quote.get("data", 0)) == ceili(10.0 * CydleFormula.new().reward_scale(1.0)), "game_session: base crafting preview differs from the Master Spec recipe")
+		var inventory_before_craft: int = base_craft_session.state.meta.inventory.size()
+		check(base_craft_session.craft_base_item("ARM_NET", 1), "game_session: blueprinted base item could not be crafted: %s" % base_craft_session.last_error)
+		var crafted_item: Dictionary = base_craft_session.state.meta.inventory[-1]
+		check(base_craft_session.state.meta.inventory.size() == inventory_before_craft + 1 and str(crafted_item.get("templateId", "")) == "ARM_NET" and bool(crafted_item.get("secured", false)) and str(crafted_item.get("origin", "")) == "craft", "game_session: base crafting did not add a secured correctly sourced item")
+		check(is_equal_approx(base_craft_session.state.meta.protected_bank.scrap, 100.0 - float(base_quote["scrap"])) and is_equal_approx(base_craft_session.state.meta.protected_bank.data, 100.0 - float(base_quote["data"])), "game_session: base crafting did not atomically charge recipe materials")
 	var tech_calibration_session: GameSession = GameSession.new()
 	tech_calibration_session.configure_save_directory("user://test-saves/tech-calibration")
 	if check(tech_calibration_session.start_new_game(1762900000400), "game_session: could not create a TechLevel-calibration profile"):

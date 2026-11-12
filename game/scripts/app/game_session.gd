@@ -15,6 +15,7 @@ var _combat: CombatState
 var _active_node_type: String = ""
 var _active_reward_modifiers: Dictionary = {}
 var _item_catalog: ItemCatalog = ItemCatalog.new()
+var _item_catalog_ready: bool = false
 var _loot_rng: DeterministicRng
 
 func configure_save_directory(path: String) -> void:
@@ -1379,6 +1380,9 @@ func _complete_contract(payload: Dictionary, rewards: Dictionary, item_spec: Dic
 	if str(contract.get("kind", "")) == "TECH":
 		var blueprint: String = "contract-blueprint:%s" % str(contract.get("id", ""))
 		if not payload["meta"]["campaignFlags"].has(blueprint): payload["meta"]["campaignFlags"].append(blueprint)
+		var template_id: String = str(paid.get("templateId", ""))
+		var item_blueprint: String = "contract-blueprint:%s" % template_id
+		if not template_id.is_empty() and not payload["meta"]["campaignFlags"].has(item_blueprint): payload["meta"]["campaignFlags"].append(item_blueprint)
 	run_payload["grantIds"].append(completion_id)
 	contract["status"] = "COMPLETE"
 	contract["rewardClaimed"] = true
@@ -1974,6 +1978,63 @@ func item_disposal_quote(item_id: String, method: String) -> Dictionary:
 	var data_gain: int = mini(1 if digital else 0, data_cap)
 	return {"valid": true, "itemId": item_id, "method": method, "credits": 0, "scrap": scrap_gain, "data": data_gain, "error": ""}
 
+func base_item_craft_quote(template_id: String, tech_level: int) -> Dictionary:
+	if not _garage_action_allowed():
+		return {"valid": false, "affordable": false, "error": "Изготовление доступно только в гараже между выездами."}
+	if not _item_catalog_loaded():
+		return {"valid": false, "affordable": false, "error": last_error}
+	var template: Dictionary = _item_catalog.get_template(template_id)
+	if template.is_empty() or not bool(template.get("craftable", false)) or template.has("uniqueEffectId") or str(template.get("category", "")) in ["MATERIAL", "SERVICE"]:
+		return {"valid": false, "affordable": false, "error": "Этот шаблон нельзя изготовить как базовое снаряжение."}
+	if not _has_item_blueprint(template_id):
+		return {"valid": false, "affordable": false, "error": "Нужна постоянная схема %s." % template_id}
+	var max_tech: int = maxi(4, state.meta.unlocked_forpost)
+	if tech_level < 1 or tech_level > max_tech:
+		return {"valid": false, "affordable": false, "error": "TechLevel должен быть от T1 до T%d, открытого гаражу." % max_tech}
+	var scale: float = CydleFormula.new().reward_scale(float(tech_level))
+	var scrap_cost: int = ceili(18.0 * scale)
+	var data_cost: int = ceili(10.0 * scale)
+	var scrap_available: float = state.meta.protected_bank.scrap
+	var data_available: float = state.meta.protected_bank.data
+	var affordable: bool = scrap_available >= scrap_cost and data_available >= data_cost
+	var reason: String = ""
+	if scrap_available < scrap_cost:
+		reason = "Нужно %d SCRAP" % scrap_cost
+	elif data_available < data_cost:
+		reason = "Нужно %d DATA" % data_cost
+	return {"valid": true, "affordable": affordable, "error": reason, "templateId": template_id, "techLevel": tech_level, "rarity": "COMMON", "scrap": scrap_cost, "data": data_cost, "blueprint": "quest-unlock:schematic:%s" % template_id}
+
+func craft_base_item(template_id: String, tech_level: int) -> bool:
+	var quote: Dictionary = base_item_craft_quote(template_id, tech_level)
+	if not bool(quote.get("valid", false)) or not bool(quote.get("affordable", false)):
+		last_error = str(quote.get("error", "Рецепт недоступен."))
+		return false
+	var rng: DeterministicRng = DeterministicRng.new()
+	var grant_id: String = "craft:%s:%d:%s:T%d" % [state.save_id, state.revision, template_id, tech_level]
+	rng.seed(grant_id, state.revision)
+	var created: Dictionary = ItemFactory.new().create_item(rng, _item_catalog, {"templateId": template_id, "techLevel": tech_level, "rarity": "COMMON", "secured": true, "originGrantId": grant_id, "origin": "craft", "acquiredAt": Time.get_unix_time_from_system()})
+	if not bool(created.get("ok", false)):
+		last_error = str(created.get("error", "Предмет не удалось изготовить."))
+		return false
+	var item: Dictionary = (created["item"] as ItemInstance).to_dictionary()
+	var payload: Dictionary = state.to_payload()
+	if _inventory_has(payload["meta"]["inventory"], str(item.get("itemId", ""))):
+		last_error = "Повторный ID изготовления уже использован."
+		return false
+	payload["meta"]["inventory"].append(item)
+	payload["meta"]["protectedBank"]["SCRAP"] = float(payload["meta"]["protectedBank"].get("SCRAP", 0.0)) - float(quote["scrap"])
+	payload["meta"]["protectedBank"]["DATA"] = float(payload["meta"]["protectedBank"].get("DATA", 0.0)) - float(quote["data"])
+	return _commit_payload(payload)
+
+func _has_item_blueprint(template_id: String) -> bool:
+	if state == null:
+		return false
+	for flag_value: Variant in state.meta.campaign_flags:
+		var flag: String = str(flag_value)
+		if flag == "quest-unlock:schematic:%s" % template_id or flag == "item-blueprint:%s" % template_id or flag == "contract-blueprint:%s" % template_id:
+			return true
+	return false
+
 func sell_item(item_id: String) -> bool:
 	return _dispose_secured_item(item_id, "SELL")
 
@@ -2345,8 +2406,11 @@ func _craft_item_affix(item_id: String, affix_index: int, new_affix_id: String, 
 	return false
 
 func _item_catalog_loaded() -> bool:
+	if _item_catalog_ready:
+		return true
 	var loaded: Dictionary = _item_catalog.load_catalog()
 	if bool(loaded.get("ok", false)):
+		_item_catalog_ready = true
 		return true
 	last_error = str(loaded.get("error", "Каталог предметов недоступен."))
 	return false
