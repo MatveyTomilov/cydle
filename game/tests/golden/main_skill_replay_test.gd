@@ -6,7 +6,80 @@ func run(_tree: SceneTree) -> bool:
 	_run_replay("pierce_skill_replay", "SK_PIERCE")
 	_run_replay("execute_skill_replay", "SK_EXEC")
 	_run_replay("plasma_skill_replay", "SK_PLASMA")
+	_run_reaction_shield()
+	_run_reaction_emp_interrupt()
 	return failure_count == 0
+
+func _run_reaction_shield() -> void:
+	var meta: Dictionary = _read_dictionary(SAVE_FIXTURE).get("meta", {})
+	var fixture: Dictionary = _read_dictionary("res://tests/fixtures/combat/basic_auto_replay.json")
+	if not check(not meta.is_empty() and not fixture.is_empty(), "reaction_shield: fixture or starter save is missing"):
+		return
+	var items_by_id: Dictionary = {}
+	for item_value: Dictionary in meta.get("inventory", []):
+		items_by_id[str(item_value["itemId"])] = item_value
+	var main_item: ItemInstance = ItemInstance.new()
+	if not check(main_item.instantiate_from_dictionary(items_by_id[str(meta["equipment"]["MAIN"])]), "reaction_shield: starter weapon did not parse"):
+		return
+	var build: Dictionary = BuildResolver.new().resolve_build({
+		"equipment": {"MAIN": main_item}, "attributes": meta["operator"]["attributes"],
+		"skillIds": ["SK_SHIELD"], "passiveIds": [], "treeNodeIds": [], "attributePointsEarned": 0, "treePointsEarned": 0,
+	})
+	if not check(bool(build.get("valid", false)), "reaction_shield: build was rejected"):
+		return
+	var config: Dictionary = fixture["config"]
+	var initialized: Dictionary = CombatSimulator.new().create_state({
+		"seed": config["seed"], "depth": config["depth"], "biome": config.get("biome", "B01"),
+		"nodeType": config.get("nodeType", "COMBAT"), "build": build, "enemies": [config["enemy"]],
+		"tactics": {"id": "test", "rules": [{"id": "shield", "priority": 1, "enabled": true, "skillId": "SK_SHIELD", "target": "self", "conditions": []}]},
+		"startEnergy": 100,
+	})
+	if not check(bool(initialized.get("ok", false)), "reaction_shield: state initialization failed: %s" % initialized.get("error", "")):
+		return
+	var simulator: CombatSimulator = CombatSimulator.new()
+	var state: CombatState = initialized["state"] as CombatState
+	for _tick: int in range(2):
+		var stepped: Dictionary = simulator.step_combat(state)
+		if not check(bool(stepped.get("ok", false)), "reaction_shield: step failed: %s" % stepped.get("error", "")):
+			return
+		state = stepped["state"] as CombatState
+	check(int(state.metrics.get("skillUses", {}).get("SK_SHIELD", 0)) == 1, "reaction_shield: reaction did not resolve independently of the main channel")
+	check(not state.operator.temp_shields.is_empty() and is_equal_approx(float(state.operator.temp_shields[0].get("amount", 0.0)), 60.0), "reaction_shield: temporary shield pool was not applied")
+
+func _run_reaction_emp_interrupt() -> void:
+	var meta: Dictionary = _read_dictionary(SAVE_FIXTURE).get("meta", {})
+	var fixture: Dictionary = _read_dictionary("res://tests/fixtures/combat/basic_auto_replay.json")
+	var items_by_id: Dictionary = {}
+	for item_value: Dictionary in meta.get("inventory", []):
+		items_by_id[str(item_value["itemId"])] = item_value
+	var main_item: ItemInstance = ItemInstance.new()
+	if not check(main_item.instantiate_from_dictionary(items_by_id[str(meta["equipment"]["MAIN"])]), "reaction_emp: starter weapon did not parse"):
+		return
+	var build: Dictionary = BuildResolver.new().resolve_build({
+		"equipment": {"MAIN": main_item}, "attributes": meta["operator"]["attributes"],
+		"skillIds": ["SK_EMP"], "passiveIds": [], "treeNodeIds": [], "attributePointsEarned": 0, "treePointsEarned": 0,
+	})
+	if not check(bool(build.get("valid", false)), "reaction_emp: build was rejected"):
+		return
+	var config: Dictionary = fixture["config"]
+	var initialized: Dictionary = CombatSimulator.new().create_state({
+		"seed": config["seed"], "depth": config["depth"], "biome": config.get("biome", "B01"),
+		"nodeType": config.get("nodeType", "COMBAT"), "build": build, "enemies": [config["enemy"]],
+		"tactics": {"id": "test", "rules": [{"id": "emp", "priority": 1, "enabled": true, "skillId": "SK_EMP", "target": "imminentCast", "conditions": [{"kind": "enemyCasting", "interruptibleOnly": true}]}]},
+		"startEnergy": 100,
+	})
+	if not check(bool(initialized.get("ok", false)), "reaction_emp: state initialization failed: %s" % initialized.get("error", "")):
+		return
+	var simulator: CombatSimulator = CombatSimulator.new()
+	var state: CombatState = initialized["state"] as CombatState
+	state.enemies[0].cast = {"actionId": "enemy:test-cast", "abilityId": "test", "skillId": "", "startedAt": 0.0, "resolveAt": 1000.0, "endAt": 1200.0, "targetId": "operator", "interruptible": true, "telegraph": true, "channel": "main"}
+	for _tick: int in range(3):
+		var stepped: Dictionary = simulator.step_combat(state)
+		if not check(bool(stepped.get("ok", false)), "reaction_emp: step failed: %s" % stepped.get("error", "")):
+			return
+		state = stepped["state"] as CombatState
+	check(int(state.metrics.get("interrupts", 0)) == 1, "reaction_emp: reaction did not interrupt the imminent cast")
+	check(state.enemies[0].cast == null, "reaction_emp: interrupted cast remained active")
 
 func _run_replay(replay_name: String, skill_id: String) -> void:
 	var meta: Dictionary = _read_dictionary(SAVE_FIXTURE).get("meta", {})

@@ -22,7 +22,7 @@ func run(_tree: SceneTree) -> bool:
 	check(session.state.run.phase == "NODE", "game_session: travel did not enter the node")
 	if not check(session.begin_combat(), "game_session: first combat could not start: %s" % session.last_error):
 		return false
-	check(not session.combat_notice.is_empty(), "game_session: omitted reaction rules were not disclosed")
+	check(session.combat_notice.is_empty(), "game_session: supported starter reactions were incorrectly filtered")
 	var ticks: int = 0
 	var used_burst: bool = false
 	while session.combat_state() != null and session.combat_state().outcome.is_empty() and ticks < 1800:

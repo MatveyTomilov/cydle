@@ -572,7 +572,7 @@ func begin_combat() -> bool:
 		if not rule_value is Dictionary or not bool(rule_value.get("enabled", false)):
 			continue
 		var skill_id: String = str(rule_value.get("skillId", "AUTO"))
-		if skill_id in ["AUTO", "SK_BURST", "SK_PIERCE", "SK_EXEC", "SK_PLASMA"]:
+		if skill_id in ["AUTO", "SK_BURST", "SK_PIERCE", "SK_EXEC", "SK_PLASMA", "SK_SHIELD", "SK_EMP", "SK_GUARD", "SK_VENT", "SK_HEAL", "SK_DRONE_MARK"]:
 			var compatible_rule: Dictionary = rule_value.duplicate(true)
 			if skill_id == "SK_BURST" and str(compatible_rule.get("target", "")) == "allEnemies":
 				compatible_rule["target"] = "nearest"
@@ -583,7 +583,7 @@ func begin_combat() -> bool:
 		compatible_rules.append({"id": "basic-auto", "priority": -999, "enabled": true, "skillId": "AUTO", "target": "nearest", "conditions": []})
 	var effective_tactic: Dictionary = {"id": str(tactic.get("id", "DEFAULT")), "name": str(tactic.get("name", "Тактика")), "rules": compatible_rules}
 	if not omitted_rules.is_empty():
-		combat_notice = "Пока не поддерживаются реакции/умения: %s. Остальные правила и условия работают; исходный профиль сохранён." % ", ".join(omitted_rules)
+		combat_notice = "Пока не поддерживаются умения: %s. Остальные правила и условия работают; исходный профиль сохранён." % ", ".join(omitted_rules)
 	var resources: Dictionary = state.run.resources
 	var pending_next: Dictionary = state.run.pending_next_combat
 	var effective_type: String = str(node.get("type", "COMBAT"))
