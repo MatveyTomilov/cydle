@@ -193,7 +193,8 @@ func _supports_skill_trigger_effects(state: CombatState) -> bool:
 		var effect_id: String = str(effect.get("id", ""))
 		var skill_trigger: bool = source_id in ["SK_BLADE", "SK_NEURO", "SK_SEED", "SK_BREAK"]
 		var periodic_item_trigger: bool = effect_id in ["DR_MED_heal", "DR_EMP_interrupt", "TR_SUPPORT_blast"] and str(effect.get("event", "")) == "PERIODIC" and str(trigger_value.get("sourceKind", "")) == "item"
-		if not skill_trigger and not periodic_item_trigger:
+		var attack_counter_trigger: bool = effect_id in ["ARC_E2_splash", "FOCUS_D1_virus", "DR_ARC_shock"] and str(effect.get("event", "")) == "ON_ATTACK_COUNTER" and str(trigger_value.get("sourceKind", "")) == "item"
+		if not skill_trigger and not periodic_item_trigger and not attack_counter_trigger:
 			return false
 	return true
 
@@ -1419,6 +1420,7 @@ func _resolve_basic_attack(state: CombatState, rng: DeterministicRng, actor: Com
 	_emit(state, "ATTACK", actor.id, {"targetId": target.id, "actionId": action_id, "text": "%s атакует %s." % [actor.display_name, target.display_name]})
 	actor.last_target_id = target.id
 	var packets: Array[Dictionary] = _attack_packets(actor, weapon)
+	var landed: bool = false
 	for packet: Dictionary in packets:
 		var current_target: CombatActorState = _pick_auto_target(state, actor)
 		if current_target == null:
@@ -1426,9 +1428,58 @@ func _resolve_basic_attack(state: CombatState, rng: DeterministicRng, actor: Com
 		var hit_result: Dictionary = _resolve_basic_hit(state, rng, actor, current_target, float(packet["amount"]), str(packet["type"]), action_id, actor.kind == "operator")
 		if not bool(hit_result.get("ok", false)):
 			return hit_result
+		landed = landed or bool(hit_result.get("hit", false))
 	if actor.kind == "operator":
 		actor.flags["firstAttack"] = 0.0
+	if landed:
+		_dispatch_attack_counter_triggers(state, rng, actor, target, action_id)
 	return {"ok": true, "error": ""}
+
+func _dispatch_attack_counter_triggers(state: CombatState, rng: DeterministicRng, actor: CombatActorState, target: CombatActorState, action_id: String) -> void:
+	if actor.kind != "operator" and actor.kind != "drone":
+		return
+	var attack_action: bool = action_id.begins_with("%s:atk:" % actor.id)
+	if actor.kind == "drone" and not attack_action:
+		return
+	var source_item_id: String = ""
+	if actor.kind == "operator":
+		var main_item: Variant = state.build.get("equipment", {}).get("MAIN")
+		if main_item is ItemInstance: source_item_id = main_item.item_id
+	else:
+		source_item_id = actor.drone_item_id
+	for trigger_value: Dictionary in state.build.get("triggerEffects", []):
+		var effect: Dictionary = trigger_value.get("effect", {})
+		var effect_id: String = str(effect.get("id", ""))
+		if str(effect.get("event", "")) != "ON_ATTACK_COUNTER" or str(trigger_value.get("sourceKind", "")) != "item" or str(trigger_value.get("sourceId", "")) != source_item_id:
+			continue
+		var every: int = int(effect.get("counterEvery", 0))
+		var attack_count: int = int(actor.counters.get("attacks", 0))
+		if every <= 0 or attack_count <= 0 or attack_count % every != 0:
+			continue
+		var trigger_action_id: String = "%s:trigger:%s" % [action_id, effect_id]
+		_emit(state, "TRIGGER", actor.id, {"targetId": target.id if target.alive else null, "actionId": trigger_action_id, "text": "%s: сработал триггер %s." % [actor.display_name, effect_id], "data": {"attackCounter": attack_count, "counterEvery": every}})
+		match effect_id:
+			"ARC_E2_splash":
+				var secondary: CombatActorState = _counter_secondary_target(state, target.id)
+				if secondary != null:
+					var main_weapon: Dictionary = state.build.get("mainWeapon", {})
+					var raw: float = float(main_weapon.get("damage", 0.0)) * float(effect.get("action", {}).get("coefficient", 0.25))
+					_resolve_basic_hit(state, rng, actor, secondary, raw, str(effect.get("action", {}).get("damageType", "ENERGY")), trigger_action_id, false)
+			"FOCUS_D1_virus":
+				if target.alive:
+					_add_dot_status(state, actor, target, "VIRUS", 0.0, trigger_action_id, int(effect.get("action", {}).get("stacks", 1)))
+			"DR_ARC_shock":
+				if target.alive:
+					var definition: Dictionary = _status_catalog.get_definition("SHOCK")
+					_add_simple_status(state, actor, target, "SHOCK", float(definition.get("durationMs", 1000.0)))
+
+func _counter_secondary_target(state: CombatState, excluded_id: String) -> CombatActorState:
+	var targets: Array[CombatActorState] = []
+	for enemy: CombatActorState in state.enemies:
+		if enemy.alive and enemy.id != excluded_id:
+			targets.append(enemy)
+	targets.sort_custom(func(left: CombatActorState, right: CombatActorState) -> bool: return left.id < right.id)
+	return targets[0] if not targets.is_empty() else null
 
 func _attack_packets(actor: CombatActorState, weapon: Dictionary) -> Array[Dictionary]:
 	var packets: Array[Dictionary] = []

@@ -50,6 +50,7 @@ func run(_tree: SceneTree) -> bool:
 		if int(frame.get("timeMs", 0)) == 100:
 			check(_json_equivalent(initial_payload, _initial_state_payload(state_result["state"])), "combat_step: advancing mutated the source state")
 	_test_support_relay(config, operator)
+	_test_attack_counter_items(config, operator)
 	return failure_count == 0
 
 func _test_support_relay(config: Dictionary, operator: Dictionary) -> void:
@@ -108,6 +109,88 @@ func _test_support_relay(config: Dictionary, operator: Dictionary) -> void:
 	if raw_by_tech.has(1) and raw_by_tech.has(3):
 		var expected_ratio: float = CydleFormula.new().h_depth(3.0) / CydleFormula.new().h_depth(1.0)
 		check(absf(float(raw_by_tech[3]) / maxf(0.000001, float(raw_by_tech[1])) - expected_ratio) < 0.000001, "combat_step: support relay damage ignored support-item TechLevel")
+
+func _test_attack_counter_items(config: Dictionary, operator: Dictionary) -> void:
+	var catalog: ItemCatalog = ItemCatalog.new()
+	if not check(bool(catalog.load_catalog().get("ok", false)), "combat_step: catalog failed to load for attack counters"):
+		return
+	for weapon_id: String in ["ARC_E2", "FOCUS_D1", "DR_ARC"]:
+		var item_rng: DeterministicRng = DeterministicRng.new()
+		item_rng.seed("counter-test", weapon_id)
+		var created: Dictionary = ItemFactory.new().create_item(item_rng, catalog, {
+			"templateId": weapon_id, "techLevel": 1, "rarity": "COMMON", "secured": false,
+			"originGrantId": "counter-%s" % weapon_id, "origin": "test", "acquiredAt": 0,
+		})
+		if not check(bool(created.get("ok", false)), "combat_step: counter weapon %s could not be created" % weapon_id):
+			return
+		var weapon: ItemInstance = created["item"] as ItemInstance
+		var equipment: Dictionary = {}
+		if weapon_id == "DR_ARC":
+			var starter_meta: Dictionary = _read_dictionary(SAVE_FIXTURE).get("meta", {})
+			var starter_main: ItemInstance = ItemInstance.new()
+			var starter_main_data: Dictionary = {}
+			for item_value: Dictionary in starter_meta.get("inventory", []):
+				if str(item_value.get("itemId", "")) == str(starter_meta.get("equipment", {}).get("MAIN", "")):
+					starter_main_data = item_value
+					break
+			if not check(starter_main.instantiate_from_dictionary(starter_main_data), "combat_step: starter weapon failed to parse for DR_ARC"):
+				return
+			equipment = {"MAIN": starter_main, "DRONE_1": weapon}
+		else:
+			equipment = {"MAIN": weapon}
+		var build: Dictionary = BuildResolver.new().resolve_build({
+			"equipment": equipment, "attributes": operator.get("attributes", {}),
+			"skillIds": [], "passiveIds": [], "treeNodeIds": [],
+			"attributePointsEarned": 0, "treePointsEarned": 0,
+		})
+		if not check(bool(build.get("valid", false)), "combat_step: counter weapon build %s was rejected" % weapon_id):
+			return
+		var enemies: Array[Dictionary] = [config.get("enemy", {})]
+		if weapon_id == "ARC_E2": enemies.append(config.get("enemy", {}).duplicate(true))
+		var initialized: Dictionary = CombatSimulator.new().create_state({
+			"seed": "counter-%s" % weapon_id, "depth": int(config.get("depth", 1)),
+			"biome": str(config.get("biome", "B01")), "nodeType": "COMBAT",
+			"build": build, "enemies": enemies, "tactics": config.get("tactics", {}), "maxDurationMs": 30000,
+		})
+		if not check(bool(initialized.get("ok", false)), "combat_step: %s counter combat failed to initialize" % weapon_id):
+			return
+		var state: CombatState = initialized["state"] as CombatState
+		var counter_actor: CombatActorState = state.drones[0] if weapon_id == "DR_ARC" and not state.drones.is_empty() else state.operator
+		state.operator.next_attack_at = 100000.0 if weapon_id == "DR_ARC" else 100.0
+		counter_actor.next_attack_at = 100.0
+		for enemy: CombatActorState in state.enemies:
+			enemy.hp = 100000.0
+			enemy.next_attack_at = 100000.0
+			for modifier: Dictionary in enemy.base_mods:
+				if str(modifier.get("stat", "")) == "evasion": modifier["value"] = 0.0
+		var ticks: int = 0
+		var required_attacks: int = 20 if weapon_id == "DR_ARC" else 4
+		while _attack_counter_count(state, weapon_id) < required_attacks and ticks < 1000:
+			var stepped: Dictionary = CombatSimulator.new().step_combat(state)
+			if not check(bool(stepped.get("ok", false)), "combat_step: %s counter tick failed: %s" % [weapon_id, str(stepped.get("error", ""))]):
+				return
+			state = stepped["state"] as CombatState
+			ticks += 1
+		check(_attack_counter_count(state, weapon_id) == required_attacks, "combat_step: %s did not reach attack %d" % [weapon_id, required_attacks])
+		var trigger_found: bool = false
+		var child_hit_found: bool = false
+		var expected_trigger_id: String = "ARC_E2_splash" if weapon_id == "ARC_E2" else "FOCUS_D1_virus" if weapon_id == "FOCUS_D1" else "DR_ARC_shock"
+		for event: Dictionary in state.log:
+			if str(event.get("kind", "")) == "TRIGGER" and str(event.get("actionId", "")).contains(expected_trigger_id):
+				trigger_found = true
+			if weapon_id == "ARC_E2" and str(event.get("kind", "")) == "DAMAGE" and str(event.get("actionId", "")).contains("ARC_E2_splash") and str(event.get("targetId", "")) == "enemy:1":
+				child_hit_found = true
+		check(trigger_found, "combat_step: %s did not execute its fourth-attack trigger" % weapon_id)
+		if weapon_id == "ARC_E2":
+			check(child_hit_found, "combat_step: ARC_E2 did not damage the secondary enemy")
+		elif weapon_id == "FOCUS_D1":
+			check(state.enemies[0].statuses.get("VIRUS", []).size() == 1, "combat_step: FOCUS_D1 did not apply its VIRUS stack")
+		else:
+			check(state.enemies[0].statuses.has("SHOCK"), "combat_step: DR_ARC did not apply SHOCK on its fifth attack")
+
+func _attack_counter_count(state: CombatState, source_id: String) -> int:
+	var actor: CombatActorState = state.drones[0] if source_id == "DR_ARC" and not state.drones.is_empty() else state.operator
+	return int(actor.counters.get("attacks", 0))
 
 func _initial_state_payload(state_value: Variant) -> Dictionary:
 	return (state_value as CombatState).to_dictionary()
