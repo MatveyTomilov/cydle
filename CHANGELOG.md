@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — stable save checksum round-trips
+
+- Fixed a save-integrity failure where Godot's JSON float serialization alternated between adjacent numeric representations after repeated load/write cycles. New checksums canonicalize numeric precision without changing stored gameplay values; old checksum documents remain loadable. Added repeated file/JSON round-trip regression coverage.
+- Campaign E2E reproduced the issue at the d8 boss reward save. After the fix, the resumed d8 BOSS_B defeat (167 ticks) persisted and reloaded correctly, then the driver resumed its next attempt; a successful d8 gate clear is still unverified.
+- Godot headless suite: 22 scripts, 87,506 assertions, 0 failures. Full campaign acceptance remains in progress.
+
 ## Unreleased — targeted boss reactions and d4 campaign win
 
 - Tactic condition `enemyCasting` now scopes to the selected target when one exists; untargeted rules retain group-wide behavior. This fixes boss tactics that previously spent EMP on a healer cast before the boss telegraph. Added a regression covering simultaneous boss/healer targets.

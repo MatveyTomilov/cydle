@@ -22,6 +22,12 @@ func run(_tree: SceneTree) -> bool:
 	var payload: Dictionary = {"profile": {"level": 1, "credits": 120}, "items": ["starter"]}
 	var precise_float_result: Dictionary = repository.call("save", "precise_float", {"hp": 90.87378640776699}, 99)
 	check(bool(precise_float_result.get("ok", false)), "save_repository: JSON float round-trip invalidated a valid save")
+	var precise_float_loaded: Dictionary = repository.call("load", "precise_float")
+	check(bool(precise_float_loaded.get("ok", false)), "save_repository: precise float save did not survive a file reload")
+	var precise_float_document: Dictionary = precise_float_loaded.get("save", {})
+	var serialized_document: Variant = JSON.parse_string(JSON.stringify(precise_float_document, "", true, true))
+	serialized_document = JSON.parse_string(JSON.stringify(serialized_document, "", true, true))
+	check(bool(validator.call("validate", serialized_document).get("ok", false)), "save_repository: checksum changed after repeated JSON float conversions")
 	var first_result: Dictionary = repository.call("save", "slot_a", payload, 100)
 	check(bool(first_result.get("ok", false)), "save_repository: first snapshot was not saved")
 	var first: Dictionary = first_result.get("save", {})

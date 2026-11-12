@@ -7,6 +7,7 @@ const BALANCE_VERSION: String = "1.0.0"
 const GAME_VERSION: String = "1.0.0"
 
 var _state_hash: StateHash = StateHash.new()
+const FLOAT_CHECKSUM_SCALE: float = 100000000.0
 
 func create_document(payload: Dictionary, save_id: String, revision: int, updated_at: int, balance_version: String = BALANCE_VERSION, game_version: String = GAME_VERSION) -> Dictionary:
 	var document: Dictionary = {
@@ -50,7 +51,8 @@ func validate(value: Variant) -> Dictionary:
 	for field_name: Variant in document.keys():
 		if not ["format", "schemaVersion", "balanceVersion", "gameVersion", "saveId", "revision", "updatedAt", "payload", "checksum"].has(field_name):
 			return _failure("Неизвестное поле сохранения: %s." % str(field_name))
-	if checksum(document) != str(document["checksum"]):
+	var saved_checksum: String = str(document["checksum"])
+	if checksum(document) != saved_checksum and _legacy_checksum(document) != saved_checksum:
 		return _failure("Контрольная сумма не совпадает: файл повреждён.")
 	return {"ok": true, "save": document.duplicate(true), "error": ""}
 
@@ -59,11 +61,45 @@ func checksum(document: Dictionary) -> String:
 	payload.erase("checksum")
 	if not _is_json_value(payload):
 		return _state_hash.state_hash(payload)
-	# Match the representation that can actually survive a JSON save/load round-trip.
-	# Godot's JSON encoder may round the last digits of floats, so hashing the in-memory
-	# value directly can make a freshly written save fail validation immediately.
+	return _state_hash.state_hash(_canonicalize_checksum_numbers(payload))
+
+func _legacy_checksum(document: Dictionary) -> String:
+	# Accept saves created before the stable-number checksum was introduced.
+	var payload: Dictionary = document.duplicate(true)
+	payload.erase("checksum")
+	if not _is_json_value(payload):
+		return _state_hash.state_hash(payload)
 	var normalized: Variant = JSON.parse_string(JSON.stringify(payload, "", true, true))
+	# Older documents hashed the in-memory value after one normalization. A document
+	# loaded from disk has already undergone another JSON float conversion, so retain
+	# compatibility with the historic checksum after both conversions.
+	normalized = JSON.parse_string(JSON.stringify(normalized, "", true, true))
 	return _state_hash.state_hash(normalized)
+
+func _canonicalize_checksum_numbers(value: Variant) -> Variant:
+	if value is Dictionary:
+		var result: Dictionary = {}
+		for key: Variant in value:
+			result[key] = _canonicalize_checksum_numbers(value[key])
+		return result
+	if value is Array:
+		var result: Array = []
+		for entry: Variant in value:
+			result.append(_canonicalize_checksum_numbers(entry))
+		return result
+	if value is float:
+		var number: float = float(value)
+		if number == 0.0:
+			return 0
+		if number == floor(number) and absf(number) <= 9007199254740991.0:
+			return int(number)
+		# JSON's decimal-to-binary conversion can alternate between adjacent floats
+		# across repeated save/load cycles. Hash a fixed 1e-8 numeric bucket instead.
+		# This affects integrity metadata only; the original saved value is untouched.
+		if absf(number) <= 90000000000.0:
+			return {"__cydle_float_e8__": int(round(number * FLOAT_CHECKSUM_SCALE))}
+		return {"__cydle_float_text__": "%.8e" % number}
+	return value
 
 func parse_text(text: String) -> Dictionary:
 	var parser: JSON = JSON.new()
