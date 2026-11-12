@@ -2054,8 +2054,8 @@ func resolve_active_combat() -> bool:
 		return false
 	var run_payload: Dictionary = state.run.to_dictionary()
 	var resources: Dictionary = run_payload["resources"]
-	resources["hp"] = _combat.operator.hp
-	resources["shield"] = _combat.operator.shield
+	resources["hp"] = minf(_combat.operator.hp, float(resources.get("maxHP", _combat.operator.hp)))
+	resources["shield"] = minf(_combat.operator.shield, float(resources.get("maxShield", _combat.operator.shield)))
 	resources["energy"] = _combat.operator.energy
 	resources["heat"] = _combat.operator.heat
 	resources["gameTimeMs"] = float(resources["gameTimeMs"]) + _combat.time_ms

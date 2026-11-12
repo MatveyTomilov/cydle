@@ -6,6 +6,10 @@
 
 The active strategy is **FULL GAME FIRST**: connect every major Master Spec system into a campaign that can be completed, then deepen edge cases, balance, and presentation. The entries below report implementation status; they are not a queue of isolated feature slices. A checkpoint commit is a safety measure, so continue to the next missing campaign-critical system while the session permits. Defer saved Simulation Lab presets, report exports, cosmetic polish, secondary settings, and redundant tests until functional campaign coverage exists.
 
+### Live continuation (2026-11-12)
+
+The local WIP wires deterministic direct `ON_HIT` status triggers into the shared Godot simulator, including K3A ARMOR_BREAK, and excludes secondary splash/detonation packets. Victory settlement clamps HP/shield to persisted sortie maxima after fractional max-stat drift caused a save rejection. The forced-proc regression passes. A real saved-profile campaign diagnostic completed three d3 extraction farms and started the next d1–d4 attempt; d4 is unconfirmed. This WIP is pending commit/push; Windows export has not been rerun.
+
 ## Latest implementation checkpoint (2026-11-12)
 
 The native save schema now treats `EXTRACTED`, `TOWED`, `ABANDONED`, and `DEFEATED` run equipment as historical state: it still validates item ownership/shape, but no longer requires that old loadout to match the player's current garage skills/tree. This removes a real blocker where changing from a kinetic to energy build (or back) after a run could fail because the archived run stored its previous equipment. Live runs retain BuildResolver validation. A regression checks both live rejection and terminal reload.

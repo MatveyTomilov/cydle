@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — direct kinetic status procs and resource-safe settlement
+
+- The Godot combat simulator now executes direct `ON_HIT` status triggers from non-skill build sources, including K3A's kinetic ARMOR_BREAK proc. Proc chances use the deterministic battle RNG; cooldowns belong to the trigger owner; damage type/directness and supported status conditions are respected. Secondary splash/detonation packets do not count as direct hits.
+- Combat settlement clamps returned HP and shield to the persisted sortie maxima, preventing fractional max-stat drift from rejecting an otherwise valid save after victory.
+- Added a Godot combat regression that forces K3A's proc and checks both ARMOR_BREAK and the proc metric.
+- Latest Godot editor import and headless tests pass (22 scripts, 87,499 assertions); `npm run typecheck` and `git diff --check` also pass. The resumed diagnostic completed its three d3 extraction farms and has started the next d1–d4 attempt. BOSS_A and later sectors are not yet confirmed in this continuation.
+
 ## Unreleased — terminal loadout persistence and campaign diagnostics
 
 - Save validation no longer compares a terminal run's historical field equipment against the player's post-run skills/tree. This lets garage build changes after defeat/extraction persist while keeping full BuildResolver validation for active runs.

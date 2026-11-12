@@ -1,5 +1,15 @@
 # CYDLE — Project handoff and development history
 
+## Current continuation checkpoint (2026-11-12)
+
+- Branch: `development/codex`; pushed base: `2af38337287306f9eddde9299b6630bdeb0df9a0`; local WIP is pending commit. This supersedes older latest-status bullets below.
+- Added deterministic direct `ON_HIT` status-trigger execution in the existing Godot combat simulator for non-skill build triggers, including K3A's 12% kinetic ARMOR_BREAK with owner-scoped ICD and proc multiplier. Secondary splash/detonation is not treated as direct. Added forced-proc regression coverage.
+- Combat victory settlement now clamps HP/shield to sortie maxima. This fixes a reproducible save rejection where combat rounded HP to 400 while persisted maxHP was 399.57.
+- Latest actual checks: Godot 4.7.2 editor import exit 0; 22 headless scripts / 87,499 assertions / 0 failures. Windows export has not been rerun for this local WIP.
+- `game/tools/campaign_e2e.gd` now selects K3A to exercise that proc. Its preserved external profile completed three d3 extraction farms and has started the next d1–d4 attempt. The diagnostic process is still running; no d4 success or later campaign completion is confirmed. After the HP clamp, it completed the third farm without the prior save validation failure.
+- Latest actual checks: Godot editor import exit 0; 22 headless scripts / 87,499 assertions / 0 failures; `npm run typecheck` exit 0; `git diff --check` exit 0. Windows export has not been rerun for this local WIP.
+- Exact continuation: observe the ongoing `campaign_e2e.gd -- --resume` process and inspect the d4 result; then document actual campaign progress. Continue through d12/d13 and fix shared-system blockers without changing Master Spec balance.
+
 ## Latest active checkpoint (2026-11-12; supersedes earlier status below)
 
 - Repository root: `E:\cydle\project`; branch: `development/codex`; latest pushed base before this WIP: `0c6a28cd7951aeb2b31b56c3416f64750a186015`. The current local changes are not committed yet.

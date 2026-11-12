@@ -268,7 +268,7 @@ func _prepare_garage(session: GameSession) -> bool:
 				break
 			if slot == "MAIN":
 				print("E2E main candidate rejected template=%s T%d rarity=%s error=%s" % [str(item.get("templateId", "")), int(item.get("techLevel", 1)), str(item.get("rarity", "COMMON")), session.last_error])
-	var campaign_tree: Array[String] = ["S1A", "S1B", "S1C", "S2C", "K1A", "K1B", "K2A", "K1C", "K1D", "K3B"]
+	var campaign_tree: Array[String] = ["S1A", "S1B", "S2C", "K1A", "K1B", "K2A", "K1C", "K1D", "K3A"]
 	for node_id: String in session.state.meta.tree_node_ids.duplicate():
 		if not campaign_tree.has(node_id) and not session.set_tree_node_allocated(node_id, false):
 			print("E2E garage rejected: tree removal %s error=%s" % [node_id, session.last_error])

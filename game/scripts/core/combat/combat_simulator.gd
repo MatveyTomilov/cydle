@@ -194,7 +194,8 @@ func _supports_skill_trigger_effects(state: CombatState) -> bool:
 		var skill_trigger: bool = source_id in ["SK_BLADE", "SK_NEURO", "SK_SEED", "SK_BREAK"]
 		var periodic_item_trigger: bool = effect_id in ["DR_MED_heal", "DR_EMP_interrupt", "TR_SUPPORT_blast"] and str(effect.get("event", "")) == "PERIODIC" and str(trigger_value.get("sourceKind", "")) == "item"
 		var attack_counter_trigger: bool = effect_id in ["ARC_E2_splash", "FOCUS_D1_virus", "DR_ARC_shock"] and str(effect.get("event", "")) == "ON_ATTACK_COUNTER" and str(trigger_value.get("sourceKind", "")) == "item"
-		if not skill_trigger and not periodic_item_trigger and not attack_counter_trigger:
+		var direct_status_trigger: bool = str(effect.get("event", "")) == "ON_HIT" and str(effect.get("type", "")) == "trigger" and str(effect.get("action", {}).get("kind", "")) == "applyStatus" and not str(effect.get("action", {}).get("status", "")).is_empty()
+		if not skill_trigger and not periodic_item_trigger and not attack_counter_trigger and not direct_status_trigger:
 			return false
 	return true
 
@@ -996,7 +997,7 @@ func _resolve_main_skill(state: CombatState, rng: DeterministicRng, actor: Comba
 		arc_others.sort_custom(func(left: CombatActorState, right: CombatActorState) -> bool: return left.id < right.id)
 		for secondary: CombatActorState in arc_others.slice(0, 2):
 			var splash_raw: float = _skill_raw_damage(skill, base_damage, effective, secondary) * float(skill.get("splash", {}).get("coefficient", 0.5))
-			var splash_hit: Dictionary = _resolve_basic_hit(state, rng, actor, secondary, splash_raw, damage_type, action_id, is_main, skill_id)
+			var splash_hit: Dictionary = _resolve_basic_hit(state, rng, actor, secondary, splash_raw, damage_type, action_id, is_main, skill_id, 0.0, false)
 			if bool(splash_hit.get("hit", false)):
 				_add_simple_status(state, actor, secondary, "SHOCK", 1000.0)
 		return
@@ -1085,7 +1086,7 @@ func _resolve_virus_detonation(state: CombatState, rng: DeterministicRng, actor:
 	if target.statuses["VIRUS"].is_empty(): target.statuses.erase("VIRUS")
 	var sheet: Dictionary = _effective_sheet(state, actor, target)
 	var raw: float = potential * float(sheet.get("detonateCoefficient", 0.6)) * float(sheet.get("moreSkillDigital", 1.0))
-	_resolve_basic_hit(state, rng, actor, target, raw, "DIGITAL", action_id, false, str(skill.get("id", "SK_DETONATE")))
+	_resolve_basic_hit(state, rng, actor, target, raw, "DIGITAL", action_id, false, str(skill.get("id", "SK_DETONATE")), 0.0, false)
 
 func _record_rule_failure(state: CombatState, rule_id: String, reason: String) -> void:
 	var failures: Array = state.metrics.get("ruleFailures", [])
@@ -1473,7 +1474,7 @@ func _dispatch_attack_counter_triggers(state: CombatState, rng: DeterministicRng
 				if secondary != null:
 					var main_weapon: Dictionary = state.build.get("mainWeapon", {})
 					var raw: float = float(main_weapon.get("damage", 0.0)) * float(effect.get("action", {}).get("coefficient", 0.25))
-					_resolve_basic_hit(state, rng, actor, secondary, raw, str(effect.get("action", {}).get("damageType", "ENERGY")), trigger_action_id, false)
+					_resolve_basic_hit(state, rng, actor, secondary, raw, str(effect.get("action", {}).get("damageType", "ENERGY")), trigger_action_id, false, "", 0.0, false)
 			"FOCUS_D1_virus":
 				if target.alive:
 					_add_dot_status(state, actor, target, "VIRUS", 0.0, trigger_action_id, int(effect.get("action", {}).get("stacks", 1)))
@@ -1506,7 +1507,7 @@ func _attack_packets(actor: CombatActorState, weapon: Dictionary) -> Array[Dicti
 		packets.append({"type": actor.attack_type, "amount": actor.attack_damage})
 	return packets
 
-func _resolve_basic_hit(state: CombatState, rng: DeterministicRng, actor: CombatActorState, target: CombatActorState, raw_base: float, damage_type: String, action_id: String, is_main: bool, skill_id: String = "", bypass_shield_ratio: float = 0.0) -> Dictionary:
+func _resolve_basic_hit(state: CombatState, rng: DeterministicRng, actor: CombatActorState, target: CombatActorState, raw_base: float, damage_type: String, action_id: String, is_main: bool, skill_id: String = "", bypass_shield_ratio: float = 0.0, direct: bool = true) -> Dictionary:
 	var attacker: Dictionary = _effective_sheet(state, actor, target)
 	var defender: Dictionary = _effective_sheet(state, target, actor)
 	var accuracy: float = float(attacker.get("accuracy", 100.0))
@@ -1597,11 +1598,85 @@ func _resolve_basic_hit(state: CombatState, rng: DeterministicRng, actor: Combat
 	if not skill_id.is_empty():
 		damage_event["skillId"] = skill_id
 	_emit(state, "DAMAGE", actor.id, damage_event)
+	_dispatch_direct_status_triggers(state, rng, actor, target, damage_type, action_id, skill_id, direct)
 	if actor.side == "enemy" and target.side == "player":
 		_resolve_enemy_direct_hit_effects(state, actor, target, action_id, raw)
 	if bulwark != null and redirected_raw > 0.0:
 		_apply_redirected_damage(state, actor, bulwark, redirected_raw, damage_type, action_id, skill_id, penetration, crit)
 	return {"ok": true, "hit": true, "damage": dealt, "raw": raw, "error": ""}
+
+func _dispatch_direct_status_triggers(state: CombatState, rng: DeterministicRng, actor: CombatActorState, target: CombatActorState, damage_type: String, action_id: String, skill_id: String, direct: bool) -> void:
+	if not direct or actor.side != "player" or not actor.alive or not target.alive:
+		return
+	if not _status_catalog_loaded:
+		var loaded: Dictionary = _status_catalog.load_catalog()
+		_status_catalog_loaded = true
+		_status_catalog_error = str(loaded.get("error", "")) if not bool(loaded.get("ok", false)) else ""
+	if not _status_catalog_error.is_empty():
+		return
+	for trigger_value: Variant in state.build.get("triggerEffects", []):
+		if not trigger_value is Dictionary:
+			continue
+		var effect: Dictionary = trigger_value.get("effect", {})
+		if str(effect.get("event", "")) != "ON_HIT" or str(effect.get("action", {}).get("kind", "")) != "applyStatus":
+			continue
+		if str(trigger_value.get("sourceKind", "")) == "skill":
+			continue
+		if bool(effect.get("requireDirect", false)) and not direct:
+			continue
+		var damage_type_filter: Array = effect.get("damageTypeFilter", [])
+		if not damage_type_filter.is_empty() and not damage_type_filter.has(damage_type):
+			continue
+		if not _trigger_status_condition_passes(state, actor, target, effect.get("condition", {})):
+			continue
+		var trigger_id: String = str(effect.get("id", ""))
+		var source_id: String = str(trigger_value.get("sourceId", ""))
+		var owner: CombatActorState = _trigger_owner(state, source_id)
+		var trigger_key: String = "%s:%s" % [source_id, trigger_id]
+		if float(owner.icds.get(trigger_key, 0.0)) > float(state.time_ms):
+			continue
+		var proc_chance: float = clampf(float(effect.get("chance", 1.0)) * float(_effective_sheet(state, owner, target).get("procMultiplier", 1.0)), 0.0, 1.0)
+		if not rng.chance(proc_chance):
+			continue
+		var action: Dictionary = effect.get("action", {})
+		var status_id: String = str(action.get("status", ""))
+		if status_id.is_empty() or not STEP_STATUS_IDS.has(status_id):
+			continue
+		owner.icds[trigger_key] = float(state.time_ms) + float(effect.get("icdMs", 0.0))
+		state.metrics["procsTriggered"] = int(state.metrics.get("procsTriggered", 0)) + 1
+		var trigger_action_id: String = "%s:trigger:%s" % [action_id, trigger_id]
+		_emit(state, "TRIGGER", owner.id, {"targetId": target.id, "actionId": trigger_action_id, "skillId": skill_id if not skill_id.is_empty() else "", "damageType": damage_type, "text": "%s: сработал эффект «%s» после попадания %s." % [owner.display_name, trigger_id, actor.display_name], "data": {"sourceId": source_id, "chance": proc_chance}})
+		var action_target: CombatActorState = target
+		var action_target_kind: String = str(action.get("target", "target"))
+		if action_target_kind == "self":
+			action_target = owner
+		if action_target_kind == "allEnemies":
+			for enemy: CombatActorState in state.enemies:
+				if enemy.alive:
+					_add_simple_status(state, owner, enemy, status_id, float(action.get("durationMs", _status_catalog.get_definition(status_id).get("durationMs", 0.0))))
+		elif action_target_kind == "otherEnemy":
+			for enemy: CombatActorState in state.enemies:
+				if enemy.alive and enemy.id != target.id:
+					action_target = enemy
+					break
+		if action_target_kind not in ["allEnemies", "otherEnemy"] and action_target != null:
+			_add_simple_status(state, owner, action_target, status_id, float(action.get("durationMs", _status_catalog.get_definition(status_id).get("durationMs", 0.0))))
+
+func _trigger_status_condition_passes(state: CombatState, actor: CombatActorState, target: CombatActorState, condition_value: Variant) -> bool:
+	if not condition_value is Dictionary or condition_value.is_empty():
+		return true
+	var condition_kind: String = str(condition_value.get("kind", ""))
+	match condition_kind:
+		"targetStatus":
+			return _status_stacks(target, str(condition_value.get("status", ""))) >= int(condition_value.get("minStacks", 1))
+		"targetNoStatus":
+			return not _has_status(target, str(condition_value.get("status", "")))
+		"heatAtLeast":
+			return actor.heat >= float(condition_value.get("value", 0.0))
+		"hpBelow":
+			return actor.hp / maxf(1.0, float(_effective_sheet(state, actor).get("maxHP", 1.0))) <= float(condition_value.get("value", 0.0))
+		_:
+			return false
 
 func _apply_redirected_damage(state: CombatState, source: CombatActorState, target: CombatActorState, raw: float, damage_type: String, action_id: String, skill_id: String, penetration: Dictionary, crit: bool) -> void:
 	var defender: Dictionary = _effective_sheet(state, target, source)

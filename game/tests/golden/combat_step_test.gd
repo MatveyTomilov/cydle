@@ -66,7 +66,33 @@ func run(_tree: SceneTree) -> bool:
 			check(_json_equivalent(initial_payload, _initial_state_payload(state_result["state"])), "combat_step: advancing mutated the source state")
 	_test_support_relay(config, operator)
 	_test_attack_counter_items(config, operator)
+	_test_direct_status_tree_trigger(config, build)
 	return failure_count == 0
+
+func _test_direct_status_tree_trigger(config: Dictionary, build: Dictionary) -> void:
+	var trigger_build: Dictionary = build.duplicate(true)
+	trigger_build["triggerEffects"] = [{
+		"sourceId": "K3A", "sourceName": "Раскол брони", "sourceKind": "tree",
+		"effect": {"type": "trigger", "id": "K3A", "event": "ON_HIT", "chance": 1.0, "icdMs": 4000, "requireDirect": true, "damageTypeFilter": ["KINETIC"], "action": {"kind": "applyStatus", "status": "ARMOR_BREAK", "stacks": 1, "target": "target"}},
+	}]
+	var initialized: Dictionary = CombatSimulator.new().create_state({
+		"seed": "campaign-k3a-trigger", "depth": int(config.get("depth", 1)), "biome": str(config.get("biome", "B01")),
+		"nodeType": str(config.get("nodeType", "COMBAT")), "build": trigger_build,
+		"enemies": [config.get("enemy", {})], "tactics": config.get("tactics", {}), "maxDurationMs": 180000,
+	})
+	if not check(bool(initialized.get("ok", false)), "combat_step: K3A trigger combat did not initialize: %s" % str(initialized.get("error", ""))):
+		return
+	var simulator: CombatSimulator = CombatSimulator.new()
+	var state: CombatState = initialized["state"] as CombatState
+	var ticks: int = 0
+	while not state.enemies.is_empty() and not state.enemies[0].statuses.has("ARMOR_BREAK") and ticks < 100:
+		var stepped: Dictionary = simulator.step_combat(state)
+		if not check(bool(stepped.get("ok", false)), "combat_step: K3A trigger tick failed: %s" % str(stepped.get("error", ""))):
+			return
+		state = stepped["state"] as CombatState
+		ticks += 1
+	check(not state.enemies.is_empty() and state.enemies[0].statuses.has("ARMOR_BREAK"), "combat_step: K3A did not apply ARMOR_BREAK on a direct kinetic hit")
+	check(int(state.metrics.get("procsTriggered", 0)) == 1, "combat_step: K3A trigger was not recorded exactly once")
 
 func _test_support_relay(config: Dictionary, operator: Dictionary) -> void:
 	var catalog: ItemCatalog = ItemCatalog.new()
