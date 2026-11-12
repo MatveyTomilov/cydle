@@ -118,7 +118,7 @@ func _supports_basic_auto_step(state: CombatState) -> bool:
 	for rule_value: Variant in state.tactics.get("rules", []):
 		if not rule_value is Dictionary or not bool(rule_value.get("enabled", false)):
 			continue
-		if str(rule_value.get("skillId", "AUTO")) not in ["AUTO", "SK_BURST", "SK_PIERCE"] or not rule_value.get("conditions", []).is_empty():
+		if str(rule_value.get("skillId", "AUTO")) not in ["AUTO", "SK_BURST", "SK_PIERCE", "SK_EXEC"] or not rule_value.get("conditions", []).is_empty():
 			return false
 		if str(rule_value.get("skillId", "AUTO")) == "SK_BURST" and str(rule_value.get("target", "nearest")) not in ["nearest", "lowestHPPercent"]:
 			return false
@@ -127,7 +127,7 @@ func _supports_basic_auto_step(state: CombatState) -> bool:
 	for actor: CombatActorState in state.all_actors():
 		if not actor.elite_mod.is_empty() or not actor.ability_next.is_empty() or not actor.buffs.is_empty() or actor.reaction_cast != null:
 			return false
-		if actor.cast != null and (actor.kind != "operator" or not actor.cast is Dictionary or str(actor.cast.get("skillId", "")) not in ["SK_BURST", "SK_PIERCE"]):
+		if actor.cast != null and (actor.kind != "operator" or not actor.cast is Dictionary or str(actor.cast.get("skillId", "")) not in ["SK_BURST", "SK_PIERCE", "SK_EXEC"]):
 			return false
 		for status_id: Variant in actor.statuses.keys():
 			if not STEP_STATUS_IDS.has(str(status_id)):
@@ -264,8 +264,11 @@ func _resolve_main_skill(state: CombatState, rng: DeterministicRng, actor: Comba
 			current_target = _pick_auto_target(state, actor)
 		if current_target == null:
 			break
+		var raw_base: float = float(weapon.get("damage", 0.0)) * coefficient
+		if skill_id == "SK_EXEC" and current_target.hp / maxf(1.0, float(current_target.base_sheet.get("maxHP", 1.0))) < 0.3:
+			raw_base *= 1.4 * float(_effective_sheet(state, actor, current_target).get("moreExecute", 1.0))
 		var hit: Dictionary = _resolve_basic_hit(
-			state, rng, actor, current_target, float(weapon.get("damage", 0.0)) * coefficient,
+			state, rng, actor, current_target, raw_base,
 			damage_type, str(cast.get("actionId", "")), true, skill_id,
 		)
 		if not bool(hit.get("ok", false)):

@@ -4,6 +4,7 @@ const SAVE_FIXTURE: String = "res://tests/fixtures/saves/initial_save.json"
 func run(_tree: SceneTree) -> bool:
 	_run_replay("main_skill_replay", "SK_BURST")
 	_run_replay("pierce_skill_replay", "SK_PIERCE")
+	_run_replay("execute_skill_replay", "SK_EXEC")
 	return failure_count == 0
 
 func _run_replay(replay_name: String, skill_id: String) -> void:
@@ -28,7 +29,7 @@ func _run_replay(replay_name: String, skill_id: String) -> void:
 		"seed": config.get("seed", ""), "depth": config.get("depth", 0), "biome": config.get("biome", "B01"),
 		"nodeType": config.get("nodeType", "COMBAT"), "build": build,
 		"enemies": [config.get("enemy", {})], "tactics": config.get("tactics", {}),
-		"maxDurationMs": config.get("maxDurationMs", 180000),
+		"maxDurationMs": config.get("maxDurationMs", 180000), "startEnergy": config.get("startEnergy", 0),
 	})
 	if not check(bool(initialized.get("ok", false)), "%s: combat init failed: %s" % [replay_name, initialized.get("error", "")]):
 		return

@@ -354,6 +354,46 @@ writeFileSync(pierceReplayOutput, `${JSON.stringify({
 }, null, 2)}\n`, 'utf8');
 console.log(`Exported ${pierceFrames.length} armor-piercing skill replay frames to ${pierceReplayOutput}`);
 
+const executeBuild = resolveBuild({
+  attributes: initialSaveFixture.meta.operator.attributes, equipment: { MAIN: starterMain },
+  skillIds: ['SK_EXEC'], passiveIds: [], treeNodeIds: [], attributePointsEarned: 0, treePointsEarned: 0,
+});
+const executeTactics: TacticalProfile = {
+  id: 'EXECUTE_TEST', name: 'Execute replay', rules: [{
+    id: 'RULE_EXECUTE', priority: 100, enabled: true, skillId: 'SK_EXEC',
+    target: 'lowestHPPercent', conditions: [], logic: 'AND',
+  }],
+};
+const executeEnemy = { ...basicStateConfig.enemies[0]!, hpMult: 0.2 };
+const executeConfig = { ...basicStateConfig, build: executeBuild, tactics: executeTactics, enemies: [executeEnemy], startEnergy: 20 };
+let executeState = createCombatState(executeConfig);
+const executeFrames = [];
+for (let tick = 0; tick < 16; tick++) {
+  const previousLogLength = executeState.log.length;
+  executeState = stepCombat(executeState);
+  const actorFrame = (actor: typeof executeState.operator) => ({
+    id: actor.id, hp: actor.hp, shield: actor.shield, energy: actor.energy, heat: actor.heat,
+    nextAttackAt: actor.nextAttackAt, alive: actor.alive, flags: actor.flags, counters: actor.counters,
+    cooldowns: actor.cooldowns, cast: actor.cast,
+    damageDealt: actor.damageDealt, damageTaken: actor.damageTaken,
+  });
+  executeFrames.push({
+    timeMs: executeState.timeMs, rng: executeState.rng, nextEventId: executeState.nextEventId,
+    metrics: executeState.metrics, outcome: executeState.outcome,
+    operator: actorFrame(executeState.operator), enemies: executeState.enemies.map(actorFrame),
+    events: executeState.log.slice(previousLogLength),
+  });
+}
+const executeReplayOutput = resolve('game/tests/fixtures/combat/execute_skill_replay.json');
+writeFileSync(executeReplayOutput, `${JSON.stringify({
+  config: {
+    seed: executeConfig.seed, depth: executeConfig.depth, biome: executeConfig.biome, nodeType: executeConfig.nodeType,
+		enemy: executeConfig.enemies[0], tactics: executeTactics, maxDurationMs: executeConfig.maxDurationMs,
+		startEnergy: executeConfig.startEnergy,
+	}, build: executeBuild, frames: executeFrames,
+}, null, 2)}\n`, 'utf8');
+console.log(`Exported ${executeFrames.length} execute-skill replay frames to ${executeReplayOutput}`);
+
 let dotState = createCombatState(basicStateConfig);
 applyStatus(dotState, dotState.operator, dotState.enemies[0]!, 'BLEED', { snapshot: 100 });
 const dotFrames = [];
