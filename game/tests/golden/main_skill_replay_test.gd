@@ -8,6 +8,7 @@ func run(_tree: SceneTree) -> bool:
 	_run_replay("plasma_skill_replay", "SK_PLASMA")
 	_run_reaction_shield()
 	_run_reaction_emp_interrupt()
+	_run_healer_target_selection()
 	_run_enemy_telegraphed_attack()
 	_run_enemy_death_burst()
 	_run_boss_threshold_phase()
@@ -85,8 +86,30 @@ func _run_reaction_emp_interrupt() -> void:
 		if not check(bool(stepped.get("ok", false)), "reaction_emp: step failed: %s" % stepped.get("error", "")):
 			return
 		state = stepped["state"] as CombatState
+		if int(state.metrics.get("skillUses", {}).get("SK_EMP", 0)) == 0:
+			check(state.operator.cast == null, "reaction_emp: reaction-only skill was incorrectly started on the main channel")
+			check(state.operator.reaction_cast == null or str(state.operator.reaction_cast.get("channel", "")) == "reaction", "reaction_emp: reaction skill did not retain its independent channel")
 	check(int(state.metrics.get("interrupts", 0)) == 1, "reaction_emp: reaction did not interrupt the imminent cast")
 	check(state.enemies[0].cast == null, "reaction_emp: interrupted cast remained active")
+
+func _run_healer_target_selection() -> void:
+	var state: CombatState = CombatState.new()
+	var operator: CombatActorState = CombatActorState.new()
+	operator.id = "operator"
+	operator.side = "player"
+	var boss: CombatActorState = CombatActorState.new()
+	boss.id = "enemy:0"
+	boss.side = "enemy"
+	boss.is_boss = true
+	var healer: CombatActorState = CombatActorState.new()
+	healer.id = "enemy:1"
+	healer.side = "enemy"
+	healer.is_healer = true
+	state.enemies = [boss, healer]
+	var simulator: CombatSimulator = CombatSimulator.new()
+	check(simulator._pick_rule_target(state, operator, "healer") == healer, "tactics_target: healer selector did not prioritize a live healer")
+	healer.alive = false
+	check(simulator._pick_rule_target(state, operator, "healer") == boss, "tactics_target: unavailable healer did not fall back to the first stable enemy")
 
 func _run_enemy_telegraphed_attack() -> void:
 	var meta: Dictionary = _read_dictionary(SAVE_FIXTURE).get("meta", {})

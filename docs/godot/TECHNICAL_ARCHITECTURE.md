@@ -1,6 +1,6 @@
 # CYDLE Godot Technical Architecture
 
-**Status:** approved project direction; native foundations are implemented, but no playable gameplay loop is connected yet.
+**Status:** approved project direction; the native Godot app has an integrated garage-to-expedition loop with road, combat, rewards and checkpoint continuation. Campaign/endgame acceptance and several broader systems remain incomplete.
 **Target:** standalone Windows game, with an architecture that can be exported to Steam and used on Steam Deck.
 **Reviewed:** 2026-11-12.
 

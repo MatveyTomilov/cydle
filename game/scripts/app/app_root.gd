@@ -526,8 +526,8 @@ func _show_tactics() -> void:
 			editors.add_child(skill_selector)
 			var target_selector: OptionButton = OptionButton.new()
 			target_selector.custom_minimum_size.x = 190
-			var targets: Dictionary = {"nearest": "Ближайшая", "lowestHPPercent": "Мало HP %", "self": "Себя", "imminentCast": "Кастует", "boss": "Босс", "infected": "Заражённая", "marked": "Помеченная", "otherEnemy": "Другая цель", "secondary": "Вторичная"}
-			for target_id: String in ["nearest", "lowestHPPercent", "self", "imminentCast", "boss", "infected", "marked", "otherEnemy", "secondary"]:
+			var targets: Dictionary = {"nearest": "Ближайшая", "lowestHPPercent": "Мало HP %", "self": "Себя", "imminentCast": "Кастует", "boss": "Босс", "healer": "Лекарь", "infected": "Заражённая", "marked": "Помеченная", "otherEnemy": "Другая цель", "secondary": "Вторичная"}
+			for target_id: String in ["nearest", "lowestHPPercent", "self", "imminentCast", "boss", "healer", "infected", "marked", "otherEnemy", "secondary"]:
 				target_selector.add_item(str(targets[target_id]))
 				target_selector.set_item_metadata(target_selector.item_count - 1, target_id)
 				if target_id == str(rule.get("target", "nearest")):

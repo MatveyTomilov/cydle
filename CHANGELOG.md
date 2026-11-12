@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — campaign acceptance continuation
+
+- Added the Master Spec `healer` tactic selector in the shared combat simulator, save command validation and tactic editor; unavailable targets fall back deterministically to the first live enemy.
+- Prevented reaction-channel skills from starting on the main combat channel; regression coverage confirms SK_EMP remains a reaction and can still interrupt.
+- Fixed d4/d8 milestone reward settlement that crashed after a boss victory when constructing milestone arrays through a typed GDScript array.
+- Expanded the opt-in shared-engine campaign driver to exercise the authored starter loadout, healer-focused SK_BURST, secured prototype/equipment progression and resumption from a persisted victory.
+- Acceptance has defeated BOSS_A and resumed through its saved victory into d5–d7. Full d12 ending/d13 acceptance remains in progress and unverified.
+
 ## Unreleased — B06 anomaly route integration
 
 - B06 sectors now generate a guaranteed ANOMALY branch using an existing elite modifier and a biome-eligible enemy; other biomes do not receive this node.

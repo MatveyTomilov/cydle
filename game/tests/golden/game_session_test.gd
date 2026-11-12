@@ -693,7 +693,7 @@ func run(_tree: SceneTree) -> bool:
 		check(tactics_session.set_tactic_rule_enabled("starter-burst", false), "game_session: tactic rule could not be disabled: %s" % tactics_session.last_error)
 		check(not tactics_session.active_tactic().get("rules", []).filter(func(rule: Dictionary) -> bool: return str(rule.get("id", "")) == "starter-burst")[0].get("enabled", true), "game_session: disabled tactic rule was not persisted")
 		check(tactics_session.set_tactic_rule_skill("starter-burst", "SK_EMP") and not tactics_session.set_tactic_rule_skill("starter-burst", "SK_PIERCE"), "game_session: tactic skill selector accepted an uninstalled skill or rejected an installed one")
-		check(tactics_session.set_tactic_rule_target("starter-burst", "boss") and not tactics_session.set_tactic_rule_target("starter-burst", "unknown"), "game_session: tactic target selector validation failed")
+		check(tactics_session.set_tactic_rule_target("starter-burst", "boss") and tactics_session.set_tactic_rule_target("starter-burst", "healer") and not tactics_session.set_tactic_rule_target("starter-burst", "unknown"), "game_session: tactic target selector validation failed")
 		check(tactics_session.set_tactic_rule_condition("starter-burst", {"kind": "hpBelow", "value": 0.4}) and not tactics_session.set_tactic_rule_condition("starter-burst", {"kind": "hpBelow", "value": 1.4}), "game_session: tactic condition thresholds were not validated")
 		check(tactics_session.move_tactic_rule("starter-auto", -1), "game_session: tactic priority could not be reordered: %s" % tactics_session.last_error)
 		var added_before: int = tactics_session.active_tactic().get("rules", []).size()

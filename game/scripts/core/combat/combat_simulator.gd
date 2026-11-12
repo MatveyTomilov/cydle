@@ -151,8 +151,6 @@ func _supports_basic_auto_step(state: CombatState) -> bool:
 			continue
 		if str(rule_value.get("skillId", "AUTO")) not in ["AUTO", "SK_BURST", "SK_PIERCE", "SK_EXEC", "SK_BLADE", "SK_PLASMA", "SK_ARC", "SK_OVR", "SK_NEURO", "SK_SEED", "SK_DETONATE", "SK_BREAK", "SK_SCAN", "SK_LEECH", "SK_CHAIN", "SK_KINETIC", "SK_SIDE_FIRE", "SK_SHIELD", "SK_EMP", "SK_GUARD", "SK_VENT", "SK_HEAL", "SK_DRONE_MARK"]:
 			return false
-		if str(rule_value.get("skillId", "AUTO")) == "SK_BURST" and str(rule_value.get("target", "nearest")) not in ["nearest", "lowestHPPercent"]:
-			return false
 	if state.extra_enemy_digital_bonus != 0.0:
 		return false
 	for actor: CombatActorState in state.all_actors():
@@ -286,6 +284,9 @@ func _choose_main_skill(state: CombatState, _rng: DeterministicRng, actor: Comba
 		var rule_id: String = str(rule.get("id", ""))
 		if skill.is_empty():
 			_record_rule_failure(state, rule_id, "not_equipped")
+			continue
+		if str(skill.get("channel", "main")) != "main":
+			_record_rule_failure(state, rule_id, "wrong_channel")
 			continue
 		if float(actor.cooldowns.get(skill_id, 0.0)) > float(state.time_ms):
 			_record_rule_failure(state, rule_id, "cooldown")
@@ -668,6 +669,10 @@ func _pick_rule_target(state: CombatState, actor: CombatActorState, mode: String
 	if mode == "boss":
 		for enemy: CombatActorState in enemies:
 			if enemy.is_boss:
+				return enemy
+	if mode == "healer":
+		for enemy: CombatActorState in enemies:
+			if enemy.is_healer:
 				return enemy
 	if mode == "lowestHPPercent":
 		enemies.sort_custom(func(left: CombatActorState, right: CombatActorState) -> bool:

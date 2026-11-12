@@ -2144,7 +2144,14 @@ func resolve_active_combat() -> bool:
 			var boss_flag: String = "SECTOR_BOSS_%d" % depth
 			if not payload["meta"]["campaignFlags"].has(boss_flag):
 				payload["meta"]["campaignFlags"].append(boss_flag)
-			var milestones: Array[String] = ["ACT_I_ARCHIVE", "FORPOST_4"] if depth == 4 else ["ACT_II_DRONE_LINE", "TARGET_HUNT_TOOLS", "FORPOST_8"] if depth == 8 else []
+			var milestones: Array[String] = []
+			if depth == 4:
+				milestones.append("ACT_I_ARCHIVE")
+				milestones.append("FORPOST_4")
+			elif depth == 8:
+				milestones.append("ACT_II_DRONE_LINE")
+				milestones.append("TARGET_HUNT_TOOLS")
+				milestones.append("FORPOST_8")
 			for milestone: String in milestones:
 				if not payload["meta"]["campaignFlags"].has(milestone): payload["meta"]["campaignFlags"].append(milestone)
 		if depth == 12 and not payload["meta"]["campaignFlags"].has("CAMPAIGN_COMPLETED"):
@@ -3070,7 +3077,7 @@ func set_tactic_rule_skill(rule_id: String, skill_id: String) -> bool:
 	return _update_tactic_rule(rule_id, func(rule: Dictionary) -> void: rule["skillId"] = skill_id)
 
 func set_tactic_rule_target(rule_id: String, target: String) -> bool:
-	if not ["self", "nearest", "lowestHPPercent", "imminentCast", "boss", "infected", "marked", "otherEnemy", "secondary"].has(target):
+	if not ["self", "nearest", "lowestHPPercent", "imminentCast", "boss", "healer", "infected", "marked", "otherEnemy", "secondary"].has(target):
 		last_error = "Неизвестный селектор цели."
 		return false
 	return _update_tactic_rule(rule_id, func(rule: Dictionary) -> void: rule["target"] = target)

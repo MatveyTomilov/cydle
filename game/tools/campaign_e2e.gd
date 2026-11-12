@@ -9,12 +9,27 @@ func _initialize() -> void:
 func _run_campaign() -> void:
 	var session: GameSession = GameSession.new()
 	session.configure_save_directory("user://campaign-e2e")
-	if not session.start_new_game(1762900001001):
-		_fail("Не удалось создать стартовый профиль: %s" % session.last_error)
-		return
+	var resume_existing: bool = OS.get_cmdline_user_args().has("--resume")
+	if resume_existing:
+		if not session.load_saved_game() or session.state == null or session.state.run == null:
+			_fail("Не удалось продолжить сохранённую кампанию: %s" % session.last_error)
+			return
+		print("E2E resume d%d phase=%s activeCombat=%s" % [session.state.run.depth, session.state.run.phase, str(session.has_active_combat())])
+	else:
+		if not session.start_new_game(1762900001001):
+			_fail("Не удалось создать стартовый профиль: %s" % session.last_error)
+			return
+		# Keep the authored starter skills, but focus its existing group burst on healers.
+		if not session.set_tactic_rule_target("starter-burst", "healer"):
+			_fail("Не удалось настроить правило фокусировки SK_BURST на лекаре: %s" % session.last_error)
+			return
 	var sector_attempts: Dictionary = {}
+	var prepared_gate_depths: Dictionary = {}
+	var secured_boss_depths: Dictionary = {}
 	var processed_nodes: int = 0
-	var seed_index: int = 0
+	var seed_index: int = 3 if resume_existing else 0
+	if resume_existing and int(session.state.meta.unlocked_forpost) < 4:
+		sector_attempts[1] = 3
 	while int(session.state.meta.unlocked_forpost) < 12 and processed_nodes < MAX_NODE_STEPS:
 		if session.state.run == null or ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(session.state.run.phase):
 			var next_depth: int = int(session.state.meta.unlocked_forpost) + 1
@@ -22,8 +37,11 @@ func _run_campaign() -> void:
 				print("E2E terminal d%d phase=%s hp=%d hull=%d fuel=%d error=%s" % [session.state.run.depth, session.state.run.phase, int(session.state.run.resources.get("hp", 0)), int(session.state.run.resources.get("hull", 0)), int(session.state.run.resources.get("fuel", 0)), session.last_error])
 			sector_attempts[next_depth] = int(sector_attempts.get(next_depth, 0)) + 1
 			seed_index += 1
-			if int(sector_attempts[next_depth]) > 1:
-				_fail("Сектор %d не пройден за один диагностический выезд." % next_depth)
+			if int(sector_attempts[next_depth]) > 8:
+				_fail("Акт с открытым сектором %d не пройден за восемь выездов." % next_depth)
+				return
+			if int(sector_attempts[next_depth]) > 1 and not _prepare_garage(session):
+				_fail("Не удалось применить найденные улучшения в гараже: %s" % session.last_error)
 				return
 			if not session.start_expedition("campaign-e2e:%d:%d" % [next_depth, seed_index]):
 				_fail("Не удалось начать сектор %d: %s" % [next_depth, session.last_error])
@@ -38,6 +56,7 @@ func _run_campaign() -> void:
 				if not session.travel_to(str(target.get("id", ""))):
 					_fail("Переход отклонён в секторе %d: %s" % [session.state.run.depth, session.last_error])
 					return
+				print("E2E route d%d -> %s (%s), fuel=%d" % [session.state.run.depth, str(target.get("id", "")), str(target.get("type", "")), int(session.state.run.resources.get("fuel", 0))])
 				processed_nodes += 1
 			"NODE":
 				if not _resolve_node(session):
@@ -46,6 +65,20 @@ func _run_campaign() -> void:
 				processed_nodes += 1
 			"CHECKPOINT":
 				var depth: int = int(session.state.run.depth)
+				if depth % 4 == 3 and not prepared_gate_depths.has(depth + 1):
+					prepared_gate_depths[depth + 1] = true
+					if not session.extract_run():
+						_fail("Не удалось закрепить добычу перед боссом d%d: %s" % [depth + 1, session.last_error])
+						return
+					print("E2E farm checkpoint d%d: secured loot and XP before replaying act" % depth)
+					continue
+				if depth in [4, 8] and not secured_boss_depths.has(depth):
+					secured_boss_depths[depth] = true
+					if not session.extract_run():
+						_fail("Не удалось закрепить добычу после босса d%d: %s" % [depth, session.last_error])
+						return
+					print("E2E boss checkpoint d%d: secured boss rewards" % depth)
+					continue
 				if depth == 12 and not session.state.meta.campaign_flags.has("ENDING_SELECTED"):
 					if not session.resolve_campaign_ending("FREE_CORRIDOR"):
 						_fail("Не удалось зафиксировать финал кампании: %s" % session.last_error)
@@ -87,11 +120,14 @@ func _choose_node(session: GameSession) -> Dictionary:
 		var score: float = 0.0
 		if node_type == "CHECKPOINT": score = 100.0
 		elif node_type == "FUEL": score = 70.0
-		elif node_type == "REPAIR": score = 65.0 if float(resources.get("hull", 0.0)) <= 70.0 or float(resources.get("hp", 0.0)) <= float(resources.get("maxHP", 1.0)) * 0.55 else 4.0
+		elif node_type == "REPAIR":
+			var hp_fraction: float = float(resources.get("hp", 0.0)) / maxf(1.0, float(resources.get("maxHP", 1.0)))
+			var repair_needed: bool = float(resources.get("hull", 0.0)) <= 70.0 or hp_fraction <= 0.9
+			score = (82.0 if int(session.state.run.depth) % 4 == 0 else 62.0) if repair_needed else 4.0
 		elif node_type == "CACHE": score = 22.0
 		elif node_type == "EVENT": score = 16.0
 		elif node_type == "COMBAT": score = 10.0
-		elif node_type == "SHOP": score = 2.0
+		elif node_type == "SHOP": score = 32.0 if int(session.state.run.depth) <= 3 and float(session.state.run.wallet.credits) >= 40.0 else 2.0
 		elif node_type in ["ELITE", "BOUNTY"]: score = -6.0
 		if score > best_score or is_equal_approx(score, best_score) and node_id < str(best.get("id", "~")):
 			best = candidate
@@ -117,7 +153,7 @@ func _resolve_node(session: GameSession) -> bool:
 	var node: Dictionary = session.current_node()
 	var kind: String = str(node.get("type", ""))
 	if kind in ["COMBAT", "ELITE", "BOUNTY", "BOSS", "ANOMALY"]:
-		if not session.begin_combat():
+		if not session.has_active_combat() and not session.begin_combat():
 			return false
 		var ticks: int = 0
 		while session.combat_state() != null and session.combat_state().outcome.is_empty() and ticks < MAX_COMBAT_TICKS:
@@ -132,6 +168,8 @@ func _resolve_node(session: GameSession) -> bool:
 		for enemy: CombatActorState in combat.enemies:
 			enemies_left.append("%s %.0f/%.0f dealt=%.0f" % [enemy.template_id, enemy.hp, float(enemy.base_sheet.get("maxHP", 0.0)), enemy.damage_dealt])
 		print("E2E combat d%d node=%s outcome=%s ticks=%d opHP=%.0f opDamage=%.0f opTaken=%.0f enemies=%s level=%d fuel=%d" % [session.state.run.depth, str(node.get("id", "")), combat.outcome, ticks, combat.operator.hp, combat.operator.damage_dealt, combat.operator.damage_taken, ",".join(enemies_left), session.state.meta.operator.level, int(session.state.run.resources.get("fuel", 0))])
+		if kind == "BOSS":
+			print("E2E boss metrics skills=%s interrupts=%d damageSources=%s takenSources=%s shieldAbsorbed=%.0f hpLost=%.0f ruleFailures=%s" % [str(combat.metrics.get("skillUses", {})), int(combat.metrics.get("interrupts", 0)), str(combat.metrics.get("damageBySource", {})), str(combat.metrics.get("takenBySource", {})), float(combat.metrics.get("shieldAbsorbed", 0.0)), float(combat.metrics.get("hpLost", 0.0)), str(combat.metrics.get("ruleFailures", []))])
 		return session.resolve_active_combat()
 	if kind == "EVENT":
 		var event: Dictionary = session.current_event()
@@ -141,12 +179,63 @@ func _resolve_node(session: GameSession) -> bool:
 		return session.resolve_service_node("LEAVE_NODE")
 	if kind == "CACHE":
 		var options: Array = node.get("prototypeChoices", [])
-		return session.resolve_service_node("OPEN_CACHE", str(options[0]) if not options.is_empty() else "")
+		var prototype: String = "IMP_SHIELD" if options.has("IMP_SHIELD") else str(options[0]) if not options.is_empty() else ""
+		return session.resolve_service_node("OPEN_CACHE", prototype)
 	if kind == "FUEL":
 		return session.resolve_service_node("BUY_FUEL") or session.resolve_service_node("SCRAP_FUEL") or session.resolve_service_node("LEAVE_NODE")
 	if kind == "REPAIR":
 		return session.resolve_service_node("REPAIR_HULL") or session.resolve_service_node("REPAIR_HP") or session.resolve_service_node("LEAVE_NODE")
+	if kind == "SHOP":
+		var catalog: ItemCatalog = ItemCatalog.new()
+		if bool(catalog.load_catalog().get("ok", false)):
+			var offers: Array[Dictionary] = session.shop_offers()
+			for index: int in range(offers.size()):
+				var item: Dictionary = offers[index].get("item", {})
+				var template: Dictionary = catalog.get_template(str(item.get("templateId", "")))
+				if str(template.get("category", "")) == "MAIN" and session.buy_shop_item(index):
+					break
+		return session.resolve_service_node("LEAVE_NODE")
 	return session.resolve_service_node("LEAVE_NODE")
+
+func _prepare_garage(session: GameSession) -> bool:
+	var catalog: ItemCatalog = ItemCatalog.new()
+	if not bool(catalog.load_catalog().get("ok", false)):
+		return false
+	var current_slots: Array[String] = ["MAIN", "ARMOR", "OFFHAND", "DRONE_1", "IMP_1", "IMP_2", "IMP_3", "IMP_4"]
+	for slot: String in current_slots:
+		var current_id: String = str(session.state.meta.equipment.get(slot, ""))
+		var expected_category: String = "IMPLANT" if slot.begins_with("IMP_") else slot
+		var current_rank: int = 0
+		for item: Dictionary in session.state.meta.inventory:
+			if str(item.get("itemId", "")) == current_id:
+				current_rank = _item_rank(item)
+				break
+		var candidates: Array[Dictionary] = []
+		for item: Dictionary in session.state.meta.inventory:
+			if not bool(item.get("secured", false)) or str(item.get("itemId", "")) == current_id:
+				continue
+			var template: Dictionary = catalog.get_template(str(item.get("templateId", "")))
+			if str(template.get("category", "")) == expected_category and _item_rank(item) > current_rank and session.valid_equipment_slots(str(item.get("itemId", ""))).has(slot):
+				candidates.append(item)
+		candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return _item_rank(a) > _item_rank(b))
+		for item: Dictionary in candidates:
+			if session.equip_item(slot, str(item.get("itemId", ""))):
+				current_rank = _item_rank(item)
+				break
+	if session.tree_points_available() > 0 and not session.state.meta.tree_node_ids.has("K1A"):
+		session.set_tree_node_allocated("K1A", true)
+	var equipped_ids: Array[String] = []
+	for item_id: Variant in session.state.meta.equipment.values():
+		equipped_ids.append(str(item_id))
+	for item_id: String in equipped_ids:
+		var item: Dictionary = session.state.meta.inventory.filter(func(value: Dictionary) -> bool: return str(value.get("itemId", "")) == item_id)[0]
+		if float(item.get("durability", 100.0)) < 100.0:
+			session.repair_item(item_id)
+	return bool(session.build_preview().get("valid", false))
+
+func _item_rank(item: Dictionary) -> int:
+	var rarity_order: Dictionary = {"COMMON": 0, "MODIFIED": 1, "RARE": 2, "LEGENDARY": 3, "UNIQUE": 4}
+	return int(item.get("techLevel", 0)) * 100 + int(rarity_order.get(str(item.get("rarity", "COMMON")), 0)) * 10 + roundi(float(item.get("durability", 0.0)) / 10.0)
 
 func _fail(message: String) -> void:
 	push_error("campaign E2E: " + message)
