@@ -1,6 +1,13 @@
 extends "res://tests/test_case.gd"
 
 func run(_tree: SceneTree) -> bool:
+	var sortie_fuel_session: GameSession = GameSession.new()
+	sortie_fuel_session.configure_save_directory("user://test-saves/sortie-fuel")
+	if check(sortie_fuel_session.start_new_game(1762900000049), "game_session: could not create a sortie fuel profile"):
+		sortie_fuel_session.state.meta.transport.fuel = 3.0
+		check(sortie_fuel_session.start_expedition("sortie-refill-test"), "game_session: sortie could not start from a depleted garage tank: %s" % sortie_fuel_session.last_error)
+		check(is_equal_approx(float(sortie_fuel_session.state.run.resources.get("fuel", 0.0)), sortie_fuel_session.state.meta.transport.fuel_max), "game_session: a new sortie did not leave with a full transport tank")
+
 	var autopilot_session: GameSession = GameSession.new()
 	autopilot_session.configure_save_directory("user://test-saves/autopilot")
 	if check(autopilot_session.start_new_game(1762900000050), "game_session: could not create an autopilot profile"):

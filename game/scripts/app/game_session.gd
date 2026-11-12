@@ -733,6 +733,7 @@ func start_expedition(seed_value: String = "", use_medical_restore: bool = false
 	var loot_rng: DeterministicRng = DeterministicRng.new()
 	loot_rng.seed("loot", seed)
 	var transport: GameSaveState.TransportState = state.meta.transport
+	var sortie_fuel_max: float = maxf(24.0, transport.fuel_max)
 	var stats: Dictionary = build.get("stats", {})
 	var run_payload: Dictionary = {
 		"seed": seed, "depth": depth, "biome": biome, "graph": generated["graph"],
@@ -748,7 +749,9 @@ func start_expedition(seed_value: String = "", use_medical_restore: bool = false
 			"alliedTurret": false, "extraRareOnElite": false,
 		},
 		"resources": {
-			"fuel": transport.fuel, "maxFuel": transport.fuel_max,
+			# A new sortie leaves the garage with a full transport tank. Fuel is
+			# persistent only while continuing through checkpoints in the same run.
+			"fuel": sortie_fuel_max, "maxFuel": sortie_fuel_max,
 			"hull": transport.hull, "maxHull": transport.hull_max,
 			"hp": float(stats.get("maxHP", 0.0)), "maxHP": float(stats.get("maxHP", 0.0)),
 			"shield": float(stats.get("maxShield", 0.0)), "maxShield": float(stats.get("maxShield", 0.0)),
