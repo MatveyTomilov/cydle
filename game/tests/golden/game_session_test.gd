@@ -215,6 +215,48 @@ func run(_tree: SceneTree) -> bool:
 		check(str(expired_meta["questProgress"]["Q02"].get("status", "")) == "FAILED" and int(expired_meta["reputation"]["F_ECHO"]) == -3, "game_session: Q02 deadline did not fail with its F_ECHO compensation")
 		deadline_session._expire_quest_deadlines(expired_meta, 7)
 		check(int(expired_meta["reputation"]["F_ECHO"]) == -3, "game_session: Q02 deadline compensation was applied more than once")
+	var quest_target_session: GameSession = GameSession.new()
+	quest_target_session.configure_save_directory("user://test-saves/quest-target-elite")
+	if check(quest_target_session.start_new_game(1762900000131), "game_session: could not create a targeted quest profile"):
+		var quest_target_payload: Dictionary = quest_target_session.state.to_payload()
+		quest_target_payload["meta"]["unlockedForpost"] = 2
+		quest_target_payload["meta"]["maxSectorCleared"] = 2
+		quest_target_payload["meta"]["questProgress"] = {"Q04": {"status": "ACTIVE", "stage": 2, "startedDepth": 2, "stageStartedDepth": 2, "completedStages": ["S1"], "choiceHistory": [{"stage": 1, "choiceId": "A", "nodeId": "D2N1"}], "flags": []}}
+		check(quest_target_session._commit_payload(quest_target_payload), "game_session: could not prepare the Q04 elite objective")
+		if check(quest_target_session.start_expedition("q04-target-elite"), "game_session: next-sector Q04 expedition failed: %s" % quest_target_session.last_error):
+			var q04_target_found: bool = false
+			for layer: Array in quest_target_session.state.run.graph.get("layers", []):
+				for node: Dictionary in layer:
+					if str(node.get("type", "")) == "ELITE" and node.get("questTargets", []).has("Q04") and node.get("enemies", []).any(func(enemy: Dictionary) -> bool: return str(enemy.get("templateId", "")) == "E12"): q04_target_found = true
+			check(quest_target_session.state.run.biome == "B02" and q04_target_found, "game_session: active Q04 did not create its promised E12 elite in the next B02 sector")
+	var rust_quest_target: GameSession = GameSession.new()
+	rust_quest_target.configure_save_directory("user://test-saves/q03-target-elite")
+	if check(rust_quest_target.start_new_game(1762900000132), "game_session: could not create a Q03 target profile"):
+		var rust_payload: Dictionary = rust_quest_target.state.to_payload()
+		rust_payload["meta"]["unlockedForpost"] = 1
+		rust_payload["meta"]["maxSectorCleared"] = 1
+		rust_payload["meta"]["questProgress"] = {"Q03": {"status": "ACTIVE", "stage": 2, "startedDepth": 1, "stageStartedDepth": 1, "completedStages": ["S1"], "choiceHistory": [{"stage": 1, "choiceId": "A", "nodeId": "D1N1"}], "flags": []}}
+		check(rust_quest_target._commit_payload(rust_payload), "game_session: could not prepare the Q03 target")
+		if check(rust_quest_target.start_expedition("q03-target-elite"), "game_session: Q03 next stage expedition failed: %s" % rust_quest_target.last_error):
+			var q03_target_found: bool = false
+			for layer: Array in rust_quest_target.state.run.graph.get("layers", []):
+				for node: Dictionary in layer:
+					if str(node.get("type", "")) == "ELITE" and node.get("questTargets", []).has("Q03") and node.get("enemies", []).any(func(enemy: Dictionary) -> bool: return str(enemy.get("templateId", "")) == "E09"): q03_target_found = true
+			check(rust_quest_target.state.run.biome == "B03" and q03_target_found, "game_session: active Q03 did not create its E09 technician target in B03")
+	var thermal_quest_target: GameSession = GameSession.new()
+	thermal_quest_target.configure_save_directory("user://test-saves/q05-target-elite")
+	if check(thermal_quest_target.start_new_game(1762900000133), "game_session: could not create a Q05 target profile"):
+		var thermal_payload: Dictionary = thermal_quest_target.state.to_payload()
+		thermal_payload["meta"]["unlockedForpost"] = 6
+		thermal_payload["meta"]["maxSectorCleared"] = 6
+		thermal_payload["meta"]["questProgress"] = {"Q05": {"status": "ACTIVE", "stage": 2, "startedDepth": 6, "stageStartedDepth": 6, "completedStages": ["S1"], "choiceHistory": [{"stage": 1, "choiceId": "A", "nodeId": "D6N1"}], "flags": []}}
+		check(thermal_quest_target._commit_payload(thermal_payload), "game_session: could not prepare the Q05 target")
+		if check(thermal_quest_target.start_expedition("q05-target-elite"), "game_session: Q05 target expedition failed: %s" % thermal_quest_target.last_error):
+			var q05_target_found: bool = false
+			for layer: Array in thermal_quest_target.state.run.graph.get("layers", []):
+				for node: Dictionary in layer:
+					if str(node.get("type", "")) == "ELITE" and node.get("questTargets", []).has("Q05") and node.get("enemies", []).any(func(enemy: Dictionary) -> bool: return str(enemy.get("templateId", "")) == "E19"): q05_target_found = true
+			check(thermal_quest_target.state.run.biome == "B05" and q05_target_found, "game_session: active Q05 did not create its E19 objective in B05")
 	var session: GameSession = GameSession.new()
 	session.configure_save_directory("user://test-saves/game-session")
 	if not check(session.start_new_game(1762900000000), "game_session: could not create a new game: %s" % session.last_error):

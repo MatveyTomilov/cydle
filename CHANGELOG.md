@@ -15,6 +15,8 @@
 - ESCORT offers now reveal their deterministic faction reputation reward; campaign faction-control endings theme endgame ESCORTs to the controlling faction, and the accepted reward survives save/load validation.
 - Reputation thresholds now affect the world loop: +30/+60 discounts faction shop stock by 10%/15%, +60 exposes one faction HUNT contract, ≤−30 adds 3 wanted after a matching faction victory, and ≤−60 adds a marked elite bounty to the route. The encounter faction, discount, contract, and bounty are visible in the interface.
 - Added session regressions for threshold contract acceptance, discounted persisted shop stock, hostile route bounty, and wanted gained from a hostile faction fight.
+- Active Q03/Q04/Q05 kill-elite stages now reserve a deterministic reachable ELITE target in the next matching biome (excluding the active contract target); the target enemy and quest marker are persisted in the route and disclosed on arrival.
+- Added route-generation regressions proving Q03's E09, Q04's E12 and Q05's E19 objectives exist in B03/B02/B05 at the correct progression points.
 
 ## Unreleased
 

@@ -2,12 +2,12 @@
 
 ## Active checkpoint update (2026-11-12; supersedes older test counts and WIP labels below)
 
-- Working tree: `E:\cydle\project`, branch `development/codex`. The previous pushed checkpoint is `8d321feea68ed1e3c8c2994b7fc24c6fe16473f8`; current WIP implements faction reputation threshold behavior. This WIP is not yet committed at the time of this note.
+- Working tree: `E:\cydle\project`, branch `development/codex`. The previous pushed checkpoint is `993757a417c046d4f7b8b68525ca224736182963`; current WIP makes active Q03/Q04/Q05 elite objectives guaranteed and reachable in their authored biomes. This WIP is not yet committed at the time of this note.
 - ESCORT offers reveal a deterministic faction and +8 reputation reward; an accepted contract persists both, settlement grants the selected faction, and a faction-control campaign ending themes endgame ESCORT offers to the controlling faction. Reputation thresholds also affect deterministic faction-owned shops (+30/+60 gives 10%/15% discount), expose one HUNT offer at +60, add 3 wanted after a matching faction victory at ≤−30, and guarantee a marked EL_PEN faction bounty in the route at ≤−60. UI discloses the discount and battle hostility. Older active contract saves remain compatible. Files: `game/scripts/app/game_session.gd`, `game/scripts/app/app_root.gd`, `game/scripts/core/persistence/game_save_schema.gd`, `game/tests/golden/game_session_test.gd`.
 - Strategy instructions in `AGENTS.md` and `docs/ROADMAP.md` now explicitly prioritize the connected, completable campaign over isolated slices and defer Simulation Lab presets/report export, cosmetic polish, secondary settings, and redundant tests.
-- Checks on current WIP: Godot import and tests — 22 scripts, 87,434 assertions, 0 failures (exit 0); `npm run typecheck` (exit 0); Godot 4.7.2 Windows Desktop export (exit 0); exported `CYDLE.exe --headless --quit-after 3` (exit 0); `git diff --check` (exit 0).
+- Checks on current WIP: Godot import and tests — 22 scripts, 87,446 assertions, 0 failures (exit 0); `npm run typecheck` (exit 0); Godot 4.7.2 Windows Desktop export (exit 0); exported `CYDLE.exe --headless --quit-after 3` (exit 0); `git diff --check` (exit 0).
 - Current checkout is still not a release-complete game: full campaign playthrough/ending acceptance has not been run; quest/event story coverage, broad combat behavior parity, richer autopilot/offline policy/report, and release art/audio remain incomplete. Continue implementing missing gameplay systems; do not return to Lab extras or polish as the next work.
-- Exact continuation: commit/push this faction-reputation checkpoint on `development/codex`. Proceed afterward to the next campaign-critical gaps; checkpointing is not task completion.
+- Exact continuation: commit/push the Q03/Q04/Q05 target-generation checkpoint on `development/codex`. Then audit and wire event-trigger coverage for all six quest chains; proceed to other campaign-critical gaps afterward. Checkpointing is not task completion.
 
 ## Current Codex checkpoint (2026-11-12)
 

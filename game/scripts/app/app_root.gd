@@ -1032,6 +1032,9 @@ func _show_current_node(run: GameSaveState.RunState) -> void:
 		var hostility: String = " · +3 РОЗЫСК ЗА ПОБЕДУ" if reputation <= -30 else ""
 		var bounty_label: String = "ЦЕЛЬ ВОЗМЕЗДИЯ" if bool(node.get("factionBounty", false)) else "ГРУППИРОВКА"
 		_body.add_child(_label("%s · %s%s" % [bounty_label, faction_id, hostility], 12, COLOR_RED if reputation <= -30 else COLOR_AMBER))
+	var quest_targets: Array = node.get("questTargets", [])
+	if not quest_targets.is_empty():
+		_body.add_child(_label("ЦЕЛЬ ЗАДАНИЯ · %s" % " · ".join(quest_targets), 12, COLOR_CYAN))
 	if ["COMBAT", "ELITE", "BOUNTY", "BOSS", "ANOMALY"].has(node_type):
 		if node_type == "ANOMALY":
 			_body.add_child(_label("НУЛЕВАЯ ЗОНА · ПРОТОКОЛ %s" % str(node.get("anomalyProtocol", "UNKNOWN")), 13, COLOR_AMBER))

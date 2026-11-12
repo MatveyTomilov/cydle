@@ -507,6 +507,73 @@ func _apply_faction_world_effects(graph: Dictionary, seed_value: String) -> void
 			enemies[0]["elite"] = "EL_PEN"
 			target["enemies"] = enemies
 
+func _apply_active_quest_targets(graph: Dictionary, biome: String, reserved_node_id: String = "") -> void:
+	if state == null:
+		return
+	var catalog: QuestCatalog = QuestCatalog.new()
+	if not bool(catalog.load_catalog().get("ok", false)):
+		return
+	var reserved: Dictionary = {}
+	if not reserved_node_id.is_empty():
+		reserved[reserved_node_id] = true
+	var progress_by_quest: Dictionary = state.meta.quest_progress
+	var quest_ids: Array[String] = []
+	for quest_value: Variant in progress_by_quest.keys():
+		quest_ids.append(str(quest_value))
+	quest_ids.sort()
+	for quest_id: String in quest_ids:
+		var progress: Dictionary = progress_by_quest[quest_id]
+		if str(progress.get("status", "")) != "ACTIVE":
+			continue
+		var quest: Dictionary = catalog.get_quest(quest_id)
+		var stage_index: int = int(progress.get("stage", 1)) - 1
+		if quest.is_empty() or stage_index < 0 or stage_index >= quest.get("stages", []).size():
+			continue
+		var stage: Dictionary = quest["stages"][stage_index]
+		var requirement: Dictionary = stage.get("requirement", {})
+		if str(requirement.get("kind", "")) != "killElite":
+			continue
+		var target_biome: String = str(stage.get("biome", quest.get("biome", "")))
+		if target_biome != biome:
+			continue
+		var target_node: Dictionary = _force_quest_target_node(graph.get("layers", []), str(requirement.get("enemyId", "")), reserved)
+		if target_node.is_empty():
+			continue
+		var node_id: String = str(target_node.get("id", ""))
+		reserved[node_id] = true
+		var quest_targets: Array = target_node.get("questTargets", [])
+		if not quest_targets.has(quest_id):
+			quest_targets.append(quest_id)
+		target_node["questTargets"] = quest_targets
+
+func _force_quest_target_node(layers: Array, enemy_id: String, reserved: Dictionary) -> Dictionary:
+	if enemy_id.is_empty():
+		return {}
+	var candidates: Array[Dictionary] = []
+	for layer: Array in layers:
+		for value: Variant in layer:
+			if value is Dictionary:
+				var node: Dictionary = value
+				if not reserved.has(str(node.get("id", ""))) and str(node.get("type", "")) in ["COMBAT", "ELITE", "BOUNTY"]:
+					candidates.append(node)
+	candidates.sort_custom(func(left: Dictionary, right: Dictionary) -> bool:
+		var left_layer: int = int(left.get("layer", 0))
+		var right_layer: int = int(right.get("layer", 0))
+		return left_layer < right_layer if left_layer != right_layer else str(left.get("id", "")) < str(right.get("id", "")))
+	if candidates.is_empty():
+		return {}
+	var target: Dictionary = candidates[0]
+	target["type"] = "ELITE"
+	target["factionBounty"] = false
+	var enemies: Array = target.get("enemies", [])
+	if enemies.is_empty():
+		enemies = [{"templateId": enemy_id, "elite": "EL_FAST"}]
+	else:
+		enemies[0]["templateId"] = enemy_id
+		enemies[0]["elite"] = "EL_FAST"
+	target["enemies"] = enemies
+	return target
+
 func start_expedition(seed_value: String = "", use_medical_restore: bool = false, contract_id: String = "", escalation_ids: Array[String] = []) -> bool:
 	if state == null:
 		last_error = "Сначала создайте или загрузите профиль."
@@ -541,7 +608,6 @@ func start_expedition(seed_value: String = "", use_medical_restore: bool = false
 	if not bool(generated.get("ok", false)):
 		last_error = str(generated.get("error", "Не удалось создать дорожную карту."))
 		return false
-	_apply_faction_world_effects(generated["graph"], seed)
 	var contract: Dictionary = {}
 	if not contract_id.is_empty():
 		var contract_catalog: QuestCatalog = QuestCatalog.new()
@@ -604,6 +670,8 @@ func start_expedition(seed_value: String = "", use_medical_restore: bool = false
 		contract["rewardClaimed"] = false
 		var biome_tags: Dictionary = {"B01": "weapon", "B02": "armor", "B03": "drone", "B04": "digital", "B05": "energy", "B06": "hybrid"}
 		contract["targetTechTag"] = str(contract.get("rewardItem", {}).get("tag", biome_tags.get(biome, "tech")))
+	_apply_active_quest_targets(generated["graph"], biome, str(contract.get("targetNodeId", "")))
+	_apply_faction_world_effects(generated["graph"], seed)
 	var world_rng: DeterministicRng = DeterministicRng.new()
 	world_rng.seed("world", seed)
 	var loot_rng: DeterministicRng = DeterministicRng.new()
