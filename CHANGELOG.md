@@ -20,6 +20,7 @@
 - Corrected campaign boss assignment to the authored BOSS_A/BOSS_B/BOSS_CORE sequence at d4/d8/d12. Endgame bosses are now seeded from the current biome-compatible catalog, avoid the immediately previous boss when alternatives exist, and persist the last defeated boss across sectors and reloads.
 - Added boss-selection fixtures for all three campaign milestones plus deterministic, compatible, non-repeating endgame selection.
 - A faction-control ending now generates a distinct endgame-exclusive HUNT offer for its controlling faction, with compatible targeted loot and faction reputation; neutral endings and all ordinary contracts remain available. The offer is accepted through the same deterministic contract target/reward pipeline.
+- Added the VANTA Wanted rules from Master Spec §16.3: reputation below −60 starts an expedition at +10 Wanted; VANTA ordinary/elite route victories add +4/+7 Wanted, with the separate hostile-reputation +3 applied on top. The node view previews the consequence.
 
 ## Unreleased
 

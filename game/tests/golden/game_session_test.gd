@@ -92,6 +92,14 @@ func run(_tree: SceneTree) -> bool:
 				for node: Dictionary in layer:
 					if str(node.get("type", "")) == "BOUNTY" and str(node.get("factionId", "")) == "F_ECHO" and bool(node.get("factionBounty", false)): themed_bounty_found = true
 			check(themed_bounty_found, "game_session: -60 faction reputation did not add a themed bounty to the route")
+	var wanted_start_session: GameSession = GameSession.new()
+	wanted_start_session.configure_save_directory("user://test-saves/vanta-start-wanted")
+	if check(wanted_start_session.start_new_game(1762900000112), "game_session: could not create a VANTA pressure profile"):
+		var wanted_start_payload: Dictionary = wanted_start_session.state.to_payload()
+		wanted_start_payload["meta"]["reputation"]["F_VANTA"] = -61
+		check(wanted_start_session._commit_payload(wanted_start_payload), "game_session: could not set VANTA hostility")
+		if check(wanted_start_session.start_expedition("vanta-start-wanted"), "game_session: VANTA hostility expedition could not start: %s" % wanted_start_session.last_error):
+			check(is_equal_approx(wanted_start_session.state.run.wanted, 10.0), "game_session: VANTA reputation below -60 did not add 10 starting wanted")
 	var shop_session: GameSession = GameSession.new()
 	shop_session.configure_save_directory("user://test-saves/faction-shop-discount")
 	if check(shop_session.start_new_game(1762900000111), "game_session: could not create a faction shop profile"):
@@ -279,8 +287,8 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	var battle_payload: Dictionary = session.state.to_payload()
 	battle_payload["run"]["graph"]["layers"][0][0]["enemies"] = [{"templateId": "E01"}, {"templateId": "E01"}]
-	battle_payload["run"]["graph"]["layers"][0][0]["factionId"] = "F_ECHO"
-	battle_payload["meta"]["reputation"]["F_ECHO"] = -30
+	battle_payload["run"]["graph"]["layers"][0][0]["factionId"] = "F_VANTA"
+	battle_payload["meta"]["reputation"]["F_VANTA"] = -30
 	check(session._commit_payload(battle_payload), "game_session: could not install the tactical-rule test encounter")
 	if not check(session.travel_to(str(choices[0]["id"])), "game_session: reachable node travel failed: %s" % session.last_error):
 		return false
@@ -315,7 +323,7 @@ func run(_tree: SceneTree) -> bool:
 	if session.combat_state() != null and not session.combat_state().outcome.is_empty():
 		check(session.resolve_active_combat(), "game_session: combat reward/defeat transaction failed: %s" % session.last_error)
 	if session.state.run != null and session.state.run.phase == "ROUTE":
-		check(is_equal_approx(session.state.run.wanted, wanted_before_faction_fight + 3.0), "game_session: hostile faction encounter did not add the specified 3 wanted")
+		check(is_equal_approx(session.state.run.wanted, wanted_before_faction_fight + 7.0), "game_session: ordinary VANTA encounter did not add 4 base wanted plus 3 hostile-standing wanted")
 	if session.state.run != null and session.state.run.phase == "ROUTE":
 		var next_nodes: Array[Dictionary] = session.reachable_nodes()
 		if not next_nodes.is_empty() and str(next_nodes[0].get("type", "")) == "CACHE":

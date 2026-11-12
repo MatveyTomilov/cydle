@@ -1029,9 +1029,11 @@ func _show_current_node(run: GameSaveState.RunState) -> void:
 	if ["COMBAT", "ELITE", "BOUNTY"].has(node_type) and not str(node.get("factionId", "")).is_empty():
 		var faction_id: String = str(node.get("factionId", ""))
 		var reputation: int = int(_session.state.meta.reputation.get(faction_id, 0))
-		var hostility: String = " · +3 РОЗЫСК ЗА ПОБЕДУ" if reputation <= -30 else ""
+		var wanted_effect: String = ""
+		if faction_id == "F_VANTA": wanted_effect = " · +%d РОЗЫСК" % (7 if node_type in ["ELITE", "BOUNTY"] else 4)
+		if reputation <= -30: wanted_effect += " · ЕЩЁ +3 ЗА ВРАЖДЕБНОСТЬ"
 		var bounty_label: String = "ЦЕЛЬ ВОЗМЕЗДИЯ" if bool(node.get("factionBounty", false)) else "ГРУППИРОВКА"
-		_body.add_child(_label("%s · %s%s" % [bounty_label, faction_id, hostility], 12, COLOR_RED if reputation <= -30 else COLOR_AMBER))
+		_body.add_child(_label("%s · %s%s" % [bounty_label, faction_id, wanted_effect], 12, COLOR_RED if reputation <= -30 else COLOR_AMBER))
 	var quest_targets: Array = node.get("questTargets", [])
 	if not quest_targets.is_empty():
 		_body.add_child(_label("ЦЕЛЬ ЗАДАНИЯ · %s" % " · ".join(quest_targets), 12, COLOR_CYAN))

@@ -721,7 +721,8 @@ func start_expedition(seed_value: String = "", use_medical_restore: bool = false
 		"seed": seed, "depth": depth, "biome": biome, "graph": generated["graph"],
 		"equipment": state.meta.equipment.duplicate(true), "currentNodeId": "START",
 		"visitedNodeIds": [], "clearedNodeIds": [], "eventsSeen": [], "phase": "ROUTE",
-		"wanted": 0.0, "revealLevel": 1, "pendingTravelDeltaMs": 0,
+		"wanted": 10.0 if int(state.meta.reputation.get("F_VANTA", 0)) < -60 else 0.0,
+		"revealLevel": 1, "pendingTravelDeltaMs": 0,
 		"escalationIds": escalation_ids.duplicate(),
 		"pendingCombatEffects": {"initialTempShield": 0.0, "extraHeat": 0.0},
 		"pendingNextCombat": {
@@ -2048,6 +2049,9 @@ func resolve_active_combat() -> bool:
 	if _combat.wanted_delta != 0:
 		run_payload["wanted"] = clampf(float(run_payload.get("wanted", 0.0)) + float(_combat.wanted_delta), 0.0, 100.0)
 	var encounter_faction: String = str(node.get("factionId", ""))
+	if encounter_faction == "F_VANTA":
+		var corporate_delta: float = 7.0 if _active_node_type in ["ELITE", "BOUNTY", "ANOMALY"] else 4.0
+		run_payload["wanted"] = clampf(float(run_payload.get("wanted", 0.0)) + corporate_delta, 0.0, 100.0)
 	if ["F_VANTA", "F_RUST", "F_CHOIR", "F_ECHO"].has(encounter_faction) and int(state.meta.reputation.get(encounter_faction, 0)) <= -30:
 		run_payload["wanted"] = clampf(float(run_payload.get("wanted", 0.0)) + 3.0, 0.0, 100.0)
 	if _active_node_type in ["ELITE", "ANOMALY", "BOUNTY"] and run_payload.get("escalationIds", []).has("WANTED_PLUS"):
