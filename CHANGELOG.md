@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — checkpoint quest and faction integration
+
+- Campaign checkpoint transitions now inject active quest elite targets, quest-stage event IDs and faction world effects into the next sector, matching the normal expedition-start path. Previously `continue_campaign()` bypassed those integrations.
+- Regression continues d5→d6 with Q03 active and verifies its E09 target plus Q03_S2 event tag. Godot import, 22 scripts / 87,639 assertions, Windows export, EXE smoke, and `git diff --check` passed. TypeScript not run (native Godot-only change).
+
 ## Unreleased — Q06 extra anomaly objective
 
 - An active Q06 stage 2 now adds a second elite ANOMALY encounter to the B06 route, keeps the sector's default anomaly, and marks the added fight as the quest objective. The stage requires the tagged quest encounter to be cleared on new routes; old route saves retain the generic anomaly fallback.

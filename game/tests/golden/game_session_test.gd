@@ -489,6 +489,29 @@ func run(_tree: SceneTree) -> bool:
 					if str(node.get("type", "")) == "ELITE" and node.get("questTargets", []).has("Q03") and node.get("enemies", []).any(func(enemy: Dictionary) -> bool: return str(enemy.get("templateId", "")) == "E09"): q03_target_found = true
 					if str(node.get("type", "")) == "EVENT" and (node.get("questEventIds", []) as Array).has("Q03_S2"): q03_stage_event_found = true
 			check(rust_quest_target.state.run.biome == "B03" and q03_target_found and q03_stage_event_found, "game_session: active Q03 did not create its E09 technician target and dedicated stage event ID in B03")
+	var continued_quest_session: GameSession = GameSession.new()
+	continued_quest_session.configure_save_directory("user://test-saves/quest-target-continue")
+	if check(continued_quest_session.start_new_game(1762900000135), "game_session: could not create a continued-quest profile") and check(continued_quest_session.start_expedition("quest-target-continue"), "game_session: could not create the pre-checkpoint outing"):
+		var previous_graph: Dictionary = continued_quest_session._generator.generate("quest-target-previous-depth", 5, "B04").get("graph", {})
+		var continue_payload: Dictionary = continued_quest_session.state.to_payload()
+		continue_payload["meta"]["unlockedForpost"] = 5
+		continue_payload["meta"]["maxSectorCleared"] = 5
+		continue_payload["meta"]["questProgress"] = {"Q03": {"status": "ACTIVE", "stage": 2, "startedDepth": 2, "stageStartedDepth": 2, "completedStages": ["S1"], "choiceHistory": [{"stage": 1, "choiceId": "A", "nodeId": "prior-debt"}], "flags": ["xp-milestone:S1"]}}
+		continue_payload["run"]["depth"] = 5
+		continue_payload["run"]["biome"] = "B04"
+		continue_payload["run"]["graph"] = previous_graph
+		continue_payload["run"]["seed"] = "quest-target-previous-depth"
+		continue_payload["run"]["phase"] = "CHECKPOINT"
+		continue_payload["run"]["currentNodeId"] = str(previous_graph.get("layers", [[], [], [], [], [], [{}]])[5][0].get("id", ""))
+		check(continued_quest_session._commit_payload(continue_payload), "game_session: Q03 continuation checkpoint could not be saved: %s" % continued_quest_session.last_error)
+		if check(continued_quest_session.continue_campaign(), "game_session: campaign could not continue into Q03's target biome: %s" % continued_quest_session.last_error):
+			var continued_e09_found: bool = false
+			var continued_stage_event_found: bool = false
+			for layer: Array in continued_quest_session.state.run.graph.get("layers", []):
+				for node: Dictionary in layer:
+					if str(node.get("type", "")) == "ELITE" and node.get("questTargets", []).has("Q03") and node.get("enemies", []).any(func(enemy: Dictionary) -> bool: return str(enemy.get("templateId", "")) == "E09"): continued_e09_found = true
+					if str(node.get("type", "")) == "EVENT" and (node.get("questEventIds", []) as Array).has("Q03_S2"): continued_stage_event_found = true
+			check(continued_quest_session.state.run.depth == 6 and continued_quest_session.state.run.biome == "B03" and continued_e09_found and continued_stage_event_found, "game_session: continue_campaign omitted the Q03 target or stage event from the next-sector graph")
 	var thermal_quest_target: GameSession = GameSession.new()
 	thermal_quest_target.configure_save_directory("user://test-saves/q05-target-elite")
 	if check(thermal_quest_target.start_new_game(1762900000133), "game_session: could not create a Q05 target profile"):

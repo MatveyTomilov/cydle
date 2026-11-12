@@ -2202,6 +2202,9 @@ func continue_campaign(escalation_ids: Array[String] = []) -> bool:
 	if not bool(generated.get("ok", false)):
 		last_error = str(generated.get("error", "Не удалось создать следующий сектор."))
 		return false
+	_apply_active_quest_targets(generated["graph"], biome)
+	_apply_active_quest_event_ids(generated["graph"], biome)
+	_apply_faction_world_effects(generated["graph"], seed)
 	var payload: Dictionary = state.to_payload()
 	# A checkpoint is the sector-clear boundary even when the next boss gate is
 	# several depths away. Persisting this lets depth-gated quests and garage
