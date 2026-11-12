@@ -2846,6 +2846,58 @@ func item_disposal_quote(item_id: String, method: String) -> Dictionary:
 	var data_gain: int = mini(1 if digital else 0, data_cap)
 	return {"valid": true, "itemId": item_id, "method": method, "credits": 0, "scrap": scrap_gain, "data": data_gain, "error": ""}
 
+func run_item_dismantle_quote(item_id: String) -> Dictionary:
+	if state == null or state.run == null or not ["ROUTE", "CHECKPOINT"].has(state.run.phase):
+		return {"valid": false, "scrap": 0, "data": 0, "error": "Разбор груза доступен между узлами или на контрольной точке."}
+	if garage_level("WORKSHOP") < 1:
+		return {"valid": false, "scrap": 0, "data": 0, "error": "Разбор груза требует WORKSHOP уровня 1."}
+	var item: Dictionary = {}
+	for candidate: Dictionary in state.run.unsecured_cargo:
+		if str(candidate.get("itemId", "")) == item_id:
+			item = candidate
+			break
+	if item.is_empty():
+		return {"valid": false, "scrap": 0, "data": 0, "error": "Предмет отсутствует в незакреплённом грузе."}
+	for equipped_id: Variant in state.run.equipment.values():
+		if str(equipped_id) == item_id:
+			return {"valid": false, "scrap": 0, "data": 0, "error": "Сначала снимите предмет со слота рейда."}
+	var loaded: Dictionary = _item_catalog.load_catalog()
+	if not bool(loaded.get("ok", false)):
+		return {"valid": false, "scrap": 0, "data": 0, "error": str(loaded.get("error", "Каталог предметов недоступен."))}
+	var template: Dictionary = _item_catalog.get_template(str(item.get("templateId", "")))
+	if template.is_empty():
+		return {"valid": false, "scrap": 0, "data": 0, "error": "Шаблон предмета отсутствует в каталоге."}
+	var scale: float = CydleFormula.new().reward_scale(float(item.get("techLevel", 1)))
+	var scrap: int = mini(ceili(3.0 * scale), floori(18.0 * scale * 0.6))
+	var data: int = 1 if (template.get("tags", []) as Array).has("digital") else 0
+	return {"valid": true, "itemId": item_id, "scrap": scrap, "data": data, "item": item.duplicate(true), "error": ""}
+
+func dismantle_run_item(item_id: String) -> bool:
+	var quote: Dictionary = run_item_dismantle_quote(item_id)
+	if not bool(quote.get("valid", false)):
+		last_error = str(quote.get("error", "Разбор груза недоступен."))
+		return false
+	var payload: Dictionary = state.to_payload()
+	var run_payload: Dictionary = payload["run"]
+	var item: Dictionary = quote["item"].duplicate(true)
+	for index: int in range(run_payload["unsecuredCargo"].size()):
+		if str(run_payload["unsecuredCargo"][index].get("itemId", "")) == item_id:
+			run_payload["unsecuredCargo"].remove_at(index)
+			break
+	var scrap: int = int(quote["scrap"])
+	var data: int = int(quote["data"])
+	var wallet: Dictionary = run_payload["runWallet"]
+	wallet["SCRAP"] = float(wallet.get("SCRAP", 0.0)) + float(scrap)
+	wallet["DATA"] = float(wallet.get("DATA", 0.0)) + float(data)
+	var history: Array = payload["meta"].get("disassemblyHistory", []).duplicate(true)
+	history.append({"itemId": item_id, "templateId": str(item.get("templateId", "")), "seed": str(item.get("rollSeed", "")), "reason": "RUN_MANUAL", "scrap": scrap, "data": data, "createdAt": int(Time.get_unix_time_from_system()), "undone": false})
+	while history.size() > 100:
+		history.pop_front()
+	payload["meta"]["disassemblyHistory"] = history
+	payload["meta"]["disassemblyUndo"] = {"item": item, "scrap": scrap, "data": data, "createdAt": int(Time.get_unix_time_from_system()), "source": "RUN", "runSeed": str(run_payload.get("seed", "")), "nodeId": str(run_payload.get("currentNodeId", ""))}
+	run_payload["lastCommandId"] = "cargo:dismantle:%s:%s" % [str(run_payload.get("currentNodeId", "")), item_id]
+	return _commit_payload(payload)
+
 func loot_filter_settings() -> Dictionary:
 	if state == null:
 		return {"preset": "ALL", "minimumRarity": "COMMON", "itemType": "ANY", "slot": "ANY", "requiredTags": [], "minimumAffixTier": 1, "affixId": "", "compareBuild": false, "comparisonStat": "", "autoDismantle": false}
@@ -3093,7 +3145,7 @@ func can_undo_last_dismantle() -> bool:
 		return false
 	var source: String = str(state.meta.disassembly_undo.get("source", "SECURED"))
 	if source == "RUN":
-		if state.run == null or state.run.phase != "ROUTE" or str(state.meta.disassembly_undo.get("runSeed", "")) != state.run.seed or str(state.meta.disassembly_undo.get("nodeId", "")) != state.run.current_node_id:
+		if state.run == null or not ["ROUTE", "CHECKPOINT"].has(state.run.phase) or str(state.meta.disassembly_undo.get("runSeed", "")) != state.run.seed or str(state.meta.disassembly_undo.get("nodeId", "")) != state.run.current_node_id:
 			return false
 	else:
 		if state.run != null and not ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(state.run.phase):

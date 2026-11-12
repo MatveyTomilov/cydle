@@ -1187,6 +1187,7 @@ func _show_road() -> void:
 			var history_label: Label = _label("%02d · %s · %s · узлов %d · боёв %d" % [history_index + 1, str(saved_report.get("status", "")), str(saved_report.get("reasonCode", "")), int(saved_report.get("nodesVisited", 0)), int(saved_report.get("battles", 0))], 10, COLOR_MUTED)
 			history_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			_body.add_child(history_label)
+	_add_run_cargo_control(run)
 	var active_contract: Dictionary = run.contract
 	if not active_contract.is_empty():
 		_body.add_child(_label("КОНТРАКТ %s · %s · БОЕВЫХ УЗЛОВ %d" % [str(active_contract.get("id", "")), str(active_contract.get("status", "")), int(active_contract.get("combatNodes", 0))], 12, COLOR_CYAN))
@@ -1250,6 +1251,40 @@ func _show_road() -> void:
 	back.pressed.connect(_show_garage)
 	_body.add_child(back)
 	_footer.text = "ПЕРЕХОДЫ РАСХОДУЮТ ТОПЛИВО И 25 СЕКУНД ИГРОВОГО ВРЕМЕНИ"
+
+func _add_run_cargo_control(run: GameSaveState.RunState) -> void:
+	if not ["ROUTE", "CHECKPOINT"].has(run.phase):
+		return
+	_body.add_child(_label("НЕЗАКРЕПЛЁННЫЙ ГРУЗ · SCR %d · DATA %d" % [int(run.wallet.scrap), int(run.wallet.data)], 12, COLOR_CYAN))
+	if run.unsecured_cargo.is_empty():
+		_body.add_child(_label("Грузовой отсек пуст.", 10, COLOR_MUTED))
+	else:
+		var catalog: ItemCatalog = ItemCatalog.new()
+		catalog.load_catalog()
+		for item: Dictionary in run.unsecured_cargo:
+			var item_id: String = str(item.get("itemId", ""))
+			var template: Dictionary = catalog.get_template(str(item.get("templateId", "")))
+			var item_row: HBoxContainer = HBoxContainer.new()
+			_body.add_child(item_row)
+			var item_label: Label = _label("%s · %s · T%d" % [str(template.get("name", item.get("templateId", "Предмет"))), str(item.get("rarity", "COMMON")), int(item.get("techLevel", 1))], 11, COLOR_TEXT)
+			item_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			item_row.add_child(item_label)
+			var quote: Dictionary = _session.run_item_dismantle_quote(item_id)
+			var dismantle: Button = _button("РАЗОБРАТЬ · %d SCR / %d DATA" % [int(quote.get("scrap", 0)), int(quote.get("data", 0))], false)
+			dismantle.disabled = not bool(quote.get("valid", false))
+			dismantle.tooltip_text = str(quote.get("error", "Получится незакреплённый ресурс; можно отменить до следующего узла."))
+			dismantle.pressed.connect(_on_dismantle_run_item.bind(item_id))
+			item_row.add_child(dismantle)
+	if _session.can_undo_last_dismantle() and str(_session.state.meta.disassembly_undo.get("source", "")) == "RUN":
+		var undo_run: Button = _button("ОТМЕНИТЬ ПОСЛЕДНИЙ РАЗБОР", true)
+		undo_run.tooltip_text = "Вернёт предмет в этот груз и спишет полученный SCRAP/DATA. Недоступно после входа в следующий узел."
+		undo_run.pressed.connect(_on_undo_last_dismantle)
+		_body.add_child(undo_run)
+
+func _on_dismantle_run_item(item_id: String) -> void:
+	var dismantled: bool = _session.dismantle_run_item(item_id)
+	_show_road()
+	_footer.text = "ГРУЗ РАЗОБРАН · РЕСУРСЫ ОСТАЮТСЯ НЕЗАКРЕПЛЁННЫМИ" if dismantled else _session.last_error
 
 func _show_current_node(run: GameSaveState.RunState) -> void:
 	var node: Dictionary = _session.current_node()

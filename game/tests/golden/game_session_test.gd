@@ -28,6 +28,12 @@ func run(_tree: SceneTree) -> bool:
 			check(loot_filter_session._commit_payload(loot_payload), "game_session: auto dismantle save was rejected: %s" % loot_filter_session.last_error)
 			check(loot_filter_session.can_undo_last_dismantle() and loot_filter_session.undo_last_dismantle(), "game_session: auto dismantle could not be undone before the next node: %s" % loot_filter_session.last_error)
 			check(loot_filter_session.state.run.unsecured_cargo.any(func(entry: Dictionary) -> bool: return str(entry.get("itemId", "")) == str(filtered_item.get("itemId", ""))), "game_session: undo did not restore filtered cargo item")
+			var manual_quote: Dictionary = loot_filter_session.run_item_dismantle_quote(str(filtered_item.get("itemId", "")))
+			var scrap_before_manual: float = loot_filter_session.state.run.wallet.scrap
+			var bank_scrap_before_manual: float = loot_filter_session.state.meta.protected_bank.scrap
+			check(bool(manual_quote.get("valid", false)) and loot_filter_session.dismantle_run_item(str(filtered_item.get("itemId", ""))), "game_session: manual run-cargo dismantle failed: %s" % loot_filter_session.last_error)
+			check(loot_filter_session.state.run.wallet.scrap > scrap_before_manual and is_equal_approx(loot_filter_session.state.meta.protected_bank.scrap, bank_scrap_before_manual), "game_session: run-cargo dismantle did not leave its yield unsecured")
+			check(loot_filter_session.can_undo_last_dismantle() and loot_filter_session.undo_last_dismantle(), "game_session: manual run-cargo dismantle could not be undone")
 
 	var terminal_build_session: GameSession = GameSession.new()
 	terminal_build_session.configure_save_directory("user://test-saves/terminal-build-history")

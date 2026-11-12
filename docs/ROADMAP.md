@@ -78,11 +78,12 @@ The frozen TypeScript quest definitions export as six three-stage chains and thr
 
 This is a breadth-first integration directive, not a sequence of narrow acceptance gates. Keep the native game playable while wiring the missing major systems together. Do not spend time on saved Simulation Lab presets, report exports, or visual polish until campaign completion, the other core systems, persistence, and offline/autopilot exist end to end.
 
-### Latest connected gameplay status (2026-11-13; pushed at `c395aa6`)
+### Latest connected gameplay status (2026-11-13; base pushed at `781cea3`, run-cargo WIP)
 
 - Campaign chronicle is pushed at `167908d`; it renders Act I/II/III milestones, ending choice, and faction standing from persistent campaign state.
 - The §19.3 loot-filter work is connected to combat, cache, event, quest, and contract item grants. The UI supports keep-all, rare+, required-tag, and custom rarity/item-type/slot/affix policies. Custom rules also compare a selected stat through the shared BuildResolver against the active RUN equipment, including unsecured equipped cargo. Undiscovered UNIQUE items bypass rejection. Optional auto-dismantle requires an installed SCANNER or WORKSHOP L3; yield remains unsecured RUN SCRAP/DATA, the last salvage can be undone before the next node, and up to 100 dismantles retain item seed/reason. Default save payloads retain their legacy shape; old saves use the default filter.
-- Actual verification for this checkpoint: Godot editor import passed; 22 scripts / 87,608 assertions / 0 failures; Windows export and exported EXE headless smoke passed; `git diff --check` passed. TypeScript was not run because this change is Godot-only. Manual run-cargo dismantling remains unimplemented; this does not complete all economy or release criteria.
+- Manual run-cargo dismantling is now connected at route and checkpoint states. It requires WORKSHOP L1, rejects equipped/missing cargo, adds the authored capped return only to unsecured RUN currencies, and exposes undo before entering a different node.
+- Actual verification for this local WIP: Godot editor import passed; 22 scripts / 87,611 assertions / 0 failures; Windows export and exported EXE headless smoke passed; `git diff --check` passed. TypeScript was not run because this change is Godot-only. Commit/push is pending; continue the event/quest consequence audit after the checkpoint. This does not complete all economy or release criteria.
 
 1. Complete the 12-sector campaign loop through sector 12 and depth-13+ endgame, including all six biome rules, boss milestones, finale, and persistent recovery.
 2. Complete all 24 events, six quest chains, contracts, faction reputation, requirements, outcomes, and one-time rewards across route generation, UI, and META/RUN saves; current integrations are partial.
