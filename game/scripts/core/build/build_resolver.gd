@@ -259,6 +259,19 @@ func resolve_build(input: Dictionary) -> Dictionary:
 	result["mutationIds"] = mutation_ids
 	return result
 
+func tree_node_lock_reason(node_id: String, allocated: Array[String], points_earned: int) -> String:
+	if not _build_catalog_loaded:
+		var loaded: Dictionary = _build_catalog.load_catalog()
+		_build_catalog_loaded = true
+		_build_catalog_error = str(loaded.get("error", "")) if not bool(loaded.get("ok", false)) else ""
+	if not _build_catalog_error.is_empty():
+		return "Не удалось загрузить дерево: %s" % _build_catalog_error
+	if points_earned < 0 or points_earned > 60:
+		return "Недопустимое число полученных очков дерева"
+	if allocated.size() >= points_earned:
+		return "Нет свободных очков"
+	return _tree_lock_reason(node_id, allocated, points_earned - allocated.size())
+
 func _read_selection(input: Dictionary, key: String, issues: Array[Dictionary]) -> Array[String]:
 	var output: Array[String] = []
 	var raw: Variant = input.get(key, [])

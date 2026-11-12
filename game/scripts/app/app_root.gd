@@ -320,6 +320,59 @@ func _show_build() -> void:
 		passive_button.disabled = not passive_equipped and _session.state.meta.passive_ids.size() >= 3
 		passive_button.pressed.connect(_on_set_passive_equipped.bind(passive_id, not passive_equipped))
 		passive_row.add_child(passive_button)
+	var tree_points: int = _session.tree_points_available()
+	_body.add_child(_label("ДЕРЕВО СПЕЦИАЛИЗАЦИИ · %d / 60 ОЧКОВ · %d СВОБОДНО" % [_session.state.meta.tree_node_ids.size(), tree_points], 16, COLOR_CYAN))
+	var tree_note: Label = _label("Один узел стоит 1 очко. Снятие узла стоит 10 кредитов за каждый снимаемый узел; зависимые узлы, теряющие требования, снимаются вместе.", 11, COLOR_MUTED)
+	tree_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_body.add_child(tree_note)
+	var branch_names: Dictionary = {"K": "КИНЕТИКА", "H": "ЭНЕРГИЯ И НАГРЕВ", "N": "НЕТРАННЕР", "D": "ДРОНЫ", "S": "ЗАЩИТА", "R": "РЕАКЦИЯ И ТАКТИКА", "X": "МЕЖВЕТОЧНЫЕ УЗЛЫ"}
+	var branch_order: Array[String] = ["K", "H", "N", "D", "S", "R", "X"]
+	var tree_resolver: BuildResolver = BuildResolver.new()
+	var selected_tree: Array[String] = _session.state.meta.tree_node_ids
+	var can_edit_tree: bool = _session.state.run == null or ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(_session.state.run.phase)
+	for branch: String in branch_order:
+		_body.add_child(_label("%s · %s" % [branch, str(branch_names[branch])], 15, COLOR_TEXT))
+		for tier: int in range(1, 5):
+			var tier_nodes: Array[Dictionary] = []
+			for node_value: Variant in skill_catalog.tree_nodes.values():
+				var node: Dictionary = node_value
+				if str(node.get("branch", "")) == branch and int(node.get("tier", 0)) == tier:
+					tier_nodes.append(node)
+			tier_nodes.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return str(a.get("pos", "")) < str(b.get("pos", "")))
+			if tier_nodes.is_empty():
+				continue
+			_body.add_child(_label("T%d" % tier if branch != "X" else "МЕЖВЕТОЧНЫЙ", 11, COLOR_CYAN))
+			var tree_grid: GridContainer = GridContainer.new()
+			tree_grid.columns = 2
+			tree_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			tree_grid.add_theme_constant_override("h_separation", 12)
+			tree_grid.add_theme_constant_override("v_separation", 8)
+			_body.add_child(tree_grid)
+			for node: Dictionary in tier_nodes:
+				var node_card: PanelContainer = PanelContainer.new()
+				node_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				tree_grid.add_child(node_card)
+				var node_row: HBoxContainer = HBoxContainer.new()
+				node_row.add_theme_constant_override("separation", 8)
+				node_card.add_child(node_row)
+				var node_info: VBoxContainer = VBoxContainer.new()
+				node_info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				node_row.add_child(node_info)
+				var node_id: String = str(node.get("id", ""))
+				var is_allocated: bool = selected_tree.has(node_id)
+				var keystone_tag: String = " · KEYSTONE" if bool(node.get("keystone", false)) else ""
+				node_info.add_child(_label("%s · %s%s" % [node_id, str(node.get("name", node_id)), keystone_tag], 12, COLOR_TEXT))
+				var node_desc: Label = _label(str(node.get("desc", "")), 10, COLOR_MUTED)
+				node_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				node_info.add_child(node_desc)
+				var lock_reason: String = "ИЗУЧЕН" if is_allocated else tree_resolver.tree_node_lock_reason(node_id, selected_tree, _session.state.meta.operator.tree_points)
+				var status: Label = _label(lock_reason if not lock_reason.is_empty() else "ДОСТУПЕН · 1 ОЧКО", 9, COLOR_CYAN if is_allocated or lock_reason.is_empty() else COLOR_MUTED)
+				status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				node_info.add_child(status)
+				var node_button: Button = _button("СНЯТЬ" if is_allocated else "ИЗУЧИТЬ", is_allocated)
+				node_button.disabled = not can_edit_tree or (not is_allocated and not lock_reason.is_empty()) or (is_allocated and _session.state.meta.protected_bank.credits < 10.0)
+				node_button.pressed.connect(_on_set_tree_node.bind(node_id, not is_allocated))
+				node_row.add_child(node_button)
 	var back: Button = _button("НАЗАД В ГАРАЖ", false)
 	back.pressed.connect(_show_garage)
 	_body.add_child(back)
@@ -673,6 +726,11 @@ func _on_set_passive_equipped(passive_id: String, equipped: bool) -> void:
 	var changed: bool = _session.set_passive_equipped(passive_id, equipped)
 	_show_build()
 	_footer.text = "ПАССИВНЫЕ ПРОТОКОЛЫ ОБНОВЛЕНЫ · %d / 3" % _session.state.meta.passive_ids.size() if changed else _session.last_error
+
+func _on_set_tree_node(node_id: String, allocated: bool) -> void:
+	var changed: bool = _session.set_tree_node_allocated(node_id, allocated)
+	_show_build()
+	_footer.text = "УЗЕЛ %s · СВОБОДНО %d" % [node_id, _session.tree_points_available()] if changed else _session.last_error
 
 func _on_equip_item(slot: String, item_id: String) -> void:
 	if _session.equip_item(slot, item_id):

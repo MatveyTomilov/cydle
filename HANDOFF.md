@@ -4,7 +4,7 @@
 
 This block supersedes the historical Qwen/Luna work notes below for the active checkout.
 
-### Latest native continuation (WIP after `f94b3b3`)
+### Latest native continuation (local WIP after `5ce3987`)
 
 - Current changes add save/resume for an active combat and a JSON-float checksum correction. The main files are `game/scripts/app/game_session.gd`, `game/scripts/core/combat/combat_state.gd`, `game/scripts/core/combat/combat_actor_state.gd`, `game/scripts/core/persistence/save_validator.gd`, and their tests.
 - The same 100 ms `CombatSimulator` now includes timed enemy abilities, E14/E18/E19/E23/E24 passive behaviors, boss threshold phases, and the six elite modifiers. These are integrated behavior slices, not complete parity for the entire catalog.
@@ -17,8 +17,9 @@ This block supersedes the historical Qwen/Luna work notes below for the active c
 - Garage attribute investment is now playable: available points derive from earned points minus allocated values, allocation recomputes the normal BuildResolver result, and reset costs 10 protected credits per point while refunding the allocation. Both operations are restricted to between runs; tests cover allocation, its POW effect, respec cost/refund, and active-run rejection.
 - The Build Lab now exposes all 24 catalogued active skills as a loadout; players can swap up to three in the garage, and the existing BuildResolver validates weapon requirements before saving. Tests cover replacing a starter skill, filling a slot, rejecting a fourth, and removing an installed skill.
 - All 10 catalogued static passive protocols are selectable in the same Build Lab with three slots. Effects flow through BuildResolver; tests verify PP_AMMO changes the resolved stat and cover the slot limit and removal.
+- The Build Lab now exposes all 100 specialization nodes across six branches and cross-branch nodes. Allocation is restricted to the garage, spends earned tree points, and validates branch/tier/keystone rules through BuildResolver. Respeccing costs 10 protected credits per removed node and automatically removes nodes whose requirements fail as a result; each spent point becomes available again. The interface displays current allocation, lock reasons, node effects, and keystone labels.
 - Active combat snapshots now save simulator state, actors, RNG, event log and reward context after each 100 ms step. Loading rebuilds the current build, reconstructs the combat state, and resumes the same deterministic sequence. A regression test loads midway through combat and compares the following simulation step with uninterrupted play. Save checksums normalize through JSON serialization to avoid false corruption from Godot float precision; RNG restore accepts integral JSON floats.
-- Latest native verification for this WIP: Godot 4.7.2 editor import exit 0; headless runner exit 0, 22 scripts, 87,172 assertions; Windows Desktop export exit 0 and exported `game/build/CYDLE.exe --headless --quit-after 3` exit 0. Legacy npm checks passed at the active-combat save checkpoint. Full visual/manual playthrough was not performed.
+- Latest native verification for this WIP: Godot 4.7.2 editor import exit 0; headless runner exit 0, 22 scripts, 87,182 assertions; Windows Desktop export exit 0 and exported `game/build/CYDLE.exe --headless --quit-after 3` exit 0. `git diff --check` passed before documentation edits. Legacy npm checks passed at the active-combat save checkpoint. Full visual/manual playthrough was not performed.
 - Still missing or incomplete against `CYDLE_MASTER_SPEC.md`: remaining skill-trigger and item/passive proc parity, broader enemy AI/passives and event outcomes, full campaign and quest/faction/endgame flow, autopilot/offline progression, Simulation Lab, complete build investment/operations, production art/audio and release acceptance. Do not infer these from catalog or partial behavior support.
 
 - Repository: `https://github.com/MatveyTomilov/cydle.git`.

@@ -222,6 +222,77 @@ func set_passive_equipped(passive_id: String, equipped: bool) -> bool:
 		return false
 	return _commit(candidate)
 
+func tree_points_available() -> int:
+	if state == null:
+		return 0
+	return maxi(0, state.meta.operator.tree_points - state.meta.tree_node_ids.size())
+
+func set_tree_node_allocated(node_id: String, allocated: bool) -> bool:
+	if state == null:
+		last_error = "Нет активного профиля."
+		return false
+	if state.run != null and not ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(state.run.phase):
+		last_error = "Дерево меняется только в гараже между выездами."
+		return false
+	var catalog: BuildCatalog = BuildCatalog.new()
+	var loaded: Dictionary = catalog.load_catalog()
+	if not bool(loaded.get("ok", false)) or not catalog.tree_nodes.has(node_id):
+		last_error = "Неизвестный узел дерева %s." % node_id
+		return false
+	var current_ids: Array[String] = state.meta.tree_node_ids.duplicate()
+	if allocated:
+		var resolver: BuildResolver = BuildResolver.new()
+		var lock_reason: String = resolver.tree_node_lock_reason(node_id, current_ids, state.meta.operator.tree_points)
+		if not lock_reason.is_empty():
+			last_error = "%s: %s." % [node_id, lock_reason]
+			return false
+		current_ids.append(node_id)
+		return _commit_tree_selection(current_ids, 0)
+	if not current_ids.has(node_id):
+		last_error = "Узел %s не изучен." % node_id
+		return false
+	current_ids.erase(node_id)
+	var resolver: BuildResolver = BuildResolver.new()
+	var removed_ids: Array[String] = [node_id]
+	var validation: Dictionary = resolver.resolve_build(_build_input_with_tree(state, current_ids))
+	while not bool(validation.get("valid", false)):
+		var invalid_node: String = ""
+		for issue_value: Variant in validation.get("issues", []):
+			if issue_value is Dictionary and str(issue_value.get("code", "")) == "TREE_LOCKED":
+				invalid_node = str(issue_value.get("sourceId", ""))
+				break
+		if invalid_node.is_empty() or not current_ids.has(invalid_node):
+			last_error = "Нельзя снять узел: %s." % str(validation.get("issues", []))
+			return false
+		current_ids.erase(invalid_node)
+		removed_ids.append(invalid_node)
+		validation = resolver.resolve_build(_build_input_with_tree(state, current_ids))
+	var respec_cost: int = removed_ids.size() * 10
+	if state.meta.protected_bank.credits < float(respec_cost):
+		last_error = "Для снятия %d узлов требуется %d защищённых кредитов." % [removed_ids.size(), respec_cost]
+		return false
+	return _commit_tree_selection(current_ids, respec_cost)
+
+func _commit_tree_selection(tree_ids: Array[String], respec_cost: int) -> bool:
+	var payload: Dictionary = state.to_payload()
+	payload["meta"]["treeNodeIds"] = tree_ids
+	payload["meta"]["protectedBank"]["CREDITS"] = float(payload["meta"]["protectedBank"].get("CREDITS", 0.0)) - float(respec_cost)
+	var parsed: Dictionary = GameSaveState.new().parse_payload(payload)
+	if not bool(parsed.get("ok", false)):
+		last_error = str(parsed.get("error", "Изменение дерева не прошло проверку сохранения."))
+		return false
+	var candidate: GameSaveState = parsed["state"] as GameSaveState
+	var resolved: Dictionary = BuildResolver.new().resolve_build(_build_input(candidate))
+	if not bool(resolved.get("valid", false)):
+		last_error = "Распределение дерева отклонено BuildResolver: %s" % str(resolved.get("issues", []))
+		return false
+	return _commit(candidate)
+
+func _build_input_with_tree(save_state: GameSaveState, tree_ids: Array[String]) -> Dictionary:
+	var input: Dictionary = _build_input(save_state)
+	input["treeNodeIds"] = tree_ids
+	return input
+
 func start_expedition(seed_value: String = "") -> bool:
 	if state == null:
 		last_error = "Сначала создайте или загрузите профиль."

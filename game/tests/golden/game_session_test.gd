@@ -63,6 +63,7 @@ func run(_tree: SceneTree) -> bool:
 	if check(attribute_session.start_new_game(1762900000200), "game_session: could not create an attribute-investment profile"):
 		var attribute_payload: Dictionary = attribute_session.state.to_payload()
 		attribute_payload["meta"]["operator"]["attributePoints"] = 2
+		attribute_payload["meta"]["operator"]["treePoints"] = 3
 		attribute_payload["meta"]["protectedBank"]["CREDITS"] = 50.0
 		check(attribute_session._commit_payload(attribute_payload), "game_session: attribute-investment fixture could not be saved")
 		var base_kinetic: float = float(attribute_session.build_preview().get("stats", {}).get("kineticDamage", 0.0))
@@ -83,8 +84,19 @@ func run(_tree: SceneTree) -> bool:
 		check(float(attribute_session.build_preview().get("stats", {}).get("mainDamage", 0.0)) > main_damage_before_passive, "game_session: PP_AMMO did not change BuildResolver output")
 		check(not attribute_session.set_passive_equipped("PP_HEAT", true) and attribute_session.state.meta.passive_ids.size() == 3, "game_session: passive loadout exceeded three slots")
 		check(attribute_session.set_passive_equipped("PP_AMMO", false) and not attribute_session.state.meta.passive_ids.has("PP_AMMO"), "game_session: installed passive protocol could not be removed")
+		var base_tree_damage: float = float(attribute_session.build_preview().get("stats", {}).get("kineticDamage", 0.0))
+		check(attribute_session.tree_points_available() == 3, "game_session: available tree points were calculated incorrectly")
+		check(not attribute_session.set_tree_node_allocated("K2A", true), "game_session: tier 2 tree node was allocated before its branch requirements")
+		check(attribute_session.set_tree_node_allocated("K1A", true), "game_session: first-tier tree node could not be allocated: %s" % attribute_session.last_error)
+		check(float(attribute_session.build_preview().get("stats", {}).get("kineticDamage", 0.0)) > base_tree_damage, "game_session: allocated tree node did not affect BuildResolver output")
+		check(attribute_session.set_tree_node_allocated("K1B", true) and attribute_session.set_tree_node_allocated("K2A", true), "game_session: valid tier 2 progression was rejected: %s" % attribute_session.last_error)
+		check(attribute_session.tree_points_available() == 0 and not attribute_session.set_tree_node_allocated("K1C", true), "game_session: tree allocation exceeded earned points")
+		check(attribute_session.set_tree_node_allocated("K1A", false), "game_session: tree respec did not remove invalid dependent nodes: %s" % attribute_session.last_error)
+		check(attribute_session.state.meta.tree_node_ids == ["K1B"] and attribute_session.tree_points_available() == 2, "game_session: dependent tree nodes were not cascaded and refunded")
+		check(is_equal_approx(attribute_session.state.meta.protected_bank.credits, 20.0), "game_session: tree respec did not charge 10 credits per removed node")
 		check(attribute_session.start_expedition("attribute-lock-test"), "game_session: attribute test expedition failed to start")
 		check(not attribute_session.allocate_attribute("REF") and int(attribute_session.state.meta.operator.attributes.get("REF", 0)) == 5, "game_session: attribute allocation was allowed during an active expedition")
+		check(not attribute_session.set_tree_node_allocated("K1C", true), "game_session: tree allocation was allowed during an active expedition")
 	var resumed: GameSession = GameSession.new()
 	resumed.configure_save_directory("user://test-saves/game-session")
 	check(resumed.load_saved_game(), "game_session: persisted state did not reload: %s" % resumed.last_error)
