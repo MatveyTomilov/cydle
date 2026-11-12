@@ -32,7 +32,7 @@ func validate_payload(value: Variant) -> Dictionary:
 	if not bool(meta_result.get("ok", false)):
 		return meta_result
 	if payload["run"] != null:
-		var run_result: Dictionary = _validate_run(payload["run"])
+		var run_result: Dictionary = _validate_run(payload["run"], payload["meta"])
 		if not bool(run_result.get("ok", false)):
 			return run_result
 	return {"ok": true, "error": ""}
@@ -68,18 +68,35 @@ func _validate_meta(value: Variant) -> Dictionary:
 		return _failure("meta.wallet: баланс должен содержать конечные неотрицательные значения.")
 	if not meta["inventory"] is Array or not meta["equipment"] is Dictionary or not _has_only_keys(meta["equipment"], SLOT_KEYS):
 		return _failure("meta.inventory/equipment: неверная структура.")
+	var catalog: ItemCatalog = ItemCatalog.new()
+	var catalog_result: Dictionary = catalog.load_catalog()
+	if not bool(catalog_result.get("ok", false)):
+		return _failure("meta.inventory: каталог предметов недоступен: %s" % str(catalog_result.get("error", "")))
 	var item_ids: Dictionary = {}
+	var items_by_id: Dictionary = {}
 	for item_value: Variant in meta["inventory"]:
 		if not item_value is Dictionary or not _validate_item(item_value):
 			return _failure("meta.inventory: экземпляр предмета имеет неверную структуру.")
 		var item_id: String = str(item_value["itemId"])
 		if item_ids.has(item_id):
 			return _failure("meta.inventory: повторяется ID экземпляра предмета %s." % item_id)
+		var template: Dictionary = catalog.get_template(str(item_value["templateId"]))
+		if template.is_empty():
+			return _failure("meta.inventory.%s: неизвестный шаблон предмета %s." % [item_id, str(item_value["templateId"])])
+		if not _validate_item_catalog_refs(item_value, template, catalog):
+			return _failure("meta.inventory.%s: аффиксы или уникальные эффекты не соответствуют каталогу." % item_id)
 		item_ids[item_id] = true
+		var item: ItemInstance = ItemInstance.new()
+		if not item.instantiate_from_dictionary(item_value):
+			return _failure("meta.inventory.%s: экземпляр предмета не удалось разобрать." % item_id)
+		items_by_id[item_id] = item
 	for slot_value: Variant in meta["equipment"].keys():
 		var item_id: String = str(meta["equipment"][slot_value])
 		if not item_ids.has(item_id):
 			return _failure("meta.equipment.%s: предмет отсутствует в инвентаре." % str(slot_value))
+	var build_result: Dictionary = _validate_meta_build(meta, items_by_id)
+	if not bool(build_result.get("ok", false)):
+		return build_result
 	if not _is_number_map(meta["garage"], GARAGE_KEYS, 1.0, 3.0, true):
 		return _failure("meta.garage: уровни гаража должны быть целыми от 1 до 3.")
 	if not _is_integer(meta["unlockedForpost"]) or int(meta["unlockedForpost"]) < 0 or int(meta["unlockedForpost"]) > 12:
@@ -105,7 +122,7 @@ func _validate_meta(value: Variant) -> Dictionary:
 			return _failure("meta.autopilotProfiles: неверные значения профиля.")
 	return {"ok": true, "error": ""}
 
-func _validate_run(value: Variant) -> Dictionary:
+func _validate_run(value: Variant, meta: Dictionary) -> Dictionary:
 	if not value is Dictionary:
 		return _failure("run: ожидался объект или null.")
 	var run: Dictionary = value
@@ -155,6 +172,65 @@ func _validate_run(value: Variant) -> Dictionary:
 			return _failure("run.%s: неверное состояние RNG." % key)
 	if run.has("combatSnapshot") and run["combatSnapshot"] != null and not _validate_combat_snapshot(run["combatSnapshot"]):
 		return _failure("run.combatSnapshot: снимок боя повреждён.")
+	var ownership_result: Dictionary = _validate_run_ownership(run, meta)
+	if not bool(ownership_result.get("ok", false)):
+		return ownership_result
+	return {"ok": true, "error": ""}
+
+func _validate_run_ownership(run: Dictionary, meta: Dictionary) -> Dictionary:
+	var catalog: ItemCatalog = ItemCatalog.new()
+	var catalog_result: Dictionary = catalog.load_catalog()
+	if not bool(catalog_result.get("ok", false)):
+		return _failure("run: каталог предметов недоступен: %s" % str(catalog_result.get("error", "")))
+	var available_items: Dictionary = {}
+	for item_value: Variant in meta["inventory"]:
+		available_items[str(item_value["itemId"])] = item_value
+	for item_value: Variant in run["unsecuredCargo"]:
+		if not item_value is Dictionary or not _validate_item(item_value):
+			return _failure("run.unsecuredCargo: экземпляр предмета имеет неверную структуру.")
+		var item_id: String = str(item_value["itemId"])
+		if available_items.has(item_id):
+			return _failure("run: ID предмета %s повторяется в собственности и грузе." % item_id)
+		var template: Dictionary = catalog.get_template(str(item_value["templateId"]))
+		if template.is_empty() or not _validate_item_catalog_refs(item_value, template, catalog):
+			return _failure("run.unsecuredCargo.%s: шаблон или эффекты предмета отсутствуют в каталоге." % item_id)
+		available_items[item_id] = item_value
+	for item_value: Variant in run["shippedCargo"]:
+		if not item_value is Dictionary or not _validate_item(item_value):
+			return _failure("run.shippedCargo: экземпляр предмета имеет неверную структуру.")
+		var template: Dictionary = catalog.get_template(str(item_value["templateId"]))
+		if template.is_empty() or not _validate_item_catalog_refs(item_value, template, catalog):
+			return _failure("run.shippedCargo: шаблон или эффекты предмета отсутствуют в каталоге.")
+	var run_equipment: Variant = run["equipment"]
+	if not _has_only_keys(run_equipment, SLOT_KEYS):
+		return _failure("run.equipment: неизвестный слот экипировки.")
+	var equipped_ids: Dictionary = {}
+	var build_equipment: Dictionary = {}
+	for slot_value: Variant in run_equipment.keys():
+		var item_id: String = str(run_equipment[slot_value])
+		if not available_items.has(item_id):
+			return _failure("run.equipment.%s: предмет отсутствует среди доступных." % str(slot_value))
+		if equipped_ids.has(item_id):
+			return _failure("run.equipment: предмет %s установлен более одного раза." % item_id)
+		equipped_ids[item_id] = true
+		var item: ItemInstance = ItemInstance.new()
+		if not item.instantiate_from_dictionary(available_items[item_id]):
+			return _failure("run.equipment.%s: экземпляр предмета повреждён." % str(slot_value))
+		build_equipment[str(slot_value)] = item
+	var operator: Dictionary = meta["operator"]
+	var build: Dictionary = BuildResolver.new().resolve_build({
+		"equipment": build_equipment,
+		"attributes": operator["attributes"],
+		"attributePointsEarned": operator["attributePoints"],
+		"treePointsEarned": operator["treePoints"],
+		"skillIds": meta["skillIds"],
+		"passiveIds": meta["passiveIds"],
+		"treeNodeIds": meta["treeNodeIds"],
+		"unlockedImplantSlots": meta["unlockedImplantSlots"],
+		"unlockedDroneSlots": meta["unlockedDroneSlots"],
+	})
+	if not bool(build.get("valid", false)):
+		return _failure("run.build: полевая сборка некорректна.")
 	return {"ok": true, "error": ""}
 
 func _validate_pending_combat_effects(value: Variant) -> bool:
@@ -209,8 +285,52 @@ func _validate_rng(value: Variant) -> bool:
 	return true
 
 func _validate_item(value: Dictionary) -> bool:
-	var required: Array[String] = ["itemId", "templateId", "techLevel", "rarity", "secured", "durability", "originGrantId"]
-	return _has_keys(value, required) and _nonempty_string(value["itemId"]) and _nonempty_string(value["templateId"]) and _is_integer(value["techLevel"]) and int(value["techLevel"]) >= 1 and RARITIES.has(str(value["rarity"])) and value["secured"] is bool and _is_finite_number(value["durability"]) and float(value["durability"]) >= 0.0 and float(value["durability"]) <= 100.0 and _nonempty_string(value["originGrantId"])
+	var item: ItemInstance = ItemInstance.new()
+	return item.instantiate_from_dictionary(value)
+
+func _validate_item_catalog_refs(value: Dictionary, template: Dictionary, catalog: ItemCatalog) -> bool:
+	if not value.get("uniqueEffectIds") is Array or not value.get("affixes") is Array:
+		return false
+	var expected_unique: Array = [str(template["uniqueEffectId"])] if template.has("uniqueEffectId") else []
+	if value["uniqueEffectIds"] != expected_unique:
+		return false
+	var groups: Dictionary = {}
+	for affix_value: Variant in value["affixes"]:
+		var affix_id: String = str(affix_value.get("affixId", "")) if affix_value is Dictionary else ""
+		var definition: Dictionary = catalog.get_affix(affix_id)
+		if definition.is_empty() or not (definition.get("slots", []) as Array).has(str(template["category"])):
+			return false
+		var group_id: String = str(definition.get("group", ""))
+		if group_id.is_empty() or groups.has(group_id):
+			return false
+		groups[group_id] = true
+	return true
+
+func _validate_meta_build(meta: Dictionary, items_by_id: Dictionary) -> Dictionary:
+	var equipment: Dictionary = {}
+	for slot_value: Variant in meta["equipment"].keys():
+		var item_id: String = str(meta["equipment"][slot_value])
+		if items_by_id.has(item_id):
+			equipment[str(slot_value)] = items_by_id[item_id]
+	var operator: Dictionary = meta["operator"]
+	var resolver: BuildResolver = BuildResolver.new()
+	var result: Dictionary = resolver.resolve_build({
+		"equipment": equipment,
+		"attributes": operator["attributes"],
+		"attributePointsEarned": operator["attributePoints"],
+		"treePointsEarned": operator["treePoints"],
+		"skillIds": meta["skillIds"],
+		"passiveIds": meta["passiveIds"],
+		"treeNodeIds": meta["treeNodeIds"],
+		"unlockedImplantSlots": meta["unlockedImplantSlots"],
+		"unlockedDroneSlots": meta["unlockedDroneSlots"],
+	})
+	if not bool(result.get("valid", false)):
+		var messages: PackedStringArray = PackedStringArray()
+		for issue: Dictionary in result.get("issues", []):
+			messages.append(str(issue.get("message", "Неверная сборка.")))
+		return _failure("meta.build: %s" % " ".join(messages))
+	return {"ok": true, "error": ""}
 
 func _validate_transport(value: Variant) -> bool:
 	if not value is Dictionary or not _has_exact_keys(value, ["fuel", "fuelMax", "hull", "hullMax", "cargoCapacity"]):

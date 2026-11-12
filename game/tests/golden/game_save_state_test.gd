@@ -41,16 +41,28 @@ func run(_tree: SceneTree) -> bool:
 	var broken_reputation_result: Dictionary = state_class.call("parse_payload", broken_reputation)
 	check(not bool(broken_reputation_result.get("ok", false)), "game_save_state: incomplete faction state was accepted")
 
+	var unknown_template: Dictionary = _valid_payload()
+	unknown_template["meta"]["inventory"][0]["templateId"] = "MISSING_TEMPLATE"
+	var unknown_template_result: Dictionary = state_class.call("parse_payload", unknown_template)
+	check(not bool(unknown_template_result.get("ok", false)), "game_save_state: inventory item with an unknown template was accepted")
+
+	var invalid_skill: Dictionary = _valid_payload()
+	invalid_skill["meta"]["skillIds"][0] = "MISSING_SKILL"
+	var invalid_skill_result: Dictionary = state_class.call("parse_payload", invalid_skill)
+	check(not bool(invalid_skill_result.get("ok", false)), "game_save_state: build with an unknown skill was accepted")
+
 	var duplicate_equipment: Dictionary = _valid_payload()
-	duplicate_equipment["meta"]["inventory"] = [
-		{"itemId": "item-a", "templateId": "PISTOL_K1", "techLevel": 1, "rarity": "COMMON", "secured": true, "durability": 100.0, "originGrantId": "grant-a"},
-	]
-	duplicate_equipment["meta"]["equipment"] = {"MAIN": "item-a", "OFFHAND": "missing-item"}
+	duplicate_equipment["meta"]["equipment"]["OFFHAND"] = duplicate_equipment["meta"]["equipment"]["MAIN"]
 	var duplicate_equipment_result: Dictionary = state_class.call("parse_payload", duplicate_equipment)
-	check(not bool(duplicate_equipment_result.get("ok", false)), "game_save_state: equipment without owned inventory item was accepted")
+	check(not bool(duplicate_equipment_result.get("ok", false)), "game_save_state: one owned item equipped in two slots was accepted")
+
+	var missing_owned_item: Dictionary = _valid_payload()
+	missing_owned_item["meta"]["equipment"]["MAIN"] = "missing-item"
+	var missing_owned_result: Dictionary = state_class.call("parse_payload", missing_owned_item)
+	check(not bool(missing_owned_result.get("ok", false)), "game_save_state: equipment without an owned inventory item was accepted")
 
 	var active_payload: Dictionary = _valid_payload()
-	active_payload["run"] = _valid_run()
+	active_payload["run"] = _valid_run(active_payload["meta"])
 	active_payload["run"]["eventsSeen"] = ["EV19"]
 	active_payload["run"]["serviceScrapFuelCounts"] = {"fuel": 2}
 	active_payload["run"]["shippedCheckpointIds"] = ["cp-1"]
@@ -64,16 +76,28 @@ func run(_tree: SceneTree) -> bool:
 		var active_state: Object = active_result.get("state") as Object
 		check(_json_equivalent(active_state.call("to_payload"), active_payload), "game_save_state: active RUN roundtrip lost run fields")
 	var invalid_pending: Dictionary = _valid_payload()
-	invalid_pending["run"] = _valid_run()
+	invalid_pending["run"] = _valid_run(invalid_pending["meta"])
 	invalid_pending["run"]["pendingTravelDeltaMs"] = 60001
 	var invalid_pending_result: Dictionary = state_class.call("parse_payload", invalid_pending)
 	check(not bool(invalid_pending_result.get("ok", false)), "game_save_state: out-of-range pending travel effect was accepted")
 
 	var bad_combat_snapshot: Dictionary = _valid_payload()
-	bad_combat_snapshot["run"] = _valid_run()
+	bad_combat_snapshot["run"] = _valid_run(bad_combat_snapshot["meta"])
 	bad_combat_snapshot["run"]["combatSnapshot"] = {"simTimeMs": -1}
 	var bad_combat_result: Dictionary = state_class.call("parse_payload", bad_combat_snapshot)
 	check(not bool(bad_combat_result.get("ok", false)), "game_save_state: invalid combat snapshot was accepted")
+
+	var missing_run_item: Dictionary = _valid_payload()
+	missing_run_item["run"] = _valid_run(missing_run_item["meta"])
+	missing_run_item["run"]["equipment"]["MAIN"] = "missing-run-item"
+	var missing_run_item_result: Dictionary = state_class.call("parse_payload", missing_run_item)
+	check(not bool(missing_run_item_result.get("ok", false)), "game_save_state: run equipment without owned item was accepted")
+
+	var duplicate_run_item: Dictionary = _valid_payload()
+	duplicate_run_item["run"] = _valid_run(duplicate_run_item["meta"])
+	duplicate_run_item["run"]["equipment"]["OFFHAND"] = duplicate_run_item["run"]["equipment"]["MAIN"]
+	var duplicate_run_item_result: Dictionary = state_class.call("parse_payload", duplicate_run_item)
+	check(not bool(duplicate_run_item_result.get("ok", false)), "game_save_state: one run item equipped in two slots was accepted")
 	return failure_count == 0
 
 func _valid_payload() -> Dictionary:
@@ -83,9 +107,9 @@ func _valid_payload() -> Dictionary:
 		return {}
 	return created["payload"]
 
-func _valid_run() -> Dictionary:
+func _valid_run(meta: Dictionary) -> Dictionary:
 	return {
-		"seed": "native-run-seed", "depth": 1, "biome": "B01", "graph": {}, "equipment": {}, "currentNodeId": "START",
+		"seed": "native-run-seed", "depth": 1, "biome": "B01", "graph": {}, "equipment": meta["equipment"].duplicate(true), "currentNodeId": "START",
 		"visitedNodeIds": [], "clearedNodeIds": [], "eventsSeen": [], "phase": "ROUTE", "wanted": 0.0, "revealLevel": 0,
 		"resources": {"fuel": 24.0, "maxFuel": 24.0, "hull": 100.0, "maxHull": 100.0, "hp": 300.0, "maxHP": 300.0, "shield": 75.0, "maxShield": 75.0, "energy": 100.0, "heat": 0.0, "gameTimeMs": 0.0},
 		"runWallet": {"CREDITS": 0.0, "SCRAP": 0.0, "DATA": 0.0},
