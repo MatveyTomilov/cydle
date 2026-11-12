@@ -58,3 +58,25 @@ func to_dictionary() -> Dictionary:
 		"enemyWindupMult": enemy_windup_mult, "elitePen": elite_pen,
 		"extraEnemyDigitalBonus": extra_enemy_digital_bonus, "triggerChains": trigger_chains.duplicate(true),
 	}
+
+func clone() -> CombatState:
+	var copy: CombatState = CombatState.new()
+	for property: Dictionary in get_property_list():
+		var property_name: String = str(property.get("name", ""))
+		if property_name in ["script", "operator", "drones", "enemies", "allies", "build", "tactics"] or property_name.is_empty():
+			continue
+		var value: Variant = get(property_name)
+		if value is Dictionary or value is Array:
+			copy.set(property_name, value.duplicate(true))
+		else:
+			copy.set(property_name, value)
+	copy.operator = operator.clone()
+	for actor: CombatActorState in drones:
+		copy.drones.append(actor.clone())
+	for actor: CombatActorState in enemies:
+		copy.enemies.append(actor.clone())
+	for actor: CombatActorState in allies:
+		copy.allies.append(actor.clone())
+	copy.build = build.duplicate(true)
+	copy.tactics = tactics.duplicate(true)
+	return copy

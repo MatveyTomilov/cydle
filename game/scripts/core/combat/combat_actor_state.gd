@@ -71,3 +71,16 @@ func to_dictionary() -> Dictionary:
 		"lastMainAttackAt": last_main_attack_at, "lastTargetId": last_target_id, "sameTargetHits": same_target_hits,
 		"lastSkillId": last_skill_id, "sameSkillCount": same_skill_count, "damageDealt": damage_dealt, "damageTaken": damage_taken,
 	}
+
+func clone() -> CombatActorState:
+	var copy: CombatActorState = CombatActorState.new()
+	for property: Dictionary in get_property_list():
+		var property_name: String = str(property.get("name", ""))
+		if property_name == "script" or property_name.is_empty():
+			continue
+		var value: Variant = get(property_name)
+		if value is Dictionary or value is Array:
+			copy.set(property_name, value.duplicate(true))
+		else:
+			copy.set(property_name, value)
+	return copy

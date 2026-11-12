@@ -12,7 +12,8 @@ import { MUTATIONS } from '../src/data/progression';
 import { createInitialSave } from '../src/core/save/initial';
 import { UNIQUE_TEMPLATE_BY_ID } from '../src/data/uniques';
 import { BOSSES, ELITE_MODS, ENEMIES } from '../src/data/enemies';
-import { createCombatState } from '../src/core/combat/engine';
+import { createCombatState, stepCombat } from '../src/core/combat/engine';
+import type { TacticalProfile } from '../src/core/combat/types';
 
 const templates = [...ITEM_TEMPLATES, ...Object.values(UNIQUE_TEMPLATE_BY_ID)];
 const ids = new Set(templates.map((template) => template.id));
@@ -202,3 +203,38 @@ writeFileSync(combatFixtureOutput, `${JSON.stringify({
   },
 }, null, 2)}\n`, 'utf8');
 console.log(`Exported combat actor initialization oracle to ${combatFixtureOutput}`);
+
+const starterMainId = initialSaveFixture.meta.equipment.MAIN;
+if (!starterMainId) throw new Error('Starter save is missing its main weapon.');
+const starterMain = starterItemsById.get(starterMainId)!;
+const basicBuild = resolveBuild({
+  attributes: initialSaveFixture.meta.operator.attributes,
+  equipment: { MAIN: starterMain },
+  skillIds: [], passiveIds: [], treeNodeIds: [], attributePointsEarned: 0, treePointsEarned: 0,
+});
+const basicTactics: TacticalProfile = { id: 'EMPTY', name: 'Empty', rules: [] };
+const basicStateConfig = {
+  seed: 'basic-auto-replay', depth: 1, biome: 'B01' as const, nodeType: 'COMBAT' as const,
+  build: basicBuild, enemies: [{ templateId: 'E01' }], tactics: basicTactics, maxDurationMs: 3000,
+};
+let basicState = createCombatState(basicStateConfig);
+const basicAutoFrames = [];
+for (let tick = 0; tick < 15; tick++) {
+  const previousLogLength = basicState.log.length;
+  basicState = stepCombat(basicState);
+  const actorFrame = (actor: typeof basicState.operator) => ({
+    id: actor.id, hp: actor.hp, shield: actor.shield, energy: actor.energy, heat: actor.heat,
+    nextAttackAt: actor.nextAttackAt, alive: actor.alive, flags: actor.flags, counters: actor.counters,
+    damageDealt: actor.damageDealt, damageTaken: actor.damageTaken,
+  });
+  basicAutoFrames.push({
+    timeMs: basicState.timeMs, rng: basicState.rng, nextEventId: basicState.nextEventId,
+    metrics: basicState.metrics, outcome: basicState.outcome,
+    operator: actorFrame(basicState.operator), enemies: basicState.enemies.map(actorFrame),
+    events: basicState.log.slice(previousLogLength),
+  });
+}
+const basicAutoFixtureOutput = resolve('game/tests/fixtures/combat/basic_auto_replay.json');
+mkdirSync(dirname(basicAutoFixtureOutput), { recursive: true });
+writeFileSync(basicAutoFixtureOutput, `${JSON.stringify({ config: { seed: basicStateConfig.seed, depth: basicStateConfig.depth, biome: basicStateConfig.biome, nodeType: basicStateConfig.nodeType, enemy: basicStateConfig.enemies[0], tactics: basicTactics, maxDurationMs: basicStateConfig.maxDurationMs }, frames: basicAutoFrames }, null, 2)}\n`, 'utf8');
+console.log(`Exported ${basicAutoFrames.length} basic-auto combat replay frames to ${basicAutoFixtureOutput}`);

@@ -4,9 +4,13 @@ extends RefCounted
 const COMBAT_RULES_VERSION: String = "cydle-combat-1.0"
 const MAX_LOG_EVENTS: int = 5000
 const DEFAULT_MAX_DURATION_MS: int = 180000
+const TICK_MS: int = 100
+const SHIELD_REGEN_DELAY_MS: int = 4000
 
 var _factory: CombatFactory = CombatFactory.new()
 var _hash: StateHash = StateHash.new()
+var _damage: DamageMath = DamageMath.new()
+var _formula: CydleFormula = CydleFormula.new()
 
 func create_state(config: Dictionary) -> Dictionary:
 	var seed_value: Variant = config.get("seed", "")
@@ -59,6 +63,247 @@ func create_state(config: Dictionary) -> Dictionary:
 		"data": {"initialTempShield": float(config.get("initialTempShield", 0.0)), "initialExtraHeat": float(config.get("initialExtraHeat", 0.0)), "alliedCount": 0},
 	})
 	return {"ok": true, "state": state, "error": ""}
+
+func step_combat(state: CombatState) -> Dictionary:
+	if state == null:
+		return _failure("Нельзя продвинуть пустое состояние боя.")
+	if not state.outcome.is_empty():
+		return {"ok": true, "state": state, "error": ""}
+	if not _supports_basic_auto_step(state):
+		return _failure("Эта боевая конфигурация требует ещё не перенесённые способности, статусы, триггеры или тактические правила.")
+	var next: CombatState = state.clone()
+	var rng: DeterministicRng = DeterministicRng.new()
+	if not rng.restore(next.rng):
+		return _failure("Состояние боевого RNG повреждено.")
+	next.time_ms += TICK_MS
+	_apply_basic_continuous(next)
+	var ready: Array[CombatActorState] = next.all_actors()
+	ready.sort_custom(func(left: CombatActorState, right: CombatActorState) -> bool: return left.id < right.id)
+	for actor: CombatActorState in ready:
+		if not actor.alive or actor.next_attack_at > float(next.time_ms):
+			continue
+		var target: CombatActorState = _pick_auto_target(next, actor)
+		if target == null:
+			continue
+		var attack: Dictionary = _resolve_basic_attack(next, rng, actor, target)
+		if not bool(attack.get("ok", false)):
+			return _failure(str(attack.get("error", "Автоатака не разрешилась.")))
+		_schedule_next_attack(next, actor)
+	_resolve_basic_deaths(next)
+	_check_terminal(next)
+	next.rng = rng.serialize()
+	return {"ok": true, "state": next, "error": ""}
+
+func _supports_basic_auto_step(state: CombatState) -> bool:
+	if not state.tactics.get("rules", []).is_empty() or not state.build.get("triggerEffects", []).is_empty():
+		return false
+	if state.extra_enemy_digital_bonus != 0.0:
+		return false
+	for actor: CombatActorState in state.all_actors():
+		if not actor.elite_mod.is_empty() or not actor.ability_next.is_empty() or not actor.statuses.is_empty() or not actor.buffs.is_empty() or actor.cast != null or actor.reaction_cast != null:
+			return false
+		if actor.side == "enemy":
+			var template: Dictionary = _factory._enemy_catalog.get_template(actor.template_id)
+			if not template.get("passives", []).is_empty() or not template.get("rotating", []).is_empty():
+				return false
+	return true
+
+func _apply_basic_continuous(state: CombatState) -> void:
+	var operator: CombatActorState = state.operator
+	if operator.alive:
+		var sheet: Dictionary = operator.base_sheet
+		operator.energy = clampf(operator.energy + float(sheet.get("energyRegen", 0.0)) * 0.1, 0.0, float(sheet.get("maxEnergy", 0.0)))
+		var ambient: float = state.ambient_heat_per_sec
+		for enemy: CombatActorState in state.enemies:
+			if enemy.alive:
+				ambient += float(_factory._enemy_catalog.get_template(enemy.template_id).get("ambientHeatPerSec", 0.0))
+		var cooling: float = maxf(0.0, float(sheet.get("heatCooling", 0.0)) - state.cooling_penalty)
+		operator.heat = clampf(operator.heat + (ambient - cooling) * 0.1, 0.0, float(sheet.get("maxHeat", 0.0)))
+		if operator.heat <= 25.0:
+			operator.flags["coldStreak"] = float(operator.flags.get("coldStreak", 0.0)) + 100.0
+		else:
+			operator.flags["coldStreak"] = 0.0
+		var since_hit: float = float(state.time_ms) - float(operator.flags.get("lastDamagedAt", -100000.0))
+		if since_hit >= SHIELD_REGEN_DELAY_MS and operator.shield < float(sheet.get("maxShield", 0.0)):
+			operator.shield = clampf(operator.shield + float(sheet.get("shieldRegen", 0.0)) * 0.1, 0.0, float(sheet.get("maxShield", 0.0)))
+		if operator.shield <= 0.0:
+			state.metrics["timeWithoutShieldMs"] = int(state.metrics.get("timeWithoutShieldMs", 0)) + TICK_MS
+		state.metrics["lowestHpFraction"] = minf(float(state.metrics.get("lowestHpFraction", 1.0)), operator.hp / maxf(1.0, float(sheet.get("maxHP", 1.0))))
+	for actor: CombatActorState in state.drones + state.enemies + state.allies:
+		if not actor.alive:
+			continue
+		var sheet: Dictionary = actor.base_sheet
+		var since_hit: float = float(state.time_ms) - float(actor.flags.get("lastDamagedAt", -100000.0))
+		if since_hit >= SHIELD_REGEN_DELAY_MS and actor.shield < float(sheet.get("maxShield", 0.0)):
+			actor.shield = clampf(actor.shield + float(sheet.get("shieldRegen", 0.0)) * 0.1, 0.0, float(sheet.get("maxShield", 0.0)))
+
+func _pick_auto_target(state: CombatState, actor: CombatActorState) -> CombatActorState:
+	if actor.side == "enemy":
+		if state.operator.alive:
+			return state.operator
+		for ally: CombatActorState in [state.operator] + state.drones + state.allies:
+			if ally.alive:
+				return ally
+		return null
+	var enemies: Array[CombatActorState] = []
+	for enemy: CombatActorState in state.enemies:
+		if enemy.alive:
+			enemies.append(enemy)
+	enemies.sort_custom(func(left: CombatActorState, right: CombatActorState) -> bool: return left.id < right.id)
+	return enemies[0] if not enemies.is_empty() else null
+
+func _resolve_basic_attack(state: CombatState, rng: DeterministicRng, actor: CombatActorState, target: CombatActorState) -> Dictionary:
+	var weapon: Dictionary = state.build.get("mainWeapon", {}) if actor.kind == "operator" else {}
+	if actor.kind == "operator":
+		var energy_cost: float = float(weapon.get("energyPerAttack", 0.0))
+		if energy_cost > 0.0 and actor.energy < energy_cost:
+			state.metrics["energyStarvedMs"] = int(state.metrics.get("energyStarvedMs", 0)) + TICK_MS
+			return {"ok": true, "error": ""}
+		if energy_cost > 0.0:
+			actor.energy = maxf(0.0, actor.energy - energy_cost)
+			state.metrics["energySpent"] = float(state.metrics.get("energySpent", 0.0)) + energy_cost
+	actor.counters["attacks"] = int(actor.counters.get("attacks", 0)) + 1
+	var action_id: String = "%s:atk:%d" % [actor.id, int(actor.counters["attacks"])]
+	actor.last_main_attack_at = state.time_ms
+	_emit(state, "ATTACK", actor.id, {"targetId": target.id, "actionId": action_id, "text": "%s атакует %s." % [actor.display_name, target.display_name]})
+	actor.last_target_id = target.id
+	var packets: Array[Dictionary] = _attack_packets(actor, weapon)
+	for packet: Dictionary in packets:
+		var current_target: CombatActorState = _pick_auto_target(state, actor)
+		if current_target == null:
+			break
+		var hit_result: Dictionary = _resolve_basic_hit(state, rng, actor, current_target, float(packet["amount"]), str(packet["type"]), action_id, actor.kind == "operator")
+		if not bool(hit_result.get("ok", false)):
+			return hit_result
+	if actor.kind == "operator":
+		actor.flags["firstAttack"] = 0.0
+	return {"ok": true, "error": ""}
+
+func _attack_packets(actor: CombatActorState, weapon: Dictionary) -> Array[Dictionary]:
+	var packets: Array[Dictionary] = []
+	if actor.kind == "operator" and weapon.get("packets", []) is Array and not weapon.get("packets", []).is_empty():
+		for packet: Dictionary in weapon["packets"]:
+			packets.append({"type": packet["type"], "amount": packet["amount"]})
+	elif actor.kind == "operator":
+		var count: int = int(weapon.get("pelletCount", 1))
+		for _index: int in range(count):
+			packets.append({"type": actor.attack_type, "amount": actor.attack_damage})
+	else:
+		packets.append({"type": actor.attack_type, "amount": actor.attack_damage})
+	return packets
+
+func _resolve_basic_hit(state: CombatState, rng: DeterministicRng, actor: CombatActorState, target: CombatActorState, raw_base: float, damage_type: String, action_id: String, is_main: bool) -> Dictionary:
+	var attacker: Dictionary = actor.base_sheet
+	var defender: Dictionary = target.base_sheet
+	var chance_to_hit: float = _damage.hit_probability(float(attacker.get("accuracy", 100.0)), float(defender.get("evasion", 0.0)))
+	if not rng.chance(chance_to_hit):
+		state.metrics["misses"] = int(state.metrics.get("misses", 0)) + 1
+		if target.kind == "operator":
+			state.metrics["dodgesTaken"] = int(state.metrics.get("dodgesTaken", 0)) + 1
+		_emit(state, "MISS", actor.id, {
+			"targetId": target.id, "actionId": action_id, "damageType": damage_type,
+			"originActionId": action_id, "text": "%s: промах по %s." % [actor.display_name, target.display_name], "roll": chance_to_hit,
+		})
+		return {"ok": true, "error": ""}
+	var crit: bool = rng.chance(_damage.crit_probability(float(attacker.get("critChance", 0.0))))
+	var raw: float = raw_base * _outgoing_multiplier(attacker, damage_type, is_main)
+	if crit:
+		raw *= float(attacker.get("critMultiplier", 1.5)) * float(attacker.get("moreCritDamage", 1.0))
+		state.metrics["crits"] = int(state.metrics.get("crits", 0)) + 1
+	var penetration: Dictionary = {
+		"armorPen": float(attacker.get("armorPen", 0.0)) + state.elite_pen + (10.0 if actor.elite_mod == "EL_PEN" else 0.0),
+		"armorPenPercent": float(attacker.get("armorPenPercent", 0.0)),
+		"energyPen": float(attacker.get("energyPen", 0.0)), "energyPenPercent": float(attacker.get("energyPenPercent", 0.0)),
+		"digitalPen": float(attacker.get("digitalPen", 0.0)), "digitalPenPercent": float(attacker.get("digitalPenPercent", 0.0)),
+	}
+	var mitigation: Dictionary = _damage.mitigate_packet(raw, damage_type, {"armor": defender.get("armor", 0.0), "energyRes": defender.get("energyRes", 0.0), "digitalRes": defender.get("digitalRes", 0.0)}, penetration)
+	var incoming: float = float(mitigation["afterDefense"]) * float(defender.get("incomingAll", 1.0)) * float(defender.get("incomingKinetic" if damage_type == "KINETIC" else "incomingEnergy" if damage_type == "ENERGY" else "incomingDigital", 1.0))
+	var partition: Dictionary = _damage.partition_damage(incoming, {"hp": target.hp, "shield": target.shield, "temp": target.temp_shields}, 0.0, float(defender.get("incomingShield", 1.0)))
+	_apply_partition(target, partition)
+	target.flags["lastDamagedAt"] = float(state.time_ms)
+	state.metrics["hits"] = int(state.metrics.get("hits", 0)) + 1
+	var dealt: float = float(partition["shieldConsumed"]) + float(partition["hpLost"])
+	actor.damage_dealt += dealt
+	target.damage_taken += dealt
+	if actor.side == "player":
+		state.metrics["damageDealt"] = float(state.metrics.get("damageDealt", 0.0)) + dealt
+		var by_type: Dictionary = state.metrics["damageByType"]
+		by_type[damage_type] = float(by_type.get(damage_type, 0.0)) + incoming
+		var by_source: Dictionary = state.metrics["damageBySource"]
+		by_source[actor.id] = float(by_source.get(actor.id, 0.0)) + dealt
+		state.metrics["shieldAbsorbed"] = float(state.metrics.get("shieldAbsorbed", 0.0)) + float(partition["shieldConsumed"])
+	else:
+		state.metrics["damageTaken"] = float(state.metrics.get("damageTaken", 0.0)) + dealt
+		var taken_by_source: Dictionary = state.metrics["takenBySource"]
+		taken_by_source[actor.id] = float(taken_by_source.get(actor.id, 0.0)) + dealt
+		if target.kind == "operator":
+			state.metrics["hpLost"] = float(state.metrics.get("hpLost", 0.0)) + float(partition["hpLost"])
+	_emit(state, "DAMAGE", actor.id, {
+		"targetId": target.id, "actionId": action_id, "damageType": damage_type, "crit": crit,
+		"originActionId": action_id, "amountBeforeDefense": raw, "amountAfterDefense": incoming,
+		"shieldConsumed": partition["shieldConsumed"], "hpLost": partition["hpLost"], "bypassed": partition["bypassed"],
+		"text": "%s → %s: %s %s%s, щит −%s, HP −%s." % [actor.display_name, target.display_name, _one_decimal(incoming), damage_type, " (крит)" if crit else "", _one_decimal(float(partition["shieldConsumed"])), _one_decimal(float(partition["hpLost"]))],
+		"data": {"overkill": partition["overkill"]},
+	})
+	return {"ok": true, "error": ""}
+
+func _outgoing_multiplier(sheet: Dictionary, damage_type: String, is_main: bool) -> float:
+	var type_stat: String = "kineticDamage" if damage_type == "KINETIC" else "energyDamage" if damage_type == "ENERGY" else "digitalDamage"
+	var more_type: String = "moreKinetic" if damage_type == "KINETIC" else "moreEnergy" if damage_type == "ENERGY" else "moreDigital"
+	var multiplier: float = (1.0 + float(sheet.get(type_stat, 0.0)) / 100.0) * (1.0 + float(sheet.get("allDamage", 0.0)) / 100.0)
+	if is_main:
+		multiplier *= 1.0 + float(sheet.get("mainDamage", 0.0)) / 100.0
+	multiplier *= float(sheet.get(more_type, 1.0)) * float(sheet.get("moreDirect", 1.0))
+	if is_main:
+		multiplier *= float(sheet.get("moreMain", 1.0))
+	return multiplier
+
+func _apply_partition(actor: CombatActorState, result: Dictionary) -> void:
+	var regular_consumed: float = float(result["shieldConsumed"])
+	for consumed: Dictionary in result["tempConsumed"]:
+		regular_consumed -= float(consumed["amount"])
+		for pool: Dictionary in actor.temp_shields:
+			if str(pool.get("sourceId", "")) == str(consumed["sourceId"]):
+				pool["amount"] = maxf(0.0, float(pool.get("amount", 0.0)) - float(consumed["amount"]))
+	actor.temp_shields = actor.temp_shields.filter(func(pool: Dictionary) -> bool: return float(pool.get("amount", 0.0)) > 0.0)
+	actor.shield = maxf(0.0, actor.shield - regular_consumed)
+	actor.hp = maxf(0.0, actor.hp - float(result["hpLost"]))
+
+func _schedule_next_attack(state: CombatState, actor: CombatActorState) -> void:
+	var interval: float = actor.attack_interval_ms
+	if actor.kind == "operator":
+		var sheet: Dictionary = actor.base_sheet
+		var weapon: Dictionary = state.build.get("mainWeapon", {})
+		interval = _formula.attack_interval_ms(float(weapon.get("intervalMs", 1000.0)), float(sheet.get("attackSpeed", 0.0)), float(sheet.get("moreAttackSpeed", 1.0)))
+	actor.next_attack_at += interval
+	if actor.next_attack_at <= float(state.time_ms):
+		actor.next_attack_at = float(state.time_ms) + interval
+
+func _resolve_basic_deaths(state: CombatState) -> void:
+	for actor: CombatActorState in state.all_actors():
+		if not actor.alive or actor.hp > 0.0:
+			continue
+		actor.alive = false
+		_emit(state, "DEATH", actor.id, {"text": "%s уничтожен." % actor.display_name})
+		if actor.side == "enemy":
+			state.metrics["kills"] = int(state.metrics.get("kills", 0)) + 1
+			var ttk: Array = state.metrics["ttk"]
+			ttk.append({"enemyId": actor.id, "name": actor.display_name, "ms": state.time_ms})
+		elif actor.kind == "drone":
+			state.metrics["droneDeaths"] = int(state.metrics.get("droneDeaths", 0)) + 1
+
+func _check_terminal(state: CombatState) -> void:
+	if not state.operator.alive:
+		state.outcome = "DEFEAT"
+	elif not state.enemies.any(func(enemy: CombatActorState) -> bool: return enemy.alive):
+		state.outcome = "VICTORY"
+	elif state.time_ms >= state.max_duration_ms:
+		state.outcome = "TIMEOUT"
+	if not state.outcome.is_empty():
+		_emit(state, "COMBAT_END", "operator", {"text": "Бой завершён: %s." % state.outcome, "data": {"outcome": state.outcome}})
+
+func _one_decimal(value: float) -> String:
+	return "%.1f" % value
 
 func _new_rng(seed_value: String) -> DeterministicRng:
 	var rng: DeterministicRng = DeterministicRng.new()

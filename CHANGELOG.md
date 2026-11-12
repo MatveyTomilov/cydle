@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added a checked 15-frame TypeScript combat oracle and an immutable native `step_combat()` slice for eligible basic auto-attack encounters, covering baseline resource updates, hit/crit RNG, shared damage mitigation, shields/HP, metrics, death, and combat termination.
 - Added typed native combat actor/state initialization for operators, drones, and enemies, plus deterministic RNG, rules hash, metrics, and COMBAT_START event; verified against one TypeScript `createCombatState` oracle fixture with an EL_FAST enemy.
 - Exported and validated the native enemy catalog: 24 regular enemies, 6 bosses with phase/rotation data, and 6 elite modifiers. This is a data port only; combat behavior remains pending.
 - Exported the native skill/passive/tree/mutation catalogs and extended `BuildResolver` to validate and apply these selections through the shared stat pipeline; expanded the two TypeScript build oracle fixtures.
