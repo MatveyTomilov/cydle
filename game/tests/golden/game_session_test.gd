@@ -4,7 +4,7 @@ func run(_tree: SceneTree) -> bool:
 	var loot_filter_session: GameSession = GameSession.new()
 	loot_filter_session.configure_save_directory("user://test-saves/loot-filter")
 	if check(loot_filter_session.start_new_game(1762900000046), "game_session: could not create a loot-filter profile"):
-		var filter_settings: Dictionary = {"preset": "CUSTOM", "minimumRarity": "RARE", "itemType": "ANY", "slot": "ANY", "requiredTags": [], "minimumAffixTier": 1, "affixId": "", "autoDismantle": true}
+		var filter_settings: Dictionary = {"preset": "CUSTOM", "minimumRarity": "COMMON", "itemType": "MAIN", "slot": "MAIN", "requiredTags": [], "minimumAffixTier": 1, "affixId": "", "compareBuild": true, "comparisonStat": "techPower", "autoDismantle": true}
 		check(loot_filter_session.auto_dismantle_available(), "game_session: starter scanner did not enable auto dismantle")
 		check(loot_filter_session.set_loot_filter_settings(filter_settings), "game_session: valid custom loot filter was rejected: %s" % loot_filter_session.last_error)
 		check(loot_filter_session.start_expedition("loot-filter-seed"), "game_session: could not start loot-filter sortie")
@@ -16,6 +16,12 @@ func run(_tree: SceneTree) -> bool:
 		if check(bool(filtered_result.get("ok", false)), "game_session: filtered common item fixture could not be created"):
 			var filtered_item: Dictionary = (filtered_result["item"] as ItemInstance).to_dictionary()
 			var loot_payload: Dictionary = loot_filter_session.state.to_payload()
+			var comparison_seed: DeterministicRng = DeterministicRng.new()
+			comparison_seed.seed("loot-filter-seed", "better-weapon")
+			var comparison_item_result: Dictionary = ItemFactory.new().create_item(comparison_seed, loot_catalog, {"templateId": "RIFLE_K2", "techLevel": 1, "rarity": "COMMON", "secured": false, "originGrantId": "loot-filter:better", "origin": "test", "acquiredAt": 0})
+			if check(bool(comparison_item_result.get("ok", false)), "game_session: build-comparison weapon fixture could not be created"):
+				var comparison_item: Dictionary = (comparison_item_result["item"] as ItemInstance).to_dictionary()
+				check(loot_filter_session._loot_item_improves_build(comparison_item, "techPower", "MAIN", loot_payload["run"]), "game_session: BuildResolver comparison did not recognize an upgrade to the selected stat")
 			var loot_receipt: Dictionary = loot_filter_session._receive_run_item(loot_payload, filtered_item, "TEST")
 			check(bool(loot_receipt.get("salvaged", false)) and not bool(loot_receipt.get("accepted", false)), "game_session: custom filter did not salvage an excluded item into run resources")
 			check(float(loot_payload["run"]["runWallet"]["SCRAP"]) > 0.0 and loot_payload["meta"]["protectedBank"]["SCRAP"] == loot_filter_session.state.meta.protected_bank.scrap, "game_session: auto dismantle incorrectly protected SCRAP before extraction")

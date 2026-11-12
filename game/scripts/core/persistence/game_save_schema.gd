@@ -181,7 +181,7 @@ func _validate_loot_filter(value: Variant) -> bool:
 	if not value is Dictionary:
 		return false
 	var filter: Dictionary = value
-	if not _has_exact_keys(filter, ["preset", "minimumRarity", "itemType", "slot", "requiredTags", "minimumAffixTier", "affixId", "autoDismantle"]):
+	if not _has_exact_keys(filter, ["preset", "minimumRarity", "itemType", "slot", "requiredTags", "minimumAffixTier", "affixId", "compareBuild", "comparisonStat", "autoDismantle"]):
 		return false
 	if not ["ALL", "RARE_PLUS", "TAGS", "CUSTOM"].has(str(filter["preset"])) or not RARITIES.has(str(filter["minimumRarity"])):
 		return false
@@ -195,7 +195,13 @@ func _validate_loot_filter(value: Variant) -> bool:
 		return false
 	if not _is_integer(filter["minimumAffixTier"]) or int(filter["minimumAffixTier"]) < 1 or int(filter["minimumAffixTier"]) > 4:
 		return false
-	if not filter["affixId"] is String or not filter["autoDismantle"] is bool:
+	if not filter["affixId"] is String or not filter["compareBuild"] is bool or not filter["comparisonStat"] is String or not filter["autoDismantle"] is bool:
+		return false
+	if bool(filter["compareBuild"]) and not StatMath.new().stat_ids().has(str(filter["comparisonStat"])):
+		return false
+	if bool(filter["compareBuild"]) and str(filter["preset"]) != "CUSTOM":
+		return false
+	if not bool(filter["compareBuild"]) and not str(filter["comparisonStat"]).is_empty():
 		return false
 	return true
 

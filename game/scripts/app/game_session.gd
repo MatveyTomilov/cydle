@@ -2848,7 +2848,7 @@ func item_disposal_quote(item_id: String, method: String) -> Dictionary:
 
 func loot_filter_settings() -> Dictionary:
 	if state == null:
-		return {"preset": "ALL", "minimumRarity": "COMMON", "itemType": "ANY", "slot": "ANY", "requiredTags": [], "minimumAffixTier": 1, "affixId": "", "autoDismantle": false}
+		return {"preset": "ALL", "minimumRarity": "COMMON", "itemType": "ANY", "slot": "ANY", "requiredTags": [], "minimumAffixTier": 1, "affixId": "", "compareBuild": false, "comparisonStat": "", "autoDismantle": false}
 	return state.meta.loot_filter.duplicate(true)
 
 func set_loot_filter_settings(settings: Dictionary) -> bool:
@@ -2880,7 +2880,7 @@ func auto_dismantle_available() -> bool:
 	var template: Dictionary = _item_catalog.get_template(str(item.get("templateId", "")))
 	return (template.get("tags", []) as Array).has("scanner")
 
-func _loot_item_matches_filter(item: Dictionary, meta_payload: Dictionary) -> bool:
+func _loot_item_matches_filter(item: Dictionary, meta_payload: Dictionary, run_payload: Dictionary = {}) -> bool:
 	var filter: Dictionary = meta_payload.get("lootFilter", {})
 	var preset: String = str(filter.get("preset", "ALL"))
 	var rarity_order: Array[String] = ["COMMON", "MODIFIED", "RARE", "LEGENDARY", "UNIQUE"]
@@ -2937,7 +2937,58 @@ func _loot_item_matches_filter(item: Dictionary, meta_payload: Dictionary) -> bo
 		if int(affix_value.get("tier", 1)) >= min_tier and (affix_id.is_empty() or str(affix_value.get("affixId", "")) == affix_id):
 			matching_affix = true
 			break
-	return matching_affix
+	if not matching_affix:
+		return false
+	if bool(filter.get("compareBuild", false)):
+		return _loot_item_improves_build(item, str(filter.get("comparisonStat", "")), str(filter.get("slot", "ANY")), run_payload)
+	return true
+
+func _loot_item_improves_build(item: Dictionary, stat_id: String, requested_slot: String, run_payload: Dictionary) -> bool:
+	var stats: StatMath = StatMath.new()
+	if not stats.stat_ids().has(stat_id):
+		return false
+	var loaded: Dictionary = _item_catalog.load_catalog()
+	if not bool(loaded.get("ok", false)):
+		return false
+	var template: Dictionary = _item_catalog.get_template(str(item.get("templateId", "")))
+	var slots_by_category: Dictionary = {
+		"MAIN": ["MAIN"], "OFFHAND": ["OFFHAND"], "ARMOR": ["ARMOR"], "IMPLANT": ["IMP_1", "IMP_2", "IMP_3", "IMP_4", "IMP_5", "IMP_6"],
+		"DRONE": ["DRONE_1", "DRONE_2"], "ENGINE": ["ENGINE"], "CHASSIS": ["CHASSIS"], "SCANNER": ["SCANNER"], "SERVICE": ["SERVICE"], "CARGO": ["CARGO"], "SUPPORT": ["SUPPORT"]
+	}
+	var candidates: Array = slots_by_category.get(str(template.get("category", "")), [])
+	if requested_slot != "ANY":
+		if not candidates.has(requested_slot): return false
+		candidates = [requested_slot]
+	var base_input: Dictionary = _build_input(state)
+	if not run_payload.is_empty():
+		var current_equipment: Dictionary = {}
+		var items_by_id: Dictionary = {}
+		for owned_item: Dictionary in state.meta.inventory:
+			items_by_id[str(owned_item.get("itemId", ""))] = owned_item
+		for cargo_item: Dictionary in run_payload.get("unsecuredCargo", []):
+			items_by_id[str(cargo_item.get("itemId", ""))] = cargo_item
+		for slot_value: Variant in run_payload.get("equipment", {}).keys():
+			var raw: Dictionary = items_by_id.get(str(run_payload["equipment"][slot_value]), {})
+			if raw.is_empty(): continue
+			var instance: ItemInstance = ItemInstance.new()
+			if instance.instantiate_from_dictionary(raw): current_equipment[str(slot_value)] = instance
+		base_input["equipment"] = current_equipment
+	var current_result: Dictionary = BuildResolver.new().resolve_build(base_input)
+	if not bool(current_result.get("valid", false)):
+		return false
+	var current_value: float = float(current_result.get("stats", {}).get(stat_id, 0.0))
+	var candidate_item: ItemInstance = ItemInstance.new()
+	if not candidate_item.instantiate_from_dictionary(item):
+		return false
+	for slot: String in candidates:
+		var candidate_input: Dictionary = base_input.duplicate(true)
+		var candidate_equipment: Dictionary = candidate_input.get("equipment", {}).duplicate(true)
+		candidate_equipment[slot] = candidate_item
+		candidate_input["equipment"] = candidate_equipment
+		var candidate_result: Dictionary = BuildResolver.new().resolve_build(candidate_input)
+		if bool(candidate_result.get("valid", false)) and float(candidate_result.get("stats", {}).get(stat_id, 0.0)) > current_value + 0.000001:
+			return true
+	return false
 
 func _receive_run_item(payload: Dictionary, item_value: Dictionary, reason: String = "LOOT") -> Dictionary:
 	var run_payload: Dictionary = payload.get("run", {})
@@ -2946,7 +2997,7 @@ func _receive_run_item(payload: Dictionary, item_value: Dictionary, reason: Stri
 		return {"accepted": false, "salvaged": false, "discarded": true}
 	var item: Dictionary = item_value.duplicate(true)
 	item["secured"] = false
-	if _loot_item_matches_filter(item, meta_payload):
+	if _loot_item_matches_filter(item, meta_payload, run_payload):
 		if _cargo_fits(run_payload, item):
 			run_payload["unsecuredCargo"].append(item)
 			return {"accepted": true, "salvaged": false, "discarded": false}

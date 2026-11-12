@@ -948,6 +948,27 @@ func _show_inventory() -> void:
 	required_affix.text = str(loot_filter.get("affixId", ""))
 	required_affix.custom_minimum_size.x = 170
 	filter_row.add_child(required_affix)
+	var compare_build: CheckBox = CheckBox.new()
+	compare_build.text = "BUILD ПРЕВЫШЕ"
+	compare_build.button_pressed = bool(loot_filter.get("compareBuild", false))
+	compare_build.disabled = str(loot_filter.get("preset", "ALL")) != "CUSTOM"
+	compare_build.tooltip_text = "Оставить предмет, только если расчёт BuildResolver повышает выбранную характеристику относительно текущей сборки."
+	filter_row.add_child(compare_build)
+	var comparison_stat: OptionButton = OptionButton.new()
+	var stat_ids: Array[String] = StatMath.new().stat_ids()
+	var selected_stat_index: int = 0
+	for stat_index: int in range(stat_ids.size()):
+		comparison_stat.add_item(stat_ids[stat_index])
+		comparison_stat.set_item_metadata(stat_index, stat_ids[stat_index])
+		if str(loot_filter.get("comparisonStat", "")) == stat_ids[stat_index]: selected_stat_index = stat_index
+	comparison_stat.select(selected_stat_index)
+	comparison_stat.disabled = not compare_build.button_pressed
+	compare_build.toggled.connect(func(enabled: bool) -> void: comparison_stat.disabled = not enabled)
+	filter_mode.item_selected.connect(func(index: int) -> void:
+		compare_build.disabled = str(filter_mode.get_item_metadata(index)) != "CUSTOM"
+		comparison_stat.disabled = compare_build.disabled or not compare_build.button_pressed
+	)
+	filter_row.add_child(comparison_stat)
 	var auto_dismantle: CheckBox = CheckBox.new()
 	auto_dismantle.text = "АВТОРАЗБОР"
 	auto_dismantle.button_pressed = bool(loot_filter.get("autoDismantle", false))
@@ -955,7 +976,7 @@ func _show_inventory() -> void:
 	auto_dismantle.tooltip_text = "Нужен установленный SCANNER или WORKSHOP L3. Выручка остаётся незакреплённой до эвакуации."
 	filter_row.add_child(auto_dismantle)
 	var save_filter: Button = _button("СОХРАНИТЬ ФИЛЬТР", false)
-	save_filter.pressed.connect(_on_save_loot_filter.bind(filter_mode, minimum_rarity, item_type, item_slot, required_tags, min_affix_tier, required_affix, auto_dismantle))
+	save_filter.pressed.connect(_on_save_loot_filter.bind(filter_mode, minimum_rarity, item_type, item_slot, required_tags, min_affix_tier, required_affix, compare_build, comparison_stat, auto_dismantle))
 	filter_row.add_child(save_filter)
 	_body.add_child(_label("АВТОРАЗБОР: %s · UNIQUE без защищённой копии всегда сохраняются. Текущее правило не меняет уже выпавший груз." % ("ГОТОВ" if _session.auto_dismantle_available() else "ЗАКРЫТ · НУЖЕН SCANNER ИЛИ WORKSHOP L3"), 10, COLOR_MUTED))
 	if _session.can_undo_last_dismantle():
@@ -1950,7 +1971,7 @@ func _on_undo_last_dismantle() -> void:
 		_show_inventory()
 	_footer.text = "РАЗБОР ОТМЕНЁН · ПРЕДМЕТ ВОССТАНОВЛЕН" if restored else _session.last_error
 
-func _on_save_loot_filter(mode: OptionButton, rarity: OptionButton, item_type: OptionButton, item_slot: OptionButton, tags: LineEdit, affix_tier: SpinBox, affix: LineEdit, auto_dismantle: CheckBox) -> void:
+func _on_save_loot_filter(mode: OptionButton, rarity: OptionButton, item_type: OptionButton, item_slot: OptionButton, tags: LineEdit, affix_tier: SpinBox, affix: LineEdit, compare_build: CheckBox, comparison_stat: OptionButton, auto_dismantle: CheckBox) -> void:
 	var selected_tags: Array[String] = []
 	for tag_value: String in tags.text.split(",", false):
 		var normalized: String = tag_value.strip_edges().to_lower()
@@ -1964,6 +1985,8 @@ func _on_save_loot_filter(mode: OptionButton, rarity: OptionButton, item_type: O
 		"requiredTags": selected_tags,
 		"minimumAffixTier": int(affix_tier.value),
 		"affixId": affix.text.strip_edges(),
+		"compareBuild": compare_build.button_pressed and str(mode.get_item_metadata(mode.selected)) == "CUSTOM",
+		"comparisonStat": str(comparison_stat.get_item_metadata(comparison_stat.selected)) if compare_build.button_pressed and str(mode.get_item_metadata(mode.selected)) == "CUSTOM" else "",
 		"autoDismantle": auto_dismantle.button_pressed,
 	}
 	if _session.set_loot_filter_settings(settings):
