@@ -1115,6 +1115,7 @@ func _show_current_node(run: GameSaveState.RunState) -> void:
 func _show_checkpoint(_run: GameSaveState.RunState) -> void:
 	var completed: bool = _session.state.meta.campaign_flags.has("CAMPAIGN_COMPLETED")
 	_body.add_child(_label("КАМПАНИЯ ПРОЙДЕНА" if completed else "КОНТРОЛЬНЫЙ УЗЕЛ", 20, COLOR_CYAN if completed else COLOR_TEXT))
+	_add_checkpoint_repair_control()
 	if completed and not _session.state.meta.campaign_flags.has("ENDING_SELECTED"):
 		_body.add_child(_label("Коридор свободных поселений останется нейтральным — или выбранная фракция получит контроль, не закрывая доступ к другим.", 14, COLOR_MUTED))
 		var free_ending: Button = _button("СОЗДАТЬ СВОБОДНЫЙ КОРИДОР", true)
@@ -1133,6 +1134,24 @@ func _show_checkpoint(_run: GameSaveState.RunState) -> void:
 	var exit_button: Button = _button("ЭВАКУИРОВАТЬСЯ С ГРУЗОМ", true)
 	exit_button.pressed.connect(_on_exit_run)
 	_body.add_child(exit_button)
+
+func _add_checkpoint_repair_control() -> void:
+	var quote: Dictionary = _session.checkpoint_repair_quote()
+	if not bool(quote.get("valid", false)):
+		return
+	var bonus: bool = _session.state.meta.campaign_flags.has("quest-service-upgrade")
+	_body.add_child(_label("СЕРВИС КОРПУСА · +%d ЗА %d ¤%s" % [roundi(float(quote["repair"])), int(quote["credits"]), " · Q03 +15%" if bonus else ""], 12, COLOR_CYAN))
+	var repair_button: Button = _button("ВОССТАНОВИТЬ КОРПУС", false)
+	repair_button.disabled = not bool(quote.get("affordable", false))
+	repair_button.tooltip_text = str(quote.get("error", ""))
+	repair_button.pressed.connect(_on_checkpoint_repair)
+	_body.add_child(repair_button)
+
+func _on_checkpoint_repair() -> void:
+	if _session.repair_checkpoint_hull():
+		_show_road()
+	else:
+		_footer.text = _session.last_error
 
 func _add_escalation_selector() -> void:
 	if _session.state == null or not _session.state.meta.campaign_flags.has("ENDGAME_UNLOCKED"):

@@ -119,6 +119,23 @@ func run(_tree: SceneTree) -> bool:
 				check(escalation_session.travel_to(str(destination.get("id", ""))), "game_session: LONG_RUN route transition failed: %s" % escalation_session.last_error)
 				var expected_time: float = 40000.0 + (8000.0 if str(destination.get("type", "")) == "CHECKPOINT" else 0.0)
 				check(is_equal_approx(float(escalation_session.state.run.resources.get("gameTimeMs", 0.0)) - start_time, expected_time), "game_session: LONG_RUN did not add fifteen seconds to route travel")
+	var checkpoint_repair_session: GameSession = GameSession.new()
+	checkpoint_repair_session.configure_save_directory("user://test-saves/checkpoint-service-upgrade")
+	if check(checkpoint_repair_session.start_new_game(1762900000117), "game_session: could not create a checkpoint repair profile") and check(checkpoint_repair_session.start_expedition("checkpoint-service-upgrade"), "game_session: checkpoint repair test run did not start"):
+		var repair_setup: Dictionary = checkpoint_repair_session.state.to_payload()
+		repair_setup["run"]["phase"] = "CHECKPOINT"
+		repair_setup["run"]["resources"]["hull"] = 50.0
+		repair_setup["run"]["runWallet"]["CREDITS"] = 100.0
+		check(checkpoint_repair_session._commit_payload(repair_setup), "game_session: could not prepare checkpoint repair resources")
+		check(is_equal_approx(float(checkpoint_repair_session.checkpoint_repair_quote().get("repair", 0.0)), 30.0), "game_session: base checkpoint repair amount was not 30 hull")
+		var service_upgrade: Dictionary = checkpoint_repair_session.state.to_payload()
+		service_upgrade["meta"]["campaignFlags"].append("quest-service-upgrade")
+		check(checkpoint_repair_session._commit_payload(service_upgrade), "game_session: could not activate Q03 service upgrade")
+		var upgraded_quote: Dictionary = checkpoint_repair_session.checkpoint_repair_quote()
+		check(is_equal_approx(float(upgraded_quote.get("repair", 0.0)), 34.5), "game_session: Q03 service upgrade did not increase checkpoint repair by 15 percent")
+		var credits_before_repair: float = checkpoint_repair_session.state.run.wallet.credits
+		check(checkpoint_repair_session.repair_checkpoint_hull(), "game_session: checkpoint hull repair failed: %s" % checkpoint_repair_session.last_error)
+		check(is_equal_approx(checkpoint_repair_session.state.run.resources["hull"], 84.5) and checkpoint_repair_session.state.run.wallet.credits < credits_before_repair, "game_session: checkpoint repair did not apply its upgrade and cost")
 	var ending_session: GameSession = GameSession.new()
 	ending_session.configure_save_directory("user://test-saves/campaign-ending")
 	if check(ending_session.start_new_game(1762900000120), "game_session: could not create a campaign-ending profile"):
@@ -600,6 +617,24 @@ func run(_tree: SceneTree) -> bool:
 		var quest_reload: GameSession = GameSession.new()
 		quest_reload.configure_save_directory("user://test-saves/quest-chain")
 		check(quest_reload.load_saved_game() and int(quest_reload.state.meta.quest_progress.get("Q02", {}).get("stage", 0)) == 2, "game_session: quest stage did not survive save reload")
+		var q02_definition: Dictionary = quest_catalog.get_quest("Q02")
+		var q02_progress: Dictionary = quest_reload.state.meta.quest_progress.get("Q02", {})
+		quest_reload.state.run.biome = "B03"
+		quest_reload.state.run.phase = "NODE"
+		quest_reload.state.run.current_node_id = "quest-stage-two-event"
+		quest_reload.state.run.graph = {"layers": [[{"id": "quest-stage-two-event", "layer": 0, "type": "EVENT", "eventId": "EV03", "enemies": []}]], "edges": []}
+		check(not quest_reload._quest_stage_ready(q02_definition, q02_definition["stages"][1], q02_progress), "game_session: Q02 delivery stage was offered in the same sector as the courier pickup")
+		quest_reload.state.run.depth += 1
+		check(quest_reload._quest_stage_ready(q02_definition, q02_definition["stages"][1], q02_progress), "game_session: Q02 delivery stage did not activate in the next matching sector")
+		var q04_definition: Dictionary = quest_catalog.get_quest("Q04")
+		var q04_progress: Dictionary = {"stage": 2, "stageStartedDepth": quest_reload.state.run.depth, "startedDepth": quest_reload.state.run.depth, "choiceHistory": []}
+		quest_reload.state.run.biome = "B02"
+		quest_reload.state.run.current_node_id = "q04-followup-event"
+		quest_reload.state.run.graph["layers"] = [[{"id": "q04-followup-event", "layer": 0, "type": "EVENT", "eventId": "EV04", "enemies": []}, {"id": "q04-cleared-elite", "layer": 0, "type": "ELITE", "enemies": [{"templateId": "E12"}]}]]
+		quest_reload.state.run.cleared_node_ids.append("q04-cleared-elite")
+		check(not quest_reload._quest_stage_ready(q04_definition, q04_definition["stages"][1], q04_progress), "game_session: Q04 elimination objective was available in its source sector")
+		quest_reload.state.run.depth += 1
+		check(quest_reload._quest_stage_ready(q04_definition, q04_definition["stages"][1], q04_progress), "game_session: Q04 elimination objective did not become available in the next B02 sector")
 	var resumed: GameSession = GameSession.new()
 	resumed.configure_save_directory("user://test-saves/game-session")
 	check(resumed.load_saved_game(), "game_session: persisted state did not reload: %s" % resumed.last_error)

@@ -1299,7 +1299,13 @@ func _quest_stage_ready(quest: Dictionary, stage: Dictionary, progress: Dictiona
 	if deadline > 0 and state.run.depth > int(progress.get("stageStartedDepth", progress.get("startedDepth", state.run.depth))) + deadline:
 		return false
 	var requirement: Dictionary = stage.get("requirement", {"kind": "none"})
-	match str(requirement.get("kind", "none")):
+	var requirement_kind: String = str(requirement.get("kind", "none"))
+	var stage_started_depth: int = int(progress.get("stageStartedDepth", progress.get("startedDepth", state.run.depth)))
+	if int(stage.get("stage", 1)) > 1 and requirement_kind == "visitBiome" and state.run.depth <= stage_started_depth:
+		return false
+	if str(quest.get("id", "")) == "Q04" and int(stage.get("stage", 0)) == 2 and state.run.depth <= stage_started_depth:
+		return false
+	match requirement_kind:
 		"none": return true
 		"visitBiome": return state.run.biome == str(requirement.get("biome", ""))
 		"killElite":
@@ -1576,6 +1582,32 @@ func continue_campaign(escalation_ids: Array[String] = []) -> bool:
 		resources["shield"] = minf(float(resources.get("shield", 0.0)), float(resources["maxShield"]))
 		resources["energy"] = minf(float(resources.get("energy", 0.0)), float(resources["maxEnergy"]))
 	run_payload["resources"]["gameTimeMs"] = float(run_payload["resources"].get("gameTimeMs", 0.0)) + 8000.0
+	return _commit_payload(payload)
+
+func checkpoint_repair_quote() -> Dictionary:
+	if state == null or state.run == null or state.run.phase != "CHECKPOINT":
+		return {"valid": false, "affordable": false, "credits": 0, "repair": 0.0, "error": "Ремонт доступен только на контрольном узле."}
+	var resources: Dictionary = state.run.resources
+	var missing: float = float(resources.get("maxHull", 0.0)) - float(resources.get("hull", 0.0))
+	if missing <= 0.0:
+		return {"valid": false, "affordable": false, "credits": 0, "repair": 0.0, "error": "Корпус уже полностью восстановлен."}
+	var credits: int = ceili(15.0 * CydleFormula.new().reward_scale(float(state.run.depth)))
+	var repair_amount: float = 30.0 * (1.15 if state.meta.campaign_flags.has("quest-service-upgrade") else 1.0)
+	return {"valid": true, "affordable": state.run.wallet.credits >= float(credits), "credits": credits, "repair": minf(missing, repair_amount), "error": "" if state.run.wallet.credits >= float(credits) else "Недостаточно незакреплённых кредитов."}
+
+func repair_checkpoint_hull() -> bool:
+	var quote: Dictionary = checkpoint_repair_quote()
+	if not bool(quote.get("valid", false)) or not bool(quote.get("affordable", false)):
+		last_error = str(quote.get("error", "Ремонт корпуса недоступен."))
+		return false
+	var payload: Dictionary = state.to_payload()
+	var run_payload: Dictionary = payload["run"]
+	var wallet: Dictionary = run_payload["runWallet"]
+	var resources: Dictionary = run_payload["resources"]
+	wallet["CREDITS"] = float(wallet.get("CREDITS", 0.0)) - float(quote["credits"])
+	resources["hull"] = minf(float(resources.get("maxHull", 0.0)), float(resources.get("hull", 0.0)) + float(quote["repair"]))
+	resources["gameTimeMs"] = float(resources.get("gameTimeMs", 0.0)) + 8000.0
+	run_payload["lastCommandId"] = "checkpoint:repair:%s:%d" % [str(run_payload.get("seed", "")), int(resources["gameTimeMs"])]
 	return _commit_payload(payload)
 
 func shop_offers() -> Array[Dictionary]:
