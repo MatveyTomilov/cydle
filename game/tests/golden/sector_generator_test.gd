@@ -16,6 +16,11 @@ func run(_tree: SceneTree) -> bool:
 	for depth: int in [4, 8, 12]:
 		var boss_graph: Dictionary = generator.generate("boss-seed-%d" % depth, depth, generator.campaign_biome(depth, "boss"), false)["graph"]
 		check(str(boss_graph["layers"][5][0]["type"]) == "BOSS", "sector_generator: depth %d has no boss endpoint" % depth)
+		var expected_boss: String = "BOSS_A" if depth == 4 else "BOSS_B" if depth == 8 else "BOSS_CORE"
+		check(str(boss_graph["layers"][5][0]["enemies"][0].get("templateId", "")) == expected_boss, "sector_generator: campaign depth %d selected the wrong authored boss" % depth)
+	var endgame_boss: Dictionary = generator.generate("endgame-boss-seed", 16, "B04", false, 0.0, [], [], ["BOSS_B"])["graph"]["layers"][5][0]
+	var repeated_endgame_boss: Dictionary = generator.generate("endgame-boss-seed", 16, "B04", false, 0.0, [], [], ["BOSS_B"])["graph"]["layers"][5][0]
+	check(str(endgame_boss.get("enemies", [])[0].get("templateId", "")) == "BOSS_C" and endgame_boss == repeated_endgame_boss, "sector_generator: endgame boss selection ignored biome, previous boss, or deterministic seed")
 	check(generator.campaign_biome(13, "endgame-repeat-seed", ["B06", "B06"]) != "B06", "sector_generator: endgame allowed three identical biomes in sequence")
 	var campaign_graph: Dictionary = generator.generate("event-seed", 2, "B03", false)["graph"]
 	var event_node: Dictionary = campaign_graph["layers"][3][0]

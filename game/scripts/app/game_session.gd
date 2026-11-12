@@ -471,6 +471,13 @@ func _world_faction(seed_value: String, key: String) -> String:
 	var factions: Array[String] = ["F_VANTA", "F_RUST", "F_CHOIR", "F_ECHO"]
 	return factions[rng.int_range(0, factions.size() - 1)]
 
+func _last_boss_history(campaign_flags: Array[String]) -> Array[String]:
+	var result: Array[String] = []
+	for flag: String in campaign_flags:
+		if flag.begins_with("BOSS_LAST:"):
+			result.append(flag.trim_prefix("BOSS_LAST:"))
+	return result
+
 func _apply_faction_world_effects(graph: Dictionary, seed_value: String) -> void:
 	var hostile_nodes: Array[Dictionary] = []
 	var hated_faction: String = ""
@@ -599,11 +606,12 @@ func start_expedition(seed_value: String = "", use_medical_restore: bool = false
 	if seed.is_empty():
 		seed = "%s:run:%d" % [state.save_id, int(Time.get_ticks_usec())]
 	var biome: String = _generator.campaign_biome(depth, seed, _campaign_biome_history(state.meta.campaign_flags))
+	var previous_boss_ids: Array[String] = _last_boss_history(state.meta.campaign_flags)
 	var generated: Dictionary = _generator.generate(
 		seed, depth, biome,
 		depth == 1 and not bool(state.meta.tutorial.get("firstSectorCompleted", false)) and not bool(state.meta.tutorial.get("starterPrototypeSecured", false)),
 		0.0,
-		[], escalation_ids,
+	[], escalation_ids, previous_boss_ids,
 	)
 	if not bool(generated.get("ok", false)):
 		last_error = str(generated.get("error", "Не удалось создать дорожную карту."))
@@ -1723,7 +1731,7 @@ func continue_campaign(escalation_ids: Array[String] = []) -> bool:
 	var build: Dictionary = build_preview()
 	var seed: String = "%s:sector:%d" % [state.run.seed, next_depth]
 	var biome: String = _generator.campaign_biome(next_depth, seed, _campaign_biome_history(state.meta.campaign_flags))
-	var generated: Dictionary = _generator.generate(seed, next_depth, biome, false, state.run.wanted, state.run.events_seen, escalation_ids)
+	var generated: Dictionary = _generator.generate(seed, next_depth, biome, false, state.run.wanted, state.run.events_seen, escalation_ids, _last_boss_history(state.meta.campaign_flags))
 	if not bool(generated.get("ok", false)):
 		last_error = str(generated.get("error", "Не удалось создать следующий сектор."))
 		return false
@@ -2066,6 +2074,15 @@ func resolve_active_combat() -> bool:
 	run_payload["pendingNextCombat"] = {"skipOrdinary": false, "forceElite": false, "extraItemRoll": false, "forceBounty": false, "bountyCreditsBonus": 0.0, "bountyEnemyId": null, "extraRareItemRoll": false, "alliedTurret": false, "extraRareOnElite": retain_elite_contract}
 	if str(node.get("type", "")) == "BOSS":
 		var depth: int = int(state.run.depth)
+		var boss_enemies: Array = node.get("enemies", [])
+		if not boss_enemies.is_empty():
+			var previous_boss_flag: String = ""
+			for campaign_flag: String in payload["meta"]["campaignFlags"]:
+				if str(campaign_flag).begins_with("BOSS_LAST:"):
+					previous_boss_flag = str(campaign_flag)
+			if not previous_boss_flag.is_empty():
+				payload["meta"]["campaignFlags"].erase(previous_boss_flag)
+			payload["meta"]["campaignFlags"].append("BOSS_LAST:%s" % str(boss_enemies[0].get("templateId", "")))
 		if depth % 4 == 0:
 			payload["meta"]["unlockedForpost"] = maxi(int(payload["meta"]["unlockedForpost"]), depth)
 			payload["meta"]["maxSectorCleared"] = maxi(int(payload["meta"]["maxSectorCleared"]), depth)

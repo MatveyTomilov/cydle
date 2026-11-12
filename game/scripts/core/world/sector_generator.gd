@@ -25,7 +25,7 @@ func campaign_biome(depth: int, seed_value: String, previous_biomes: Array[Strin
 		selected = str(rng.pick(reroll))
 	return selected
 
-func generate(seed_value: String, depth: int, biome: String, tutorial: bool = false, wanted: float = 0.0, used_event_ids: Array[String] = [], escalation_ids: Array[String] = []) -> Dictionary:
+func generate(seed_value: String, depth: int, biome: String, tutorial: bool = false, wanted: float = 0.0, used_event_ids: Array[String] = [], escalation_ids: Array[String] = [], previous_boss_ids: Array[String] = []) -> Dictionary:
 	if seed_value.strip_edges().is_empty() or depth < 1:
 		return {"ok": false, "graph": {}, "error": "Для маршрута требуется seed и положительная глубина."}
 	if not ["B01", "B02", "B03", "B04", "B05", "B06"].has(biome):
@@ -91,7 +91,7 @@ func generate(seed_value: String, depth: int, biome: String, tutorial: bool = fa
 				node_type = "FUEL" if index == 0 else "REPAIR"
 			else:
 				node_type = str(rng.pick(["COMBAT", "REPAIR", "FUEL", "CACHE"]))
-			nodes.append(_create_node(seed_value, depth, biome, layer, index, node_type, fixed_enemies, rng, extras))
+			nodes.append(_create_node(seed_value, depth, biome, layer, index, node_type, fixed_enemies, rng, extras, previous_boss_ids))
 		layers.append(nodes)
 	if depth >= 13 and escalation_ids.has("REPAIR_RARE"):
 		var repair_nodes: Array[Dictionary] = []
@@ -121,7 +121,7 @@ func reachable_nodes(graph: Dictionary, current_node_id: String) -> Array[Dictio
 			result.append(by_id[node_id])
 	return result
 
-func _create_node(seed_value: String, depth: int, biome: String, layer: int, index: int, node_type: String, fixed_enemies: Array[String], rng: DeterministicRng, extras: Dictionary) -> Dictionary:
+func _create_node(seed_value: String, depth: int, biome: String, layer: int, index: int, node_type: String, fixed_enemies: Array[String], rng: DeterministicRng, extras: Dictionary, previous_boss_ids: Array[String] = []) -> Dictionary:
 	var enemies: Array[Dictionary] = []
 	for template_id: String in fixed_enemies:
 		enemies.append({"templateId": template_id})
@@ -139,7 +139,7 @@ func _create_node(seed_value: String, depth: int, biome: String, layer: int, ind
 		enemies = [{"templateId": anomaly_enemy, "elite": protocol}]
 		extras["anomalyProtocol"] = protocol
 	elif node_type == "BOSS":
-		enemies = [{"templateId": _boss_for_depth(depth)}]
+		enemies = [{"templateId": _boss_for_depth(depth, biome, seed_value, previous_boss_ids)}]
 	var threat: String = "boss" if node_type == "BOSS" else "high" if node_type in ["ELITE", "BOUNTY", "ANOMALY"] else "medium" if node_type in ["COMBAT", "EVENT", "QUEST"] else "low"
 	var loot_hint: String = "аномальная добыча" if node_type == "ANOMALY" else "добыча после боя" if node_type in ["COMBAT", "ELITE", "BOUNTY", "BOSS"] else "три прототипа" if node_type == "CACHE" else "восстановление ресурсов" if node_type in ["REPAIR", "FUEL"] else "5 товаров по биому" if node_type == "SHOP" else "неизвестно"
 	var node: Dictionary = {
@@ -160,17 +160,36 @@ func _enemy_for(biome: String, depth: int, rng: DeterministicRng) -> String:
 	pool.sort()
 	return str(rng.pick(pool)) if not pool.is_empty() else "E01"
 
-func _boss_for_depth(depth: int) -> String:
+func _boss_for_depth(depth: int, biome: String = "", seed_value: String = "", previous_boss_ids: Array[String] = []) -> String:
+	if depth == 4:
+		return "BOSS_A"
+	if depth == 8:
+		return "BOSS_B"
+	if depth == 12:
+		return "BOSS_CORE"
 	var eligible: Array[Dictionary] = []
 	for boss_value: Variant in _enemies.bosses.values():
 		var boss: Dictionary = boss_value
-		if int(boss.get("unlockDepth", 1)) <= depth:
+		var compatible: bool = biome.is_empty() or (boss.get("biomes", []) as Array).has(biome)
+		if int(boss.get("unlockDepth", 1)) <= depth and compatible:
 			eligible.append(boss)
+	if eligible.is_empty():
+		for boss_value: Variant in _enemies.bosses.values():
+			var boss: Dictionary = boss_value
+			if int(boss.get("unlockDepth", 1)) <= depth:
+				eligible.append(boss)
 	eligible.sort_custom(func(left: Dictionary, right: Dictionary) -> bool:
 			var left_depth: int = int(left.get("unlockDepth", 0))
 			var right_depth: int = int(right.get("unlockDepth", 0))
 			return left_depth < right_depth if left_depth != right_depth else str(left.get("id", "")) < str(right.get("id", "")))
-	return str(eligible.back().get("id", "CORE_12")) if not eligible.is_empty() else "CORE_12"
+	if eligible.is_empty():
+		return "BOSS_CORE"
+	var candidates: Array[Dictionary] = eligible.filter(func(boss: Dictionary) -> bool: return not previous_boss_ids.has(str(boss.get("id", ""))))
+	if candidates.is_empty():
+		candidates = eligible
+	var rng: DeterministicRng = DeterministicRng.new()
+	rng.seed("world:boss", "%s:%d:%s" % [seed_value, depth, biome])
+	return str(rng.pick(candidates).get("id", "BOSS_CORE"))
 
 func _link_layers(layers: Array, rng: DeterministicRng) -> Array[Dictionary]:
 	var edges: Array[Dictionary] = []
