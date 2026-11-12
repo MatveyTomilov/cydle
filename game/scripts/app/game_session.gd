@@ -24,9 +24,15 @@ func load_saved_game() -> bool:
 	var loaded: Dictionary = _repository.load_game(SLOT_ID)
 	if bool(loaded.get("ok", false)):
 		state = loaded["state"] as GameSaveState
+		var offline_since_ms: int = state.updated_at
 		if state.run != null and state.run.combat_snapshot != null:
 			if not _restore_combat_snapshot():
 				return false
+		if state.run != null and state.run.autopilot_enabled and not ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(state.run.phase):
+			var now_ms: int = int(Time.get_unix_time_from_system() * 1000.0)
+			var offline_elapsed_ms: int = clampi(now_ms - offline_since_ms, 0, 43200000)
+			if offline_elapsed_ms >= 1000:
+				last_autopilot_report = simulate_autopilot(offline_elapsed_ms)
 		last_error = ""
 		return true
 	if bool(loaded.get("empty", false)):
@@ -484,6 +490,16 @@ func start_expedition(seed_value: String = "", use_medical_restore: bool = false
 		payload["run"] = run_payload
 	return _commit_payload(payload)
 
+func set_autopilot_enabled(enabled: bool) -> bool:
+	if state == null or state.run == null or ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(state.run.phase):
+		last_error = "Настройка автопилота доступна только во время активного выезда."
+		return false
+	var payload: Dictionary = state.to_payload()
+	payload["run"]["autopilotEnabled"] = enabled
+	if not enabled:
+		payload["run"].erase("autopilotEnabled")
+	return _commit_payload(payload)
+
 func _force_contract_node(layers: Array, type: String, preferred_layer: int) -> Dictionary:
 	if layers.is_empty():
 		return {}
@@ -579,6 +595,9 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
 	var starting_time: float = float(state.run.resources.get("gameTimeMs", 0.0))
 	var starting_items: int = state.run.unsecured_cargo.size()
 	var starting_inventory: int = state.meta.inventory.size()
+	report["_startingTime"] = starting_time
+	report["_startingItems"] = starting_items
+	report["_startingInventory"] = starting_inventory
 	var actions: int = 0
 	var combat_time: int = 0
 	var policy: AutopilotPolicy = AutopilotPolicy.new()
@@ -598,6 +617,7 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
 					return _autopilot_stop("SAFE_ERROR_STOP", "COMBAT_STEP", str(step.get("error", "Боевой шаг автопилота отклонён.")), report)
 				_combat = step["state"] as CombatState
 				combat_time += 100
+				report["_combatTime"] = combat_time
 			if _combat.outcome.is_empty():
 				_persist_combat_snapshot()
 				report["status"] = "OFFLINE_CAPPED" if used_time + ticks_left * 100 >= budget else "PAUSED_FOR_DECISION"
@@ -610,6 +630,7 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
 				return _autopilot_stop("SAFE_ERROR_STOP", "COMBAT_SETTLEMENT", last_error, report)
 			report["battles"] = int(report["battles"]) + 1
 			combat_time = 0
+			report["_combatTime"] = 0
 			actions += 1
 			if state.run.phase == "DEFEATED":
 				report["status"] = "DEFEATED"
@@ -650,6 +671,8 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
 					if not resolve_event(str(event_choice.get("id", ""))):
 						return _autopilot_stop("PAUSED_FOR_RESOURCES", "EVENT_UNAFFORDABLE", last_error, report)
 				elif kind == "CACHE":
+					if node.has("prototypeChoices"):
+						return _autopilot_stop("PAUSED_FOR_DECISION", "CACHE_PROTOTYPE", "Обучающий тайник предлагает выбрать постоянный прототип.", report)
 					if not resolve_service_node("OPEN_CACHE"):
 						return _autopilot_stop("PAUSED_FOR_RESOURCES", "CACHE", last_error, report)
 				elif kind == "FUEL":
@@ -682,12 +705,7 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
 			break
 	if report["status"] == "RUNNING":
 		report["status"] = "OFFLINE_CAPPED" if report["reasonCode"] == "BUDGET" else report["status"]
-	report["simulatedMs"] = maxi(0, roundi(float(state.run.resources.get("gameTimeMs", starting_time)) - starting_time)) + combat_time
-	var current_run_items: int = state.run.unsecured_cargo.size() if state.run != null else 0
-	report["itemsFound"] = maxi(0, state.meta.inventory.size() + current_run_items - starting_inventory - starting_items)
-	report["itemsSecured"] = maxi(0, state.meta.inventory.size() - starting_inventory)
-	last_autopilot_report = report.duplicate(true)
-	return last_autopilot_report
+	return _finalize_autopilot_report(report)
 
 func _autopilot_event_choice(event: Dictionary) -> Dictionary:
 	for choice: Dictionary in event.get("choices", []):
@@ -706,6 +724,20 @@ func _autopilot_stop(status: String, code: String, reason: String, report: Dicti
 	report["reasonCode"] = code
 	report["reason"] = reason
 	report["error"] = last_error if status == "SAFE_ERROR_STOP" else ""
+	return _finalize_autopilot_report(report)
+
+func _finalize_autopilot_report(report: Dictionary) -> Dictionary:
+	if state != null:
+		var start_time: float = float(report.get("_startingTime", state.run.resources.get("gameTimeMs", 0.0) if state.run != null else 0.0))
+		var current_time: float = float(state.run.resources.get("gameTimeMs", start_time)) if state.run != null else start_time
+		report["simulatedMs"] = maxi(0, roundi(current_time - start_time)) + int(report.get("_combatTime", 0))
+		var start_items: int = int(report.get("_startingItems", 0))
+		var start_inventory: int = int(report.get("_startingInventory", state.meta.inventory.size()))
+		var current_run_items: int = state.run.unsecured_cargo.size() if state.run != null else 0
+		report["itemsFound"] = maxi(0, state.meta.inventory.size() + current_run_items - start_inventory - start_items)
+		report["itemsSecured"] = maxi(0, state.meta.inventory.size() - start_inventory)
+	for internal_key: String in ["_startingTime", "_startingItems", "_startingInventory", "_combatTime"]:
+		report.erase(internal_key)
 	last_autopilot_report = report.duplicate(true)
 	return last_autopilot_report
 
@@ -2392,6 +2424,7 @@ func extract_run() -> bool:
 	var payload: Dictionary = state.to_payload()
 	var run_payload: Dictionary = payload["run"]
 	var meta: Dictionary = payload["meta"]
+	run_payload.erase("autopilotEnabled")
 	var bank: Dictionary = meta["protectedBank"]
 	for currency: String in ["CREDITS", "SCRAP", "DATA"]:
 		bank[currency] = float(bank.get(currency, 0.0)) + float(run_payload["runWallet"].get(currency, 0.0))

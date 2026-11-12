@@ -892,6 +892,11 @@ func _show_road() -> void:
 	var autopilot_button: Button = _button("АВТОПИЛОТ · ДО БЕЗОПАСНОЙ ОСТАНОВКИ · ЛИМИТ 12 ЧАСОВ", true)
 	autopilot_button.pressed.connect(_on_autopilot)
 	_body.add_child(autopilot_button)
+	var offline_toggle: CheckButton = CheckButton.new()
+	offline_toggle.text = "Продолжать автопилот в офлайне (реальное время, максимум 12 часов)"
+	offline_toggle.button_pressed = run.autopilot_enabled
+	offline_toggle.toggled.connect(_on_toggle_offline_autopilot)
+	_body.add_child(offline_toggle)
 	if not _session.last_autopilot_report.is_empty():
 		var report: Dictionary = _session.last_autopilot_report
 		var report_label: Label = _label("АВТОПИЛОТ · %s · %s · узлов %d · боёв %d · симуляция %s" % [str(report.get("status", "")), str(report.get("reason", "")), int(report.get("nodesVisited", 0)), int(report.get("battles", 0)), _fmt(float(report.get("simulatedMs", 0.0)) / 1000.0) + " с"], 12, COLOR_CYAN)
@@ -1202,6 +1207,13 @@ func _on_autopilot() -> void:
 	var report: Dictionary = _session.simulate_autopilot()
 	if not bool(report.get("ok", false)):
 		_footer.text = str(report.get("error", "Автопилот остановлен."))
+	_show_road()
+
+func _on_toggle_offline_autopilot(enabled: bool) -> void:
+	if _session.set_autopilot_enabled(enabled):
+		_footer.text = "ОФЛАЙН-АВТОПИЛОТ ВКЛЮЧЁН · ПРОФИЛЬ СОХРАНЁН" if enabled else "ОФЛАЙН-АВТОПИЛОТ ВЫКЛЮЧЁН"
+	else:
+		_footer.text = _session.last_error
 	_show_road()
 
 func _on_save() -> void:

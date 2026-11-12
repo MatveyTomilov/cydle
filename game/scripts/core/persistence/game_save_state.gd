@@ -88,6 +88,7 @@ class RunState:
 		"alliedTurret": false, "extraRareOnElite": false,
 	}
 	var contract: Dictionary = {}
+	var autopilot_enabled: bool = false
 	var combat_result: Variant = null
 	var last_command_id: Variant = null
 	var world_rng: Dictionary = {}
@@ -128,6 +129,8 @@ class RunState:
 		}
 		if not contract.is_empty():
 			result["contract"] = contract.duplicate(true)
+		if autopilot_enabled:
+			result["autopilotEnabled"] = true
 		if combat_snapshot != null:
 			result["combatSnapshot"] = combat_snapshot.to_dictionary()
 		return result
@@ -295,6 +298,7 @@ func _run_from_dictionary(value: Dictionary) -> RunState:
 		"alliedTurret": false, "extraRareOnElite": false,
 	}).duplicate(true)
 	result.contract = value.get("contract", {}).duplicate(true)
+	result.autopilot_enabled = bool(value.get("autopilotEnabled", false))
 	result.combat_result = value.get("combatResult")
 	result.last_command_id = value.get("lastCommandId")
 	result.world_rng = value["worldRng"].duplicate(true)

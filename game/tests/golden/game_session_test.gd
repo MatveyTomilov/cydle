@@ -5,8 +5,19 @@ func run(_tree: SceneTree) -> bool:
 	autopilot_session.configure_save_directory("user://test-saves/autopilot")
 	if check(autopilot_session.start_new_game(1762900000050), "game_session: could not create an autopilot profile"):
 		check(autopilot_session.start_expedition("autopilot-fixed-seed"), "game_session: autopilot expedition could not start")
-		var autopilot_report: Dictionary = autopilot_session.simulate_autopilot(600000)
-		check(bool(autopilot_report.get("ok", false)) and int(autopilot_report.get("nodesVisited", 0)) > 0, "game_session: autopilot did not execute the route policy: %s" % autopilot_report)
+		check(autopilot_session.set_autopilot_enabled(true), "game_session: offline autopilot could not be enabled")
+		var resumed_autopilot: GameSession = GameSession.new()
+		resumed_autopilot.configure_save_directory("user://test-saves/autopilot")
+		check(resumed_autopilot.load_saved_game() and resumed_autopilot.state.run.autopilot_enabled, "game_session: offline autopilot opt-in did not persist")
+		resumed_autopilot.state.updated_at = int(Time.get_unix_time_from_system() * 1000.0) - 120000
+		check(bool(resumed_autopilot._repository.save_game(GameSession.SLOT_ID, resumed_autopilot.state, resumed_autopilot.state.updated_at).get("ok", false)), "game_session: could not prepare an elapsed offline interval")
+		var offline_resumed: GameSession = GameSession.new()
+		offline_resumed.configure_save_directory("user://test-saves/autopilot")
+		check(offline_resumed.load_saved_game(), "game_session: offline recovery could not load the profile: %s" % offline_resumed.last_error)
+		var offline_report: Dictionary = offline_resumed.last_autopilot_report
+		check(not offline_report.is_empty() and int(offline_report.get("simulatedMs", 0)) > 0 and int(offline_report.get("nodesVisited", 0)) > 0, "game_session: elapsed offline wall time did not run the shared autopilot simulation: %s" % offline_report)
+		var autopilot_report: Dictionary = offline_resumed.simulate_autopilot(600000)
+		check(bool(autopilot_report.get("ok", false)), "game_session: autopilot did not produce a route report: %s" % autopilot_report)
 		check(not ["SAFE_ERROR_STOP", "RUNNING"].has(str(autopilot_report.get("status", ""))), "game_session: autopilot returned without a clear stop state")
 	var contract_session: GameSession = GameSession.new()
 	contract_session.configure_save_directory("user://test-saves/contracts")

@@ -170,6 +170,8 @@ func _validate_run(value: Variant, meta: Dictionary) -> Dictionary:
 		return _failure("run.pendingNextCombat: неверная структура.")
 	if run.has("contract") and not _validate_contract_instance(run["contract"]):
 		return _failure("run.contract: неверный активный контракт.")
+	if run.has("autopilotEnabled") and not run["autopilotEnabled"] is bool:
+		return _failure("run.autopilotEnabled: ожидалось логическое значение.")
 	if not _validate_count_map(run["serviceScrapFuelCounts"]) or run["lastCommandId"] != null and not _nonempty_string(run["lastCommandId"]):
 		return _failure("run.serviceScrapFuelCounts/lastCommandId: неверные значения.")
 	if run["combatResult"] != null and not run["combatResult"] is Dictionary:
