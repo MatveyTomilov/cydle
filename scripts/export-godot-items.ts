@@ -244,6 +244,40 @@ mkdirSync(dirname(basicAutoFixtureOutput), { recursive: true });
 writeFileSync(basicAutoFixtureOutput, `${JSON.stringify({ config: { seed: basicStateConfig.seed, depth: basicStateConfig.depth, biome: basicStateConfig.biome, nodeType: basicStateConfig.nodeType, enemy: basicStateConfig.enemies[0], tactics: basicTactics, maxDurationMs: basicStateConfig.maxDurationMs }, frames: basicAutoFrames }, null, 2)}\n`, 'utf8');
 console.log(`Exported ${basicAutoFrames.length} basic-auto combat replay frames to ${basicAutoFixtureOutput}`);
 
+const weaponReplayTemplates = ['RIFLE_K2', 'PLASMA_E1', 'SPIKE_D2', 'DUAL_H1', 'SHOTGUN_K5'];
+const weaponPacketReplays = weaponReplayTemplates.map((templateId) => {
+  const item = createItem(new Rng('loot', `weapon-packet:${templateId}`), {
+    templateId, techLevel: 1, rarity: 'COMMON', secured: true,
+    originGrantId: `weapon-packet:${templateId}`, origin: 'fixture',
+  });
+  const build = resolveBuild({
+    attributes: initialSaveFixture.meta.operator.attributes,
+    equipment: { MAIN: item },
+    skillIds: [], passiveIds: [], treeNodeIds: [], attributePointsEarned: 0, treePointsEarned: 0,
+  });
+  let replay = createCombatState({ ...basicStateConfig, build });
+  const frames = [];
+  for (let tick = 0; tick < 15; tick++) {
+    const previousLogLength = replay.log.length;
+    replay = stepCombat(replay);
+    const actorFrame = (actor: typeof replay.operator) => ({
+      id: actor.id, hp: actor.hp, shield: actor.shield, energy: actor.energy, heat: actor.heat,
+      nextAttackAt: actor.nextAttackAt, alive: actor.alive, flags: actor.flags, counters: actor.counters,
+      damageDealt: actor.damageDealt, damageTaken: actor.damageTaken,
+    });
+    frames.push({
+      timeMs: replay.timeMs, rng: replay.rng, nextEventId: replay.nextEventId,
+      metrics: replay.metrics, outcome: replay.outcome,
+      operator: actorFrame(replay.operator), enemies: replay.enemies.map(actorFrame),
+      events: replay.log.slice(previousLogLength),
+    });
+  }
+  return { templateId, item, frames };
+});
+const weaponReplayOutput = resolve('game/tests/fixtures/combat/weapon_packet_replays.json');
+writeFileSync(weaponReplayOutput, `${JSON.stringify(weaponPacketReplays, null, 2)}\n`, 'utf8');
+console.log(`Exported ${weaponPacketReplays.length} multi-channel/packet combat replays to ${weaponReplayOutput}`);
+
 let dotState = createCombatState(basicStateConfig);
 applyStatus(dotState, dotState.operator, dotState.enemies[0]!, 'BLEED', { snapshot: 100 });
 const dotFrames = [];

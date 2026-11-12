@@ -16,6 +16,7 @@ var _factory: CombatFactory = CombatFactory.new()
 var _hash: StateHash = StateHash.new()
 var _damage: DamageMath = DamageMath.new()
 var _formula: CydleFormula = CydleFormula.new()
+var _stats: StatMath = StatMath.new()
 var _status_catalog: StatusCatalog = StatusCatalog.new()
 var _status_catalog_loaded: bool = false
 var _status_catalog_error: String = ""
@@ -300,8 +301,47 @@ func _status_stacks(actor: CombatActorState, status_id: String) -> int:
 func _has_status(actor: CombatActorState, status_id: String) -> bool:
 	return not actor.statuses.get(status_id, []).is_empty()
 
-func _effective_sheet(_state: CombatState, actor: CombatActorState, _target: CombatActorState = null) -> Dictionary:
+func _effective_sheet(state: CombatState, actor: CombatActorState, target: CombatActorState = null) -> Dictionary:
 	var sheet: Dictionary = actor.base_sheet.duplicate(true)
+	var has_conditions: bool = false
+	for modifier: Dictionary in actor.base_mods:
+		if modifier.has("condition"):
+			has_conditions = true
+			break
+	if has_conditions:
+		var self_view: Dictionary = {
+			"hp": actor.hp, "maxHP": actor.base_sheet.get("maxHP", 0.0),
+			"shield": actor.shield, "maxShield": actor.base_sheet.get("maxShield", 0.0),
+			"energy": actor.energy, "heat": actor.heat,
+			"statuses": _status_counts(actor), "isBoss": actor.is_boss,
+			"isMechanical": actor.is_mechanical, "isDrone": actor.kind == "drone",
+		}
+		var context: Dictionary = {
+			"self": self_view,
+			"enemiesAlive": _living_count(state.enemies) if actor.side == "player" else _living_player_count(state),
+			"dronesAlive": _living_count(state.drones), "timeMs": state.time_ms,
+			"heatLockout": actor.heat_lockout, "flags": actor.flags,
+			"otherDroneDead": state.drones.any(func(drone: CombatActorState) -> bool: return not drone.alive and drone.id != actor.id),
+			"bothDronesSameTarget": state.drones.size() >= 2 and state.drones.all(func(drone: CombatActorState) -> bool: return drone.alive) and not state.drones[0].last_target_id.is_empty() and state.drones[0].last_target_id == state.drones[1].last_target_id,
+		}
+		if target != null:
+			context["target"] = {
+				"hp": target.hp, "maxHP": target.base_sheet.get("maxHP", 0.0),
+				"shield": target.shield, "maxShield": target.base_sheet.get("maxShield", 0.0),
+				"energy": target.energy, "heat": target.heat,
+				"statuses": _status_counts(target), "isBoss": target.is_boss,
+				"isMechanical": target.is_mechanical, "isDrone": target.kind == "drone",
+			}
+		var uniques: Array[String] = []
+		for equipped: Variant in state.build.get("equipment", {}).values():
+			if equipped is Dictionary:
+				for unique_id: Variant in equipped.get("uniqueEffectIds", []):
+					if not uniques.has(str(unique_id)):
+						uniques.append(str(unique_id))
+		context["uniques"] = uniques
+		var resolved: Dictionary = _stats.resolve_stats(_stats.bundle(actor.base_mods), context)
+		if not resolved.has("_error") and not resolved.is_empty():
+			sheet = _stats.sheet_of(resolved)
 	var armor_break: int = _status_stacks(actor, "ARMOR_BREAK")
 	if armor_break > 0:
 		sheet["armor"] = float(sheet.get("armor", 0.0)) - 10.0 * armor_break
@@ -317,6 +357,22 @@ func _effective_sheet(_state: CombatState, actor: CombatActorState, _target: Com
 	if overclock_stacks > 0:
 		sheet["attackSpeed"] = float(sheet.get("attackSpeed", 0.0)) + 20.0 * overclock_stacks
 	return sheet
+
+func _status_counts(actor: CombatActorState) -> Dictionary:
+	var counts: Dictionary = {}
+	for status_id: Variant in actor.statuses.keys():
+		counts[str(status_id)] = _status_stacks(actor, str(status_id))
+	return counts
+
+func _living_count(actors: Array[CombatActorState]) -> int:
+	var count: int = 0
+	for actor: CombatActorState in actors:
+		if actor.alive:
+			count += 1
+	return count
+
+func _living_player_count(state: CombatState) -> int:
+	return int(state.operator.alive) + _living_count(state.drones) + _living_count(state.allies)
 
 func _apply_basic_continuous(state: CombatState) -> void:
 	var operator: CombatActorState = state.operator
@@ -374,6 +430,10 @@ func _resolve_basic_attack(state: CombatState, rng: DeterministicRng, actor: Com
 		if energy_cost > 0.0:
 			actor.energy = maxf(0.0, actor.energy - energy_cost)
 			state.metrics["energySpent"] = float(state.metrics.get("energySpent", 0.0)) + energy_cost
+		var heat_gain: float = float(weapon.get("heatPerAttack", 0.0))
+		if _has_status(actor, "OVERCLOCK"):
+			heat_gain += 5.0
+		_gain_basic_heat(state, actor, heat_gain)
 	actor.counters["attacks"] = int(actor.counters.get("attacks", 0)) + 1
 	var action_id: String = "%s:atk:%d" % [actor.id, int(actor.counters["attacks"])]
 	actor.last_main_attack_at = state.time_ms
@@ -506,11 +566,21 @@ func _schedule_next_attack(state: CombatState, actor: CombatActorState) -> void:
 		interval /= 0.7
 	if actor.kind == "drone" and _has_status(actor, "DRONE_JAM"):
 		interval /= 0.5
-	if _has_status(actor, "OVERCLOCK"):
-		actor.heat = minf(float(actor.base_sheet.get("maxHeat", 0.0)), actor.heat + 5.0)
 	actor.next_attack_at += interval
 	if actor.next_attack_at <= float(state.time_ms):
 		actor.next_attack_at = float(state.time_ms) + interval
+
+func _gain_basic_heat(state: CombatState, actor: CombatActorState, amount: float) -> void:
+	if amount <= 0.0:
+		return
+	var max_heat: float = float(actor.base_sheet.get("maxHeat", 0.0))
+	var before: float = actor.heat
+	actor.heat = clampf(actor.heat + amount, 0.0, max_heat)
+	if not actor.heat_lockout and before < max_heat and actor.heat >= max_heat:
+		actor.heat_lockout = true
+		_emit(state, "HEAT", actor.id, {"text": "Нагрев достиг максимума.", "data": {"heat": actor.heat, "threshold": max_heat}})
+		state.metrics["heatLockouts"] = int(state.metrics.get("heatLockouts", 0)) + 1
+		_emit(state, "HEAT_LOCKOUT", actor.id, {"text": "Перегрев: main-канал заблокирован до охлаждения ≤ 80."})
 
 func _resolve_basic_deaths(state: CombatState) -> void:
 	for actor: CombatActorState in state.all_actors():

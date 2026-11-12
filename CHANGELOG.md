@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added five TypeScript-oracle auto-combat replays for RIFLE_K2, PLASMA_E1, SPIKE_D2, DUAL_H1 mixed packets, and SHOTGUN_K5 pellets. Combat stat conditions now resolve through shared `StatMath` at point of use, and weapon heat-per-attack is applied before the attack event.
 - Ported catalogued ordinary-combat status effects for ARMOR_BREAK, SHOCK, DRONE_JAM, SHIELD_LEAK, MARK, SCAN_MARK, DRONE_MARK, CONTROLLED, GUARD, OVERCLOCK, ACC_BUFF, EVASION_BUFF, SHIELD_REGEN_BUFF, and two-stack BERSERK. Added 14 TypeScript-oracle replay checkpoints, including a working drone jam case; STUN/JAM and cast/tactical behavior remain unsupported.
 - Exported and validated the 25-entry native status catalog. Added native BLEED/BURN/VIRUS status application, independent DoT stacks, snapshot ticks, expiration-boundary ticks, and status expiration to the single combat transition; added a 40-frame BLEED replay fixture checked against the TypeScript oracle. Other status behaviors remain unsupported.
 - Added a checked 15-frame TypeScript combat oracle and an immutable native `step_combat()` slice for eligible basic auto-attack encounters, covering baseline resource updates, hit/crit RNG, shared damage mitigation, shields/HP, metrics, death, and combat termination.
