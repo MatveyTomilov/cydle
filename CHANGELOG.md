@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — EV12 energy refill
+
+- EV12 now refills from the current `BuildResolver` max-energy result without looking up a nonexistent energy-cap field in route resources. The event still applies its authored −5 hull consequence.
+- Godot editor import passed; 22 headless scripts passed (88,064 assertions), including an EV12 route transaction regression. Windows Desktop export and exported EXE headless smoke both passed.
+
 ## Unreleased — campaign combat rosters and save checksum compatibility
 
 - Ordinary combat nodes now assemble multiple biome-themed enemies within the authored depth threat budget and unlock rules, with a six-actor cap and bounded E20 swarm packs.

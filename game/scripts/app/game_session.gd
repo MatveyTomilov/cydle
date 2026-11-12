@@ -1585,7 +1585,7 @@ func resolve_event(choice_id: String, cargo_item_id: String = "") -> bool:
 		if not bool(build.get("valid", false)):
 			last_error = "Невозможно рассчитать энергию текущей сборки."
 			return false
-		resources["energy"] = float(build.get("stats", {}).get("maxEnergy", resources["maxEnergy"]))
+		resources["energy"] = float(build.get("stats", {}).get("maxEnergy", resources.get("energy", 0.0)))
 	if choice.has("reputation"):
 		for faction: Variant in choice["reputation"].keys():
 			meta["reputation"][str(faction)] = clampi(int(meta["reputation"].get(str(faction), 0)) + int(choice["reputation"][faction]), -100, 100)

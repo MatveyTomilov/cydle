@@ -10,6 +10,10 @@ The active strategy is **FULL GAME FIRST**: connect every major Master Spec syst
 
 Ordinary route COMBAT nodes now use biome-themed multi-enemy rosters bounded by §17 threat units, unlock depth, and six active actors; E20 uses a bounded 2–4 unit pack. This closes the previous single-enemy encounter gap, but does not establish complete tactical counter coverage or campaign balance. Save checksum writes use a wider float bucket while preserving validation for prior 1e-8 and legacy saves. Godot editor import and 22 headless scripts passed at 88,058 assertions before adding an explicit previous-bucket regression; rerun checks after that test addition. Isolated full campaign E2E has reached d4 BOSS_A but its first attempt failed; the resumed outing is still exercising route progression. Do not treat d12/endgame acceptance as verified by this run.
 
+### Current status override (2026-11-13; EV12 runtime regression)
+
+An isolated campaign run exposed EV12 reading `maxEnergy` from route resources, where that key does not exist. Event settlement now refills to the validated BuildResolver `maxEnergy`; a transaction regression checks the full refill and −5 hull cost. Godot editor import and 22 scripts / 88,064 assertions pass; Windows Desktop export and EXE headless smoke pass. Campaign acceptance remains incomplete: the isolated build has not yet defeated BOSS_A.
+
 ### Current status override (2026-11-13)
 
 Active quest stages now generate their own connected `QUEST` route nodes; ordinary events remain separate. Quest-node actions use the authored quest transaction, and paused chains can resume from the journal. The 22-script Godot suite passes at 87,649 assertions; Windows export, EXE smoke, and diff check pass. This supersedes historical roadmap notes below that say stage IDs only annotate generic event nodes; the earlier checkpoints remain as history. Six-chain conditions/deadlines, contract breadth, full campaign acceptance, and major combat coverage remain incomplete.

@@ -1144,6 +1144,18 @@ func run(_tree: SceneTree) -> bool:
 			var credits_before_vanta: float = event_session.state.run.wallet.credits
 			check(event_session.resolve_event("B", vanta_item.item_id), "game_session: VANTA cargo sale failed: %s" % event_session.last_error)
 			check(event_session.state.run.unsecured_cargo.is_empty() and event_session.state.run.wallet.credits > credits_before_vanta and event_session.state.meta.reputation.get("F_VANTA", 0) >= 5, "game_session: VANTA deal did not consume one cargo item and grant its authored rewards")
+	var energy_event_session: GameSession = GameSession.new()
+	energy_event_session.configure_save_directory("user://test-saves/event-energy-refill")
+	if check(energy_event_session.start_new_game(1762900000102), "game_session: could not create an energy-event profile") and check(energy_event_session.start_expedition("event-energy-refill"), "game_session: could not start energy-event run"):
+		var energy_event_payload: Dictionary = energy_event_session.state.to_payload()
+		energy_event_payload["run"]["graph"] = {"layers": [[{"id": "energy-refill-event", "layer": 0, "type": "EVENT", "eventId": "EV12", "threat": "medium", "enemies": [], "revealLevel": 1, "lootHint": "event"}]], "edges": [{"from": "START", "to": "energy-refill-event", "fromLayer": -1, "toLayer": 0, "fuelCost": 1}]}
+		energy_event_payload["run"]["resources"]["energy"] = 0.0
+		check(energy_event_session._commit_payload(energy_event_payload) and energy_event_session.travel_to("energy-refill-event"), "game_session: energy-refill event route could not be prepared: %s" % energy_event_session.last_error)
+		var energy_event_build: Dictionary = energy_event_session.build_preview()
+		var expected_event_energy: float = float(energy_event_build.get("stats", {}).get("maxEnergy", 0.0))
+		var hull_before_energy_event: float = float(energy_event_session.state.run.resources.get("hull", 0.0))
+		check(energy_event_session.resolve_event("A"), "game_session: EV12 energy refill failed: %s" % energy_event_session.last_error)
+		check(is_equal_approx(float(energy_event_session.state.run.resources.get("energy", -1.0)), expected_event_energy) and is_equal_approx(float(energy_event_session.state.run.resources.get("hull", 0.0)), hull_before_energy_event - 5.0), "game_session: EV12 did not refill computed max energy while applying the hull cost")
 	var scout_session: GameSession = GameSession.new()
 	scout_session.configure_save_directory("user://test-saves/event-route-scouting")
 	if check(scout_session.start_new_game(1762900000101), "game_session: could not create an event-scouting profile") and check(scout_session.start_expedition("event-route-scouting"), "game_session: could not start an event-scouting run"):

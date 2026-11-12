@@ -1,5 +1,12 @@
 # CYDLE — Project handoff and development history
 
+## Live continuation (2026-11-13; EV12 energy refill runtime fix)
+
+- Current pushed base: `913d9138f646c9412e2867cf77ea44f5af9712ea` on `development/codex`. Local WIP fixes a gameplay exception exposed by the isolated campaign route: EV12 read nonexistent `run.resources.maxEnergy` while calculating its refill. It now uses the already validated `BuildResolver` max-energy result, with a safe current-resource fallback.
+- Added EV12 transaction regression: verifies full computed energy refill and the authored −5 hull cost. Verification on this code: Godot 4.7.2 editor import exit 0; 22 scripts / 88,064 assertions / 0 failures; Windows Desktop export exit 0; exported EXE `--headless --quit-after 3` exit 0. Diff check remains to run before committing this WIP.
+- Isolated campaign profile is retained at `%APPDATA%\Godot\app_userdata\CYDLE_ROSTER_E2E_20261113\campaign-e2e-repro`. It has accumulated through repeated d1–d4 attempts; BOSS_A remained undefeated in the latest attempt at level 5. The driver was stopped after a safe d3 checkpoint. This is a test profile, not the user's game save.
+- Preserve user's original CYDLE profile and prior E2E backup. Continue by rebuilding/exporting, then resume the isolated profile with `godot_console.exe --headless --path game --script res://tools/campaign_e2e.gd -- --resume` only while `project.godot` uses the isolated test application name; restore `config/name="CYDLE"` immediately afterward. The blocking campaign issue is the current E2E build/tactics failing BOSS_A; improve the test driver's actual legal build/route choices or find a shared combat defect, without changing authored boss balance.
+
 ## Live continuation (2026-11-13; FULL GAME FIRST campaign encounters)
 
 - Working branch `development/codex`, base commit `d986d62b40f69ca68c34ca14f21d2ddf130cde6d`; local work below is not yet committed while the isolated campaign run is underway.
