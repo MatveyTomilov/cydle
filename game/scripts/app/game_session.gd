@@ -1168,6 +1168,13 @@ func _quest_stage_ready(quest: Dictionary, stage: Dictionary, progress: Dictiona
 					if str(node.get("type", "")) != "ELITE" or not state.run.cleared_node_ids.has(str(node.get("id", ""))): continue
 					for enemy: Dictionary in node.get("enemies", []):
 						if str(enemy.get("templateId", "")) == str(requirement.get("enemyId", "")): return true
+			if str(quest.get("id", "")) == "Q05" and int(stage.get("stage", 0)) == 2 and state.run.biome == "B05":
+				var survived_biome_combats: int = 0
+				for layer: Array in state.run.graph.get("layers", []):
+					for node: Dictionary in layer:
+						if str(node.get("type", "")) in ["COMBAT", "ELITE", "BOUNTY"] and state.run.cleared_node_ids.has(str(node.get("id", ""))):
+							survived_biome_combats += 1
+				return survived_biome_combats >= 3
 			return false
 		"biomeCombat":
 			var count: int = 0
@@ -1198,6 +1205,8 @@ func _expire_quest_deadlines(meta: Dictionary, next_depth: int) -> void:
 		if deadline > 0 and next_depth > int(progress.get("stageStartedDepth", progress.get("startedDepth", next_depth))) + deadline:
 			progress["status"] = "FAILED"
 			if not progress["flags"].has("deadline-expired"): progress["flags"].append("deadline-expired")
+			if quest_id == "Q02":
+				meta["reputation"]["F_ECHO"] = maxi(-100, int(meta["reputation"].get("F_ECHO", 0)) - 3)
 			all_progress[quest_id] = progress
 	meta["questProgress"] = all_progress
 

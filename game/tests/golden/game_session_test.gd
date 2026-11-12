@@ -61,6 +61,17 @@ func run(_tree: SceneTree) -> bool:
 		check(ending_session.state.meta.campaign_flags.has("ENDGAME_UNLOCKED") and ending_session.state.meta.campaign_flags.has("ENDING_FACTION:F_RUST"), "game_session: faction ending did not unlock and record endgame control")
 		check(ending_session.continue_campaign(), "game_session: campaign could not continue into endgame: %s" % ending_session.last_error)
 		check(ending_session.state.run.depth == 13 and ending_session.state.run.biome != "B06", "game_session: endgame did not begin or enforced a three-sector biome streak")
+	var deadline_session: GameSession = GameSession.new()
+	deadline_session.configure_save_directory("user://test-saves/quest-deadline")
+	if check(deadline_session.start_new_game(1762900000130), "game_session: could not create a deadline profile"):
+		var deadline_payload: Dictionary = deadline_session.state.to_payload()
+		deadline_payload["meta"]["questProgress"] = {"Q02": {"status": "ACTIVE", "stage": 2, "startedDepth": 2, "stageStartedDepth": 2, "completedStages": ["S1"], "choiceHistory": [{"stage": 1, "choiceId": "A", "nodeId": "D2N1"}], "flags": []}}
+		check(deadline_session._commit_payload(deadline_payload), "game_session: Q02 deadline fixture could not be saved")
+		var expired_meta: Dictionary = deadline_session.state.to_payload()["meta"]
+		deadline_session._expire_quest_deadlines(expired_meta, 6)
+		check(str(expired_meta["questProgress"]["Q02"].get("status", "")) == "FAILED" and int(expired_meta["reputation"]["F_ECHO"]) == -3, "game_session: Q02 deadline did not fail with its F_ECHO compensation")
+		deadline_session._expire_quest_deadlines(expired_meta, 7)
+		check(int(expired_meta["reputation"]["F_ECHO"]) == -3, "game_session: Q02 deadline compensation was applied more than once")
 	var session: GameSession = GameSession.new()
 	session.configure_save_directory("user://test-saves/game-session")
 	if not check(session.start_new_game(1762900000000), "game_session: could not create a new game: %s" % session.last_error):
