@@ -32,6 +32,8 @@ func _run_campaign() -> void:
 			var next_depth: int = int(session.state.meta.unlocked_forpost) + 1
 			if session.state.run != null and ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(session.state.run.phase):
 				print("E2E terminal d%d phase=%s hp=%d hull=%d fuel=%d error=%s" % [session.state.run.depth, session.state.run.phase, int(session.state.run.resources.get("hp", 0)), int(session.state.run.resources.get("hull", 0)), int(session.state.run.resources.get("fuel", 0)), session.last_error])
+				if session.state.run.phase == "DEFEATED" and session.state.run.depth % 4 == 0:
+					gate_farm_counts.erase(session.state.run.depth)
 			sector_attempts[next_depth] = int(sector_attempts.get(next_depth, 0)) + 1
 			seed_index += 1
 			if int(sector_attempts[next_depth]) > 20:
