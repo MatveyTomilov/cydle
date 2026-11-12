@@ -1,6 +1,13 @@
 extends "res://tests/test_case.gd"
 
 func run(_tree: SceneTree) -> bool:
+	var autopilot_session: GameSession = GameSession.new()
+	autopilot_session.configure_save_directory("user://test-saves/autopilot")
+	if check(autopilot_session.start_new_game(1762900000050), "game_session: could not create an autopilot profile"):
+		check(autopilot_session.start_expedition("autopilot-fixed-seed"), "game_session: autopilot expedition could not start")
+		var autopilot_report: Dictionary = autopilot_session.simulate_autopilot(600000)
+		check(bool(autopilot_report.get("ok", false)) and int(autopilot_report.get("nodesVisited", 0)) > 0, "game_session: autopilot did not execute the route policy: %s" % autopilot_report)
+		check(not ["SAFE_ERROR_STOP", "RUNNING"].has(str(autopilot_report.get("status", ""))), "game_session: autopilot returned without a clear stop state")
 	var contract_session: GameSession = GameSession.new()
 	contract_session.configure_save_directory("user://test-saves/contracts")
 	if check(contract_session.start_new_game(1762900000100), "game_session: could not create a contract profile"):

@@ -6,6 +6,7 @@ const SLOT_ID: String = "cylde-main"
 var state: GameSaveState
 var last_error: String = ""
 var combat_notice: String = ""
+var last_autopilot_report: Dictionary = {}
 var _repository: SaveRepository = SaveRepository.new()
 var _generator: SectorGenerator = SectorGenerator.new()
 var _stats: StatMath = StatMath.new()
@@ -564,6 +565,149 @@ func route_intel() -> Dictionary:
 					info["lootHint"] = str(node.get("lootHint", "unknown"))
 			result["nodes"][node_id] = info
 	return result
+
+func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
+	const MAX_OFFLINE_MS: int = 43200000
+	const MAX_COMMANDS: int = 2048
+	var budget: int = clampi(simulation_budget_ms, 0, MAX_OFFLINE_MS)
+	var report: Dictionary = {"ok": true, "status": "RUNNING", "reasonCode": "BUDGET", "reason": "Достигнут лимит симуляции.", "simulatedMs": 0, "nodesVisited": 0, "battles": 0, "itemsFound": 0, "itemsSecured": 0, "seed": "", "error": ""}
+	if state == null or state.run == null or ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(state.run.phase):
+		return _autopilot_stop("PAUSED_FOR_DECISION", "NO_ACTIVE_RUN", "Автопилот продолжит движение только из активного выезда.", report)
+	if budget <= 0:
+		return _autopilot_stop("PAUSED_FOR_RESOURCES", "ZERO_BUDGET", "Нулевой лимит симуляции.", report)
+	report["seed"] = state.run.seed
+	var starting_time: float = float(state.run.resources.get("gameTimeMs", 0.0))
+	var starting_items: int = state.run.unsecured_cargo.size()
+	var starting_inventory: int = state.meta.inventory.size()
+	var actions: int = 0
+	var combat_time: int = 0
+	var policy: AutopilotPolicy = AutopilotPolicy.new()
+	while actions < MAX_COMMANDS:
+		var used_time: int = maxi(0, roundi(float(state.run.resources.get("gameTimeMs", starting_time)) - starting_time)) + combat_time
+		if used_time >= budget:
+			break
+		if _combat != null:
+			var ticks_left: int = mini(1800, int((budget - used_time) / 100))
+			if ticks_left <= 0:
+				break
+			for _tick: int in range(ticks_left):
+				if not _combat.outcome.is_empty():
+					break
+				var step: Dictionary = _simulator.step_combat(_combat)
+				if not bool(step.get("ok", false)):
+					return _autopilot_stop("SAFE_ERROR_STOP", "COMBAT_STEP", str(step.get("error", "Боевой шаг автопилота отклонён.")), report)
+				_combat = step["state"] as CombatState
+				combat_time += 100
+			if _combat.outcome.is_empty():
+				_persist_combat_snapshot()
+				report["status"] = "OFFLINE_CAPPED" if used_time + ticks_left * 100 >= budget else "PAUSED_FOR_DECISION"
+				report["reasonCode"] = "TIME_BUDGET" if report["status"] == "OFFLINE_CAPPED" else "COMBAT_TICK_LIMIT"
+				report["reason"] = "Симуляция приостановлена между тиками боя; состояние сохранено."
+				break
+			if not _persist_combat_snapshot():
+				return _autopilot_stop("SAFE_ERROR_STOP", "COMBAT_SAVE", last_error, report)
+			if not resolve_active_combat():
+				return _autopilot_stop("SAFE_ERROR_STOP", "COMBAT_SETTLEMENT", last_error, report)
+			report["battles"] = int(report["battles"]) + 1
+			combat_time = 0
+			actions += 1
+			if state.run.phase == "DEFEATED":
+				report["status"] = "DEFEATED"
+				report["reasonCode"] = "OPERATOR_DEFEATED"
+				report["reason"] = "Оператор потерпел поражение; автоматический перезапуск отключён."
+				break
+			continue
+		match state.run.phase:
+			"ROUTE":
+				var choice: Dictionary = policy.choose_node(reachable_nodes(), route_intel(), state.run, 4.0)
+				if choice.is_empty():
+					return _autopilot_stop("PAUSED_FOR_RESOURCES", "NO_REACHABLE_NODE", "Нет известного достижимого перехода; требуется ручное решение.", report)
+				var edge_cost: int = 25000
+				var known_choice: Dictionary = route_intel().get("nodes", {}).get(str(choice.get("id", "")), {})
+				for edge: Dictionary in state.run.graph.get("edges", []):
+					if str(edge.get("from", "")) == state.run.current_node_id and str(edge.get("to", "")) == str(choice.get("id", "")):
+						edge_cost += int(edge.get("travelMs", 0))
+						if bool(known_choice.get("revealed", false)) and str(known_choice.get("type", "")) == "CHECKPOINT": edge_cost += 8000
+						break
+				if edge_cost > budget - used_time:
+					break
+				if not travel_to(str(choice.get("id", ""))):
+					return _autopilot_stop("PAUSED_FOR_RESOURCES", "TRAVEL_REJECTED", last_error, report)
+				report["nodesVisited"] = int(report["nodesVisited"]) + 1
+			"NODE":
+				if not available_quest_stages().is_empty():
+					return _autopilot_stop("PAUSED_FOR_DECISION", "QUEST_CHOICE", "Квестовое решение требует явного выбора игрока.", report)
+				var node: Dictionary = current_node()
+				var kind: String = str(node.get("type", ""))
+				if kind in ["COMBAT", "ELITE", "BOUNTY", "BOSS"]:
+					if not begin_combat():
+						return _autopilot_stop("SAFE_ERROR_STOP", "COMBAT_START", last_error, report)
+				elif kind == "EVENT":
+					var event: Dictionary = current_event()
+					var event_choice: Dictionary = _autopilot_event_choice(event)
+					if event_choice.is_empty():
+						return _autopilot_stop("PAUSED_FOR_DECISION", "EVENT_CHOICE", "Событие требует фракционного, сюжетного или рискованного выбора игрока.", report)
+					if not resolve_event(str(event_choice.get("id", ""))):
+						return _autopilot_stop("PAUSED_FOR_RESOURCES", "EVENT_UNAFFORDABLE", last_error, report)
+				elif kind == "CACHE":
+					if not resolve_service_node("OPEN_CACHE"):
+						return _autopilot_stop("PAUSED_FOR_RESOURCES", "CACHE", last_error, report)
+				elif kind == "FUEL":
+					var resources: Dictionary = state.run.resources
+					var fuel_action: String = "BUY_FUEL" if float(resources.get("fuel", 0.0)) < float(resources.get("maxFuel", 0.0)) else "LEAVE_NODE"
+					if fuel_action == "BUY_FUEL" and float(state.run.wallet.credits) < ceili(3.0 * CydleFormula.new().reward_scale(float(state.run.depth))):
+						fuel_action = "SCRAP_FUEL" if state.run.wallet.scrap >= 5.0 else ""
+					if fuel_action.is_empty(): return _autopilot_stop("PAUSED_FOR_RESOURCES", "FUEL_UNAVAILABLE", "Нет доступных кредитов или лома для топлива.", report)
+					if not resolve_service_node(fuel_action): return _autopilot_stop("PAUSED_FOR_RESOURCES", "FUEL_SERVICE", last_error, report)
+				elif kind == "REPAIR":
+					var resources: Dictionary = state.run.resources
+					var repair_action: String = "REPAIR_HULL" if float(resources.get("hull", 0.0)) < float(resources.get("maxHull", 0.0)) else "REPAIR_HP" if float(resources.get("hp", 0.0)) < float(resources.get("maxHP", 0.0)) else "LEAVE_NODE"
+					if repair_action != "LEAVE_NODE" and not resolve_service_node(repair_action): return _autopilot_stop("PAUSED_FOR_RESOURCES", "REPAIR_UNAVAILABLE", last_error, report)
+					if repair_action == "LEAVE_NODE" and not resolve_service_node("LEAVE_NODE"): return _autopilot_stop("SAFE_ERROR_STOP", "NODE_EXIT", last_error, report)
+				elif kind == "SHOP":
+					if not resolve_service_node("LEAVE_NODE"): return _autopilot_stop("SAFE_ERROR_STOP", "NODE_EXIT", last_error, report)
+				else:
+					return _autopilot_stop("SAFE_ERROR_STOP", "UNSUPPORTED_NODE", "Узел %s не поддерживает автоматическое действие." % kind, report)
+				actions += 1
+			"CHECKPOINT":
+				if not extract_run():
+					return _autopilot_stop("SAFE_ERROR_STOP", "EXTRACTION", last_error, report)
+				report["status"] = "EXTRACTED"
+				report["reasonCode"] = "SAFE_CHECKPOINT_EXTRACTION"
+				report["reason"] = "На контрольном узле добыча закреплена; автоматический переход в следующий сектор не выполнялся."
+				break
+			_:
+				return _autopilot_stop("PAUSED_FOR_DECISION", "RUN_STATE", "Текущий этап выезда требует ручного решения.", report)
+		if actions >= MAX_COMMANDS:
+			break
+	if report["status"] == "RUNNING":
+		report["status"] = "OFFLINE_CAPPED" if report["reasonCode"] == "BUDGET" else report["status"]
+	report["simulatedMs"] = maxi(0, roundi(float(state.run.resources.get("gameTimeMs", starting_time)) - starting_time)) + combat_time
+	var current_run_items: int = state.run.unsecured_cargo.size() if state.run != null else 0
+	report["itemsFound"] = maxi(0, state.meta.inventory.size() + current_run_items - starting_inventory - starting_items)
+	report["itemsSecured"] = maxi(0, state.meta.inventory.size() - starting_inventory)
+	last_autopilot_report = report.duplicate(true)
+	return last_autopilot_report
+
+func _autopilot_event_choice(event: Dictionary) -> Dictionary:
+	for choice: Dictionary in event.get("choices", []):
+		if choice.has("reputation") or choice.has("flag") or choice.has("wanted") or str(choice.get("special", "")) != "":
+			continue
+		var affordable: bool = true
+		for currency: String in choice.get("cost", {}).keys():
+			if float(state.run.wallet.to_dictionary().get(currency, 0.0)) < float(choice["cost"][currency]):
+				affordable = false
+		if affordable:
+			return choice
+	return {}
+
+func _autopilot_stop(status: String, code: String, reason: String, report: Dictionary) -> Dictionary:
+	report["status"] = status
+	report["reasonCode"] = code
+	report["reason"] = reason
+	report["error"] = last_error if status == "SAFE_ERROR_STOP" else ""
+	last_autopilot_report = report.duplicate(true)
+	return last_autopilot_report
 
 func travel_to(node_id: String) -> bool:
 	if state == null or state.run == null or state.run.phase != "ROUTE":

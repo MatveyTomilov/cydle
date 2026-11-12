@@ -889,6 +889,14 @@ func _show_road() -> void:
 	_body.add_child(_label("Маршрут", 27, COLOR_TEXT))
 	var resources: Dictionary = run.resources
 	_body.add_child(_label("ТОПЛИВО %d/%d   ·   КОРПУС %d/%d   ·   РОЗЫСК %d" % [int(resources.get("fuel", 0)), int(resources.get("maxFuel", 0)), int(resources.get("hull", 0)), int(resources.get("maxHull", 0)), int(run.wanted)], 13, COLOR_AMBER))
+	var autopilot_button: Button = _button("АВТОПИЛОТ · ДО БЕЗОПАСНОЙ ОСТАНОВКИ · ЛИМИТ 12 ЧАСОВ", true)
+	autopilot_button.pressed.connect(_on_autopilot)
+	_body.add_child(autopilot_button)
+	if not _session.last_autopilot_report.is_empty():
+		var report: Dictionary = _session.last_autopilot_report
+		var report_label: Label = _label("АВТОПИЛОТ · %s · %s · узлов %d · боёв %d · симуляция %s" % [str(report.get("status", "")), str(report.get("reason", "")), int(report.get("nodesVisited", 0)), int(report.get("battles", 0)), _fmt(float(report.get("simulatedMs", 0.0)) / 1000.0) + " с"], 12, COLOR_CYAN)
+		report_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_body.add_child(report_label)
 	var active_contract: Dictionary = run.contract
 	if not active_contract.is_empty():
 		_body.add_child(_label("КОНТРАКТ %s · %s · БОЕВЫХ УЗЛОВ %d" % [str(active_contract.get("id", "")), str(active_contract.get("status", "")), int(active_contract.get("combatNodes", 0))], 12, COLOR_CYAN))
@@ -1189,6 +1197,12 @@ func _on_continue_campaign() -> void:
 		_show_road()
 	else:
 		_footer.text = _session.last_error
+
+func _on_autopilot() -> void:
+	var report: Dictionary = _session.simulate_autopilot()
+	if not bool(report.get("ok", false)):
+		_footer.text = str(report.get("error", "Автопилот остановлен."))
+	_show_road()
 
 func _on_save() -> void:
 	if _session.save():
