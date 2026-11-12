@@ -629,10 +629,11 @@ func route_intel() -> Dictionary:
 		for node: Dictionary in layer:
 			var node_id: String = str(node.get("id", ""))
 			var visited: bool = state.run.visited_node_ids.has(node_id) or state.run.cleared_node_ids.has(node_id)
+			var scouted: bool = state.run.scouted_node_ids.has(node_id)
 			var distance: int = int(distances.get(node_id, 999))
 			var is_preview: bool = preview_available and not state.meta.campaign_flags.has(preview_used_flag) and str(node.get("type", "")) == "ANOMALY"
-			var revealed: bool = visited or is_preview or (distance > 0 and distance <= scan_distance and effective_intel >= 1)
-			var info: Dictionary = {"revealed": revealed, "visited": visited}
+			var revealed: bool = visited or scouted or is_preview or (distance > 0 and distance <= scan_distance and effective_intel >= 1)
+			var info: Dictionary = {"revealed": revealed, "visited": visited, "scouted": scouted}
 			if revealed:
 				info["type"] = str(node.get("type", "UNKNOWN"))
 				if effective_intel >= 2 or is_preview:
@@ -936,6 +937,13 @@ func resolve_event(choice_id: String) -> bool:
 	if choice.has("reputation"):
 		for faction: Variant in choice["reputation"].keys():
 			meta["reputation"][str(faction)] = clampi(int(meta["reputation"].get(str(faction), 0)) + int(choice["reputation"][faction]), -100, 100)
+	var reveal_count: int = maxi(0, int(choice.get("reveal", 0)))
+	if reveal_count > 0:
+		var scouted_ids: Array = run_payload.get("scoutedNodeIds", [])
+		for scouted_id: String in _next_route_nodes(node_id, reveal_count):
+			if not scouted_ids.has(scouted_id):
+				scouted_ids.append(scouted_id)
+		run_payload["scoutedNodeIds"] = scouted_ids
 	var next_combat: Dictionary = choice.get("nextCombat", {})
 	var pending_combat: Dictionary = run_payload["pendingCombatEffects"]
 	pending_combat["initialTempShield"] = float(pending_combat.get("initialTempShield", 0.0)) + float(next_combat.get("shieldBonus", 0.0))
@@ -991,6 +999,39 @@ func resolve_event(choice_id: String) -> bool:
 	run_payload["phase"] = "ROUTE"
 	run_payload["lastCommandId"] = "event:%s:%s" % [node_id, choice_id]
 	return _commit_payload(payload)
+
+func _next_route_nodes(origin_id: String, limit: int) -> Array[String]:
+	var selected: Array[String] = []
+	if state == null or state.run == null or limit <= 0:
+		return selected
+	var adjacency: Dictionary = {}
+	for edge_value: Variant in state.run.graph.get("edges", []):
+		if not edge_value is Dictionary:
+			continue
+		var edge: Dictionary = edge_value
+		var from_id: String = str(edge.get("from", ""))
+		var to_id: String = str(edge.get("to", ""))
+		if not adjacency.has(from_id): adjacency[from_id] = []
+		(adjacency[from_id] as Array).append(to_id)
+	for from_id: String in adjacency.keys():
+		(adjacency[from_id] as Array).sort()
+	var seen: Dictionary = {origin_id: true}
+	var queue: Array[String] = [origin_id]
+	var cursor: int = 0
+	while cursor < queue.size() and selected.size() < limit:
+		var current_id: String = queue[cursor]
+		cursor += 1
+		for next_value: Variant in adjacency.get(current_id, []):
+			var next_id: String = str(next_value)
+			if seen.has(next_id):
+				continue
+			seen[next_id] = true
+			queue.append(next_id)
+			if not state.run.visited_node_ids.has(next_id) and not state.run.cleared_node_ids.has(next_id):
+				selected.append(next_id)
+				if selected.size() >= limit:
+					break
+	return selected
 
 func quest_journal() -> Array[Dictionary]:
 	var result: Array[Dictionary] = []

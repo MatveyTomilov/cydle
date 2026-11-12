@@ -145,6 +145,9 @@ func _validate_run(value: Variant, meta: Dictionary) -> Dictionary:
 		return _failure("run.graph/equipment/currentNodeId: неверная структура.")
 	if not _string_array(run["visitedNodeIds"]) or not _string_array(run["clearedNodeIds"]) or not _string_array(run.get("eventsSeen", [])) or not _string_array(run["grantIds"]) or not _string_array(run["commandIds"]) or not _string_array(run["shippedCheckpointIds"]):
 		return _failure("run: неверный список ID.")
+	var scouted_node_ids: Variant = run.get("scoutedNodeIds", [])
+	if not _string_array(scouted_node_ids) or scouted_node_ids.size() > 128 or not _unique_strings(scouted_node_ids):
+		return _failure("run.scoutedNodeIds: неверный список разведанных узлов.")
 	if not _string_array(run.get("temporaryMutationIds", [])) or run.get("temporaryMutationIds", []).size() > 2:
 		return _failure("run.temporaryMutationIds: неверный список временных мутаций.")
 	var build_catalog: BuildCatalog = BuildCatalog.new()

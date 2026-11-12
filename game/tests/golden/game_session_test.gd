@@ -539,6 +539,31 @@ func run(_tree: SceneTree) -> bool:
 		check(event_session.current_event().get("id", "") == "EV02", "game_session: event node did not resolve its canonical definition")
 		check(event_session.resolve_event("A"), "game_session: event choice did not resolve: %s" % event_session.last_error)
 		check(event_session.state.run.events_seen.has("EV02") and event_session.state.run.wanted == 10.0, "game_session: event outcome flags were not persisted")
+	var scout_session: GameSession = GameSession.new()
+	scout_session.configure_save_directory("user://test-saves/event-route-scouting")
+	if check(scout_session.start_new_game(1762900000101), "game_session: could not create an event-scouting profile") and check(scout_session.start_expedition("event-route-scouting"), "game_session: could not start an event-scouting run"):
+		var scout_payload: Dictionary = scout_session.state.to_payload()
+		scout_payload["run"]["graph"] = {"layers": [
+			[{"id": "scout-event", "layer": 0, "type": "EVENT", "eventId": "EV06", "threat": "medium", "enemies": [], "revealLevel": 1, "lootHint": "event"}],
+			[{"id": "scout-next-a", "layer": 1, "type": "COMBAT", "threat": "medium", "enemies": [{"templateId": "E01"}], "revealLevel": 1, "lootHint": "combat"}, {"id": "scout-next-b", "layer": 1, "type": "CACHE", "threat": "low", "enemies": [], "revealLevel": 1, "lootHint": "cache"}],
+			[{"id": "scout-future-a", "layer": 2, "type": "REPAIR", "threat": "low", "enemies": [], "revealLevel": 1, "lootHint": "repair"}, {"id": "scout-future-b", "layer": 2, "type": "FUEL", "threat": "low", "enemies": [], "revealLevel": 1, "lootHint": "fuel"}]
+		], "edges": [
+			{"from": "START", "to": "scout-event", "fromLayer": -1, "toLayer": 0, "fuelCost": 1},
+			{"from": "scout-event", "to": "scout-next-a", "fromLayer": 0, "toLayer": 1, "fuelCost": 1},
+			{"from": "scout-event", "to": "scout-next-b", "fromLayer": 0, "toLayer": 1, "fuelCost": 1},
+			{"from": "scout-next-a", "to": "scout-future-a", "fromLayer": 1, "toLayer": 2, "fuelCost": 1},
+			{"from": "scout-next-b", "to": "scout-future-b", "fromLayer": 1, "toLayer": 2, "fuelCost": 1}
+		]}
+		scout_payload["run"]["runWallet"]["DATA"] = 10.0
+		check(scout_session._commit_payload(scout_payload), "game_session: event-scouting graph could not be saved: %s" % scout_session.last_error)
+		check(scout_session.travel_to("scout-event") and scout_session.resolve_event("A"), "game_session: EV06 did not resolve its map-scan choice: %s" % scout_session.last_error)
+		var scouted_ids: Array[String] = scout_session.state.run.scouted_node_ids
+		check(scouted_ids == ["scout-next-a", "scout-next-b", "scout-future-a"], "game_session: EV06 did not record the next three deterministic route nodes")
+		var scouted_intel: Dictionary = scout_session.route_intel().get("nodes", {})
+		check(scouted_ids.all(func(id: String) -> bool: return bool(scouted_intel.get(id, {}).get("revealed", false)) and bool(scouted_intel.get(id, {}).get("scouted", false))), "game_session: EV06 scan did not reveal its nodes to the route map/autopilot")
+		var scout_reload: GameSession = GameSession.new()
+		scout_reload.configure_save_directory("user://test-saves/event-route-scouting")
+		check(scout_reload.load_saved_game() and scout_reload.state.run.scouted_node_ids == scouted_ids, "game_session: event-scanned node knowledge did not persist across reload")
 		var mutation_payload: Dictionary = event_session.state.to_payload()
 		mutation_payload["run"]["graph"] = {"layers": [[{"id": "mutation-test", "layer": 0, "type": "EVENT", "eventId": "EV22", "threat": "medium", "enemies": [], "revealLevel": 1, "lootHint": "event"}]], "edges": [{"from": "START", "to": "mutation-test", "fromLayer": -1, "toLayer": 0, "fuelCost": 1}]}
 		mutation_payload["run"]["currentNodeId"] = "START"

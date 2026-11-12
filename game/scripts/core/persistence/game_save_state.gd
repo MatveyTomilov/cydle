@@ -67,6 +67,7 @@ class RunState:
 	var current_node_id: String = "START"
 	var visited_node_ids: Array[String] = []
 	var cleared_node_ids: Array[String] = []
+	var scouted_node_ids: Array[String] = []
 	var events_seen: Array[String] = []
 	var temporary_mutation_ids: Array[String] = []
 	var phase: String = "ROUTE"
@@ -129,6 +130,8 @@ class RunState:
 		}
 		if not contract.is_empty():
 			result["contract"] = contract.duplicate(true)
+		if not scouted_node_ids.is_empty():
+			result["scoutedNodeIds"] = scouted_node_ids.duplicate()
 		if autopilot_enabled:
 			result["autopilotEnabled"] = true
 		if combat_snapshot != null:
@@ -285,6 +288,7 @@ func _run_from_dictionary(value: Dictionary) -> RunState:
 	result.current_node_id = str(value["currentNodeId"])
 	result.visited_node_ids.assign(value.get("visitedNodeIds", []))
 	result.cleared_node_ids.assign(value.get("clearedNodeIds", []))
+	result.scouted_node_ids.assign(value.get("scoutedNodeIds", []))
 	result.events_seen.assign(value.get("eventsSeen", []))
 	result.temporary_mutation_ids.assign(value.get("temporaryMutationIds", []))
 	result.phase = str(value["phase"])

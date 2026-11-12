@@ -1001,6 +1001,8 @@ func _show_road() -> void:
 				var secondary: String = "%s · %s" % [str(intel.get("threat", "")), str(intel.get("lootHint", ""))] if intel.has("threat") else ("УЖЕ ПОСЕЩЁН" if visited else "РАЗВЕДДАННЫХ НЕТ")
 				if bool(intel.get("preview", false)):
 					secondary = "ПРЕДВАРИТЕЛЬНЫЙ СКАН · %s" % str(intel.get("anomalyProtocol", ""))
+				elif bool(intel.get("scouted", false)) and not visited:
+					secondary = "РАЗВЕДАНО СОБЫТИЕМ"
 				var button: Button = _button("%s\n%s" % [node_type, secondary], reachable)
 				button.custom_minimum_size = Vector2(145, 58)
 				button.disabled = not reachable
