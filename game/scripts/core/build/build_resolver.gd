@@ -405,7 +405,7 @@ func _slot_allows(slot: String, template: Dictionary) -> bool:
 	return not implant_slot.is_empty() and (socket == "UNIVERSAL" or implant_slot == "UNIVERSAL" or implant_slot == socket)
 
 func _validate_affixes(item: ItemInstance, template: Dictionary, issues: Array[Dictionary]) -> void:
-	var groups: Dictionary = {}
+	var affix_ids: Dictionary = {}
 	for roll: ItemInstance.AffixRoll in item.affixes:
 		var definition: Dictionary = _catalog.get_affix(roll.affix_id)
 		if definition.is_empty():
@@ -413,10 +413,12 @@ func _validate_affixes(item: ItemInstance, template: Dictionary, issues: Array[D
 			continue
 		if not (definition.get("slots", []) as Array).has(str(template["category"])) or roll.tier < 1 or roll.tier > 4 or not is_finite(roll.value):
 			_add_issue(issues, "INVALID_AFFIX", "Аффикс %s несовместим с предметом или содержит неверный ролл." % roll.affix_id, item.item_id)
-		var group_id: String = str(definition["group"])
-		if groups.has(group_id):
-			_add_issue(issues, "INVALID_AFFIX_GROUP", "Повторяется группа аффиксов %s." % group_id, item.item_id)
-		groups[group_id] = true
+		# Rarity allows up to five rolls while some item pools (notably MAIN)
+		# expose only one affix group. Reject duplicate definitions, but don't
+		# invalidate otherwise valid high-rarity drops for repeating a pool group.
+		if affix_ids.has(roll.affix_id):
+			_add_issue(issues, "INVALID_AFFIX_GROUP", "Повторяется аффикс %s." % roll.affix_id, item.item_id)
+		affix_ids[roll.affix_id] = true
 
 func _add_armor_modifiers(item: ItemInstance, template: Dictionary, source: Dictionary, modifiers: Array[Dictionary]) -> void:
 	var armor: Dictionary = template["armorBlock"]

@@ -459,7 +459,7 @@
         }
       },
       "expected": {
-        "valid": false,
+        "valid": true,
         "attributes": {
           "POW": 5,
           "REF": 5,

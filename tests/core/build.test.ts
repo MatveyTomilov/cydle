@@ -102,6 +102,19 @@ describe('resolveBuild', () => {
     expect([4, 5, 8, 9, 12, 13].map(tierForTech)).toEqual([1, 2, 2, 3, 3, 4]);
   });
 
+  it('keeps high-rarity main weapons with repeated pool groups equipable', () => {
+    for (const seed of ['boss-core-main-a', 'boss-core-main-b', 'boss-core-main-c']) {
+      const input = starterLoadout();
+      input.equipment.MAIN = createItem(new Rng('loot', seed), {
+        templateId: 'BLADE_K4', techLevel: 12, rarity: 'LEGENDARY', secured: true,
+        originGrantId: seed, origin: 'test', affixCount: 5,
+      });
+      const result = resolveBuild(input);
+      expect(result.valid).toBe(true);
+      expect(result.mainWeapon?.techLevel).toBe(12);
+    }
+  });
+
   it('applies the durability boundary at 25 without changing the original rolls', () => {
     const input = starterLoadout();
     const armor = input.equipment.ARMOR!;

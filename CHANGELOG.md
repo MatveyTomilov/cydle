@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — high-rarity generated gear remains equipable
+
+- TypeScript and Godot BuildResolver no longer reject distinct generated affixes solely because they share a broad pool group; duplicate affix IDs still fail validation. The item catalog permits up to five affixes while some slots, including MAIN, expose fewer groups, so strict group validation made valid T12 drops unusable. Item generation and numeric rolls are unchanged.
+- Added a deterministic T12 legendary MAIN build regression and regenerated the native resolver fixture for parity. The E2E final-boss retry is active; the first BOSS_CORE defeat retained 8,832/9,268 HP after 2,141 operator damage.
+- Checks: TypeScript 207 tests, typecheck and Vite build passed; Godot editor import and 22 scripts / 87,512 assertions passed; `git diff --check` passed. Windows export not rerun.
+- Master Spec §12.2 group uniqueness conflicts with its affix counts and slot pools. This current compatibility rule is documented for deliberate content/spec resolution.
+
 ## Unreleased — checkpoint sector progression
 
 - Continuing past any depth checkpoint now persists that depth as cleared, independently of the d4/d8/d12 boss-gate unlock. This makes depth based quest availability and the Master Spec's HANGAR L2 after d6 progression reachable at the correct point.

@@ -245,7 +245,7 @@ export function resolveBuild(input: BuildLoadout): ResolvedBuild {
     if (!Number.isInteger(item.techLevel) || item.techLevel < 1) addIssue(issues, 'INVALID_TECH_LEVEL', 'TechLevel должен быть целым числом не меньше 1.', item.itemId);
     if (!Number.isFinite(item.durability) || item.durability < 0 || item.durability > 100) addIssue(issues, 'INVALID_DURABILITY', 'Износ должен находиться в диапазоне 0–100.', item.itemId);
     if (item.neuralCost !== (template.neuralCost ?? 0)) addIssue(issues, 'NEURAL_COST_MISMATCH', 'Нейростоимость экземпляра не совпадает с шаблоном.', item.itemId);
-    const affixGroups = new Set<string>();
+    const affixIds = new Set<string>();
     for (const roll of item.affixes) {
       const affix = AFFIX_BY_ID[roll.affixId];
       if (!affix) {
@@ -255,8 +255,11 @@ export function resolveBuild(input: BuildLoadout): ResolvedBuild {
       if (!affix.slots.includes(template.category) || roll.tier < 1 || roll.tier > 4 || !Number.isFinite(roll.value)) {
         addIssue(issues, 'INVALID_AFFIX', `Аффикс ${roll.affixId} несовместим с предметом или содержит неверный ролл.`, item.itemId);
       }
-      if (affixGroups.has(affix.group)) addIssue(issues, 'INVALID_AFFIX_GROUP', `Повторяется группа аффиксов ${affix.group}.`, item.itemId);
-      affixGroups.add(affix.group);
+      // Rarity defines up to five rolls, but several slot pools (MAIN in particular)
+      // contain only one affix group. Keep generated high-rarity gear equipable and
+      // reject duplicate affix definitions rather than make those rarity rolls invalid.
+      if (affixIds.has(roll.affixId)) addIssue(issues, 'INVALID_AFFIX_GROUP', `Повторяется аффикс ${roll.affixId}.`, item.itemId);
+      affixIds.add(roll.affixId);
     }
   }
   if (!equipment.MAIN) addIssue(issues, 'MISSING_MAIN', 'Для боя требуется основное оружие.');
