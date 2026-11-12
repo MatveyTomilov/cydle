@@ -109,14 +109,14 @@ func _validate_run(value: Variant) -> Dictionary:
 	if not value is Dictionary:
 		return _failure("run: ожидался объект или null.")
 	var run: Dictionary = value
-	var required: Array[String] = ["seed", "depth", "biome", "graph", "equipment", "currentNodeId", "visitedNodeIds", "clearedNodeIds", "phase", "wanted", "revealLevel", "resources", "runWallet", "unsecuredCargo", "shippedCargo", "grantIds", "commandIds", "worldRng", "lootRng"]
+	var required: Array[String] = ["seed", "depth", "biome", "graph", "equipment", "currentNodeId", "visitedNodeIds", "clearedNodeIds", "phase", "wanted", "revealLevel", "resources", "runWallet", "unsecuredCargo", "shippedCargo", "grantIds", "commandIds", "serviceScrapFuelCounts", "shippedCheckpointIds", "combatResult", "lastCommandId", "worldRng", "lootRng"]
 	if not _has_keys(run, required):
 		return _failure("run: отсутствуют обязательные поля.")
 	if not _nonempty_string(run["seed"]) or not _is_integer(run["depth"]) or int(run["depth"]) < 1 or not BIOMES.has(str(run["biome"])):
 		return _failure("run.seed/depth/biome: неверные значения.")
 	if not run["graph"] is Dictionary or not run["equipment"] is Dictionary or not _nonempty_string(run["currentNodeId"]):
 		return _failure("run.graph/equipment/currentNodeId: неверная структура.")
-	if not _string_array(run["visitedNodeIds"]) or not _string_array(run["clearedNodeIds"]) or not _string_array(run["grantIds"]) or not _string_array(run["commandIds"]):
+	if not _string_array(run["visitedNodeIds"]) or not _string_array(run["clearedNodeIds"]) or not _string_array(run.get("eventsSeen", [])) or not _string_array(run["grantIds"]) or not _string_array(run["commandIds"]) or not _string_array(run["shippedCheckpointIds"]):
 		return _failure("run: неверный список ID.")
 	if run["commandIds"].size() > 128 or not _unique_strings(run["grantIds"]) or not _unique_strings(run["commandIds"]):
 		return _failure("run: ID наград/команд повторяются или лимит команд превышен.")
@@ -128,6 +128,20 @@ func _validate_run(value: Variant) -> Dictionary:
 		return _failure("run.revealLevel: ожидалось значение от 0 до 2.")
 	if not run["resources"] is Dictionary or not _validate_wallet(run["runWallet"]):
 		return _failure("run.resources/runWallet: неверная структура.")
+	if not _is_integer(run.get("pendingTravelDeltaMs", 0)) or int(run.get("pendingTravelDeltaMs", 0)) < -60000 or int(run.get("pendingTravelDeltaMs", 0)) > 60000:
+		return _failure("run.pendingTravelDeltaMs: ожидалось целое число от -60000 до 60000.")
+	if not _validate_pending_combat_effects(run.get("pendingCombatEffects", {"initialTempShield": 0.0, "extraHeat": 0.0})):
+		return _failure("run.pendingCombatEffects: неверные значения.")
+	if not _validate_pending_next_combat(run.get("pendingNextCombat", {
+		"skipOrdinary": false, "forceElite": false, "extraItemRoll": false, "forceBounty": false,
+		"bountyCreditsBonus": 0.0, "bountyEnemyId": null, "extraRareItemRoll": false,
+		"alliedTurret": false, "extraRareOnElite": false,
+	})):
+		return _failure("run.pendingNextCombat: неверная структура.")
+	if not _validate_count_map(run["serviceScrapFuelCounts"]) or run["lastCommandId"] != null and not _nonempty_string(run["lastCommandId"]):
+		return _failure("run.serviceScrapFuelCounts/lastCommandId: неверные значения.")
+	if run["combatResult"] != null and not run["combatResult"] is Dictionary:
+		return _failure("run.combatResult: ожидался объект или null.")
 	for key: String in ["fuel", "maxFuel", "hull", "maxHull", "hp", "maxHP", "shield", "maxShield", "energy", "heat", "gameTimeMs"]:
 		if not run["resources"].has(key) or not _is_finite_number(run["resources"][key]) or float(run["resources"][key]) < 0.0:
 			return _failure("run.resources.%s: ожидалось конечное неотрицательное число." % key)
@@ -142,6 +156,30 @@ func _validate_run(value: Variant) -> Dictionary:
 	if run.has("combatSnapshot") and run["combatSnapshot"] != null and not _validate_combat_snapshot(run["combatSnapshot"]):
 		return _failure("run.combatSnapshot: снимок боя повреждён.")
 	return {"ok": true, "error": ""}
+
+func _validate_pending_combat_effects(value: Variant) -> bool:
+	if not value is Dictionary or not _has_exact_keys(value, ["initialTempShield", "extraHeat"]):
+		return false
+	return _is_finite_number(value["initialTempShield"]) and float(value["initialTempShield"]) >= 0.0 and float(value["initialTempShield"]) <= 200.0 and _is_finite_number(value["extraHeat"]) and float(value["extraHeat"]) >= 0.0 and float(value["extraHeat"]) <= 100.0
+
+func _validate_pending_next_combat(value: Variant) -> bool:
+	var keys: Array[String] = ["skipOrdinary", "forceElite", "extraItemRoll", "forceBounty", "bountyCreditsBonus", "bountyEnemyId", "extraRareItemRoll", "alliedTurret", "extraRareOnElite"]
+	if not value is Dictionary or not _has_exact_keys(value, keys):
+		return false
+	for key: String in ["skipOrdinary", "forceElite", "extraItemRoll", "forceBounty", "extraRareItemRoll", "alliedTurret", "extraRareOnElite"]:
+		if not value[key] is bool:
+			return false
+	if not _is_finite_number(value["bountyCreditsBonus"]) or float(value["bountyCreditsBonus"]) < 0.0 or float(value["bountyCreditsBonus"]) > 1.0:
+		return false
+	return value["bountyEnemyId"] == null or _nonempty_string(value["bountyEnemyId"])
+
+func _validate_count_map(value: Variant) -> bool:
+	if not value is Dictionary:
+		return false
+	for key: Variant in value.keys():
+		if not _nonempty_string(key) or not _is_integer(value[key]) or int(value[key]) < 0 or int(value[key]) > 4:
+			return false
+	return true
 
 func _validate_combat_snapshot(value: Variant) -> bool:
 	if not value is Dictionary or not _has_exact_keys(value, ["simTimeMs", "actors", "eventQueue", "rngStreams", "eventLog", "nextSequenceId", "rulesHash"]):

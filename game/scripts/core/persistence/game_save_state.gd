@@ -67,6 +67,7 @@ class RunState:
 	var current_node_id: String = "START"
 	var visited_node_ids: Array[String] = []
 	var cleared_node_ids: Array[String] = []
+	var events_seen: Array[String] = []
 	var phase: String = "ROUTE"
 	var wanted: float = 0.0
 	var reveal_level: int = 0
@@ -76,6 +77,17 @@ class RunState:
 	var shipped_cargo: Array[Dictionary] = []
 	var grant_ids: Array[String] = []
 	var command_ids: Array[String] = []
+	var service_scrap_fuel_counts: Dictionary = {}
+	var shipped_checkpoint_ids: Array[String] = []
+	var pending_travel_delta_ms: int = 0
+	var pending_combat_effects: Dictionary = {"initialTempShield": 0.0, "extraHeat": 0.0}
+	var pending_next_combat: Dictionary = {
+		"skipOrdinary": false, "forceElite": false, "extraItemRoll": false, "forceBounty": false,
+		"bountyCreditsBonus": 0.0, "bountyEnemyId": null, "extraRareItemRoll": false,
+		"alliedTurret": false, "extraRareOnElite": false,
+	}
+	var combat_result: Variant = null
+	var last_command_id: Variant = null
 	var world_rng: Dictionary = {}
 	var loot_rng: Dictionary = {}
 	var combat_snapshot: CombatSnapshotState = null
@@ -90,6 +102,7 @@ class RunState:
 			"currentNodeId": current_node_id,
 			"visitedNodeIds": visited_node_ids.duplicate(),
 			"clearedNodeIds": cleared_node_ids.duplicate(),
+			"eventsSeen": events_seen.duplicate(),
 			"phase": phase,
 			"wanted": wanted,
 			"revealLevel": reveal_level,
@@ -99,11 +112,16 @@ class RunState:
 			"shippedCargo": shipped_cargo.duplicate(true),
 			"grantIds": grant_ids.duplicate(),
 			"commandIds": command_ids.duplicate(),
+			"serviceScrapFuelCounts": service_scrap_fuel_counts.duplicate(true),
+			"shippedCheckpointIds": shipped_checkpoint_ids.duplicate(),
+			"pendingTravelDeltaMs": pending_travel_delta_ms,
+			"pendingCombatEffects": pending_combat_effects.duplicate(true),
+			"pendingNextCombat": pending_next_combat.duplicate(true),
+			"combatResult": combat_result,
+			"lastCommandId": last_command_id,
 			"worldRng": world_rng.duplicate(true),
 			"lootRng": loot_rng.duplicate(true),
 			"combatSnapshot": null,
-			"combatResult": null,
-			"lastCommandId": null,
 		}
 		if combat_snapshot != null:
 			result["combatSnapshot"] = combat_snapshot.to_dictionary()
@@ -245,6 +263,7 @@ func _run_from_dictionary(value: Dictionary) -> RunState:
 	result.current_node_id = str(value["currentNodeId"])
 	result.visited_node_ids.assign(value.get("visitedNodeIds", []))
 	result.cleared_node_ids.assign(value.get("clearedNodeIds", []))
+	result.events_seen.assign(value.get("eventsSeen", []))
 	result.phase = str(value["phase"])
 	result.wanted = float(value["wanted"])
 	result.reveal_level = int(value["revealLevel"])
@@ -254,6 +273,17 @@ func _run_from_dictionary(value: Dictionary) -> RunState:
 	result.shipped_cargo.assign(value.get("shippedCargo", []))
 	result.grant_ids.assign(value["grantIds"])
 	result.command_ids.assign(value["commandIds"])
+	result.service_scrap_fuel_counts = value.get("serviceScrapFuelCounts", {}).duplicate(true)
+	result.shipped_checkpoint_ids.assign(value.get("shippedCheckpointIds", []))
+	result.pending_travel_delta_ms = int(value.get("pendingTravelDeltaMs", 0))
+	result.pending_combat_effects = value.get("pendingCombatEffects", {"initialTempShield": 0.0, "extraHeat": 0.0}).duplicate(true)
+	result.pending_next_combat = value.get("pendingNextCombat", {
+		"skipOrdinary": false, "forceElite": false, "extraItemRoll": false, "forceBounty": false,
+		"bountyCreditsBonus": 0.0, "bountyEnemyId": null, "extraRareItemRoll": false,
+		"alliedTurret": false, "extraRareOnElite": false,
+	}).duplicate(true)
+	result.combat_result = value.get("combatResult")
+	result.last_command_id = value.get("lastCommandId")
 	result.world_rng = value["worldRng"].duplicate(true)
 	result.loot_rng = value["lootRng"].duplicate(true)
 	if value.get("combatSnapshot") is Dictionary:

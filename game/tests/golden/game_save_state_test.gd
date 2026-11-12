@@ -49,6 +49,26 @@ func run(_tree: SceneTree) -> bool:
 	var duplicate_equipment_result: Dictionary = state_class.call("parse_payload", duplicate_equipment)
 	check(not bool(duplicate_equipment_result.get("ok", false)), "game_save_state: equipment without owned inventory item was accepted")
 
+	var active_payload: Dictionary = _valid_payload()
+	active_payload["run"] = _valid_run()
+	active_payload["run"]["eventsSeen"] = ["EV19"]
+	active_payload["run"]["serviceScrapFuelCounts"] = {"fuel": 2}
+	active_payload["run"]["shippedCheckpointIds"] = ["cp-1"]
+	active_payload["run"]["pendingTravelDeltaMs"] = -5000
+	active_payload["run"]["pendingCombatEffects"] = {"initialTempShield": 50.0, "extraHeat": 12.0}
+	active_payload["run"]["pendingNextCombat"]["forceBounty"] = true
+	active_payload["run"]["lastCommandId"] = "cmd-active"
+	var active_result: Dictionary = state_class.call("parse_payload", active_payload)
+	check(bool(active_result.get("ok", false)), "game_save_state: valid active run was rejected: %s" % active_result.get("error", ""))
+	if bool(active_result.get("ok", false)):
+		var active_state: Object = active_result.get("state") as Object
+		check(_json_equivalent(active_state.call("to_payload"), active_payload), "game_save_state: active RUN roundtrip lost run fields")
+	var invalid_pending: Dictionary = _valid_payload()
+	invalid_pending["run"] = _valid_run()
+	invalid_pending["run"]["pendingTravelDeltaMs"] = 60001
+	var invalid_pending_result: Dictionary = state_class.call("parse_payload", invalid_pending)
+	check(not bool(invalid_pending_result.get("ok", false)), "game_save_state: out-of-range pending travel effect was accepted")
+
 	var bad_combat_snapshot: Dictionary = _valid_payload()
 	bad_combat_snapshot["run"] = _valid_run()
 	bad_combat_snapshot["run"]["combatSnapshot"] = {"simTimeMs": -1}
@@ -94,13 +114,15 @@ func _valid_payload() -> Dictionary:
 func _valid_run() -> Dictionary:
 	return {
 		"seed": "native-run-seed", "depth": 1, "biome": "B01", "graph": {}, "equipment": {}, "currentNodeId": "START",
-		"visitedNodeIds": [], "clearedNodeIds": [], "phase": "ROUTE", "wanted": 0.0, "revealLevel": 0,
+		"visitedNodeIds": [], "clearedNodeIds": [], "eventsSeen": [], "phase": "ROUTE", "wanted": 0.0, "revealLevel": 0,
 		"resources": {"fuel": 24.0, "maxFuel": 24.0, "hull": 100.0, "maxHull": 100.0, "hp": 300.0, "maxHP": 300.0, "shield": 75.0, "maxShield": 75.0, "energy": 100.0, "heat": 0.0, "gameTimeMs": 0.0},
 		"runWallet": {"CREDITS": 0.0, "SCRAP": 0.0, "DATA": 0.0},
-		"unsecuredCargo": [], "shippedCargo": [], "grantIds": [], "commandIds": [],
+		"unsecuredCargo": [], "shippedCargo": [], "grantIds": [], "commandIds": [], "serviceScrapFuelCounts": {}, "shippedCheckpointIds": [],
+		"pendingTravelDeltaMs": 0, "pendingCombatEffects": {"initialTempShield": 0.0, "extraHeat": 0.0},
+		"pendingNextCombat": {"skipOrdinary": false, "forceElite": false, "extraItemRoll": false, "forceBounty": false, "bountyCreditsBonus": 0.0, "bountyEnemyId": null, "extraRareItemRoll": false, "alliedTurret": false, "extraRareOnElite": false},
+		"combatResult": null, "lastCommandId": null, "combatSnapshot": null,
 		"worldRng": {"stream": "world", "state": [1, 2, 3, 4], "calls": 0},
 		"lootRng": {"stream": "loot", "state": [1, 2, 3, 4], "calls": 0},
-		"combatResult": null, "lastCommandId": null,
 	}
 
 func _cleanup_directory(path: String) -> void:

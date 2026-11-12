@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Added an initial typed native game-save model and structural validator around `SaveRepository`, including typed repository roundtrip coverage. This is groundwork only: active-run field parity and full legacy schema validation remain incomplete, and gameplay does not yet consume the typed state.
+- Extended the native run-save model for events, service/checkpoint counters, deferred travel/combat effects, and command/result fields, with active-run roundtrip and range checks. Nested item, graph, and combat-result validation still needs parity with the reference schema.
 - Exported all 73 ordinary and unique item templates from the frozen TypeScript catalog into native JSON, with a Godot loader that checks top-level structure and returns immutable-by-copy definitions. Item instances, affixes, and build resolution are still pending.
 - Added a native asset-manifest validator and a Windows GitHub Actions workflow for Godot import/tests/export plus the frozen reference checks.
 - Added root agent instructions for the Godot-only product boundary, protected branches, deterministic core, asset provenance, and local verification commands.
