@@ -72,7 +72,12 @@ func create_initial_payload(save_id: String, now_ms: int) -> Dictionary:
 				{"id": "starter-auto", "priority": 0, "enabled": true, "skillId": "AUTO", "target": "nearest", "conditions": [{"kind": "always"}], "logic": "AND", "note": "Базовая атака"},
 			]}],
 			"activeTacticId": "DEFAULT",
-			"autopilotProfiles": [{"id": "BALANCED", "name": "Сбалансированный", "startDepth": 1, "enabled": false}],
+			"autopilotProfiles": [
+				{"id": "CAUTIOUS", "name": "Осторожный", "startDepth": 1, "enabled": false},
+				{"id": "BALANCED", "name": "Сбалансированный", "startDepth": 1, "enabled": false},
+				{"id": "AGGRESSIVE", "name": "Агрессивный", "startDepth": 1, "enabled": false},
+			],
+			"activeAutopilotProfileId": "BALANCED",
 		},
 		"run": null,
 	}

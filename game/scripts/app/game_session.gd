@@ -783,6 +783,39 @@ func set_autopilot_enabled(enabled: bool) -> bool:
 		payload["run"].erase("autopilotEnabled")
 	return _commit_payload(payload)
 
+func active_autopilot_profile_id() -> String:
+	if state == null or state.meta.active_autopilot_profile_id.is_empty():
+		return "BALANCED"
+	return state.meta.active_autopilot_profile_id
+
+func set_active_autopilot_profile(profile_id: String) -> bool:
+	if not _garage_action_allowed():
+		last_error = "Профиль автопилота меняется только между выездами."
+		return false
+	var profile_value: Dictionary = AutopilotPolicy.profile(profile_id)
+	if profile_value.is_empty() or str(profile_value.get("id", "")) != profile_id:
+		last_error = "Профиль автопилота не найден."
+		return false
+	var payload: Dictionary = state.to_payload()
+	var saved_profiles: Array = payload["meta"].get("autopilotProfiles", [])
+	var found: bool = false
+	for profile: Dictionary in saved_profiles:
+		if str(profile.get("id", "")) == profile_id:
+			found = true
+			break
+	if not found:
+		for preset: Dictionary in AutopilotPolicy.starter_profiles():
+			var exists: bool = false
+			for profile: Dictionary in saved_profiles:
+				if str(profile.get("id", "")) == str(preset.get("id", "")):
+					exists = true
+					break
+			if not exists:
+				saved_profiles.append(preset)
+		payload["meta"]["autopilotProfiles"] = saved_profiles
+	payload["meta"]["activeAutopilotProfileId"] = profile_id
+	return _commit_payload(payload)
+
 func _force_contract_node(layers: Array, type: String, preferred_layer: int) -> Dictionary:
 	if layers.is_empty():
 		return {}
@@ -924,6 +957,7 @@ func route_intel() -> Dictionary:
 			var info: Dictionary = {"revealed": revealed, "visited": visited, "scouted": scouted}
 			if revealed:
 				info["type"] = str(node.get("type", "UNKNOWN"))
+				info["questTarget"] = not (node.get("questTargets", []) as Array).is_empty()
 				if effective_intel >= 2 or is_preview:
 					info["threat"] = str(node.get("threat", "unknown"))
 					info["lootHint"] = str(node.get("lootHint", "unknown"))
@@ -962,6 +996,8 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
 	var actions: int = 0
 	var combat_time: int = 0
 	var policy: AutopilotPolicy = AutopilotPolicy.new()
+	var pilot_profile_id: String = active_autopilot_profile_id()
+	var pilot_profile: Dictionary = AutopilotPolicy.profile(pilot_profile_id)
 	while actions < MAX_COMMANDS:
 		var used_time: int = maxi(0, roundi(float(state.run.resources.get("gameTimeMs", starting_time)) - starting_time)) + combat_time
 		if used_time >= budget:
@@ -1001,9 +1037,25 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
 			continue
 		match state.run.phase:
 			"ROUTE":
-				var choice: Dictionary = policy.choose_node(reachable_nodes(), route_intel(), state.run, 4.0)
+				if state.run.wanted > float(pilot_profile.get("maxWanted", 70)):
+					return _autopilot_stop("PAUSED_FOR_RESOURCES", "WANTED_LIMIT", "Розыск превысил предел профиля %s; требуется ручное решение." % str(pilot_profile.get("name", pilot_profile_id)), report)
+				var hp_ratio: float = float(state.run.resources.get("hp", 0.0)) / maxf(1.0, float(state.run.resources.get("maxHP", 1.0)))
+				var shield_ratio: float = float(state.run.resources.get("shield", 0.0)) / maxf(1.0, float(state.run.resources.get("maxShield", 1.0)))
+				var choice: Dictionary = policy.choose_node(reachable_nodes(), route_intel(), state.run, float(pilot_profile.get("riskWeight", 4.0)), pilot_profile_id)
 				if choice.is_empty():
-					return _autopilot_stop("PAUSED_FOR_RESOURCES", "NO_REACHABLE_NODE", "Нет известного достижимого перехода; требуется ручное решение.", report)
+					return _autopilot_stop("PAUSED_FOR_RESOURCES", "NO_ALLOWED_NODE", "В пределах профиля нет подходящего известного перехода; требуется ручное решение.", report)
+				var selected_info: Dictionary = route_intel().get("nodes", {}).get(str(choice.get("id", "")), {})
+				var selected_type: String = str(selected_info.get("type", "UNKNOWN")) if bool(selected_info.get("revealed", false)) else "UNKNOWN"
+				var needs_service: bool = hp_ratio < float(pilot_profile.get("minHP", 0.35)) or shield_ratio < float(pilot_profile.get("minShield", 0.15))
+				if needs_service and selected_type != "REPAIR":
+					var service_visible: bool = false
+					for candidate: Dictionary in reachable_nodes():
+						var candidate_info: Dictionary = route_intel().get("nodes", {}).get(str(candidate.get("id", "")), {})
+						if bool(candidate_info.get("revealed", false)) and str(candidate_info.get("type", "")) == "REPAIR":
+							service_visible = true
+							break
+					if not service_visible:
+						return _autopilot_stop("PAUSED_FOR_RESOURCES", "HEALTH_THRESHOLD", "HP/щит ниже безопасного порога профиля, а известный маршрут не предлагает ремонт.", report)
 				var edge_cost: int = 25000
 				var known_choice: Dictionary = route_intel().get("nodes", {}).get(str(choice.get("id", "")), {})
 				for edge: Dictionary in state.run.graph.get("edges", []):
@@ -1058,12 +1110,28 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
 					return _autopilot_stop("SAFE_ERROR_STOP", "UNSUPPORTED_NODE", "Узел %s не поддерживает автоматическое действие." % kind, report)
 				actions += 1
 			"CHECKPOINT":
-				if not extract_run():
-					return _autopilot_stop("SAFE_ERROR_STOP", "EXTRACTION", last_error, report)
-				report["status"] = "EXTRACTED"
-				report["reasonCode"] = "SAFE_CHECKPOINT_EXTRACTION"
-				report["reason"] = "На контрольном узле добыча закреплена; автоматический переход в следующий сектор не выполнялся."
-				break
+				if state.run.depth == 12 and state.meta.campaign_flags.has("CAMPAIGN_COMPLETED") and not state.meta.campaign_flags.has("ENDING_SELECTED"):
+					return _autopilot_stop("PAUSED_FOR_DECISION", "CAMPAIGN_ENDING", "Финал кампании требует выбора игрока; автопилот остановлен перед эндгеймом.", report)
+				var hp_ratio: float = float(state.run.resources.get("hp", 0.0)) / maxf(1.0, float(state.run.resources.get("maxHP", 1.0)))
+				var shield_ratio: float = float(state.run.resources.get("shield", 0.0)) / maxf(1.0, float(state.run.resources.get("maxShield", 1.0)))
+				var hull_ratio: float = float(state.run.resources.get("hull", 0.0)) / maxf(1.0, float(state.run.resources.get("maxHull", 1.0)))
+				var safe_to_continue: bool = hp_ratio >= float(pilot_profile.get("minHP", 0.35)) and shield_ratio >= float(pilot_profile.get("minShield", 0.15)) and hull_ratio > 0.35 and float(state.run.resources.get("fuel", 0.0)) > float(pilot_profile.get("reserveFuel", 1)) and state.run.wanted <= float(pilot_profile.get("maxWanted", 70))
+				var checkpoint_action: String = str(pilot_profile.get("checkpointAction", "CONDITIONAL"))
+				var should_extract: bool = checkpoint_action == "EXTRACT" or (checkpoint_action == "CONDITIONAL" and not safe_to_continue)
+				if should_extract:
+					if not extract_run():
+						return _autopilot_stop("SAFE_ERROR_STOP", "EXTRACTION", last_error, report)
+					report["status"] = "EXTRACTED"
+					report["reasonCode"] = "PROFILE_CHECKPOINT_EXTRACT"
+					report["reason"] = "Профиль %s закрепил добычу на контрольной точке." % str(pilot_profile.get("name", pilot_profile_id))
+					break
+				if not safe_to_continue and checkpoint_action == "CONTINUE":
+					return _autopilot_stop("PAUSED_FOR_RESOURCES", "CHECKPOINT_RESERVE", "Ресурсы ниже защитного резерва профиля; выезд оставлен на решающий выбор.", report)
+				if not continue_campaign():
+					if state.run.depth == 12 and not state.meta.campaign_flags.has("ENDING_SELECTED"):
+						return _autopilot_stop("PAUSED_FOR_DECISION", "CAMPAIGN_ENDING", last_error, report)
+					return _autopilot_stop("PAUSED_FOR_RESOURCES", "CONTINUE_REJECTED", last_error, report)
+				actions += 1
 			_:
 				return _autopilot_stop("PAUSED_FOR_DECISION", "RUN_STATE", "Текущий этап выезда требует ручного решения.", report)
 		if actions >= MAX_COMMANDS:

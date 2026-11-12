@@ -47,6 +47,7 @@ func _validate_meta(value: Variant) -> Dictionary:
 	meta_allowed.append("questProgress")
 	meta_allowed.append("disassemblyHistory")
 	meta_allowed.append("disassemblyUndo")
+	meta_allowed.append("activeAutopilotProfileId")
 	if not _has_keys(meta, keys) or not _has_only_keys(meta, meta_allowed):
 		return _failure("meta: отсутствуют обязательные поля или есть неизвестные поля.")
 	if meta.has("questProgress") and not _validate_quest_progress(meta["questProgress"]):
@@ -126,11 +127,15 @@ func _validate_meta(value: Variant) -> Dictionary:
 		return _failure("meta.tactics: профиль пуст, повреждён или activeTacticId неизвестен.")
 	if not meta["autopilotProfiles"] is Array or meta["autopilotProfiles"].is_empty():
 		return _failure("meta.autopilotProfiles: требуется хотя бы один профиль.")
+	var autopilot_profile_ids: Dictionary = {}
 	for profile: Variant in meta["autopilotProfiles"]:
 		if not profile is Dictionary or not _has_exact_keys(profile, ["id", "name", "startDepth", "enabled"]):
 			return _failure("meta.autopilotProfiles: неверная структура профиля.")
 		if not _nonempty_string(profile["id"]) or not _nonempty_string(profile["name"]) or not _is_integer(profile["startDepth"]) or int(profile["startDepth"]) < 1 or int(profile["startDepth"]) > 13 or not profile["enabled"] is bool:
 			return _failure("meta.autopilotProfiles: неверные значения профиля.")
+		autopilot_profile_ids[str(profile["id"])] = true
+	if meta.has("activeAutopilotProfileId") and (not _nonempty_string(meta["activeAutopilotProfileId"]) or not autopilot_profile_ids.has(str(meta["activeAutopilotProfileId"]))):
+		return _failure("meta.activeAutopilotProfileId: профиль не найден.")
 	return {"ok": true, "error": ""}
 
 func _validate_run(value: Variant, meta: Dictionary) -> Dictionary:

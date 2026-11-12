@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — selectable specification-based autopilot presets
+
+- Added persistent CAUTIOUS, BALANCED and AGGRESSIVE starter presets with the §16.5 risk, health/shield, Wanted, route restriction, fuel reserve and checkpoint defaults. The player selects a preset between sorties; the active choice is immutable during an outing and appears on the road screen.
+- Replaced the legacy hand-weighted node scores with the specification's normalized loot/XP/quest/service/risk/fuel/Wanted scoring equation. Only revealed type/threat/loot hints, visible quest targets, graph fuel cost and current state are considered; hidden node content is not scored.
+- Old single-BALANCED saves remain compatible and add the other preset records when a different profile is selected. TypeScript's starter save oracle and schema now include the optional selected preset. Custom weights, expense/filter/quest/tow controls, auto-restart and report history remain unimplemented.
+- Checks: Godot editor import; 22 scripts / 87,541 assertions / 0 failures, including route UI selection and hidden-info policy; TypeScript typecheck, 207 tests, data validation and production build passed after the save-schema refinement. Windows export not rerun.
+
 ## Unreleased — emergency recovery for no-fuel routes
 
 - Implemented Master Spec §16.4 evacuation tow and ABANDON_RUN through persisted `GameSession` transactions and a route-screen confirmation flow. Tow pays `ceil(30×R(d))` credits, drops one deterministic random unsecured item, loses 30% of remaining unsecured currencies and secures the rest; abandon loses all unsecured cargo/currency and damages permanently equipped gear by 10 durability.

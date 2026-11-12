@@ -66,7 +66,12 @@ export function createInitialSave(options: { saveId?: string; now?: number } = {
         ],
       }],
       activeTacticId: 'DEFAULT',
-      autopilotProfiles: [{ id: 'BALANCED', name: 'Сбалансированный', startDepth: 1, enabled: false }],
+      autopilotProfiles: [
+        { id: 'CAUTIOUS', name: 'Осторожный', startDepth: 1, enabled: false },
+        { id: 'BALANCED', name: 'Сбалансированный', startDepth: 1, enabled: false },
+        { id: 'AGGRESSIVE', name: 'Агрессивный', startDepth: 1, enabled: false },
+      ],
+      activeAutopilotProfileId: 'BALANCED',
     },
     run: null,
   };

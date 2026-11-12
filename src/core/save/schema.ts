@@ -65,7 +65,12 @@ export const SaveGameSchema = z.object({
     unlockedImplantSlots: z.number().int().min(4).max(6), unlockedDroneSlots: z.number().int().min(1).max(2),
     tactics: z.array(tacticalProfile).min(1), activeTacticId: z.string().min(1),
     autopilotProfiles: z.array(z.object({ id: z.string().min(1), name: z.string().min(1), startDepth: z.number().int().min(1).max(13), enabled: z.boolean() }).strict()).min(1),
-  }).strict(),
+    activeAutopilotProfileId: z.string().min(1).optional(),
+  }).strict().superRefine((meta, context) => {
+    if (meta.activeAutopilotProfileId && !meta.autopilotProfiles.some((profile) => profile.id === meta.activeAutopilotProfileId)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ['activeAutopilotProfileId'], message: 'Selected autopilot profile does not exist.' });
+    }
+  }),
   run: runState.nullable(),
 }).strict();
 

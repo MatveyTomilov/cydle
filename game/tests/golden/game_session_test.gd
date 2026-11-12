@@ -62,7 +62,26 @@ func run(_tree: SceneTree) -> bool:
 	var autopilot_session: GameSession = GameSession.new()
 	autopilot_session.configure_save_directory("user://test-saves/autopilot")
 	if check(autopilot_session.start_new_game(1762900000050), "game_session: could not create an autopilot profile"):
+		check(autopilot_session.state.meta.autopilot_profiles.size() == 3 and autopilot_session.active_autopilot_profile_id() == "BALANCED", "game_session: new profiles do not include the three authored pilot presets")
+		var old_pilot_payload: Dictionary = autopilot_session.state.to_payload()
+		old_pilot_payload["meta"]["autopilotProfiles"] = [{"id": "BALANCED", "name": "Сбалансированный", "startDepth": 1, "enabled": false}]
+		old_pilot_payload["meta"].erase("activeAutopilotProfileId")
+		check(autopilot_session._commit_payload(old_pilot_payload) and autopilot_session.active_autopilot_profile_id() == "BALANCED", "game_session: legacy single-profile save did not retain the balanced default")
+		check(autopilot_session.set_active_autopilot_profile("CAUTIOUS") and autopilot_session.active_autopilot_profile_id() == "CAUTIOUS" and autopilot_session.state.meta.autopilot_profiles.size() == 3, "game_session: legacy garage did not migrate and persist the selected preset")
+		var selected_pilot: GameSession = GameSession.new()
+		selected_pilot.configure_save_directory("user://test-saves/autopilot")
+		check(selected_pilot.load_saved_game() and selected_pilot.active_autopilot_profile_id() == "CAUTIOUS", "game_session: selected autopilot preset did not survive save reload")
 		check(autopilot_session.start_expedition("autopilot-fixed-seed"), "game_session: autopilot expedition could not start")
+		check(not autopilot_session.set_active_autopilot_profile("AGGRESSIVE"), "game_session: active outing allowed changing its risk policy mid-run")
+		var pilot_policy: AutopilotPolicy = AutopilotPolicy.new()
+		var policy_run: GameSaveState.RunState = GameSaveState.RunState.new()
+		var elite_choice: Array[Dictionary] = [{"id": "elite", "layer": 0, "type": "ELITE"}]
+		var elite_intel: Dictionary = {"nodes": {"elite": {"revealed": true, "type": "ELITE", "threat": "high", "lootHint": "elite"}}}
+		check(pilot_policy.choose_node(elite_choice, elite_intel, policy_run, 4.0, "CAUTIOUS").is_empty(), "game_session: cautious preset selected a disallowed elite")
+		check(str(pilot_policy.choose_node(elite_choice, elite_intel, policy_run, 4.0, "AGGRESSIVE").get("id", "")) == "elite", "game_session: aggressive preset failed to select its allowed elite route")
+		var disclosed_choices: Array[Dictionary] = [{"id": "cache", "type": "CACHE"}, {"id": "hidden-elite", "type": "ELITE"}]
+		var disclosed_intel: Dictionary = {"nodes": {"cache": {"revealed": true, "type": "CACHE", "threat": "low", "lootHint": "три прототипа"}, "hidden-elite": {"revealed": false}}}
+		check(str(pilot_policy.choose_node(disclosed_choices, disclosed_intel, policy_run, 4.0, "BALANCED").get("id", "")) == "cache", "game_session: route policy leaked a hidden node's type or ignored its disclosed loot hint")
 		check(autopilot_session.set_autopilot_enabled(true), "game_session: offline autopilot could not be enabled")
 		var resumed_autopilot: GameSession = GameSession.new()
 		resumed_autopilot.configure_save_directory("user://test-saves/autopilot")

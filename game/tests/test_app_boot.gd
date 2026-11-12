@@ -23,6 +23,17 @@ func run(tree: SceneTree) -> bool:
 	check(_has_label(app, "CYDLE"), "test_app_boot: CYDLE title is missing from the game shell")
 	check(_has_button(body, "НОВАЯ ИГРА"), "test_app_boot: new game action is missing")
 	check(_has_button(body, "ПРОДОЛЖИТЬ"), "test_app_boot: continue action is missing")
+	var pilot_session: GameSession = GameSession.new()
+	pilot_session.configure_save_directory("user://test-saves/autopilot-ui")
+	if check(pilot_session.start_new_game(17629000000501), "test_app_boot: could not create an isolated autopilot UI profile"):
+		app.set("_session", pilot_session)
+		app.call("_show_road")
+		var pilot_picker: OptionButton = _find_option_button(app)
+		check(pilot_picker != null and pilot_picker.item_count == 3, "test_app_boot: road did not render all three autopilot presets")
+		if pilot_picker != null and pilot_picker.item_count == 3:
+			check(str(pilot_picker.get_item_metadata(1)) == "BALANCED" and pilot_picker.selected == 1, "test_app_boot: selected balanced preset was not reflected in road UI")
+			pilot_picker.item_selected.emit(0)
+			check(pilot_session.active_autopilot_profile_id() == "CAUTIOUS", "test_app_boot: selecting a road preset did not save the active policy")
 
 	app.queue_free()
 	await tree.process_frame
@@ -43,3 +54,12 @@ func _has_button(node: Node, text: String) -> bool:
 		if _has_button(child, text):
 			return true
 	return false
+
+func _find_option_button(node: Node) -> OptionButton:
+	if node is OptionButton:
+		return node as OptionButton
+	for child: Node in node.get_children():
+		var found: OptionButton = _find_option_button(child)
+		if found != null:
+			return found
+	return null

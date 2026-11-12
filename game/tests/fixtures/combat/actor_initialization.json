@@ -24,7 +24,7 @@
         "conditions": [
           {
             "kind": "hpBelow",
-            "value": 45
+            "value": 0.45
           }
         ],
         "logic": "AND",
@@ -520,7 +520,7 @@
         "lowestHpFraction": 1,
         "timeWithoutShieldMs": 0
       },
-      "rulesHash": "93d17943"
+      "rulesHash": "821a0145"
     }
   }
 }

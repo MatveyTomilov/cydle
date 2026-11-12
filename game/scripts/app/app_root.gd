@@ -955,6 +955,20 @@ func _show_road() -> void:
 	if _session.state.run == null or ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(_session.state.run.phase):
 		_body.add_child(_label("ДОРОГА   /   ВЫЕЗД НЕ НАЧАТ", 12, COLOR_CYAN))
 		_body.add_child(_label("Сформируйте маршрут", 27, COLOR_TEXT))
+		_body.add_child(_label("АВТОПИЛОТ · ПРОФИЛЬ НА СЛЕДУЮЩИЙ ВЫЕЗД", 12, COLOR_CYAN))
+		var pilot_picker: OptionButton = OptionButton.new()
+		var active_pilot_id: String = _session.active_autopilot_profile_id()
+		var selected_pilot_index: int = 0
+		var pilot_presets: Array[Dictionary] = AutopilotPolicy.starter_profiles()
+		for profile_index: int in range(pilot_presets.size()):
+			var preset: Dictionary = pilot_presets[profile_index]
+			pilot_picker.add_item(str(preset.get("name", "Автопилот")))
+			pilot_picker.set_item_metadata(profile_index, str(preset.get("id", "")))
+			if str(preset.get("id", "")) == active_pilot_id:
+				selected_pilot_index = profile_index
+		pilot_picker.select(selected_pilot_index)
+		pilot_picker.item_selected.connect(_on_autopilot_profile_selected.bind(pilot_picker))
+		_body.add_child(pilot_picker)
 		_add_escalation_selector()
 		var start: Button = _button("НАЧАТЬ ВЫЕЗД", true)
 		start.pressed.connect(_on_start_expedition)
@@ -968,6 +982,8 @@ func _show_road() -> void:
 	var run: GameSaveState.RunState = _session.state.run
 	_body.add_child(_label("СЕКТОР %02d   /   %s   /   %s" % [run.depth, run.biome, run.phase], 12, COLOR_CYAN))
 	_body.add_child(_label("Маршрут", 27, COLOR_TEXT))
+	var active_pilot: Dictionary = AutopilotPolicy.profile(_session.active_autopilot_profile_id())
+	_body.add_child(_label("ПРОФИЛЬ АВТОПИЛОТА · %s · РИСК %.1f · HP %.0f%% · ЩИТ %.0f%% · РОЗЫСК %d" % [str(active_pilot.get("name", "Сбалансированный")), float(active_pilot.get("riskWeight", 4.0)), float(active_pilot.get("minHP", 0.35)) * 100.0, float(active_pilot.get("minShield", 0.15)) * 100.0, int(active_pilot.get("maxWanted", 70))], 11, COLOR_MUTED))
 	var resources: Dictionary = run.resources
 	_body.add_child(_label("ТОПЛИВО %d/%d   ·   КОРПУС %d/%d   ·   РОЗЫСК %d" % [int(resources.get("fuel", 0)), int(resources.get("maxFuel", 0)), int(resources.get("hull", 0)), int(resources.get("maxHull", 0)), int(run.wanted)], 13, COLOR_AMBER))
 	var autopilot_button: Button = _button("АВТОПИЛОТ · ДО БЕЗОПАСНОЙ ОСТАНОВКИ · ЛИМИТ 12 ЧАСОВ", true)
@@ -1007,6 +1023,8 @@ func _show_road() -> void:
 				var intel: Dictionary = map_intel.get(node_id, {})
 				var node_type: String = str(intel.get("type", "НЕИЗВЕСТНО"))
 				var secondary: String = "%s · %s" % [str(intel.get("threat", "")), str(intel.get("lootHint", ""))] if intel.has("threat") else ("УЖЕ ПОСЕЩЁН" if visited else "РАЗВЕДДАННЫХ НЕТ")
+				if bool(intel.get("questTarget", false)):
+					secondary = "ЦЕЛЬ ЗАДАНИЯ · " + secondary
 				if bool(intel.get("preview", false)):
 					secondary = "ПРЕДВАРИТЕЛЬНЫЙ СКАН · %s" % str(intel.get("anomalyProtocol", ""))
 				elif bool(intel.get("scouted", false)) and not visited:
@@ -1433,6 +1451,15 @@ func _on_autopilot() -> void:
 	if not bool(report.get("ok", false)):
 		_footer.text = str(report.get("error", "Автопилот остановлен."))
 	_show_road()
+
+func _on_autopilot_profile_selected(index: int, picker: OptionButton) -> void:
+	if index < 0 or index >= picker.item_count:
+		return
+	var profile_id: String = str(picker.get_item_metadata(index))
+	if _session.set_active_autopilot_profile(profile_id):
+		_show_road()
+	else:
+		_footer.text = _session.last_error
 
 func _on_toggle_offline_autopilot(enabled: bool) -> void:
 	if _session.set_autopilot_enabled(enabled):
