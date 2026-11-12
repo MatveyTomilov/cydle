@@ -230,7 +230,7 @@ func compute_stat(stat_id: String, mod_bundle: Dictionary, context: Dictionary =
 			var group_factor: float = 1.0 + float(entry["sum"]) / 100.0
 			factor *= group_factor
 			value = (factor - 1.0) * 100.0
-			children.append(_trace.make_node("MULTIPLY", "эффективный %s" % _group_label(group_key), value, {
+			children.append(_trace.make_node("MULTIPLY", "эффективный %% %s" % _group_label(group_key), value, {
 				"sourceId": "group:%s" % group_key, "sourceName": "Группа %s" % group_key, "unit": "%", "inputs": [entry["sum"], group_factor],
 				"localizedExplanation": "Группа %s: %s%% → ×%s; эффективный бонус %s%%" % [group_key, entry["sum"], group_factor, value],
 			}))

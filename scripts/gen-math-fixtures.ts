@@ -130,6 +130,26 @@ for (let i = 0; i < 160; i++) {
 }
 
 /* ---------------- Stat compute cases ---------------- */
+// Trace IDs are process-global in TS but per-instance in GDScript and are
+// excluded from canonical gameplay hashes, so strip them before comparing.
+// JSON.stringify turns Infinity/NaN into null, so encode non-finite numbers as
+// explicit sentinels to keep the computational trace contract verifiable.
+function sanitizeTrace(node: unknown): unknown {
+  if (Array.isArray(node)) return node.map(sanitizeTrace);
+  if (node && typeof node === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
+      if (k === 'id') continue;
+      out[k] = sanitizeTrace(v);
+    }
+    return out;
+  }
+  if (typeof node === 'number' && !Number.isFinite(node)) {
+    if (Number.isNaN(node)) return 'NaN';
+    return node > 0 ? 'Infinity' : '-Infinity';
+  }
+  return node;
+}
 function randomModifier(stat: StatId, i: number): Modifier {
   const d = STAT_REGISTRY[stat];
   let op = pick(OPS as unknown as string[]);
@@ -157,7 +177,8 @@ function randomModifier(stat: StatId, i: number): Modifier {
 const statCases: unknown[] = [];
 for (const stat of STAT_IDS) {
   // Empty bundle → base value.
-  statCases.push({ name: `${stat}:base`, statId: stat, mods: [], conversions: [], context: {}, expectedValue: computeStat(stat, bundle([])).value });
+  const baseResult = computeStat(stat, bundle([]));
+  statCases.push({ name: `${stat}:base`, statId: stat, mods: [], conversions: [], context: {}, expectedValue: baseResult.value, expectedTrace: sanitizeTrace(baseResult.trace) });
   // Randomized bundles.
   for (let k = 0; k < 10; k++) {
     const n = 1 + Math.floor(rnd() * 5);
@@ -165,7 +186,8 @@ for (const stat of STAT_IDS) {
     for (let i = 0; i < n; i++) mods.push(randomModifier(stat, i));
     const ctx = rnd() < 0.5 ? randomContext() : {};
     const b = bundle(mods);
-    statCases.push({ name: `${stat}:rand${k}`, statId: stat, mods, conversions: [], context: ctx, expectedValue: computeStat(stat, b, ctx).value });
+    const r = computeStat(stat, b, ctx);
+    statCases.push({ name: `${stat}:rand${k}`, statId: stat, mods, conversions: [], context: ctx, expectedValue: r.value, expectedTrace: sanitizeTrace(r.trace) });
   }
 }
 // Targeted edge cases: integer rounding, clamps, negative resistances, multiplier flats.
@@ -181,7 +203,8 @@ const edgeStats: Array<[StatId, Modifier[]]> = [
   ['armor', [mod('armor', 'FLOOR', 30, source(0)), mod('armor', 'FLAT', -100, source(1))]],
 ];
 for (const [stat, mods] of edgeStats) {
-  statCases.push({ name: `${stat}:edge${statCases.length}`, statId: stat, mods, conversions: [], context: {}, expectedValue: computeStat(stat, bundle(mods)).value });
+  const r = computeStat(stat, bundle(mods));
+  statCases.push({ name: `${stat}:edge${statCases.length}`, statId: stat, mods, conversions: [], context: {}, expectedValue: r.value, expectedTrace: sanitizeTrace(r.trace) });
 }
 
 /* ---------------- Conversion + full-sheet cases ---------------- */
@@ -259,7 +282,7 @@ const penSets = [
 for (const type of ['KINETIC', 'ENERGY', 'DIGITAL'] as const) {
   for (const def of defSets) for (const pen of penSets) for (const raw of [100, 0, 55.5]) {
     const m = D.mitigatePacket(raw, type, def, pen);
-    damageCases.push({ fn: 'mitigate_packet', args: [raw, type, def, pen], expected: { armorEff: m.armorEff, reduction: m.reduction, resistanceAfterPen: m.resistanceAfterPen, afterDefense: m.afterDefense } });
+    damageCases.push({ fn: 'mitigate_packet', args: [raw, type, def, pen], expected: { armorEff: m.armorEff, reduction: m.reduction, resistanceAfterPen: m.resistanceAfterPen, afterDefense: m.afterDefense, trace: sanitizeTrace(m.trace) } });
   }
 }
 const poolSets = [
@@ -271,7 +294,7 @@ const poolSets = [
 ];
 for (const pools of poolSets) for (const bypass of [0, 0.25, 1, 1.5]) for (const mult of [1, 2, 0, 0.5]) for (const incoming of [20, 0, 500]) {
   const p = D.partitionDamage(incoming, pools, bypass, mult);
-  damageCases.push({ fn: 'partition_damage', args: [incoming, pools, bypass, mult], expected: { shieldConsumed: p.shieldConsumed, hpLost: p.hpLost, bypassed: p.bypassed, overkill: p.overkill, tempConsumed: p.tempConsumed } });
+  damageCases.push({ fn: 'partition_damage', args: [incoming, pools, bypass, mult], expected: { shieldConsumed: p.shieldConsumed, hpLost: p.hpLost, bypassed: p.bypassed, overkill: p.overkill, tempConsumed: p.tempConsumed, trace: sanitizeTrace(p.trace) } });
 }
 for (const def of defSets) for (const type of ['KINETIC', 'ENERGY', 'DIGITAL'] as const) {
   damageCases.push({ fn: 'simple_ehp', args: [300, 75, def, type], expected: D.simpleEHP(300, 75, def, type) });

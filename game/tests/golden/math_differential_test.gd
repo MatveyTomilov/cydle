@@ -70,12 +70,21 @@ func _typed_args(args: Variant) -> Array:
 func _near(actual: float, expected: float) -> bool:
 	return absf(actual - expected) <= 0.000000001 * maxf(1.0, absf(expected))
 
-func _compare(actual: Variant, expected: Variant, label: String) -> void:
+func _compare(actual: Variant, expected: Variant, label: String, skip_explanation: bool = false) -> void:
+	if expected == null:
+		check(actual == null, "%s: expected null, got %s" % [label, str(actual)])
+		return
 	if expected is Dictionary:
 		if not check(actual is Dictionary, "%s: expected Dictionary" % label):
 			return
 		for key: Variant in (expected as Dictionary).keys():
-			_compare((actual as Dictionary).get(key), (expected as Dictionary)[key], "%s.%s" % [label, key])
+			# localizedExplanation is cosmetic UI text. Godot str(float) rounds to 6
+			# decimals while JS uses shortest round-trip, so exact explanation-text
+			# parity is deferred to the Lab UI stage. The computational trace contract
+			# (operation/stage/exactValue/inputs/source/unit/children/flags) is compared.
+			if skip_explanation and str(key) == "localizedExplanation":
+				continue
+			_compare((actual as Dictionary).get(key), (expected as Dictionary)[key], "%s.%s" % [label, key], skip_explanation)
 	elif expected is Array:
 		if not check(actual is Array, "%s: expected Array" % label):
 			return
@@ -84,11 +93,23 @@ func _compare(actual: Variant, expected: Variant, label: String) -> void:
 		if not check(actual_array.size() == expected_array.size(), "%s: array size %d != %d" % [label, actual_array.size(), expected_array.size()]):
 			return
 		for i: int in range(expected_array.size()):
-			_compare(actual_array[i], expected_array[i], "%s[%d]" % [label, i])
+			_compare(actual_array[i], expected_array[i], "%s[%d]" % [label, i], skip_explanation)
+	elif expected is String and (expected == "Infinity" or expected == "-Infinity" or expected == "NaN"):
+		var actual_float: float = float(actual) if actual != null else NAN
+		var matches: bool = false
+		if expected == "Infinity":
+			matches = is_inf(actual_float) and actual_float > 0.0
+		elif expected == "-Infinity":
+			matches = is_inf(actual_float) and actual_float < 0.0
+		else:
+			matches = is_nan(actual_float)
+		check(matches, "%s: non-finite %s != %s" % [label, str(actual), str(expected)])
 	elif expected is String:
 		check(actual is String and str(actual) == str(expected), "%s: text '%s' != '%s'" % [label, str(actual), str(expected)])
 	elif expected is bool:
 		check(actual is bool and bool(actual) == bool(expected), "%s: bool %s != %s" % [label, str(actual), str(expected)])
+	elif actual == null:
+		check(false, "%s: expected number %s, got null (missing field)" % [label, str(expected)])
 	else:
 		check(_near(float(actual), float(expected)), "%s: value %s != %s" % [label, str(actual), str(expected)])
 
@@ -116,6 +137,8 @@ func _run_stats() -> void:
 		var result: Dictionary = _stats.call("compute_stat", str(c.get("statId", "")), bundle, c.get("context", {}), {}, "")
 		var label: String = "stat[%s]" % str(c.get("name", index))
 		check(_near(float(result.get("value", 0.0)), float(c.get("expectedValue", 0.0))), "%s: value %s != %s" % [label, str(result.get("value")), str(c.get("expectedValue"))])
+		if c.has("expectedTrace"):
+			_compare(result.get("trace", {}), c.get("expectedTrace", {}), "%s.trace" % label, true)
 
 func _run_conversions() -> void:
 	var cases: Variant = _load("conversion_cases.json")
@@ -166,4 +189,4 @@ func _run_damage() -> void:
 		var fn: String = str(c.get("fn", ""))
 		var args: Array = c.get("args", [])
 		var actual: Variant = _damage.callv(fn, args)
-		_compare(actual, c.get("expected"), "damage[%d:%s]" % [index, fn])
+		_compare(actual, c.get("expected"), "damage[%d:%s]" % [index, fn], true)
