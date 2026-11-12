@@ -219,11 +219,13 @@ func _prepare_garage(session: GameSession) -> bool:
 		var expected_category: String = "IMPLANT" if slot.begins_with("IMP_") else "DRONE" if slot.begins_with("DRONE_") else slot
 		var current_rank: int = 0
 		var current_template_id: String = ""
+		var current_tech_level: int = 0
 		var current_weapon_type: String = ""
 		for item: Dictionary in session.state.meta.inventory:
 			if str(item.get("itemId", "")) == current_id:
 				current_rank = _item_rank(item)
 				current_template_id = str(item.get("templateId", ""))
+				current_tech_level = int(item.get("techLevel", 1))
 				current_weapon_type = str(catalog.get_template(str(item.get("templateId", ""))).get("weapon", {}).get("type", ""))
 				break
 		var candidates: Array[Dictionary] = []
@@ -234,7 +236,9 @@ func _prepare_garage(session: GameSession) -> bool:
 			var candidate_type: String = str(template.get("weapon", {}).get("type", ""))
 			var is_compatible_kinetic: bool = slot == "MAIN" and candidate_type == "KINETIC" and current_weapon_type != "KINETIC" and _item_rank(item) >= current_rank - 15
 			var preferred_rifle: bool = slot == "MAIN" and str(template.get("id", "")) == "RIFLE_K2" and int(item.get("techLevel", 1)) >= 3 and current_template_id != "RIFLE_K2" and _item_rank(item) >= current_rank - 15
-			if str(template.get("category", "")) == expected_category and (_item_rank(item) > current_rank or is_compatible_kinetic or preferred_rifle):
+			var preserve_test_rifle: bool = slot == "MAIN" and current_template_id == "RIFLE_K2" and current_tech_level >= 3 and str(template.get("id", "")) != "RIFLE_K2" and _item_rank(item) <= current_rank + 15
+			var ranked_upgrade: bool = _item_rank(item) > current_rank and not preserve_test_rifle
+			if str(template.get("category", "")) == expected_category and (ranked_upgrade or is_compatible_kinetic or preferred_rifle):
 				candidates.append(item)
 		candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 			if slot == "MAIN":
