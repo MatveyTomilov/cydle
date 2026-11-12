@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added an initial typed native game-save model and structural validator around `SaveRepository`, including typed repository roundtrip coverage. This is groundwork only: active-run field parity and full legacy schema validation remain incomplete, and gameplay does not yet consume the typed state.
 - Added a native asset-manifest validator and a Windows GitHub Actions workflow for Godot import/tests/export plus the frozen reference checks.
 - Added root agent instructions for the Godot-only product boundary, protected branches, deterministic core, asset provenance, and local verification commands.
 - Fixed TypeScript 5.9 readonly-array typing in the math fixture generator without changing fixture values.

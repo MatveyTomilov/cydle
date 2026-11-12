@@ -43,6 +43,15 @@ func save(slot_id: String, payload: Dictionary, updated_at: int, requested_save_
 	var previous_document: Dictionary = current.get("save", {})
 	return _commit(slot_id, document, previous_document)
 
+func save_game(slot_id: String, state: GameSaveState, updated_at: int) -> Dictionary:
+	if state == null:
+		return _failure("Нельзя сохранить пустое состояние игры.")
+	var payload: Dictionary = state.to_payload()
+	var validation: Dictionary = GameSaveSchema.new().validate_payload(payload)
+	if not bool(validation.get("ok", false)):
+		return _failure("Игровое состояние не прошло проверку: %s" % str(validation.get("error", "неизвестная ошибка")))
+	return save(slot_id, payload, updated_at, state.save_id)
+
 func load(slot_id: String) -> Dictionary:
 	if not _valid_slot_id(slot_id):
 		return _failure("Недопустимый идентификатор слота сохранения.")
@@ -76,6 +85,15 @@ func load(slot_id: String) -> Dictionary:
 	for candidate: Dictionary in candidates:
 		recovery_paths.append(str(candidate["path"]))
 	return {"ok": true, "empty": false, "recovered": recovered, "save": selected_save, "error": "", "available_recovery": recovery_paths}
+
+func load_game(slot_id: String) -> Dictionary:
+	var loaded: Dictionary = self.load(slot_id)
+	if not bool(loaded.get("ok", false)):
+		return loaded
+	var state_result: Dictionary = GameSaveState.new().parse_payload(loaded["save"]["payload"])
+	if not bool(state_result.get("ok", false)):
+		return _failure("Снимок найден, но данные игры повреждены; исходный файл сохранён: %s" % str(state_result.get("error", "неизвестная ошибка")))
+	return {"ok": true, "empty": false, "recovered": bool(loaded.get("recovered", false)), "state": state_result["state"], "save": loaded["save"], "error": ""}
 
 func export_text(slot_id: String) -> Dictionary:
 	var loaded: Dictionary = self.load(slot_id)

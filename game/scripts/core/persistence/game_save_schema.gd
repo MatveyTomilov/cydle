@@ -1,0 +1,272 @@
+class_name GameSaveSchema
+extends RefCounted
+
+const SCHEMA_VERSION: int = 1
+const BIOMES: Array[String] = ["B01", "B02", "B03", "B04", "B05", "B06"]
+const RARITIES: Array[String] = ["COMMON", "MODIFIED", "RARE", "LEGENDARY", "UNIQUE"]
+const GARAGE_KEYS: Array[String] = ["WORKSHOP", "NEUROLAB", "SERVER", "HANGAR", "MARKET", "INTEL", "GARAGE_MED", "CALIBRATOR"]
+const ATTRIBUTE_KEYS: Array[String] = ["POW", "REF", "INT", "ENG", "SYN"]
+const FACTION_KEYS: Array[String] = ["F_VANTA", "F_RUST", "F_CHOIR", "F_ECHO"]
+const WALLET_KEYS: Array[String] = ["CREDITS", "SCRAP", "DATA"]
+const SLOT_KEYS: Array[String] = ["MAIN", "OFFHAND", "ARMOR", "IMP_1", "IMP_2", "IMP_3", "IMP_4", "IMP_5", "IMP_6", "DRONE_1", "DRONE_2", "ENGINE", "CHASSIS", "SCANNER", "SERVICE", "CARGO", "SUPPORT"]
+
+func validate_payload(value: Variant) -> Dictionary:
+	if not value is Dictionary:
+		return _failure("save: ожидался объект.")
+	var payload: Dictionary = value
+	if _is_integer(payload.get("schemaVersion")) and int(payload["schemaVersion"]) > SCHEMA_VERSION:
+		return _failure("Сохранение использует будущую игровую схему %d; поддерживается версия %d." % [int(payload["schemaVersion"]), SCHEMA_VERSION])
+	if not _has_exact_keys(payload, ["schemaVersion", "balanceVersion", "gameVersion", "saveId", "createdAt", "updatedAt", "revision", "meta", "run"]):
+		return _failure("save: отсутствуют обязательные поля или есть неизвестные поля.")
+	if not _is_integer(payload["schemaVersion"]) or int(payload["schemaVersion"]) != SCHEMA_VERSION:
+		return _failure("schemaVersion: неподдерживаемая версия.")
+	for key: String in ["balanceVersion", "gameVersion", "saveId"]:
+		if not payload[key] is String or str(payload[key]).is_empty():
+			return _failure("%s: ожидалась непустая строка." % key)
+	for key: String in ["createdAt", "updatedAt"]:
+		if not _is_finite_number(payload[key]) or float(payload[key]) < 0.0:
+			return _failure("%s: ожидалось конечное неотрицательное число." % key)
+	if not _is_integer(payload["revision"]) or int(payload["revision"]) < 1:
+		return _failure("revision: ожидалось целое число не меньше 1.")
+	var meta_result: Dictionary = _validate_meta(payload["meta"])
+	if not bool(meta_result.get("ok", false)):
+		return meta_result
+	if payload["run"] != null:
+		var run_result: Dictionary = _validate_run(payload["run"])
+		if not bool(run_result.get("ok", false)):
+			return run_result
+	return {"ok": true, "error": ""}
+
+func _validate_meta(value: Variant) -> Dictionary:
+	if not value is Dictionary:
+		return _failure("meta: ожидался объект.")
+	var meta: Dictionary = value
+	var keys: Array[String] = ["operator", "tutorial", "reputation", "campaignFlags", "transport", "protectedBank", "unsecuredWallet", "inventory", "equipment", "garage", "unlockedForpost", "maxSectorCleared", "unlockedBiomes", "skillIds", "passiveIds", "treeNodeIds", "unlockedImplantSlots", "unlockedDroneSlots", "tactics", "activeTacticId", "autopilotProfiles"]
+	if not _has_exact_keys(meta, keys):
+		return _failure("meta: отсутствуют обязательные поля или есть неизвестные поля.")
+	var operator_value: Variant = meta["operator"]
+	if not operator_value is Dictionary or not _has_exact_keys(operator_value, ["level", "xp", "attributes", "attributePoints", "treePoints"]):
+		return _failure("meta.operator: неверная структура.")
+	var operator: Dictionary = operator_value
+	if not _is_integer(operator["level"]) or int(operator["level"]) < 1 or int(operator["level"]) > 999:
+		return _failure("meta.operator.level: вне допустимого диапазона.")
+	for key: String in ["xp", "attributePoints", "treePoints"]:
+		if not _is_integer(operator[key]) or int(operator[key]) < 0:
+			return _failure("meta.operator.%s: ожидалось неотрицательное целое число." % key)
+	if not _is_number_map(operator["attributes"], ATTRIBUTE_KEYS, 1.0, 999.0, true):
+		return _failure("meta.operator.attributes: требуются пять атрибутов с целыми значениями не меньше 1.")
+	if not meta["tutorial"] is Dictionary or not _has_exact_keys(meta["tutorial"], ["firstSectorCompleted", "starterPrototypeSecured"]):
+		return _failure("meta.tutorial: неверная структура.")
+	for key: String in ["firstSectorCompleted", "starterPrototypeSecured"]:
+		if not meta["tutorial"][key] is bool:
+			return _failure("meta.tutorial.%s: ожидалось логическое значение." % key)
+	if not _is_number_map(meta["reputation"], FACTION_KEYS, -100.0, 100.0, true):
+		return _failure("meta.reputation: ожидались четыре целые репутации от -100 до 100.")
+	if not _string_array(meta["campaignFlags"]) or not _validate_transport(meta["transport"]):
+		return _failure("meta.campaignFlags или meta.transport: неверные данные.")
+	if not _validate_wallet(meta["protectedBank"]) or not _validate_wallet(meta["unsecuredWallet"]):
+		return _failure("meta.wallet: баланс должен содержать конечные неотрицательные значения.")
+	if not meta["inventory"] is Array or not meta["equipment"] is Dictionary or not _has_only_keys(meta["equipment"], SLOT_KEYS):
+		return _failure("meta.inventory/equipment: неверная структура.")
+	var item_ids: Dictionary = {}
+	for item_value: Variant in meta["inventory"]:
+		if not item_value is Dictionary or not _validate_item(item_value):
+			return _failure("meta.inventory: экземпляр предмета имеет неверную структуру.")
+		var item_id: String = str(item_value["itemId"])
+		if item_ids.has(item_id):
+			return _failure("meta.inventory: повторяется ID экземпляра предмета %s." % item_id)
+		item_ids[item_id] = true
+	for slot_value: Variant in meta["equipment"].keys():
+		var item_id: String = str(meta["equipment"][slot_value])
+		if not item_ids.has(item_id):
+			return _failure("meta.equipment.%s: предмет отсутствует в инвентаре." % str(slot_value))
+	if not _is_number_map(meta["garage"], GARAGE_KEYS, 1.0, 3.0, true):
+		return _failure("meta.garage: уровни гаража должны быть целыми от 1 до 3.")
+	if not _is_integer(meta["unlockedForpost"]) or int(meta["unlockedForpost"]) < 0 or int(meta["unlockedForpost"]) > 12:
+		return _failure("meta.unlockedForpost: недопустимая глубина.")
+	if not _is_integer(meta["maxSectorCleared"]) or int(meta["maxSectorCleared"]) < 0:
+		return _failure("meta.maxSectorCleared: ожидалось неотрицательное целое число.")
+	if not _enum_string_array(meta["unlockedBiomes"], BIOMES) or not _string_array(meta["skillIds"]) or meta["skillIds"].size() > 3:
+		return _failure("meta.unlockedBiomes/skillIds: неверный список.")
+	if not _string_array(meta["passiveIds"]) or meta["passiveIds"].size() > 3 or not _string_array(meta["treeNodeIds"]):
+		return _failure("meta.passiveIds/treeNodeIds: неверный список.")
+	if not _is_integer(meta["unlockedImplantSlots"]) or int(meta["unlockedImplantSlots"]) < 4 or int(meta["unlockedImplantSlots"]) > 6:
+		return _failure("meta.unlockedImplantSlots: ожидалось значение от 4 до 6.")
+	if not _is_integer(meta["unlockedDroneSlots"]) or int(meta["unlockedDroneSlots"]) < 1 or int(meta["unlockedDroneSlots"]) > 2:
+		return _failure("meta.unlockedDroneSlots: ожидалось значение 1 или 2.")
+	if not _validate_profiles(meta["tactics"], meta["activeTacticId"], "tactics"):
+		return _failure("meta.tactics: профиль пуст, повреждён или activeTacticId неизвестен.")
+	if not meta["autopilotProfiles"] is Array or meta["autopilotProfiles"].is_empty():
+		return _failure("meta.autopilotProfiles: требуется хотя бы один профиль.")
+	for profile: Variant in meta["autopilotProfiles"]:
+		if not profile is Dictionary or not _has_exact_keys(profile, ["id", "name", "startDepth", "enabled"]):
+			return _failure("meta.autopilotProfiles: неверная структура профиля.")
+		if not _nonempty_string(profile["id"]) or not _nonempty_string(profile["name"]) or not _is_integer(profile["startDepth"]) or int(profile["startDepth"]) < 1 or int(profile["startDepth"]) > 13 or not profile["enabled"] is bool:
+			return _failure("meta.autopilotProfiles: неверные значения профиля.")
+	return {"ok": true, "error": ""}
+
+func _validate_run(value: Variant) -> Dictionary:
+	if not value is Dictionary:
+		return _failure("run: ожидался объект или null.")
+	var run: Dictionary = value
+	var required: Array[String] = ["seed", "depth", "biome", "graph", "equipment", "currentNodeId", "visitedNodeIds", "clearedNodeIds", "phase", "wanted", "revealLevel", "resources", "runWallet", "unsecuredCargo", "shippedCargo", "grantIds", "commandIds", "worldRng", "lootRng"]
+	if not _has_keys(run, required):
+		return _failure("run: отсутствуют обязательные поля.")
+	if not _nonempty_string(run["seed"]) or not _is_integer(run["depth"]) or int(run["depth"]) < 1 or not BIOMES.has(str(run["biome"])):
+		return _failure("run.seed/depth/biome: неверные значения.")
+	if not run["graph"] is Dictionary or not run["equipment"] is Dictionary or not _nonempty_string(run["currentNodeId"]):
+		return _failure("run.graph/equipment/currentNodeId: неверная структура.")
+	if not _string_array(run["visitedNodeIds"]) or not _string_array(run["clearedNodeIds"]) or not _string_array(run["grantIds"]) or not _string_array(run["commandIds"]):
+		return _failure("run: неверный список ID.")
+	if run["commandIds"].size() > 128 or not _unique_strings(run["grantIds"]) or not _unique_strings(run["commandIds"]):
+		return _failure("run: ID наград/команд повторяются или лимит команд превышен.")
+	if not ["ROUTE", "NODE", "CHECKPOINT", "EXTRACTED", "TOWED", "ABANDONED", "DEFEATED", "SAFE_ERROR_STOP"].has(str(run["phase"])):
+		return _failure("run.phase: неизвестное состояние.")
+	if not _is_finite_number(run["wanted"]) or float(run["wanted"]) < 0.0 or float(run["wanted"]) > 100.0:
+		return _failure("run.wanted: ожидалось значение от 0 до 100.")
+	if not _is_integer(run["revealLevel"]) or int(run["revealLevel"]) < 0 or int(run["revealLevel"]) > 2:
+		return _failure("run.revealLevel: ожидалось значение от 0 до 2.")
+	if not run["resources"] is Dictionary or not _validate_wallet(run["runWallet"]):
+		return _failure("run.resources/runWallet: неверная структура.")
+	for key: String in ["fuel", "maxFuel", "hull", "maxHull", "hp", "maxHP", "shield", "maxShield", "energy", "heat", "gameTimeMs"]:
+		if not run["resources"].has(key) or not _is_finite_number(run["resources"][key]) or float(run["resources"][key]) < 0.0:
+			return _failure("run.resources.%s: ожидалось конечное неотрицательное число." % key)
+	if float(run["resources"]["fuel"]) > float(run["resources"]["maxFuel"]) or float(run["resources"]["hull"]) > float(run["resources"]["maxHull"]) or float(run["resources"]["hp"]) > float(run["resources"]["maxHP"]) or float(run["resources"]["shield"]) > float(run["resources"]["maxShield"]):
+		return _failure("run.resources: текущее значение превышает максимум.")
+	for key: String in ["unsecuredCargo", "shippedCargo"]:
+		if not run[key] is Array:
+			return _failure("run.%s: ожидался массив." % key)
+	for key: String in ["worldRng", "lootRng"]:
+		if not _validate_rng(run[key]):
+			return _failure("run.%s: неверное состояние RNG." % key)
+	if run.has("combatSnapshot") and run["combatSnapshot"] != null and not _validate_combat_snapshot(run["combatSnapshot"]):
+		return _failure("run.combatSnapshot: снимок боя повреждён.")
+	return {"ok": true, "error": ""}
+
+func _validate_combat_snapshot(value: Variant) -> bool:
+	if not value is Dictionary or not _has_exact_keys(value, ["simTimeMs", "actors", "eventQueue", "rngStreams", "eventLog", "nextSequenceId", "rulesHash"]):
+		return false
+	if not _is_integer(value["simTimeMs"]) or int(value["simTimeMs"]) < 0 or not _is_integer(value["nextSequenceId"]) or int(value["nextSequenceId"]) < 1:
+		return false
+	if not _nonempty_string(value["rulesHash"]):
+		return false
+	for key: String in ["actors", "eventQueue", "rngStreams", "eventLog"]:
+		if not _dictionary_array(value[key]):
+			return false
+	if value["eventLog"].size() > 5000:
+		return false
+	for rng_value: Variant in value["rngStreams"]:
+		if not _validate_rng(rng_value):
+			return false
+	return true
+
+func _validate_rng(value: Variant) -> bool:
+	if not value is Dictionary or not _has_exact_keys(value, ["stream", "state", "calls"]):
+		return false
+	if not _nonempty_string(value["stream"]) or not value["state"] is Array or value["state"].size() != 4 or not _is_integer(value["calls"]) or int(value["calls"]) < 0:
+		return false
+	for word: Variant in value["state"]:
+		if not _is_integer(word) or int(word) < 0 or int(word) > 4294967295:
+			return false
+	return true
+
+func _validate_item(value: Dictionary) -> bool:
+	var required: Array[String] = ["itemId", "templateId", "techLevel", "rarity", "secured", "durability", "originGrantId"]
+	return _has_keys(value, required) and _nonempty_string(value["itemId"]) and _nonempty_string(value["templateId"]) and _is_integer(value["techLevel"]) and int(value["techLevel"]) >= 1 and RARITIES.has(str(value["rarity"])) and value["secured"] is bool and _is_finite_number(value["durability"]) and float(value["durability"]) >= 0.0 and float(value["durability"]) <= 100.0 and _nonempty_string(value["originGrantId"])
+
+func _validate_transport(value: Variant) -> bool:
+	if not value is Dictionary or not _has_exact_keys(value, ["fuel", "fuelMax", "hull", "hullMax", "cargoCapacity"]):
+		return false
+	for key: String in ["fuel", "fuelMax", "hull", "hullMax", "cargoCapacity"]:
+		if not _is_finite_number(value[key]) or float(value[key]) < 0.0:
+			return false
+	return float(value["fuel"]) <= float(value["fuelMax"]) and float(value["hull"]) <= float(value["hullMax"])
+
+func _validate_wallet(value: Variant) -> bool:
+	return _is_number_map(value, WALLET_KEYS, 0.0, 1.0e100, false)
+
+func _validate_profiles(value: Variant, active_id: Variant, label: String) -> bool:
+	if not value is Array or value.is_empty() or not _nonempty_string(active_id):
+		return false
+	var ids: Dictionary = {}
+	for profile: Variant in value:
+		if not profile is Dictionary or not _has_exact_keys(profile, ["id", "name", "rules"]):
+			return false
+		if not _nonempty_string(profile["id"]) or not _nonempty_string(profile["name"]) or not profile["rules"] is Array or profile["rules"].size() > 12 or ids.has(str(profile["id"])):
+			return false
+		ids[str(profile["id"])] = true
+	return ids.has(str(active_id))
+
+func _is_number_map(value: Variant, expected_keys: Array[String], minimum: float, maximum: float, must_be_int: bool) -> bool:
+	if not value is Dictionary or not _has_exact_keys(value, expected_keys):
+		return false
+	for key: String in expected_keys:
+		if not _is_finite_number(value[key]) or float(value[key]) < minimum or float(value[key]) > maximum:
+			return false
+		if must_be_int and not _is_integer(value[key]):
+			return false
+	return true
+
+func _string_array(value: Variant) -> bool:
+	if not value is Array:
+		return false
+	for entry: Variant in value:
+		if not _nonempty_string(entry):
+			return false
+	return true
+
+func _enum_string_array(value: Variant, allowed: Array[String]) -> bool:
+	if not _string_array(value):
+		return false
+	for entry: Variant in value:
+		if not allowed.has(str(entry)):
+			return false
+	return true
+
+func _unique_strings(values: Array) -> bool:
+	var seen: Dictionary = {}
+	for value: Variant in values:
+		if seen.has(str(value)):
+			return false
+		seen[str(value)] = true
+	return true
+
+func _dictionary_array(value: Variant) -> bool:
+	if not value is Array:
+		return false
+	for entry: Variant in value:
+		if not entry is Dictionary:
+			return false
+	return true
+
+func _has_keys(value: Dictionary, required: Array[String]) -> bool:
+	for key: String in required:
+		if not value.has(key):
+			return false
+	return true
+
+func _has_exact_keys(value: Dictionary, expected: Array[String]) -> bool:
+	if value.size() != expected.size():
+		return false
+	for key: String in expected:
+		if not value.has(key):
+			return false
+	return true
+
+func _has_only_keys(value: Dictionary, allowed: Array[String]) -> bool:
+	for key: Variant in value.keys():
+		if not allowed.has(str(key)):
+			return false
+	return true
+
+func _is_integer(value: Variant) -> bool:
+	return (value is int or value is float) and is_finite(float(value)) and float(value) == floor(float(value))
+
+func _is_finite_number(value: Variant) -> bool:
+	return (value is int or value is float) and is_finite(float(value))
+
+func _nonempty_string(value: Variant) -> bool:
+	return value is String and not str(value).is_empty()
+
+func _failure(message: String) -> Dictionary:
+	return {"ok": false, "error": message}
