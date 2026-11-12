@@ -285,7 +285,11 @@ func _validate_run_ownership(run: Dictionary, meta: Dictionary) -> Dictionary:
 		"unlockedImplantSlots": meta["unlockedImplantSlots"],
 		"unlockedDroneSlots": meta["unlockedDroneSlots"],
 	})
-	if not bool(build.get("valid", false)):
+	# A terminal run retains its last field loadout for history and rewards. The
+	# garage may change the current skills/tree after extraction or defeat, so do
+	# not validate that historical equipment against the player's new build.
+	var run_is_terminal: bool = ["EXTRACTED", "TOWED", "ABANDONED", "DEFEATED"].has(str(run["phase"]))
+	if not run_is_terminal and not bool(build.get("valid", false)):
 		return _failure("run.build: полевая сборка некорректна.")
 	return {"ok": true, "error": ""}
 

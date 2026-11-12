@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — terminal loadout persistence and campaign diagnostics
+
+- Save validation no longer compares a terminal run's historical field equipment against the player's post-run skills/tree. This lets garage build changes after defeat/extraction persist while keeping full BuildResolver validation for active runs.
+- Added regression coverage proving an incompatible historical energy loadout is rejected during a live run but accepted as terminal history, and still reloads successfully.
+- Added an isolated solo E09 campaign-combat integration check; the deterministic encounter reaches victory within the test's 900-tick bound.
+- Expanded the opt-in campaign driver to preserve its resumed test profile, collect three legal d3 extraction farms before each boss gate, prefer compatible T3 kinetic rifle loadouts, restore the canonical starter skills, and use a mixed defensive/kinetic tree. The d4 boss remains undefeated in the current acceptance profile; no balance values were changed.
+- Latest checks: Godot editor import passed; 22 Godot tests passed, 87,481 assertions, zero failures; TypeScript typecheck passed. Full campaign completion, Windows export, and d8/d12 boss acceptance are not verified by this checkpoint.
+
 ## Unreleased — campaign acceptance continuation
 
 - Added the Master Spec `healer` tactic selector in the shared combat simulator, save command validation and tactic editor; unavailable targets fall back deterministically to the first live enemy.

@@ -6,6 +6,14 @@
 
 The active strategy is **FULL GAME FIRST**: connect every major Master Spec system into a campaign that can be completed, then deepen edge cases, balance, and presentation. The entries below report implementation status; they are not a queue of isolated feature slices. A checkpoint commit is a safety measure, so continue to the next missing campaign-critical system while the session permits. Defer saved Simulation Lab presets, report exports, cosmetic polish, secondary settings, and redundant tests until functional campaign coverage exists.
 
+## Latest implementation checkpoint (2026-11-12)
+
+The native save schema now treats `EXTRACTED`, `TOWED`, `ABANDONED`, and `DEFEATED` run equipment as historical state: it still validates item ownership/shape, but no longer requires that old loadout to match the player's current garage skills/tree. This removes a real blocker where changing from a kinetic to energy build (or back) after a run could fail because the archived run stored its previous equipment. Live runs retain BuildResolver validation. A regression checks both live rejection and terminal reload.
+
+Current validation also includes an isolated E09-only encounter that wins through the shared simulator. The full campaign driver still has not defeated BOSS_A: at level 8 with T3 gear and the canonical starter abilities it has dealt roughly 1,900 damage before defeat, leaving about 880 boss HP after killing the summoned healer. No boss values were changed; the diagnostic runner now secures three d3 extraction farms and uses a legal mixed defensive/K build before retrying. Treat campaign completion as unverified until it reaches d12 ending and d13.
+
+Latest local checks: Godot 4.7.2 editor import exit 0; 22 headless scripts / 87,481 assertions / 0 failures; `npm run typecheck` exit 0. Windows export/EXE smoke must be rerun after this native change.
+
 ## Active campaign acceptance finding (2026-11-12)
 
 Pushed base: `e5356f879e380f81c4d866df086a2c4c05e31d99`. Local WIP adds the Master Spec healer target, blocks reaction abilities from the main channel, and fixes runtime typed-array failure during d4/d8 boss settlement. New sortie fuel behavior remains `max(24, fuelMax)`; `continue_campaign()` preserves fuel between sectors in one run. Latest checks: Godot import exit 0; 22 scripts / 87,471 assertions; TypeScript typecheck exit 0. Windows export needs rerunning after the native WIP.

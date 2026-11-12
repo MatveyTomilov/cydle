@@ -1,6 +1,42 @@
 extends "res://tests/test_case.gd"
 
 func run(_tree: SceneTree) -> bool:
+	var terminal_build_session: GameSession = GameSession.new()
+	terminal_build_session.configure_save_directory("user://test-saves/terminal-build-history")
+	if check(terminal_build_session.start_new_game(1762900000048), "game_session: could not create a terminal-build regression profile") and check(terminal_build_session.start_expedition("terminal-build-history"), "game_session: could not start terminal-build regression sortie"):
+		var item_catalog: ItemCatalog = ItemCatalog.new()
+		var rng: DeterministicRng = DeterministicRng.new()
+		rng.seed("terminal-build-history", "energy-main")
+		var catalog_result: Dictionary = item_catalog.load_catalog()
+		var energy_result: Dictionary = ItemFactory.new().create_item(rng, item_catalog, {"templateId": "LASER_E3", "techLevel": 1, "rarity": "COMMON", "secured": true, "originGrantId": "terminal-build-history:laser", "origin": "test", "acquiredAt": 0})
+		if check(bool(catalog_result.get("ok", false)) and bool(energy_result.get("ok", false)), "game_session: could not create an energy weapon for terminal-build regression: %s" % energy_result):
+			var energy_item: ItemInstance = energy_result["item"] as ItemInstance
+			var invalid_live_payload: Dictionary = terminal_build_session.state.to_payload()
+			invalid_live_payload["meta"]["inventory"].append(energy_item.to_dictionary())
+			invalid_live_payload["run"]["equipment"]["MAIN"] = energy_item.item_id
+			check(not bool(GameSaveSchema.new().validate_payload(invalid_live_payload).get("ok", false)), "game_session: a live field build accepted kinetic skills on an energy weapon")
+			invalid_live_payload["run"]["phase"] = "DEFEATED"
+			check(terminal_build_session._commit_payload(invalid_live_payload), "game_session: a terminal field loadout blocked later garage builds: %s" % terminal_build_session.last_error)
+			var terminal_reload: GameSession = GameSession.new()
+			terminal_reload.configure_save_directory("user://test-saves/terminal-build-history")
+			check(terminal_reload.load_saved_game() and terminal_reload.state.run.phase == "DEFEATED", "game_session: terminal history did not reload after a garage build change")
+
+	var e09_session: GameSession = GameSession.new()
+	e09_session.configure_save_directory("user://test-saves/e09-solo-integration")
+	if check(e09_session.start_new_game(1762900000047), "game_session: could not create an E09 integration profile") and check(e09_session.start_expedition("e09-solo-integration"), "game_session: could not start E09 integration sortie"):
+		var e09_payload: Dictionary = e09_session.state.to_payload()
+		e09_payload["run"]["graph"] = {"layers": [[{"id": "e09-solo", "layer": 0, "type": "COMBAT", "threat": "medium", "enemies": [{"templateId": "E09"}], "revealLevel": 1, "lootHint": "combat"}]], "edges": [{"from": "START", "to": "e09-solo", "fromLayer": -1, "toLayer": 0, "fuelCost": 1}]}
+		check(e09_session._commit_payload(e09_payload) and e09_session.travel_to("e09-solo") and e09_session.begin_combat(), "game_session: E09 solo encounter could not start: %s" % e09_session.last_error)
+		var e09_ticks: int = 0
+		while e09_session.combat_state() != null and e09_session.combat_state().outcome.is_empty() and e09_ticks < 900:
+			if not e09_session.advance_combat_step():
+				break
+			e09_ticks += 1
+		var e09_state: CombatState = e09_session.combat_state()
+		var e09_hp: float = -1.0
+		if e09_state != null and not e09_state.enemies.is_empty(): e09_hp = e09_state.enemies[0].hp
+		check(e09_state != null and e09_state.outcome == "VICTORY" and e09_ticks < 900, "game_session: solo E09 fight stalled at %d ticks, HP %.1f, metrics %s" % [e09_ticks, e09_hp, str(e09_state.metrics if e09_state != null else {})])
+
 	var sortie_fuel_session: GameSession = GameSession.new()
 	sortie_fuel_session.configure_save_directory("user://test-saves/sortie-fuel")
 	if check(sortie_fuel_session.start_new_game(1762900000049), "game_session: could not create a sortie fuel profile"):

@@ -8,7 +8,7 @@ func _initialize() -> void:
 
 func _run_campaign() -> void:
 	var session: GameSession = GameSession.new()
-	session.configure_save_directory("user://campaign-e2e")
+	session.configure_save_directory("user://campaign-e2e-repro")
 	var resume_existing: bool = OS.get_cmdline_user_args().has("--resume")
 	if resume_existing:
 		if not session.load_saved_game() or session.state == null or session.state.run == null:
@@ -19,15 +19,12 @@ func _run_campaign() -> void:
 		if not session.start_new_game(1762900001001):
 			_fail("Не удалось создать стартовый профиль: %s" % session.last_error)
 			return
-		# Keep the authored starter skills, but focus its existing group burst on healers.
-		if not session.set_tactic_rule_target("starter-burst", "healer"):
-			_fail("Не удалось настроить правило фокусировки SK_BURST на лекаре: %s" % session.last_error)
-			return
 	var sector_attempts: Dictionary = {}
-	var prepared_gate_depths: Dictionary = {}
+	var gate_farm_counts: Dictionary = {}
 	var secured_boss_depths: Dictionary = {}
 	var processed_nodes: int = 0
 	var seed_index: int = 3 if resume_existing else 0
+	var seed_nonce: String = str(Time.get_ticks_usec())
 	if resume_existing and int(session.state.meta.unlocked_forpost) < 4:
 		sector_attempts[1] = 3
 	while int(session.state.meta.unlocked_forpost) < 12 and processed_nodes < MAX_NODE_STEPS:
@@ -37,13 +34,16 @@ func _run_campaign() -> void:
 				print("E2E terminal d%d phase=%s hp=%d hull=%d fuel=%d error=%s" % [session.state.run.depth, session.state.run.phase, int(session.state.run.resources.get("hp", 0)), int(session.state.run.resources.get("hull", 0)), int(session.state.run.resources.get("fuel", 0)), session.last_error])
 			sector_attempts[next_depth] = int(sector_attempts.get(next_depth, 0)) + 1
 			seed_index += 1
-			if int(sector_attempts[next_depth]) > 8:
-				_fail("Акт с открытым сектором %d не пройден за восемь выездов." % next_depth)
+			if int(sector_attempts[next_depth]) > 20:
+				_fail("Акт с открытым сектором %d не пройден за двадцать выездов." % next_depth)
 				return
 			if int(sector_attempts[next_depth]) > 1 and not _prepare_garage(session):
 				_fail("Не удалось применить найденные улучшения в гараже: %s" % session.last_error)
 				return
-			if not session.start_expedition("campaign-e2e:%d:%d" % [next_depth, seed_index]):
+			var expedition_seed: String = "campaign-e2e:%d:%d" % [next_depth, seed_index]
+			if resume_existing or seed_index > 1:
+				expedition_seed += ":%s" % seed_nonce
+			if not session.start_expedition(expedition_seed):
 				_fail("Не удалось начать сектор %d: %s" % [next_depth, session.last_error])
 				return
 			print("E2E start d%d try%d fuel=%d hull=%d credits=%d" % [next_depth, int(sector_attempts[next_depth]), int(session.state.run.resources.get("fuel", 0)), int(session.state.run.resources.get("hull", 0)), int(session.state.meta.protected_bank.credits)])
@@ -65,12 +65,15 @@ func _run_campaign() -> void:
 				processed_nodes += 1
 			"CHECKPOINT":
 				var depth: int = int(session.state.run.depth)
-				if depth % 4 == 3 and not prepared_gate_depths.has(depth + 1):
-					prepared_gate_depths[depth + 1] = true
+				var boss_depth: int = depth + 1
+				var farm_count: int = int(gate_farm_counts.get(boss_depth, 0))
+				var required_farms: int = 3
+				if depth % 4 == 3 and farm_count < required_farms:
+					gate_farm_counts[boss_depth] = farm_count + 1
 					if not session.extract_run():
-						_fail("Не удалось закрепить добычу перед боссом d%d: %s" % [depth + 1, session.last_error])
+						_fail("Не удалось закрепить добычу перед боссом d%d: %s" % [boss_depth, session.last_error])
 						return
-					print("E2E farm checkpoint d%d: secured loot and XP before replaying act" % depth)
+					print("E2E farm checkpoint d%d: secured loot and XP (%d/%d) before boss d%d" % [depth, farm_count + 1, required_farms, boss_depth])
 					continue
 				if depth in [4, 8] and not secured_boss_depths.has(depth):
 					secured_boss_depths[depth] = true
@@ -161,6 +164,12 @@ func _resolve_node(session: GameSession) -> bool:
 				return false
 			ticks += 1
 		if session.combat_state() == null or session.combat_state().outcome.is_empty():
+			if session.combat_state() != null:
+				var stalled_combat: CombatState = session.combat_state()
+				var stalled_enemies: Array[String] = []
+				for enemy: CombatActorState in stalled_combat.enemies:
+					stalled_enemies.append("%s %.0f/%.0f" % [enemy.template_id, enemy.hp, float(enemy.base_sheet.get("maxHP", 0.0))])
+				print("E2E combat stalled d%d node=%s ticks=%d opHP=%.0f opDamage=%.0f enemies=%s metrics=%s" % [session.state.run.depth, str(node.get("id", "")), ticks, stalled_combat.operator.hp, stalled_combat.operator.damage_dealt, ",".join(stalled_enemies), str(stalled_combat.metrics)])
 			session.last_error = "Бой превысил %d тиков." % MAX_COMBAT_TICKS
 			return false
 		var combat: CombatState = session.combat_state()
@@ -200,30 +209,66 @@ func _resolve_node(session: GameSession) -> bool:
 func _prepare_garage(session: GameSession) -> bool:
 	var catalog: ItemCatalog = ItemCatalog.new()
 	if not bool(catalog.load_catalog().get("ok", false)):
+		print("E2E garage rejected: item catalog")
 		return false
 	var current_slots: Array[String] = ["MAIN", "ARMOR", "OFFHAND", "DRONE_1", "IMP_1", "IMP_2", "IMP_3", "IMP_4"]
 	for slot: String in current_slots:
 		var current_id: String = str(session.state.meta.equipment.get(slot, ""))
 		var expected_category: String = "IMPLANT" if slot.begins_with("IMP_") else slot
 		var current_rank: int = 0
+		var current_template_id: String = ""
+		var current_weapon_type: String = ""
 		for item: Dictionary in session.state.meta.inventory:
 			if str(item.get("itemId", "")) == current_id:
 				current_rank = _item_rank(item)
+				current_template_id = str(item.get("templateId", ""))
+				current_weapon_type = str(catalog.get_template(str(item.get("templateId", ""))).get("weapon", {}).get("type", ""))
 				break
 		var candidates: Array[Dictionary] = []
 		for item: Dictionary in session.state.meta.inventory:
 			if not bool(item.get("secured", false)) or str(item.get("itemId", "")) == current_id:
 				continue
 			var template: Dictionary = catalog.get_template(str(item.get("templateId", "")))
-			if str(template.get("category", "")) == expected_category and _item_rank(item) > current_rank and session.valid_equipment_slots(str(item.get("itemId", ""))).has(slot):
+			var candidate_type: String = str(template.get("weapon", {}).get("type", ""))
+			var is_compatible_kinetic: bool = slot == "MAIN" and candidate_type == "KINETIC" and current_weapon_type != "KINETIC" and _item_rank(item) >= current_rank - 15
+			var preferred_rifle: bool = slot == "MAIN" and str(template.get("id", "")) == "RIFLE_K2" and int(item.get("techLevel", 1)) >= 3 and current_template_id != "RIFLE_K2" and _item_rank(item) >= current_rank - 15
+			if str(template.get("category", "")) == expected_category and (_item_rank(item) > current_rank or is_compatible_kinetic or preferred_rifle):
 				candidates.append(item)
-		candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return _item_rank(a) > _item_rank(b))
+		candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+			if slot == "MAIN":
+				var a_template: Dictionary = catalog.get_template(str(a.get("templateId", "")))
+				var b_template: Dictionary = catalog.get_template(str(b.get("templateId", "")))
+				var a_kinetic: bool = str(a_template.get("weapon", {}).get("type", "")) == "KINETIC"
+				var b_kinetic: bool = str(b_template.get("weapon", {}).get("type", "")) == "KINETIC"
+				if a_kinetic != b_kinetic:
+					return a_kinetic
+				var a_rifle: bool = str(a_template.get("id", "")) == "RIFLE_K2" and int(a.get("techLevel", 1)) >= 3
+				var b_rifle: bool = str(b_template.get("id", "")) == "RIFLE_K2" and int(b.get("techLevel", 1)) >= 3
+				if a_rifle != b_rifle:
+					return a_rifle
+			return _item_rank(a) > _item_rank(b)
+		)
 		for item: Dictionary in candidates:
 			if session.equip_item(slot, str(item.get("itemId", ""))):
 				current_rank = _item_rank(item)
 				break
-	if session.tree_points_available() > 0 and not session.state.meta.tree_node_ids.has("K1A"):
-		session.set_tree_node_allocated("K1A", true)
+			if slot == "MAIN":
+				print("E2E main candidate rejected template=%s T%d rarity=%s error=%s" % [str(item.get("templateId", "")), int(item.get("techLevel", 1)), str(item.get("rarity", "COMMON")), session.last_error])
+	var campaign_tree: Array[String] = ["S1A", "S1B", "S1C", "S2C", "K1A", "K1B", "K2A", "K1C", "K1D", "K3B"]
+	for node_id: String in session.state.meta.tree_node_ids.duplicate():
+		if not campaign_tree.has(node_id) and not session.set_tree_node_allocated(node_id, false):
+			print("E2E garage rejected: tree removal %s error=%s" % [node_id, session.last_error])
+			return false
+	for node_id: String in campaign_tree:
+		if session.tree_points_available() <= 0:
+			break
+		if not session.state.meta.tree_node_ids.has(node_id) and not session.set_tree_node_allocated(node_id, true):
+			print("E2E garage rejected: tree allocation %s error=%s" % [node_id, session.last_error])
+			return false
+	while session.attribute_points_available() > 0:
+		if not session.allocate_attribute("POW"):
+			print("E2E garage rejected: attribute allocation error=%s" % session.last_error)
+			return false
 	var equipped_ids: Array[String] = []
 	for item_id: Variant in session.state.meta.equipment.values():
 		equipped_ids.append(str(item_id))
@@ -231,7 +276,37 @@ func _prepare_garage(session: GameSession) -> bool:
 		var item: Dictionary = session.state.meta.inventory.filter(func(value: Dictionary) -> bool: return str(value.get("itemId", "")) == item_id)[0]
 		if float(item.get("durability", 100.0)) < 100.0:
 			session.repair_item(item_id)
-	return bool(session.build_preview().get("valid", false))
+	if not _prepare_boss_tactic(session):
+		print("E2E garage rejected: final tactic setup error=%s skills=%s rules=%s" % [session.last_error, str(session.state.meta.skill_ids), str(session.state.meta.tactics)])
+		return false
+	var build: Dictionary = session.build_preview()
+	var stats: Dictionary = build.get("stats", {})
+	print("E2E garage stats HP=%.0f shield=%.0f armor=%.0f tree=%s" % [float(stats.get("maxHP", 0.0)), float(stats.get("maxShield", 0.0)), float(stats.get("armor", 0.0)), ",".join(session.state.meta.tree_node_ids)])
+	var main_id: String = str(session.state.meta.equipment.get("MAIN", ""))
+	for item: Dictionary in session.state.meta.inventory:
+		if str(item.get("itemId", "")) == main_id:
+			print("E2E garage build level=%d POW=%d main=%s T%d rank=%d" % [session.state.meta.operator.level, int(session.state.meta.operator.attributes.get("POW", 5)), str(item.get("templateId", "")), int(item.get("techLevel", 1)), _item_rank(item)])
+			break
+	return bool(build.get("valid", false))
+
+func _prepare_boss_tactic(session: GameSession) -> bool:
+	var main_id: String = str(session.state.meta.equipment.get("MAIN", ""))
+	var main_template: Dictionary = {}
+	for item: Dictionary in session.state.meta.inventory:
+		if str(item.get("itemId", "")) == main_id:
+			var catalog: ItemCatalog = ItemCatalog.new()
+			if not bool(catalog.load_catalog().get("ok", false)):
+				return false
+			main_template = catalog.get_template(str(item.get("templateId", "")))
+			break
+	if str(main_template.get("weapon", {}).get("type", "")) != "KINETIC":
+		var auto_skill_ok: bool = session.set_tactic_rule_skill("starter-burst", "AUTO")
+		var auto_condition_ok: bool = session.set_tactic_rule_condition("starter-burst", {"kind": "always"})
+		return auto_skill_ok and auto_condition_ok
+	for starter_skill: String in ["SK_SHIELD", "SK_EMP", "SK_BURST"]:
+		if not session.state.meta.skill_ids.has(starter_skill) and not session.set_skill_equipped(starter_skill, true):
+			return false
+	return session.set_tactic_rule_skill("starter-burst", "SK_BURST") and session.set_tactic_rule_target("starter-burst", "healer") and session.set_tactic_rule_condition("starter-burst", {"kind": "enemiesAtLeast", "value": 2})
 
 func _item_rank(item: Dictionary) -> int:
 	var rarity_order: Dictionary = {"COMMON": 0, "MODIFIED": 1, "RARE": 2, "LEGENDARY": 3, "UNIQUE": 4}

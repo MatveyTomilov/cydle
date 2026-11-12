@@ -1,5 +1,15 @@
 # CYDLE — Project handoff and development history
 
+## Latest active checkpoint (2026-11-12; supersedes earlier status below)
+
+- Repository root: `E:\cydle\project`; branch: `development/codex`; latest pushed base before this WIP: `0c6a28cd7951aeb2b31b56c3416f64750a186015`. The current local changes are not committed yet.
+- `game/scripts/core/persistence/game_save_schema.gd` now validates the build of a live run against its field equipment, but treats terminal run equipment as historical. This prevents old gear from blocking later garage skill/tree changes. Item ownership and structure validation still applies to terminal runs.
+- Regression coverage in `game/tests/golden/game_session_test.gd` proves that kinetic skills are rejected for an energy weapon in a live run, but terminal history can retain that old loadout and reload after garage changes. The same suite includes a solo E09 encounter on the shared combat engine.
+- `game/tools/campaign_e2e.gd` is a diagnostic driver, not player-facing content. It now writes to external `user://campaign-e2e-repro`, avoids duplicate reward seeds on resume, secures up to three d3 extractions before boss gates, restores the canonical starter abilities, prefers a compatible T3 RIFLE_K2, and tries a mixed defensive/kinetic specialization. The external save is preserved under `%APPDATA%\Godot\app_userdata\CYDLE\campaign-e2e-repro`; do not delete it.
+- Latest checks actually run: Godot editor import exit 0; `res://tests/run_tests.gd` exit 0 (22 scripts, 87,481 assertions); `npm run typecheck` exit 0; `git diff --check` exit 0. Windows export is not run for this local WIP.
+- Campaign acceptance is not complete. The profile has reached d4 repeatedly but BOSS_A remains undefeated; the best recent legal T3 run killed E09 and left 878/2269 BOSS_A HP before the operator died. An earlier diagnostic pass hit its combat tick limit at an E09 node, while the isolated E09 test passes; the driver now logs combat state on such a stall. No d5/d8/d12/endgame result has been confirmed for this checkpoint.
+- Exact continuation: commit and push this save-validation fix and regression first; then resume the preserved E2E profile with `& "$env:LOCALAPPDATA\Programs\Godot\4.7.2\godot_console.exe" --headless --path game --script res://tools/campaign_e2e.gd -- --resume`. Confirm that the current d3/d4 progress is stable, observe the 3-farm mixed-tree d4 retry, and continue resolving shared-system blockers without changing Master Spec balance. Do not treat this checkpoint as full-game acceptance.
+
 ## Active checkpoint (2026-11-12; current truth)
 
 - Branch `development/codex`; pushed base `e5356f879e380f81c4d866df086a2c4c05e31d99`. Current local WIP extends shared combat targeting and boss settlement; it is not committed yet. Do not treat historical WIP labels further down as current.
