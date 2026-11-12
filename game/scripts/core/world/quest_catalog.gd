@@ -17,12 +17,18 @@ func load_catalog(path: String = "res://data/catalog/quest_definitions.json") ->
 	if not document is Dictionary or int(document.get("schemaVersion", 0)) != SCHEMA_VERSION or not document.get("quests") is Array or not document.get("contracts") is Array:
 		return _failure("Каталог заданий имеет неверный формат или версию.")
 	var parsed_quests: Dictionary = {}
+	var quest_event_ids: Dictionary = {}
 	for quest_value: Variant in document["quests"]:
 		if not _valid_quest(quest_value):
 			return _failure("Каталог содержит неверную квестовую цепочку.")
 		var quest: Dictionary = quest_value
 		if parsed_quests.has(str(quest["id"])):
 			return _failure("Каталог содержит повторяющийся квест %s." % str(quest["id"]))
+		for stage: Dictionary in quest["stages"]:
+			var event_id: String = str(stage.get("eventId", ""))
+			if quest_event_ids.has(event_id):
+				return _failure("Каталог содержит повторяющийся ID события задания %s." % event_id)
+			quest_event_ids[event_id] = true
 		parsed_quests[str(quest["id"])] = quest.duplicate(true)
 	var parsed_contracts: Dictionary = {}
 	for contract_value: Variant in document["contracts"]:
@@ -51,7 +57,7 @@ func _valid_quest(value: Variant) -> bool:
 		return false
 	for index: int in range(3):
 		var stage: Variant = value["stages"][index]
-		if not stage is Dictionary or int(stage.get("stage", 0)) != index + 1 or not _text(stage.get("name")) or not _text(stage.get("text")) or not stage.get("choices") is Array or stage["choices"].size() != 2:
+		if not stage is Dictionary or int(stage.get("stage", 0)) != index + 1 or not _text(stage.get("eventId")) or not _text(stage.get("name")) or not _text(stage.get("text")) or not stage.get("choices") is Array or stage["choices"].size() != 2:
 			return false
 		if stage.has("biome") and not BIOMES.has(str(stage["biome"])):
 			return false

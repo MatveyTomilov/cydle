@@ -598,6 +598,43 @@ func _apply_active_quest_targets(graph: Dictionary, biome: String, reserved_node
 			quest_targets.append(quest_id)
 		target_node["questTargets"] = quest_targets
 
+func _apply_active_quest_event_ids(graph: Dictionary, biome: String) -> void:
+	if state == null or state.meta.quest_progress.is_empty():
+		return
+	var catalog: QuestCatalog = QuestCatalog.new()
+	if not bool(catalog.load_catalog().get("ok", false)):
+		return
+	var quest_event: Dictionary = {}
+	for layer: Array in graph.get("layers", []):
+		for node: Dictionary in layer:
+			if str(node.get("type", "")) == "EVENT":
+				quest_event = node
+				break
+		if not quest_event.is_empty():
+			break
+	if quest_event.is_empty():
+		return
+	var quest_ids: Array[String] = []
+	for quest_id: Variant in state.meta.quest_progress.keys():
+		quest_ids.append(str(quest_id))
+	quest_ids.sort()
+	var event_ids: Array[String] = []
+	for quest_id: String in quest_ids:
+		var progress: Dictionary = state.meta.quest_progress[quest_id]
+		if str(progress.get("status", "")) != "ACTIVE":
+			continue
+		var quest: Dictionary = catalog.get_quest(quest_id)
+		var stage_index: int = int(progress.get("stage", 1)) - 1
+		if quest.is_empty() or stage_index < 0 or stage_index >= quest.get("stages", []).size():
+			continue
+		var stage: Dictionary = quest["stages"][stage_index]
+		var target_biome: String = str(stage.get("biome", quest.get("biome", "")))
+		if target_biome == biome:
+			event_ids.append(str(stage.get("eventId", "")))
+	if not event_ids.is_empty():
+		event_ids.sort()
+		quest_event["questEventIds"] = event_ids
+
 func _force_quest_target_node(layers: Array, enemy_id: String, reserved: Dictionary) -> Dictionary:
 	if enemy_id.is_empty():
 		return {}
@@ -661,6 +698,7 @@ func start_expedition(seed_value: String = "", use_medical_restore: bool = false
 	if not bool(generated.get("ok", false)):
 		last_error = str(generated.get("error", "Не удалось создать дорожную карту."))
 		return false
+	_apply_active_quest_event_ids(generated["graph"], biome)
 	var contract: Dictionary = {}
 	if not contract_id.is_empty():
 		var contract_catalog: QuestCatalog = QuestCatalog.new()
@@ -1834,7 +1872,10 @@ func resolve_quest_choice(quest_id: String, choice_id: String) -> bool:
 	return _commit_payload(payload)
 
 func _quest_stage_ready(quest: Dictionary, stage: Dictionary, progress: Dictionary) -> bool:
-	if str(current_node().get("type", "")) != "EVENT":
+	var event_node: Dictionary = current_node()
+	if str(event_node.get("type", "")) != "EVENT":
+		return false
+	if event_node.has("questEventIds") and not (event_node.get("questEventIds", []) as Array).has(str(stage.get("eventId", ""))):
 		return false
 	var history: Array = progress.get("choiceHistory", [])
 	if not history.is_empty() and str(history[-1].get("nodeId", "")) == state.run.current_node_id:

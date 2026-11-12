@@ -483,10 +483,12 @@ func run(_tree: SceneTree) -> bool:
 		check(rust_quest_target._commit_payload(rust_payload), "game_session: could not prepare the Q03 target")
 		if check(rust_quest_target.start_expedition("q03-target-elite"), "game_session: Q03 next stage expedition failed: %s" % rust_quest_target.last_error):
 			var q03_target_found: bool = false
+			var q03_stage_event_found: bool = false
 			for layer: Array in rust_quest_target.state.run.graph.get("layers", []):
 				for node: Dictionary in layer:
 					if str(node.get("type", "")) == "ELITE" and node.get("questTargets", []).has("Q03") and node.get("enemies", []).any(func(enemy: Dictionary) -> bool: return str(enemy.get("templateId", "")) == "E09"): q03_target_found = true
-			check(rust_quest_target.state.run.biome == "B03" and q03_target_found, "game_session: active Q03 did not create its E09 technician target in B03")
+					if str(node.get("type", "")) == "EVENT" and (node.get("questEventIds", []) as Array).has("Q03_S2"): q03_stage_event_found = true
+			check(rust_quest_target.state.run.biome == "B03" and q03_target_found and q03_stage_event_found, "game_session: active Q03 did not create its E09 technician target and dedicated stage event ID in B03")
 	var thermal_quest_target: GameSession = GameSession.new()
 	thermal_quest_target.configure_save_directory("user://test-saves/q05-target-elite")
 	if check(thermal_quest_target.start_new_game(1762900000133), "game_session: could not create a Q05 target profile"):

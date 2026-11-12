@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — quest-stage event identity
+
+- Assigned unique event IDs to all 18 stages in the six authored quest chains. Generated event nodes record the matching IDs for active, biome-eligible stages; stage actions are gated to those IDs on new routes while older persisted graphs remain load-compatible.
+- The quest catalog rejects duplicate or missing stage IDs. Regression pairs the Q03_S2 event tag with its required E09 elite target. Godot import and 22 headless scripts / 87,630 assertions passed. Windows export/smoke has not yet run for this checkpoint.
+
 ## Unreleased — quest milestone progression
 
 - Completed quest stages now grant permanent `ceil(60 × R(depth))` XP. The XP milestone is marked in the existing quest flags and paid once; alternate completion counts, while a paused Q06 evacuation does not.
