@@ -39,7 +39,30 @@ func create_roster(build: Dictionary, enemy_specs: Array[Dictionary], depth: int
 		if not bool(result.get("ok", false)):
 			return _failure(str(result.get("error", "Не удалось создать врага.")))
 		enemies.append(result["actor"] as CombatActorState)
-	return {"ok": true, "operator": operator, "drones": drones, "enemies": enemies, "error": ""}
+	var allies: Array[CombatActorState] = []
+	var allied_specs: Array = options.get("alliedEnemies", [])
+	for index: int in range(allied_specs.size()):
+		var allied_spec: Dictionary = allied_specs[index] if allied_specs[index] is Dictionary else {}
+		var result: Dictionary = _create_enemy({"templateId": str(allied_spec.get("templateId", ""))}, enemy_specs.size() + index, depth, 0.0)
+		if not bool(result.get("ok", false)):
+			return _failure("Не удалось создать союзника: %s" % str(result.get("error", "неизвестный враг.")))
+		var ally: CombatActorState = result["actor"] as CombatActorState
+		var strength: float = clampf(float(allied_spec.get("strength", 0.5)), 0.0, 1.0)
+		ally.id = "ally:%s:%d" % [ally.template_id, index]
+		ally.kind = "ally"
+		ally.side = "player"
+		ally.position_tag = "left"
+		ally.display_name = "Союзник · %s" % ally.display_name
+		ally.hp *= strength
+		ally.shield *= strength
+		ally.attack_damage *= strength
+		for stat: String in ["maxHP", "maxShield", "armor"]:
+			ally.base_sheet[stat] = float(ally.base_sheet.get(stat, 0.0)) * strength
+		for modifier: Dictionary in ally.base_mods:
+			if str(modifier.get("stat", "")) in ["maxHP", "maxShield", "armor"]:
+				modifier["value"] = float(modifier.get("value", 0.0)) * strength
+		allies.append(ally)
+	return {"ok": true, "operator": operator, "drones": drones, "enemies": enemies, "allies": allies, "error": ""}
 
 func _create_operator(build: Dictionary, options: Dictionary) -> CombatActorState:
 	var weapon: Dictionary = build.get("mainWeapon", {})
@@ -181,4 +204,4 @@ func _override_modifiers(sheet: Dictionary, source: Dictionary) -> Array[Diction
 	return modifiers
 
 func _failure(message: String) -> Dictionary:
-	return {"ok": false, "operator": null, "drones": [], "enemies": [], "error": message}
+	return {"ok": false, "operator": null, "drones": [], "enemies": [], "allies": [], "error": message}

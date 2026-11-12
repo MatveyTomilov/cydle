@@ -1369,10 +1369,28 @@ func _show_current_node(run: GameSaveState.RunState) -> void:
 			_body.add_child(_label(str(event.get("name", "СОБЫТИЕ")), 22, COLOR_TEXT))
 			_body.add_child(_label(str(event.get("text", "")), 14, COLOR_MUTED))
 			for choice: Dictionary in event.get("choices", []):
-				var choose: Button = _button("%s · %s" % [str(choice.get("id", "")), str(choice.get("label", "Выбрать"))], str(choice.get("id", "")) == "A")
-				choose.custom_minimum_size.x = 370
-				choose.pressed.connect(_on_event_choice.bind(str(choice.get("id", ""))))
-				_body.add_child(choose)
+				if int(choice.get("surrenderCargo", 0)) > 0:
+					_body.add_child(_label("%s · %s · выберите предмет для передачи" % [str(choice.get("id", "")), str(choice.get("label", "Выбрать"))], 13, COLOR_AMBER))
+					var cargo_catalog: ItemCatalog = ItemCatalog.new()
+					cargo_catalog.load_catalog()
+					var available_cargo: int = 0
+					for item: Dictionary in _session.state.run.unsecured_cargo:
+						var equipped_in_run: bool = _session.state.run.equipment.values().any(func(item_id: Variant) -> bool: return str(item_id) == str(item.get("itemId", "")))
+						if equipped_in_run:
+							continue
+						available_cargo += 1
+						var template: Dictionary = cargo_catalog.get_template(str(item.get("templateId", "")))
+						var cargo_button: Button = _button("%s · %s · %s" % [str(item.get("rarity", "COMMON")), str(template.get("name", item.get("templateId", "ГРУЗ"))), str(item.get("itemId", ""))], false)
+						cargo_button.custom_minimum_size.x = 370
+						cargo_button.pressed.connect(_on_event_choice.bind(str(choice.get("id", "")), str(item.get("itemId", ""))))
+						_body.add_child(cargo_button)
+					if available_cargo == 0:
+						_body.add_child(_label("Нет незакреплённого груза для сдачи.", 11, COLOR_MUTED))
+				else:
+					var choose: Button = _button("%s · %s" % [str(choice.get("id", "")), str(choice.get("label", "Выбрать"))], str(choice.get("id", "")) == "A")
+					choose.custom_minimum_size.x = 370
+					choose.pressed.connect(_on_event_choice.bind(str(choice.get("id", "")), ""))
+					_body.add_child(choose)
 				var description: Label = _label(str(choice.get("desc", "")), 11, COLOR_MUTED)
 				_body.add_child(description)
 	else:
@@ -1716,8 +1734,8 @@ func _on_buy_shop_item(index: int) -> void:
 	else:
 		_footer.text = _session.last_error
 
-func _on_event_choice(choice_id: String) -> void:
-	if _session.resolve_event(choice_id):
+func _on_event_choice(choice_id: String, cargo_item_id: String = "") -> void:
+	if _session.resolve_event(choice_id, cargo_item_id):
 		_show_road()
 	else:
 		_footer.text = _session.last_error

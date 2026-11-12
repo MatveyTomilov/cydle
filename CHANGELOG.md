@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — event consequence integration
+
+- EV18 now contributes an E08 50%-strength allied turret to the next deterministic combat; the shared combat state saves the ally and it performs real attacks. EV05's extra RARE reward is now elite-only.
+- EV08 B now asks the player which unsecured cargo item to surrender to VANTA, protects active-run equipped items, and removes the chosen item in the same saved transaction as the authored credits and reputation.
+- Verification: Godot 4.7.2 editor import exit 0; 22 headless scripts / 87,624 assertions / 0 failures; Windows Desktop export exit 0; exported EXE `--headless --quit-after 3` exit 0; `git diff --check` exit 0. TypeScript not run (native Godot-only change).
+
 ## Unreleased — campaign chronicle
 
 - Added the garage campaign chronicle with the authored Act I archive, Act II drone-line milestone, Act III finale, current ending choice, endgame access and faction standings. Entries render from persisted milestone flags and remain locked until their actual boss gates are cleared.

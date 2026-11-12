@@ -675,7 +675,7 @@ func run(_tree: SceneTree) -> bool:
 		var disposal_factory: ItemFactory = ItemFactory.new()
 		var disposal_rng: DeterministicRng = DeterministicRng.new()
 		disposal_rng.seed("item-disposal-test", 1)
-		var sale_created: Dictionary = disposal_factory.create_item(disposal_rng, disposal_catalog, {"templateId": "ARM_CLOTH", "techLevel": 1, "rarity": "COMMON", "secured": true, "originGrantId": "test-sale-item", "origin": "TEST", "acquiredAt": 1762900000360})
+		var sale_created: Dictionary = disposal_factory.create_item(disposal_rng, disposal_catalog, {"templateId": "ARM_HEAVY", "techLevel": 1, "rarity": "COMMON", "secured": true, "originGrantId": "test-sale-item", "origin": "TEST", "acquiredAt": 1762900000360})
 		var dismantle_created: Dictionary = disposal_factory.create_item(disposal_rng, disposal_catalog, {"templateId": "ARM_NET", "techLevel": 1, "rarity": "COMMON", "secured": true, "originGrantId": "test-dismantle-item", "origin": "TEST", "acquiredAt": 1762900000360})
 		check(bool(sale_created.get("ok", false)) and bool(dismantle_created.get("ok", false)), "game_session: could not create sale/dismantle fixture items")
 		if bool(sale_created.get("ok", false)) and bool(dismantle_created.get("ok", false)):
@@ -1011,6 +1011,24 @@ func run(_tree: SceneTree) -> bool:
 		check(event_session.current_event().get("id", "") == "EV02", "game_session: event node did not resolve its canonical definition")
 		check(event_session.resolve_event("A"), "game_session: event choice did not resolve: %s" % event_session.last_error)
 		check(event_session.state.run.events_seen.has("EV02") and event_session.state.run.wanted == 10.0, "game_session: event outcome flags were not persisted")
+		var elite_contract_payload: Dictionary = event_session.state.to_payload()
+		elite_contract_payload["run"]["graph"] = {"layers": [[{"id": "elite-contract-event", "layer": 0, "type": "EVENT", "eventId": "EV05", "threat": "medium", "enemies": [], "revealLevel": 1, "lootHint": "event"}]], "edges": [{"from": event_session.state.run.current_node_id, "to": "elite-contract-event", "fromLayer": -1, "toLayer": 0, "fuelCost": 1}]}
+		check(event_session._commit_payload(elite_contract_payload) and event_session.travel_to("elite-contract-event") and event_session.resolve_event("A"), "game_session: EV05 elite contract did not resolve: %s" % event_session.last_error)
+		check(bool(event_session.state.run.pending_next_combat.get("extraRareOnElite", false)) and not bool(event_session.state.run.pending_next_combat.get("extraRareItemRoll", false)), "game_session: EV05 reward was not restricted to the next elite")
+		var vanta_rng: DeterministicRng = DeterministicRng.new()
+		vanta_rng.seed("event-ev08-vanta", "cargo")
+		var vanta_catalog: ItemCatalog = ItemCatalog.new()
+		var vanta_catalog_result: Dictionary = vanta_catalog.load_catalog()
+		var vanta_item_result: Dictionary = ItemFactory.new().create_item(vanta_rng, vanta_catalog, {"templateId": "ARM_HEAVY", "techLevel": 1, "rarity": "COMMON", "secured": false, "originGrantId": "event-ev08-vanta:cargo", "origin": "test", "acquiredAt": 0})
+		if check(bool(vanta_catalog_result.get("ok", false)) and bool(vanta_item_result.get("ok", false)), "game_session: could not create EV08 cargo fixture: %s" % vanta_item_result):
+			var vanta_item: ItemInstance = vanta_item_result["item"] as ItemInstance
+			var vanta_payload: Dictionary = event_session.state.to_payload()
+			vanta_payload["run"]["graph"] = {"layers": [[{"id": "vanta-event", "layer": 0, "type": "EVENT", "eventId": "EV08", "threat": "medium", "enemies": [], "revealLevel": 1, "lootHint": "event"}]], "edges": [{"from": event_session.state.run.current_node_id, "to": "vanta-event", "fromLayer": -1, "toLayer": 0, "fuelCost": 1}]}
+			vanta_payload["run"]["unsecuredCargo"].append(vanta_item.to_dictionary())
+			check(event_session._commit_payload(vanta_payload) and event_session.travel_to("vanta-event"), "game_session: EV08 cargo event route could not be prepared: %s" % event_session.last_error)
+			var credits_before_vanta: float = event_session.state.run.wallet.credits
+			check(event_session.resolve_event("B", vanta_item.item_id), "game_session: VANTA cargo sale failed: %s" % event_session.last_error)
+			check(event_session.state.run.unsecured_cargo.is_empty() and event_session.state.run.wallet.credits > credits_before_vanta and event_session.state.meta.reputation.get("F_VANTA", 0) >= 5, "game_session: VANTA deal did not consume one cargo item and grant its authored rewards")
 	var scout_session: GameSession = GameSession.new()
 	scout_session.configure_save_directory("user://test-saves/event-route-scouting")
 	if check(scout_session.start_new_game(1762900000101), "game_session: could not create an event-scouting profile") and check(scout_session.start_expedition("event-route-scouting"), "game_session: could not start an event-scouting run"):
@@ -1067,7 +1085,7 @@ func run(_tree: SceneTree) -> bool:
 		for cargo_index: int in range(3):
 			var cargo_rng: DeterministicRng = DeterministicRng.new()
 			cargo_rng.seed("emergency-tow", "cargo-%d" % cargo_index)
-			var created: Dictionary = ItemFactory.new().create_item(cargo_rng, tow_catalog, {"templateId": "ARM_CLOTH", "techLevel": 1, "rarity": "COMMON", "secured": false, "originGrantId": "emergency-tow:cargo:%d" % cargo_index, "origin": "test", "acquiredAt": 0})
+			var created: Dictionary = ItemFactory.new().create_item(cargo_rng, tow_catalog, {"templateId": "ARM_HEAVY", "techLevel": 1, "rarity": "COMMON", "secured": false, "originGrantId": "emergency-tow:cargo:%d" % cargo_index, "origin": "test", "acquiredAt": 0})
 			if bool(created.get("ok", false)):
 				cargo.append((created["item"] as ItemInstance).to_dictionary())
 		check(bool(tow_loaded.get("ok", false)) and cargo.size() == 3, "game_session: tow fixture could not build its unsecured cargo")

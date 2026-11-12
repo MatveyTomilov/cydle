@@ -71,7 +71,43 @@ func run(_tree: SceneTree) -> bool:
 	_test_support_relay(config, operator)
 	_test_attack_counter_items(config, operator)
 	_test_direct_status_tree_trigger(config, build)
+	_test_event_turret_ally(config, build)
 	return failure_count == 0
+
+func _test_event_turret_ally(config: Dictionary, build: Dictionary) -> void:
+	var initialized: Dictionary = CombatSimulator.new().create_state({
+		"seed": "event-ev18-turret", "depth": int(config.get("depth", 1)), "biome": str(config.get("biome", "B01")),
+		"nodeType": "COMBAT", "build": build, "enemies": [config.get("enemy", {})],
+		"tactics": config.get("tactics", {}), "alliedEnemies": [{"templateId": "E08", "strength": 0.5}],
+	})
+	if not check(bool(initialized.get("ok", false)), "combat_step: EV18 allied turret combat did not initialize: %s" % str(initialized.get("error", ""))):
+		return
+	var simulator: CombatSimulator = CombatSimulator.new()
+	var state: CombatState = initialized["state"] as CombatState
+	if not check(state.allies.size() == 1, "combat_step: EV18 did not create exactly one allied turret"):
+		return
+	var turret: CombatActorState = state.allies[0]
+	check(turret.template_id == "E08" and turret.kind == "ally" and turret.side == "player", "combat_step: EV18 turret did not use E08 ally combat identity")
+	var expected_hp: float = 0.0
+	var expected_damage: float = 0.0
+	var catalog: EnemyCatalog = EnemyCatalog.new()
+	if bool(catalog.load_catalog().get("ok", false)):
+		var template: Dictionary = catalog.get_template("E08")
+		var formula: CydleFormula = CydleFormula.new()
+		expected_hp = float(template.get("hp", 0.0)) * formula.h_depth(float(config.get("depth", 1))) * 0.5
+		expected_damage = float(template.get("damage", 0.0)) * formula.d_depth(float(config.get("depth", 1))) * 0.5
+	check(is_equal_approx(turret.hp, expected_hp) and is_equal_approx(turret.attack_damage, expected_damage), "combat_step: EV18 turret did not enter at 50% HP and attack strength")
+	var started: Dictionary = state.log[0] if not state.log.is_empty() else {}
+	check(int(started.get("data", {}).get("alliedCount", 0)) == 1, "combat_step: combat-start event did not report the allied turret")
+	state.operator.next_attack_at = 100000.0
+	for actor: CombatActorState in state.enemies:
+		actor.next_attack_at = 100000.0
+	turret.next_attack_at = 100.0
+	var stepped: Dictionary = simulator.step_combat(state)
+	if not check(bool(stepped.get("ok", false)), "combat_step: EV18 turret could not attack: %s" % str(stepped.get("error", ""))):
+		return
+	state = stepped["state"] as CombatState
+	check(state.log.any(func(event: Dictionary) -> bool: return str(event.get("kind", "")) == "ATTACK" and str(event.get("actorId", "")) == turret.id), "combat_step: EV18 turret did not make a real combat attack")
 
 func _test_direct_status_tree_trigger(config: Dictionary, build: Dictionary) -> void:
 	var trigger_build: Dictionary = build.duplicate(true)

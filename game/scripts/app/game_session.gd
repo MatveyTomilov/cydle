@@ -1406,7 +1406,7 @@ func current_event() -> Dictionary:
 		return {}
 	return EventCatalog.new().get_event(str(node.get("eventId", "")))
 
-func resolve_event(choice_id: String) -> bool:
+func resolve_event(choice_id: String, cargo_item_id: String = "") -> bool:
 	if state == null or state.run == null or state.run.phase != "NODE":
 		last_error = "Выбор события доступен только в активном узле."
 		return false
@@ -1429,6 +1429,23 @@ func resolve_event(choice_id: String) -> bool:
 	var run_payload: Dictionary = payload["run"]
 	var wallet: Dictionary = run_payload["runWallet"]
 	var scale: float = CydleFormula.new().reward_scale(float(state.run.depth))
+	var surrender_count: int = maxi(0, int(choice.get("surrenderCargo", 0)))
+	var surrendered_index: int = -1
+	if surrender_count > 0:
+		for index: int in range(run_payload["unsecuredCargo"].size()):
+			var cargo_item: Dictionary = run_payload["unsecuredCargo"][index]
+			if str(cargo_item.get("itemId", "")) == cargo_item_id:
+				var equipped_in_run: bool = false
+				for equipped_value: Variant in run_payload["equipment"].values():
+					if str(equipped_value) == cargo_item_id:
+						equipped_in_run = true
+						break
+				if not equipped_in_run:
+					surrendered_index = index
+					break
+		if surrendered_index < 0:
+			last_error = "Для сделки VANTA выберите незакреплённый предмет груза, не установленный в слот рейда."
+			return false
 	var costs: Dictionary = choice.get("cost", {}).duplicate(true)
 	var special: String = str(choice.get("special", ""))
 	if special == "dataForCredits":
@@ -1446,6 +1463,8 @@ func resolve_event(choice_id: String) -> bool:
 		if special == "dataForCredits" and currency == "CREDITS":
 			gain = ceili(30.0 * scale)
 		wallet[currency] = float(wallet.get(currency, 0.0)) - float(costs.get(currency, 0.0)) + gain
+	if surrendered_index >= 0:
+		run_payload["unsecuredCargo"].remove_at(surrendered_index)
 	var resources: Dictionary = run_payload["resources"]
 	if choice.has("wanted"):
 		run_payload["wanted"] = clampf(float(run_payload["wanted"]) + float(choice["wanted"]), 0.0, 100.0)
@@ -1485,6 +1504,7 @@ func resolve_event(choice_id: String) -> bool:
 	if bool(next_combat.get("alliedTurret", false)): pending_next["alliedTurret"] = true
 	if bool(next_combat.get("extraRareRoll", false)):
 		if str(event.get("id", "")) == "EV16": pending_next["extraItemRoll"] = true
+		elif str(event.get("id", "")) == "EV05": pending_next["extraRareOnElite"] = true
 		else: pending_next["extraRareItemRoll"] = true
 	if next_combat.has("bountyCredits"):
 		pending_next["bountyCreditsBonus"] = float(pending_next.get("bountyCreditsBonus", 0.0)) + float(next_combat["bountyCredits"])
@@ -2414,6 +2434,8 @@ func begin_combat() -> bool:
 		"elitePen": 10.0 if state.run.escalation_ids.has("SHIELD_BREAK") and effective_type in ["ELITE", "ANOMALY", "BOUNTY"] else 0.0,
 		"droneWar": state.run.escalation_ids.has("DRONE_WAR"),
 	}
+	if bool(pending_next.get("alliedTurret", false)):
+		config["alliedEnemies"] = [{"templateId": "E08", "strength": 0.5}]
 	var initialized: Dictionary = _simulator.create_state(config)
 	if not bool(initialized.get("ok", false)):
 		last_error = str(initialized.get("error", "Боевой симулятор не смог создать встречу."))

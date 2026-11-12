@@ -211,6 +211,7 @@
           "id": "B",
           "label": "Сдать груз VANTA",
           "desc": "+12 кредитов, F_VANTA +5.",
+            "surrenderCargo": 1,
           "gains": {
             "CREDITS": 12
           },

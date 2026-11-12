@@ -52,6 +52,7 @@ func create_state(config: Dictionary) -> Dictionary:
 	state.operator = roster["operator"] as CombatActorState
 	state.drones = roster["drones"]
 	state.enemies = roster["enemies"]
+	state.allies = roster.get("allies", [])
 	state.build = build_value.duplicate(true)
 	state.tactics = tactics_value.duplicate(true)
 	state.record_log = bool(config.get("recordLog", true))
@@ -77,7 +78,7 @@ func create_state(config: Dictionary) -> Dictionary:
 		enemy_names.append(enemy.display_name)
 	_emit(state, "COMBAT_START", "operator", {
 		"text": "Бой начался: %s." % ", ".join(enemy_names),
-		"data": {"initialTempShield": float(config.get("initialTempShield", 0.0)), "initialExtraHeat": float(config.get("initialExtraHeat", 0.0)), "alliedCount": 0},
+		"data": {"initialTempShield": float(config.get("initialTempShield", 0.0)), "initialExtraHeat": float(config.get("initialExtraHeat", 0.0)), "alliedCount": state.allies.size()},
 	})
 	return {"ok": true, "state": state, "error": ""}
 

@@ -1,5 +1,16 @@
 # CYDLE — Project handoff and development history
 
+## Current live continuation (2026-11-13; event-effect audit checkpoint)
+
+- Current base before this local checkpoint: `cb0c39c` on `development/codex`. This continuation adds transactional event effects in the existing `GameSession` and shared combat engine; code is currently local and not yet committed/pushed.
+- EV18 now instantiates its authored E08 turret as a 50%-strength allied actor in the next combat, persists it as part of `CombatState`, includes it in player-side targeting/terminal checks, and lets it perform real deterministic attacks. `combat_step_test.gd` verifies identity, scaled HP/damage, COMBAT_START allied count, and a real attack.
+- EV05's extra RARE reward now applies only to the next ELITE encounter; it no longer turns into an arbitrary next-combat item roll. A `GameSession` regression checks the persisted pending effect.
+- EV08 B now consumes the specific unsecured cargo item chosen by the player before granting its catalogued credit/reputation rewards. Cargo equipped in the active run cannot be surrendered. The route UI renders item-level choice buttons. This is an implementation of the Master Spec action “сдать груз VANTA”; there is no item-faction tag or further cargo quantity in the spec, so the choice consumes one selected item.
+- Actual verification: Godot 4.7.2 editor import exit 0; `res://tests/run_tests.gd` exit 0 (22 scripts, 87,624 assertions); Windows Desktop export exit 0; exported `game/build/CYDLE.exe --headless --quit-after 3` exit 0; `git diff --check` exit 0. TypeScript and web build were not run (native Godot-only changes).
+- Exact continuation: finish export/diff checks, update this note with the commit and push SHA, then continue breadth-first from the remaining unimplemented Master Spec systems. Prioritize a blocker to full campaign progression or an absent major economy/quest/endgame/offline interface over more event polish. Do not claim 1.0/release acceptance complete. Preserve the external campaign E2E profile and backup recorded below.
+
+### Current status override (2026-11-13; run-cargo dismantle pushed)
+
 ## Current live continuation (2026-11-13; supersedes checkpoint below)
 
 ### Current status override (2026-11-13; run-cargo dismantle pushed)
