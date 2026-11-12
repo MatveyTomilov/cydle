@@ -2,12 +2,12 @@
 
 ## Current live continuation (2026-11-12; supersedes checkpoint below)
 
-### Current status override (2026-11-13; enemy intel event WIP)
+### Current status override (2026-11-13; enemy intel events)
 
-- Pushed base: `a99510bc5b07e087052c0846e090d7ad7bf946cc` on `development/codex`; current event-content WIP is not committed yet.
+- Pushed HEAD: `9e323caac786e99095e1468de20302d508421993` on `development/codex`; remote SHA was verified equal and the working tree is clean after the event checkpoint.
 - EV15 A now grants a deterministic, previously undiscovered enemy codex entry eligible for the current run depth/biome, persists it in validated META, and exposes an enemy archive screen from the garage/quest journal. EV10 B records the actual sector boss and lower ENERGY/DIGITAL resistance as weakness intel; the road map shows it next to that boss. The generic event flags remain for compatibility.
 - Actual checks: Godot 4.7.2 editor import exit 0; 22 scripts / 87,592 assertions / 0 failures; regressions cover EV15 grant/save/reload and EV10 BOSS_A weakness; Windows Desktop export exit 0; exported EXE `--headless --quit-after 3` exit 0; `git diff --check` exit 0. TypeScript was not run (native Godot only).
-- Next action: verify export/smoke and diff, commit/push, then continue the event/quest audit for catalog-backed effects that are still markers. Do not claim all 24 events or quest story behavior complete based on these two effects.
+- Next action: continue the event/quest audit for catalog-backed effects or narrative state that still has no player-visible consequence. Do not claim all 24 events or quest story behavior complete based on these two effects.
 - Preserve the external campaign E2E profile and safety copy below; continue full-game coverage without Lab presets, report exports, or polish.
 
 ### Previous continuation: bounded auto-restart
@@ -21,7 +21,7 @@
 ### Current status override (later than the older bullets immediately below)
 
 - Pushed base at the start of the 2026-11-13 continuation: `35aa7de31a131340f815a88f2af322259d36447b` on `development/codex`; remote SHA matches. It includes §16.6 checkpoint SHIP and the saved CAUTIOUS/BALANCED/AGGRESSIVE policy editor/runtime integration described below.
-- The policy integration's preceding verification was Godot 4.7.2 import + 22 scripts / 87,578 assertions, plus Windows export/EXE smoke; it is now committed as `35aa7de`. The current 2026-11-13 WIP and its checks are recorded in the status override above.
+- The policy integration's preceding verification was Godot 4.7.2 import + 22 scripts / 87,578 assertions, plus Windows export/EXE smoke; it is now committed as `35aa7de`. Later checkpoint statuses are recorded above.
 - Still absent from §16.5: automatic restart after extraction with max-runs and repair-budget enforcement. The cargo policy's QUEST/VALUE priorities use explicitly tagged quest cargo or the available sell-value/rarity/TechLevel data; content-specific valuation still needs broader validation. Starter profiles do not opt into tow, abandon or restart.
 - Latest pushed commit `2a3da70ae78e94f2b0810bfe645af9a9e8f6c928` on `development/codex` adds emergency tow and ABANDON_RUN from Master Spec §16.4 in `GameSession`, route UI and campaign E2E. The saved d12 route had zero fuel; the tow charged 61 CR, secured 8 of 9 unsecured items, applied the currency loss, and completed as `TOWED` without resetting the profile.
 - The resumed campaign cleared d9–d11, then defeated BOSS_CORE at level 14 in 192 ticks: operator dealt 11,570, took 1,123 HP damage, survived with 112 HP, and eliminated the E09 support. It selected `FREE_CORRIDOR`, reached d13, played three real d13 combat nodes across two sorties, and reached the d13 checkpoint. The first d13 outing also invoked tow after fuel exhaustion. Campaign E2E passed d1–d12 ending and d13 route/checkpoint; this is not proof all subsystem/release requirements are complete.
