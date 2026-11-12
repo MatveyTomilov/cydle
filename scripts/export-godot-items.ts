@@ -12,6 +12,7 @@ import { MUTATIONS } from '../src/data/progression';
 import { createInitialSave } from '../src/core/save/initial';
 import { UNIQUE_TEMPLATE_BY_ID } from '../src/data/uniques';
 import { BOSSES, ELITE_MODS, ENEMIES } from '../src/data/enemies';
+import { createCombatState } from '../src/core/combat/engine';
 
 const templates = [...ITEM_TEMPLATES, ...Object.values(UNIQUE_TEMPLATE_BY_ID)];
 const ids = new Set(templates.map((template) => template.id));
@@ -153,3 +154,44 @@ const enemyCatalogOutput = resolve('game/data/catalog/enemy_definitions.json');
 mkdirSync(dirname(enemyCatalogOutput), { recursive: true });
 writeFileSync(enemyCatalogOutput, `${JSON.stringify({ schemaVersion: 1, enemies: ENEMIES, bosses: BOSSES, eliteMods: ELITE_MODS }, null, 2)}\n`, 'utf8');
 console.log(`Exported ${ENEMIES.length} enemies, ${BOSSES.length} bosses, and ${ELITE_MODS.length} elite modifiers to ${enemyCatalogOutput}`);
+
+const starterItemsById = new Map(initialSaveFixture.meta.inventory.map((item) => [item.itemId, item]));
+const starterEquipment = Object.fromEntries(Object.entries(initialSaveFixture.meta.equipment).map(([slot, itemId]) => [slot, starterItemsById.get(itemId)!]));
+const starterBuild = resolveBuild({
+  attributes: initialSaveFixture.meta.operator.attributes,
+  equipment: starterEquipment,
+  skillIds: initialSaveFixture.meta.skillIds,
+  passiveIds: initialSaveFixture.meta.passiveIds,
+  treeNodeIds: initialSaveFixture.meta.treeNodeIds,
+  attributePointsEarned: initialSaveFixture.meta.operator.attributePoints,
+  treePointsEarned: initialSaveFixture.meta.operator.treePoints,
+  unlockedImplantSlots: initialSaveFixture.meta.unlockedImplantSlots,
+  unlockedDroneSlots: initialSaveFixture.meta.unlockedDroneSlots,
+});
+const combatConfig = {
+  seed: 'combat-actor-golden', depth: 3, biome: 'B01' as const, nodeType: 'ELITE' as const, build: starterBuild,
+  enemies: [{ templateId: 'E07', elite: 'EL_FAST', hpMult: 1.2, damageMult: 0.8 }],
+  tactics: initialSaveFixture.meta.tactics[0]!, startEnergy: 30, startHeat: 10, initialExtraHeat: 5, initialTempShield: 12,
+};
+const combatState = createCombatState(combatConfig);
+const combatActorView = (actor: typeof combatState.operator) => ({
+  id: actor.id, kind: actor.kind, side: actor.side, templateId: actor.templateId, name: actor.name,
+  positionTag: actor.positionTag, isBoss: actor.isBoss, isMechanical: actor.isMechanical, isHealer: actor.isHealer,
+  hp: actor.hp, shield: actor.shield, tempShields: actor.tempShields, energy: actor.energy, heat: actor.heat,
+  baseSheet: actor.baseSheet, attackDamage: actor.attackDamage, attackIntervalMs: actor.attackIntervalMs,
+  attackType: actor.attackType, accuracyBase: actor.accuracyBase, threatUnits: actor.threatUnits,
+  nextAttackAt: actor.nextAttackAt, flags: actor.flags, abilityNext: actor.abilityNext, ownerId: actor.ownerId ?? null,
+  eliteMod: actor.eliteMod ?? null, noLoot: actor.noLoot ?? false, summoned: actor.summoned ?? false,
+});
+const combatFixtureOutput = resolve('game/tests/fixtures/combat/actor_initialization.json');
+mkdirSync(dirname(combatFixtureOutput), { recursive: true });
+writeFileSync(combatFixtureOutput, `${JSON.stringify({
+  seed: combatConfig.seed, depth: combatConfig.depth, biome: combatConfig.biome, nodeType: combatConfig.nodeType,
+  enemies: combatConfig.enemies, options: { startEnergy: combatConfig.startEnergy, startHeat: combatConfig.startHeat, initialExtraHeat: combatConfig.initialExtraHeat, initialTempShield: combatConfig.initialTempShield },
+  expected: {
+    operator: combatActorView(combatState.operator),
+    drones: combatState.drones.map(combatActorView),
+    enemies: combatState.enemies.map(combatActorView),
+  },
+}, null, 2)}\n`, 'utf8');
+console.log(`Exported combat actor initialization oracle to ${combatFixtureOutput}`);
