@@ -999,6 +999,8 @@ func _show_road() -> void:
 				var intel: Dictionary = map_intel.get(node_id, {})
 				var node_type: String = str(intel.get("type", "НЕИЗВЕСТНО"))
 				var secondary: String = "%s · %s" % [str(intel.get("threat", "")), str(intel.get("lootHint", ""))] if intel.has("threat") else ("УЖЕ ПОСЕЩЁН" if visited else "РАЗВЕДДАННЫХ НЕТ")
+				if bool(intel.get("preview", false)):
+					secondary = "ПРЕДВАРИТЕЛЬНЫЙ СКАН · %s" % str(intel.get("anomalyProtocol", ""))
 				var button: Button = _button("%s\n%s" % [node_type, secondary], reachable)
 				button.custom_minimum_size = Vector2(145, 58)
 				button.disabled = not reachable
@@ -1016,8 +1018,17 @@ func _show_current_node(run: GameSaveState.RunState) -> void:
 	var node: Dictionary = _session.current_node()
 	_body.add_child(_label("УЗЕЛ · %s" % str(node.get("type", "UNKNOWN")), 20, COLOR_TEXT))
 	_body.add_child(_label("Угроза: %s     ·     %s" % [str(node.get("threat", "?")), str(node.get("lootHint", ""))], 13, COLOR_MUTED))
-	if ["COMBAT", "ELITE", "BOUNTY", "BOSS"].has(str(node.get("type", ""))):
-		if _session.has_active_combat():
+	var node_type: String = str(node.get("type", ""))
+	if ["COMBAT", "ELITE", "BOUNTY", "BOSS", "ANOMALY"].has(node_type):
+		if node_type == "ANOMALY":
+			_body.add_child(_label("НУЛЕВАЯ ЗОНА · ПРОТОКОЛ %s" % str(node.get("anomalyProtocol", "UNKNOWN")), 13, COLOR_AMBER))
+			_body.add_child(_label("Элитная охрана связана с аномальным модификатором. Победа открывает узел для дальнейшего маршрута.", 12, COLOR_MUTED))
+		if run.cleared_node_ids.has(str(node.get("id", ""))) and node_type == "ANOMALY":
+			_body.add_child(_label("ОХРАНА УСТРАНЕНА · НАГРАДА ДОБАВЛЕНА В ГРУЗ", 13, COLOR_CYAN))
+			var leave_anomaly: Button = _button("ПОКИНУТЬ АНОМАЛЬНЫЙ УЗЕЛ", true)
+			leave_anomaly.pressed.connect(_on_service_action.bind("LEAVE_NODE", ""))
+			_body.add_child(leave_anomaly)
+		elif _session.has_active_combat():
 			var resume: Button = _button("ПРОДОЛЖИТЬ СОХРАНЁННЫЙ БОЙ", true)
 			resume.pressed.connect(_show_battle)
 			_body.add_child(resume)
@@ -1089,7 +1100,7 @@ func _show_current_node(run: GameSaveState.RunState) -> void:
 			quest_choice.pressed.connect(_on_resolve_quest_choice.bind(str(quest.get("id", "")), str(choice.get("id", ""))))
 			_body.add_child(quest_choice)
 			_body.add_child(_label(str(choice.get("desc", "")), 11, COLOR_MUTED))
-	if not ["COMBAT", "ELITE", "BOUNTY", "BOSS"].has(str(node.get("type", ""))):
+	if not ["COMBAT", "ELITE", "BOUNTY", "BOSS", "ANOMALY"].has(node_type):
 		var leave: Button = _button("ПОКИНУТЬ УЗЕЛ", false)
 		leave.pressed.connect(_on_service_action.bind("LEAVE_NODE", ""))
 		_body.add_child(leave)

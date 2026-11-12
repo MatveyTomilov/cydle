@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — B06 anomaly route integration
+
+- B06 sectors now generate a guaranteed ANOMALY branch using an existing elite modifier and a biome-eligible enemy; other biomes do not receive this node.
+- Anomalies enter the shared 100 ms combat simulator, award elite-band loot, remain at the node after victory for an explicit exit, reject repeat fights, and can complete the targeted TECH contract with its unique item/DATA/blueprint reward.
+- B06 scouting operates one INTEL level lower. Q06's early sensor and future-preview unlock can reveal one upcoming anomaly protocol; consuming the scan is persisted.
+- Q06 stage two now becomes reachable after surviving an anomaly and arriving at a B06 event. Contract loot advances from the post-combat RNG state, avoiding replaying the same loot stream.
+- Added route generation, INTEL/preview, anomaly settlement, Q06 progress, and TECH-contract regressions.
+
 ## Unreleased
 
 - Added garage affix replacement and free-slot crafting with deterministic rolls, TechLevel-based cost previews, compatibility/rank/TR validation, and atomic save updates.
@@ -7,7 +15,7 @@
 - Added regression coverage for affix replacement/addition, sale, dismantling, retained item identity, resource costs, rarity slots, and duplicate payout prevention.
 - Added backward-compatible save fields for the 100-entry disassembly history and latest undo record. Undo restores the original owned item and revokes the exact materials; entering a route node expires it. Inventory exposes recent reason/seed/reward details and the available undo action.
 - Added base-item fabrication for exact quest/contract blueprints, COMMON output, open TechLevel selection, spec-scaled SCRAP/DATA quotes, deterministic item IDs and atomic protected-resource spending. TECH contract completion unlocks the schematic matching its generated tech reward.
-- Imported the six three-stage quest chains and three contract templates from frozen TypeScript data into Godot. Added the persisted quest journal and initial biome-gated HUNT, TECH, and ESCORT contract gameplay, including generated objectives, rewards, checkpoint requirements, and repeat-grant protection. Offer breadth, some quest semantics, and anomaly routes remain incomplete.
+- Imported the six three-stage quest chains and three contract templates from frozen TypeScript data into Godot. Added the persisted quest journal and initial biome-gated HUNT, TECH, and ESCORT contract gameplay, including generated objectives, rewards, checkpoint requirements, and repeat-grant protection. Offer breadth and some quest semantics remain incomplete; B06 anomaly gameplay is recorded in the newer entry above.
 - Earlier item-generation/save changes left an unresolved conflict between the affix-group uniqueness rule and broad catalog groups; see the active HANDOFF note before changing item-roll validation.
 - Added a conservative road autopilot that scores only revealed route information, acts through existing game transactions, resolves battles with the shared 100 ms simulator, extracts at checkpoints, pauses on material decisions/resources, and reports its stop reason. Configurable policy breadth remains incomplete.
 - Added explicit persisted offline-autopilot opt-in. Loading an active opted-in run simulates elapsed wall-clock time up to 12 hours through the same route, node, combat, and reward transactions; decision stops such as the tutorial prototype choice require the player's input.

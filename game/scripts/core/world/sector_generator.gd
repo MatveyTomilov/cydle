@@ -77,6 +77,10 @@ func generate(seed_value: String, depth: int, biome: String, tutorial: bool = fa
 					node_type = "CACHE"
 			elif not is_tutorial and layer == 1 and index == 0 and rng.chance(0.22):
 				node_type = "ELITE"
+			elif not is_tutorial and biome == "B06" and layer == 1 and index == 1:
+				# The Zero Zone always contains its defining encounter; this is the dangerous
+				# route branch the B06 quest and TECH contracts can actually target.
+				node_type = "ANOMALY"
 			elif not is_tutorial and layer == 1 and index == 1 and wanted >= 50.0 and rng.chance(0.25):
 				node_type = "BOUNTY"
 			elif layer == 3 and index == 1:
@@ -120,10 +124,15 @@ func _create_node(seed_value: String, depth: int, biome: String, layer: int, ind
 	elif node_type == "BOUNTY":
 		var bounty_enemy: String = fixed_enemies[0] if not fixed_enemies.is_empty() else _enemy_for(biome, depth, rng)
 		enemies = [{"templateId": bounty_enemy, "elite": "EL_PEN"}]
+	elif node_type == "ANOMALY":
+		var anomaly_enemy: String = fixed_enemies[0] if not fixed_enemies.is_empty() else _enemy_for(biome, depth, rng)
+		var protocol: String = str(rng.pick(["EL_SHIELD", "EL_FAST", "EL_VIRUS", "EL_ANTI_DRONE", "EL_PEN", "EL_SPLIT"]))
+		enemies = [{"templateId": anomaly_enemy, "elite": protocol}]
+		extras["anomalyProtocol"] = protocol
 	elif node_type == "BOSS":
 		enemies = [{"templateId": _boss_for_depth(depth)}]
 	var threat: String = "boss" if node_type == "BOSS" else "high" if node_type in ["ELITE", "BOUNTY", "ANOMALY"] else "medium" if node_type in ["COMBAT", "EVENT", "QUEST"] else "low"
-	var loot_hint: String = "добыча после боя" if node_type in ["COMBAT", "ELITE", "BOUNTY", "BOSS"] else "три прототипа" if node_type == "CACHE" else "восстановление ресурсов" if node_type in ["REPAIR", "FUEL"] else "5 товаров по биому" if node_type == "SHOP" else "неизвестно"
+	var loot_hint: String = "аномальная добыча" if node_type == "ANOMALY" else "добыча после боя" if node_type in ["COMBAT", "ELITE", "BOUNTY", "BOSS"] else "три прототипа" if node_type == "CACHE" else "восстановление ресурсов" if node_type in ["REPAIR", "FUEL"] else "5 товаров по биому" if node_type == "SHOP" else "неизвестно"
 	var node: Dictionary = {
 		"id": "d%d-l%d-n%d-%s" % [depth, layer, index, seed_value.substr(0, mini(5, seed_value.length()))],
 		"layer": layer, "type": node_type, "threat": threat, "enemies": enemies,

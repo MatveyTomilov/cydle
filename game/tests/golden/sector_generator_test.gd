@@ -21,6 +21,20 @@ func run(_tree: SceneTree) -> bool:
 	var event_node: Dictionary = campaign_graph["layers"][3][0]
 	check(str(event_node.get("type", "")) == "EVENT", "sector_generator: canonical layer-three event node is missing")
 	check(EventCatalog.new().get_event(str(event_node.get("eventId", ""))).size() > 0, "sector_generator: generated event id is not in the event catalog")
+	var zero_zone: Dictionary = generator.generate("zero-zone-seed", 9, "B06", false)["graph"]
+	var anomaly: Dictionary = zero_zone["layers"][1][1]
+	check(str(anomaly.get("type", "")) == "ANOMALY", "sector_generator: B06 did not generate its guaranteed anomaly route")
+	var anomaly_protocol: String = str(anomaly.get("anomalyProtocol", ""))
+	var anomaly_enemies: Array = anomaly.get("enemies", [])
+	check(["EL_SHIELD", "EL_FAST", "EL_VIRUS", "EL_ANTI_DRONE", "EL_PEN", "EL_SPLIT"].has(anomaly_protocol), "sector_generator: anomaly protocol is outside the existing elite modifier catalog")
+	check(anomaly_enemies.size() == 1 and str(anomaly_enemies[0].get("elite", "")) == anomaly_protocol, "sector_generator: anomaly protocol is not applied to its combat encounter")
+	check(str(anomaly.get("threat", "")) == "high" and str(anomaly.get("lootHint", "")) == "аномальная добыча", "sector_generator: anomaly route risk and reward band are missing")
+	var ordinary_graph: Dictionary = generator.generate("ordinary-sector-seed", 8, "B04", false)["graph"]
+	var ordinary_anomaly_count: int = 0
+	for layer_value: Variant in ordinary_graph.get("layers", []):
+		for node: Dictionary in layer_value:
+			if str(node.get("type", "")) == "ANOMALY": ordinary_anomaly_count += 1
+	check(ordinary_anomaly_count == 0, "sector_generator: a Zero Zone anomaly appeared outside B06")
 	var invalid: Dictionary = generator.generate("bad-biome", 1, "B99")
 	check(not bool(invalid.get("ok", true)), "sector_generator: invalid biome was accepted")
 	_check_graph(graph)

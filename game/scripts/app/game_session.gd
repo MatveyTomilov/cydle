@@ -442,9 +442,20 @@ func start_expedition(seed_value: String = "", use_medical_restore: bool = false
 			var target_enemies: Array = target_node.get("enemies", [])
 			contract["targetEnemyId"] = str(target_enemies[0].get("templateId", "")) if not target_enemies.is_empty() else ""
 		elif str(contract.get("kind", "")) == "TECH":
-			var target_cache: Dictionary = _force_contract_node(layers, "CACHE", 1)
+			var target_type: String = "ANOMALY" if biome == "B06" else "CACHE"
+			var target_cache: Dictionary = {}
+			if target_type == "ANOMALY":
+				for layer: Array in layers:
+					for candidate: Dictionary in layer:
+						if str(candidate.get("type", "")) == "ANOMALY":
+							target_cache = candidate
+							break
+					if not target_cache.is_empty():
+						break
+			else:
+				target_cache = _force_contract_node(layers, target_type, 1)
 			if target_cache.is_empty():
-				last_error = "Для технического контракта не удалось создать тайник."
+				last_error = "Для технического контракта не удалось создать целевой узел."
 				return false
 			contract["targetNodeId"] = str(target_cache.get("id", ""))
 		contract["instanceId"] = "contract:%s:%s" % [seed, contract_id]
@@ -609,22 +620,39 @@ func route_intel() -> Dictionary:
 			distances[next_id] = next_distance
 			queue.append(next_id)
 	var intel_level: int = garage_level("INTEL")
-	var scan_distance: int = 1 + (1 if intel_level >= 3 else 0)
-	var result: Dictionary = {"level": intel_level, "nodes": {}}
+	var effective_intel: int = maxi(0, intel_level - 1) if state.run.biome == "B06" else intel_level
+	var scan_distance: int = 1 + (1 if effective_intel >= 3 else 0)
+	var result: Dictionary = {"level": intel_level, "effectiveLevel": effective_intel, "nodes": {}}
+	var preview_available: bool = state.run.biome == "B06" and _anomaly_preview_available()
+	var preview_used_flag: String = "ANOMALY_PREVIEW_USED:%d" % state.run.depth
 	for layer: Array in graph.get("layers", []):
 		for node: Dictionary in layer:
 			var node_id: String = str(node.get("id", ""))
 			var visited: bool = state.run.visited_node_ids.has(node_id) or state.run.cleared_node_ids.has(node_id)
 			var distance: int = int(distances.get(node_id, 999))
-			var revealed: bool = visited or (distance > 0 and distance <= scan_distance and intel_level >= 1)
+			var is_preview: bool = preview_available and not state.meta.campaign_flags.has(preview_used_flag) and str(node.get("type", "")) == "ANOMALY"
+			var revealed: bool = visited or is_preview or (distance > 0 and distance <= scan_distance and effective_intel >= 1)
 			var info: Dictionary = {"revealed": revealed, "visited": visited}
 			if revealed:
 				info["type"] = str(node.get("type", "UNKNOWN"))
-				if intel_level >= 2:
+				if effective_intel >= 2 or is_preview:
 					info["threat"] = str(node.get("threat", "unknown"))
 					info["lootHint"] = str(node.get("lootHint", "unknown"))
+				if is_preview:
+					info["anomalyProtocol"] = str(node.get("anomalyProtocol", ""))
+					info["preview"] = true
+				elif (visited or effective_intel >= 1) and effective_intel >= 2 and node.has("anomalyProtocol"):
+					info["anomalyProtocol"] = str(node.get("anomalyProtocol", ""))
 			result["nodes"][node_id] = info
 	return result
+
+func _anomaly_preview_available() -> bool:
+	if state == null:
+		return false
+	if state.meta.campaign_flags.has("quest-anomaly-preview") and not state.meta.campaign_flags.has("ANOMALY_PREVIEW_USED:QUEST"):
+		return true
+	var progress: Dictionary = state.meta.quest_progress.get("Q06", {})
+	return (progress.get("flags", []) as Array).has("earlyAnomaly") and not state.meta.campaign_flags.has("ANOMALY_PREVIEW_USED:EARLY")
 
 func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
 	const MAX_OFFLINE_MS: int = 43200000
@@ -704,7 +732,10 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
 					return _autopilot_stop("PAUSED_FOR_DECISION", "QUEST_CHOICE", "Квестовое решение требует явного выбора игрока.", report)
 				var node: Dictionary = current_node()
 				var kind: String = str(node.get("type", ""))
-				if kind in ["COMBAT", "ELITE", "BOUNTY", "BOSS"]:
+				if kind in ["COMBAT", "ELITE", "BOUNTY", "BOSS", "ANOMALY"] and state.run.cleared_node_ids.has(str(node.get("id", ""))):
+					if not resolve_service_node("LEAVE_NODE"):
+						return _autopilot_stop("SAFE_ERROR_STOP", "NODE_EXIT", last_error, report)
+				elif kind in ["COMBAT", "ELITE", "BOUNTY", "BOSS", "ANOMALY"]:
 					if not begin_combat():
 						return _autopilot_stop("SAFE_ERROR_STOP", "COMBAT_START", last_error, report)
 				elif kind == "EVENT":
@@ -802,6 +833,7 @@ func travel_to(node_id: String) -> bool:
 	if float(run_payload["resources"].get("fuel", 0.0)) < cost:
 		last_error = "Недостаточно топлива для выбранного маршрута."
 		return false
+	var payload: Dictionary = state.to_payload()
 	run_payload["resources"]["fuel"] = float(run_payload["resources"]["fuel"]) - cost
 	run_payload["resources"]["gameTimeMs"] = float(run_payload["resources"]["gameTimeMs"]) + 25000.0
 	run_payload["currentNodeId"] = node_id
@@ -817,8 +849,11 @@ func travel_to(node_id: String) -> bool:
 		run_payload["resources"]["gameTimeMs"] = float(run_payload["resources"].get("gameTimeMs", 0.0)) + 8000.0
 	else:
 		run_payload["phase"] = "NODE"
+	if str(target_node.get("type", "")) == "ANOMALY" and _anomaly_preview_available():
+		var preview_flag: String = "ANOMALY_PREVIEW_USED:QUEST" if state.meta.campaign_flags.has("quest-anomaly-preview") and not state.meta.campaign_flags.has("ANOMALY_PREVIEW_USED:QUEST") else "ANOMALY_PREVIEW_USED:EARLY"
+		if not payload["meta"]["campaignFlags"].has(preview_flag):
+			payload["meta"]["campaignFlags"].append(preview_flag)
 	run_payload["combatResult"] = null
-	var payload: Dictionary = state.to_payload()
 	payload["run"] = run_payload
 	payload["meta"].erase("disassemblyUndo")
 	if str(target_node.get("type", "")) == "CHECKPOINT":
@@ -1219,18 +1254,22 @@ func resolve_service_node(action: String, prototype_id: String = "") -> bool:
 	var node: Dictionary = current_node()
 	var node_id: String = str(node.get("id", ""))
 	var kind: String = str(node.get("type", ""))
-	if state.run.cleared_node_ids.has(node_id):
-		last_error = "Этот узел уже использован."
-		return false
 	if action == "LEAVE_NODE":
+		if kind == "ANOMALY" and not state.run.cleared_node_ids.has(node_id):
+			last_error = "Сначала победите охрану аномалии."
+			return false
 		var leave_payload: Dictionary = state.to_payload()
 		var leave_run: Dictionary = leave_payload["run"]
-		leave_run["clearedNodeIds"].append(node_id)
+		if not leave_run["clearedNodeIds"].has(node_id):
+			leave_run["clearedNodeIds"].append(node_id)
 		leave_run["phase"] = "ROUTE"
 		var leave_time: int = 5000 if kind == "CACHE" else 8000 if kind in ["SHOP", "REPAIR", "FUEL"] else 10000
 		leave_run["resources"]["gameTimeMs"] = float(leave_run["resources"].get("gameTimeMs", 0.0)) + leave_time
 		leave_run["lastCommandId"] = "node:%s:leave" % node_id
 		return _commit_payload(leave_payload)
+	if state.run.cleared_node_ids.has(node_id):
+		last_error = "Этот узел уже использован."
+		return false
 	if (kind == "FUEL" and action not in ["BUY_FUEL", "SCRAP_FUEL"]) or (kind == "REPAIR" and action not in ["REPAIR_HULL", "REPAIR_HP"]) or (kind == "CACHE" and action != "OPEN_CACHE"):
 		last_error = "Действие не подходит для узла %s." % kind
 		return false
@@ -1525,8 +1564,11 @@ func begin_combat() -> bool:
 		last_error = "Для боя нужно находиться на боевом узле."
 		return false
 	var node: Dictionary = current_node()
-	if not ["COMBAT", "ELITE", "BOUNTY", "BOSS"].has(str(node.get("type", ""))):
+	if not ["COMBAT", "ELITE", "BOUNTY", "BOSS", "ANOMALY"].has(str(node.get("type", ""))):
 		last_error = "Текущий узел не является боевым."
+		return false
+	if state.run.cleared_node_ids.has(str(node.get("id", ""))):
+		last_error = "Этот боевой узел уже пройден."
 		return false
 	var build: Dictionary = build_preview()
 	if not bool(build.get("valid", false)):
@@ -1652,6 +1694,7 @@ func resolve_active_combat() -> bool:
 		unsecured.pop_back()
 	run_payload["unsecuredCargo"] = unsecured
 	var reward: Dictionary = _battle_reward(_active_node_type if not _active_node_type.is_empty() else str(node.get("type", "COMBAT")), state.run.depth, state.run.biome, node_id, run_payload, _active_reward_modifiers)
+	run_payload["lootRng"] = reward["lootRng"]
 	var payload: Dictionary = state.to_payload()
 	payload["run"] = run_payload
 	var contract: Dictionary = run_payload.get("contract", {})
@@ -1660,7 +1703,11 @@ func resolve_active_combat() -> bool:
 			var target_scale: float = CydleFormula.new().reward_scale(float(state.run.depth))
 			if not _complete_contract(payload, {"CREDITS": ceili(30.0 * target_scale)}, {"rarity": str(contract.get("rewardItem", {}).get("rarity", "RARE")), "tag": str(contract.get("targetTechTag", "weapon"))}):
 				return false
-		elif str(contract.get("kind", "")) in ["ESCORT", "HUNT", "TECH"] and str(node.get("type", "")) in ["COMBAT", "ELITE", "BOUNTY", "BOSS"]:
+		elif str(contract.get("kind", "")) == "TECH" and str(contract.get("targetNodeId", "")) == node_id and str(node.get("type", "")) == "ANOMALY":
+			var target_scale: float = CydleFormula.new().reward_scale(float(state.run.depth))
+			if not _complete_contract(payload, {"DATA": ceili(15.0 * target_scale)}, {"rarity": "MODIFIED", "tag": str(contract.get("targetTechTag", "tech"))}):
+				return false
+		elif str(contract.get("kind", "")) in ["ESCORT", "HUNT", "TECH"] and str(node.get("type", "")) in ["COMBAT", "ELITE", "BOUNTY", "BOSS", "ANOMALY"]:
 			contract["combatNodes"] = int(contract.get("combatNodes", 0)) + 1
 	var wallet: Dictionary = run_payload["runWallet"]
 	for currency: String in ["CREDITS", "SCRAP", "DATA"]:
@@ -1671,14 +1718,13 @@ func resolve_active_combat() -> bool:
 		else:
 			reward["discardedItems"] += 1
 	run_payload["grantIds"].append_array(reward["grantIds"])
-	run_payload["lootRng"] = reward["lootRng"]
 	var xp_grant_id: String = "combat:%s:%s:xp" % [state.run.seed, node_id]
 	if not run_payload["grantIds"].has(xp_grant_id):
 		_grant_experience(payload["meta"]["operator"], int(reward["xp"]))
 		run_payload["grantIds"].append(xp_grant_id)
 	if not run_payload["clearedNodeIds"].has(node_id):
 		run_payload["clearedNodeIds"].append(node_id)
-	run_payload["phase"] = "CHECKPOINT" if int(node.get("layer", 0)) == 5 else "ROUTE"
+	run_payload["phase"] = "CHECKPOINT" if int(node.get("layer", 0)) == 5 else "NODE" if str(node.get("type", "")) == "ANOMALY" else "ROUTE"
 	run_payload["combatResult"] = null
 	run_payload["combatSnapshot"] = null
 	run_payload["lastCommandId"] = "combat:%s" % node_id
@@ -1717,7 +1763,7 @@ func _battle_reward(node_type: String, depth: int, biome: String, node_id: Strin
 	var core_chance: float = 0.0
 	var table: String = "ORDINARY"
 	match node_type:
-		"ELITE":
+		"ELITE", "ANOMALY":
 			credits = 28.0; scrap = 7.0; data = 3.0; xp = ceili(55.0 * scale)
 			item_chance = 1.0; extra_item_chance = 0.25; core_chance = 0.15; table = "ELITE"
 		"BOUNTY":

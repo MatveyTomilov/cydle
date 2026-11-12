@@ -386,6 +386,58 @@ func run(_tree: SceneTree) -> bool:
 				revealed_next_layer = true
 				check(visible_node.has("type") and visible_node.has("threat") and visible_node.has("lootHint"), "game_session: INTEL L3 omitted scanned type or reward bands")
 		check(revealed_next_layer, "game_session: INTEL L3 did not scan one layer beyond adjacent nodes")
+	var anomaly_session: GameSession = GameSession.new()
+	anomaly_session.configure_save_directory("user://test-saves/anomaly-route")
+	if check(anomaly_session.start_new_game(1762900000905), "game_session: could not create an anomaly profile"):
+		check(anomaly_session.start_expedition("anomaly-route-seed"), "game_session: could not prepare an anomaly run")
+		var anomaly_generated: Dictionary = anomaly_session._generator.generate("anomaly-route-seed", 9, "B06", false)
+		var anomaly_payload: Dictionary = anomaly_session.state.to_payload()
+		var anomaly_graph: Dictionary = anomaly_generated.get("graph", {})
+		anomaly_payload["meta"]["garage"]["INTEL"] = 3
+		anomaly_payload["meta"]["questProgress"] = {"Q06": {"status": "ACTIVE", "stage": 2, "startedDepth": 9, "stageStartedDepth": 9, "completedStages": ["S1"], "choiceHistory": [{"stage": 1, "choiceId": "A", "nodeId": "prior-event"}], "flags": []}}
+		anomaly_payload["run"]["depth"] = 9
+		anomaly_payload["run"]["biome"] = "B06"
+		anomaly_payload["run"]["graph"] = anomaly_graph
+		anomaly_payload["run"]["currentNodeId"] = "START"
+		anomaly_payload["run"]["visitedNodeIds"] = []
+		anomaly_payload["run"]["clearedNodeIds"] = []
+		anomaly_payload["run"]["phase"] = "ROUTE"
+		check(anomaly_session._commit_payload(anomaly_payload), "game_session: B06 anomaly fixture could not be saved: %s" % anomaly_session.last_error)
+		var anomaly_node: Dictionary = anomaly_graph["layers"][1][1]
+		var anomaly_id: String = str(anomaly_node.get("id", ""))
+		var reduced_intel: Dictionary = anomaly_session.route_intel()
+		check(int(reduced_intel.get("effectiveLevel", 0)) == 2 and not bool(reduced_intel.get("nodes", {}).get(anomaly_id, {}).get("revealed", false)), "game_session: B06 did not reduce route scouting by one INTEL level")
+		var early_payload: Dictionary = anomaly_session.state.to_payload()
+		early_payload["meta"]["questProgress"]["Q06"]["flags"] = ["earlyAnomaly"]
+		check(anomaly_session._commit_payload(early_payload), "game_session: Q06 preview flag could not be saved")
+		var anomaly_intel: Dictionary = anomaly_session.route_intel().get("nodes", {}).get(anomaly_id, {})
+		check(bool(anomaly_intel.get("preview", false)) and str(anomaly_intel.get("anomalyProtocol", "")) == str(anomaly_node.get("anomalyProtocol", "")), "game_session: Q06 early anomaly preview did not reveal the next B06 protocol")
+		var route_payload: Dictionary = anomaly_session.state.to_payload()
+		route_payload["run"]["currentNodeId"] = str(anomaly_graph["layers"][0][0].get("id", ""))
+		route_payload["run"]["visitedNodeIds"] = [route_payload["run"]["currentNodeId"]]
+		var tech_contract: Dictionary = {"id": "CT_TECH", "kind": "TECH", "targetBiome": "B06", "instanceId": "anomaly-contract-instance", "status": "ACTIVE", "targetNodeId": anomaly_id, "targetTechTag": "tech", "rewardClaimed": false, "combatNodes": 0}
+		route_payload["run"]["contract"] = tech_contract
+		check(anomaly_session._commit_payload(route_payload), "game_session: anomaly TECH contract fixture could not be saved: %s" % anomaly_session.last_error)
+		check(anomaly_session.travel_to(anomaly_id), "game_session: B06 anomaly was not reachable from the route: %s" % anomaly_session.last_error)
+		check(anomaly_session.state.meta.campaign_flags.has("ANOMALY_PREVIEW_USED:EARLY"), "game_session: early anomaly preview was not consumed on approach")
+		check(anomaly_session.begin_combat(), "game_session: anomaly did not enter the shared combat simulator: %s" % anomaly_session.last_error)
+		if anomaly_session.combat_state() != null:
+			anomaly_session.combat_state().outcome = "VICTORY"
+			check(anomaly_session.resolve_active_combat(), "game_session: anomaly battle settlement failed: %s" % anomaly_session.last_error)
+		check(anomaly_session.state.run.phase == "NODE" and anomaly_session.state.run.cleared_node_ids.has(anomaly_id), "game_session: anomaly victory did not retain a cleared node for its follow-up")
+		check(str(anomaly_session.state.run.contract.get("status", "")) == "COMPLETE", "game_session: clearing the TECH target anomaly did not pay its contract")
+		check(not anomaly_session.begin_combat(), "game_session: cleared anomaly could be fought and rewarded twice")
+		check(anomaly_session.resolve_service_node("LEAVE_NODE"), "game_session: cleared anomaly could not be exited: %s" % anomaly_session.last_error)
+		var q06_event: Dictionary = anomaly_graph["layers"][3][0]
+		var q06_payload: Dictionary = anomaly_session.state.to_payload()
+		q06_payload["run"]["currentNodeId"] = str(q06_event.get("id", ""))
+		q06_payload["run"]["phase"] = "NODE"
+		q06_payload["run"]["wanted"] = 25.0
+		check(anomaly_session._commit_payload(q06_payload), "game_session: Q06 follow-up event fixture could not be saved")
+		var q06_stages: Array[Dictionary] = anomaly_session.available_quest_stages()
+		check(q06_stages.size() == 1 and str(q06_stages[0].get("quest", {}).get("id", "")) == "Q06", "game_session: Q06 stage two did not become available after surviving the B06 anomaly")
+		check(anomaly_session.resolve_quest_choice("Q06", "A"), "game_session: Q06 anomaly route choice could not resolve: %s" % anomaly_session.last_error)
+		check(float(anomaly_session.state.run.wanted) == 20.0 and int(anomaly_session.state.meta.quest_progress["Q06"].get("stage", 0)) == 3, "game_session: Q06 anomaly route choice did not apply its wanted reduction and progress")
 	var medical_session: GameSession = GameSession.new()
 	medical_session.configure_save_directory("user://test-saves/garage-medical")
 	if check(medical_session.start_new_game(1762900000700), "game_session: could not create a medical-bay profile"):
