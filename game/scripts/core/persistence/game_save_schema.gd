@@ -217,6 +217,8 @@ func _validate_run(value: Variant, meta: Dictionary) -> Dictionary:
 		return _failure("run.autopilotEnabled: ожидалось логическое значение.")
 	if run.has("autopilotRepairSpend") and (not _is_finite_number(run["autopilotRepairSpend"]) or float(run["autopilotRepairSpend"]) < 0.0):
 		return _failure("run.autopilotRepairSpend: ожидался конечный неотрицательный бюджет.")
+	if run.has("autopilotRunCount") and (not _is_integer(run["autopilotRunCount"]) or int(run["autopilotRunCount"]) < 1 or int(run["autopilotRunCount"]) > 100):
+		return _failure("run.autopilotRunCount: ожидалось целое число от 1 до 100.")
 	if not _validate_count_map(run["serviceScrapFuelCounts"]) or run["lastCommandId"] != null and not _nonempty_string(run["lastCommandId"]):
 		return _failure("run.serviceScrapFuelCounts/lastCommandId: неверные значения.")
 	if run["combatResult"] != null and not run["combatResult"] is Dictionary:

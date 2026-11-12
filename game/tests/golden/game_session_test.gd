@@ -133,6 +133,30 @@ func run(_tree: SceneTree) -> bool:
 		check(repair_budget_session._commit_payload(repair_node_payload), "game_session: could not prepare the paid repair node: %s" % repair_budget_session.last_error)
 		var repair_stop: Dictionary = repair_budget_session.simulate_autopilot(60000)
 		check(str(repair_stop.get("reasonCode", "")) == "REPAIR_UNAVAILABLE" and is_equal_approx(repair_budget_session.state.run.wallet.credits, 100.0) and is_zero_approx(repair_budget_session.state.run.resources.hull - 50.0), "game_session: autopilot exceeded its explicit repair-spend limit: %s" % repair_stop)
+	var restart_session: GameSession = GameSession.new()
+	restart_session.configure_save_directory("user://test-saves/autopilot-restart")
+	if check(restart_session.start_new_game(1762900000054), "game_session: could not create an auto-restart profile"):
+		var restart_policy: Dictionary = AutopilotPolicy.profile("BALANCED")
+		restart_policy.erase("id")
+		restart_policy.erase("name")
+		restart_policy["checkpointAction"] = "EXTRACT"
+		restart_policy["autoRestartAllowed"] = true
+		restart_policy["maxRuns"] = 2
+		check(restart_session.save_autopilot_profile_settings("BALANCED", restart_policy) and restart_session.start_expedition("autopilot-restart-first"), "game_session: could not configure the bounded auto-restart policy: %s" % restart_session.last_error)
+		var restart_checkpoint: Dictionary = restart_session.state.to_payload()
+		restart_checkpoint["run"]["phase"] = "CHECKPOINT"
+		restart_checkpoint["run"]["autopilotEnabled"] = true
+		check(restart_session._commit_payload(restart_checkpoint), "game_session: could not prepare the restart checkpoint: %s" % restart_session.last_error)
+		var restart_report: Dictionary = restart_session.simulate_autopilot(1000)
+		check(restart_session.state.run.autopilot_run_count == 2 and restart_session.state.run.phase == "ROUTE" and str(restart_report.get("reasonCode", "")) == "TIME_BUDGET", "game_session: opted-in auto-restart did not begin exactly one bounded follow-up outing: %s" % restart_report)
+		var restart_reload: GameSession = GameSession.new()
+		restart_reload.configure_save_directory("user://test-saves/autopilot-restart")
+		check(restart_reload.load_saved_game() and restart_reload.state.run.autopilot_run_count == 2, "game_session: auto-restart count did not persist across save reload")
+		var final_restart_checkpoint: Dictionary = restart_reload.state.to_payload()
+		final_restart_checkpoint["run"]["phase"] = "CHECKPOINT"
+		check(restart_reload._commit_payload(final_restart_checkpoint), "game_session: could not prepare the max-runs checkpoint")
+		var max_runs_report: Dictionary = restart_reload.simulate_autopilot(1000)
+		check(restart_reload.state.run.autopilot_run_count == 2 and restart_reload.state.run.phase == "EXTRACTED" and str(max_runs_report.get("reasonCode", "")) == "MAX_RUNS", "game_session: autopilot started another outing after reaching maxRuns: %s" % max_runs_report)
 	var contract_session: GameSession = GameSession.new()
 	contract_session.configure_save_directory("user://test-saves/contracts")
 	if check(contract_session.start_new_game(1762900000100), "game_session: could not create a contract profile"):

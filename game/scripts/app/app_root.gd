@@ -1553,6 +1553,7 @@ func _show_autopilot_profile_editor() -> void:
 	_add_autopilot_spin("maxWanted", "Предел розыска", 0.0, 100.0, 5.0, float(profile.get("maxWanted", 70)))
 	_add_autopilot_spin("reserveFuel", "Резерв топлива", 0.0, 24.0, 1.0, float(profile.get("reserveFuel", 1)))
 	_add_autopilot_spin("maxSpendRepair", "Бюджет ремонта за выезд · ¤", 0.0, 1000000.0, 10.0, float(profile.get("maxSpendRepair", 1000000000.0)))
+	_add_autopilot_spin("maxRuns", "Лимит выездов подряд · 1–100", 1.0, 100.0, 1.0, float(profile.get("maxRuns", 1)))
 	var weight_heading: Label = _label("ВЕСА МАРШРУТНОЙ ОЦЕНКИ · 0–10", 13, COLOR_CYAN)
 	_body.add_child(weight_heading)
 	var weights: Dictionary = profile.get("objectiveWeights", AutopilotPolicy.DEFAULT_WEIGHTS)
@@ -1569,7 +1570,7 @@ func _show_autopilot_profile_editor() -> void:
 		toggle.button_pressed = allowed_types.is_empty() or allowed_types.has(node_type)
 		_autopilot_profile_nodes[node_type] = toggle
 		node_row.add_child(toggle)
-	for pair: Array in [["allowElite", "Разрешать элитных врагов"], ["allowAnomaly", "Разрешать аномалии"], ["allowTow", "Разрешить платный вызов тягача"], ["allowAbandon", "Разрешить автоматический отказ от выезда"]]:
+	for pair: Array in [["allowElite", "Разрешать элитных врагов"], ["allowAnomaly", "Разрешать аномалии"], ["allowTow", "Разрешить платный вызов тягача"], ["allowAbandon", "Разрешить автоматический отказ от выезда"], ["autoRestartAllowed", "После успешной эвакуации запускать следующий рейд"]]:
 		var flag: String = str(pair[0])
 		var flag_toggle: CheckButton = CheckButton.new()
 		flag_toggle.text = str(pair[1])
@@ -1584,6 +1585,7 @@ func _show_autopilot_profile_editor() -> void:
 		if action == str(profile.get("checkpointAction", "CONDITIONAL")):
 			_autopilot_profile_action.select(_autopilot_profile_action.item_count - 1)
 	_body.add_child(_autopilot_profile_action)
+	_body.add_child(_label("Автоперезапуск действует после успешной эвакуации: выберите «Эвакуироваться» на контрольной точке. Новый выезд не начнётся, если штатный ремонт корпуса недоступен по средствам или бюджету.", 11, COLOR_MUTED))
 	_body.add_child(_label("АВТОМАТИЧЕСКИЙ ВЫБОР КВЕСТА", 13, COLOR_CYAN))
 	var quest_choice: OptionButton = OptionButton.new()
 	for choice: Array in [["PAUSE", "Остановиться и запросить решение"], ["NEVER", "Никогда не выбирать автоматически"], ["MATCH", "Выбирать только явно заданные варианты"]]:
@@ -1665,7 +1667,7 @@ func _on_save_autopilot_profile() -> void:
 	settings.erase("questChoiceMap")
 	for key: String in _autopilot_profile_spins:
 		var spin: SpinBox = _autopilot_profile_spins[key] as SpinBox
-		settings[key] = spin.value / 100.0 if key in ["minHP", "minShield"] else int(round(spin.value)) if key in ["maxWanted", "reserveFuel"] else spin.value
+		settings[key] = spin.value / 100.0 if key in ["minHP", "minShield"] else int(round(spin.value)) if key in ["maxWanted", "reserveFuel", "maxRuns"] else spin.value
 	for key: String in _autopilot_profile_toggles:
 		var control: Control = _autopilot_profile_toggles[key] as Control
 		if control is CheckButton:

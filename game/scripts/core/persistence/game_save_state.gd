@@ -92,6 +92,7 @@ class RunState:
 	var contract: Dictionary = {}
 	var autopilot_enabled: bool = false
 	var autopilot_repair_spend: float = 0.0
+	var autopilot_run_count: int = 0
 	var combat_result: Variant = null
 	var last_command_id: Variant = null
 	var world_rng: Dictionary = {}
@@ -140,6 +141,8 @@ class RunState:
 			result["autopilotEnabled"] = true
 		if autopilot_repair_spend > 0.0:
 			result["autopilotRepairSpend"] = autopilot_repair_spend
+		if autopilot_run_count > 0:
+			result["autopilotRunCount"] = autopilot_run_count
 		if combat_snapshot != null:
 			result["combatSnapshot"] = combat_snapshot.to_dictionary()
 		return result
@@ -327,6 +330,7 @@ func _run_from_dictionary(value: Dictionary) -> RunState:
 	result.contract = value.get("contract", {}).duplicate(true)
 	result.autopilot_enabled = bool(value.get("autopilotEnabled", false))
 	result.autopilot_repair_spend = float(value.get("autopilotRepairSpend", 0.0))
+	result.autopilot_run_count = int(value.get("autopilotRunCount", 0))
 	result.combat_result = value.get("combatResult")
 	result.last_command_id = value.get("lastCommandId")
 	result.world_rng = value["worldRng"].duplicate(true)

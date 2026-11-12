@@ -626,7 +626,7 @@ func _force_quest_target_node(layers: Array, enemy_id: String, reserved: Diction
 	target["enemies"] = enemies
 	return target
 
-func start_expedition(seed_value: String = "", use_medical_restore: bool = false, contract_id: String = "", escalation_ids: Array[String] = []) -> bool:
+func start_expedition(seed_value: String = "", use_medical_restore: bool = false, contract_id: String = "", escalation_ids: Array[String] = [], autopilot_restart: bool = false) -> bool:
 	if state == null:
 		last_error = "Сначала создайте или загрузите профиль."
 		return false
@@ -763,7 +763,10 @@ func start_expedition(seed_value: String = "", use_medical_restore: bool = false
 		"serviceScrapFuelCounts": {}, "shippedCheckpointIds": [], "combatResult": null, "lastCommandId": null,
 		"worldRng": world_rng.serialize(), "lootRng": loot_rng.serialize(), "combatSnapshot": null,
 		"contract": contract,
+		"autopilotRunCount": (state.run.autopilot_run_count + 1) if autopilot_restart and state.run != null else 1,
 	}
+	if autopilot_restart:
+		run_payload["autopilotEnabled"] = true
 	var payload: Dictionary = state.to_payload()
 	payload["run"] = run_payload
 	_record_campaign_biome(payload["meta"], depth, biome)
@@ -1008,7 +1011,7 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
 	const MAX_OFFLINE_MS: int = 43200000
 	const MAX_COMMANDS: int = 2048
 	var budget: int = clampi(simulation_budget_ms, 0, MAX_OFFLINE_MS)
-	var report: Dictionary = {"ok": true, "status": "RUNNING", "reasonCode": "BUDGET", "reason": "Достигнут лимит симуляции.", "simulatedMs": 0, "nodesVisited": 0, "battles": 0, "itemsFound": 0, "itemsSecured": 0, "seed": "", "error": ""}
+	var report: Dictionary = {"ok": true, "status": "RUNNING", "reasonCode": "BUDGET", "reason": "Достигнут лимит симуляции.", "simulatedMs": 0, "nodesVisited": 0, "battles": 0, "itemsFound": 0, "itemsSecured": 0, "runsStarted": 1, "seed": "", "error": ""}
 	if state == null or state.run == null or ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(state.run.phase):
 		return _autopilot_stop("PAUSED_FOR_DECISION", "NO_ACTIVE_RUN", "Автопилот продолжит движение только из активного выезда.", report)
 	if budget <= 0:
@@ -1020,13 +1023,14 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
 	report["_startingTime"] = starting_time
 	report["_startingItems"] = starting_items
 	report["_startingInventory"] = starting_inventory
+	report["_completedRunTime"] = 0
 	var actions: int = 0
 	var combat_time: int = 0
 	var policy: AutopilotPolicy = AutopilotPolicy.new()
 	var pilot_profile_id: String = active_autopilot_profile_id()
 	var pilot_profile: Dictionary = active_autopilot_profile()
 	while actions < MAX_COMMANDS:
-		var used_time: int = maxi(0, roundi(float(state.run.resources.get("gameTimeMs", starting_time)) - starting_time)) + combat_time
+		var used_time: int = int(report.get("_completedRunTime", 0)) + maxi(0, roundi(float(state.run.resources.get("gameTimeMs", starting_time)) - float(report.get("_startingTime", starting_time)))) + combat_time
 		if used_time >= budget:
 			break
 		if _combat != null:
@@ -1187,11 +1191,43 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
 				var checkpoint_action: String = str(pilot_profile.get("checkpointAction", "CONDITIONAL"))
 				var should_extract: bool = checkpoint_action == "EXTRACT" or (checkpoint_action == "CONDITIONAL" and not safe_to_continue)
 				if should_extract:
+					var runs_started: int = maxi(1, state.run.autopilot_run_count)
+					var max_runs: int = int(pilot_profile.get("maxRuns", 1))
+					var restart_ready: bool = bool(pilot_profile.get("autoRestartAllowed", false)) and runs_started < max_runs
+					var restart_repair_blocked: bool = false
+					if restart_ready:
+						var repair_guard: int = 0
+						while float(state.run.resources.get("hull", 0.0)) + 0.001 < float(state.run.resources.get("maxHull", 0.0)) and repair_guard < 100:
+							var repair_quote: Dictionary = checkpoint_repair_quote()
+							if not bool(repair_quote.get("valid", false)) or not bool(repair_quote.get("affordable", false)) or not repair_checkpoint_hull(float(pilot_profile.get("maxSpendRepair", 0.0))):
+								restart_ready = false
+								restart_repair_blocked = true
+								break
+							repair_guard += 1
+						if repair_guard >= 100:
+							restart_ready = false
+							restart_repair_blocked = true
 					if not extract_run():
 						return _autopilot_stop("SAFE_ERROR_STOP", "EXTRACTION", last_error, report)
+					actions += 1
+					if restart_ready:
+						var completed_run_time: int = maxi(0, roundi(float(state.run.resources.get("gameTimeMs", 0.0)) - float(report.get("_startingTime", 0.0))))
+						report["_completedRunTime"] = int(report.get("_completedRunTime", 0)) + completed_run_time
+						var restart_seed: String = "%s:autopilot:%d" % [str(state.run.seed), runs_started + 1]
+						if not start_expedition(restart_seed, false, "", [], true):
+							report["status"] = "EXTRACTED"
+							report["reasonCode"] = "RESTART_REJECTED"
+							report["reason"] = "Добыча сохранена, но новый выезд не начат: %s" % last_error
+							break
+						report["runsStarted"] = int(report.get("runsStarted", 1)) + 1
+						report["_startingTime"] = 0.0
+						report["status"] = "RUNNING"
+						report["reasonCode"] = "AUTO_RESTART"
+						report["reason"] = "После успешной эвакуации начат выезд %d из %d." % [runs_started + 1, max_runs]
+						continue
 					report["status"] = "EXTRACTED"
-					report["reasonCode"] = "PROFILE_CHECKPOINT_EXTRACT"
-					report["reason"] = "Профиль %s закрепил добычу на контрольной точке." % str(pilot_profile.get("name", pilot_profile_id))
+					report["reasonCode"] = "MAX_RUNS" if bool(pilot_profile.get("autoRestartAllowed", false)) and runs_started >= max_runs else "RESTART_REPAIR_LIMIT" if restart_repair_blocked else "PROFILE_CHECKPOINT_EXTRACT"
+					report["reason"] = "Добыча доставлена; достигнут предел %d выездов." % runs_started if report["reasonCode"] == "MAX_RUNS" else "Добыча сохранена; ремонт для следующего выезда не прошёл по средствам или бюджету." if restart_repair_blocked else "Профиль %s закрепил добычу на контрольной точке." % str(pilot_profile.get("name", pilot_profile_id))
 					break
 				var checkpoint_ship_id: String = "ship:%s:%s" % [state.run.seed, state.run.current_node_id]
 				if checkpoint_action == "CONDITIONAL" and not state.run.shipped_checkpoint_ids.has(checkpoint_ship_id):
@@ -1216,7 +1252,9 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
 		if actions >= MAX_COMMANDS:
 			break
 	if report["status"] == "RUNNING":
-		report["status"] = "OFFLINE_CAPPED" if report["reasonCode"] == "BUDGET" else report["status"]
+		report["status"] = "OFFLINE_CAPPED"
+		report["reasonCode"] = "COMMAND_LIMIT" if actions >= MAX_COMMANDS else "TIME_BUDGET"
+		report["reason"] = "Автопилот остановлен по лимиту действий." if actions >= MAX_COMMANDS else "Симуляция приостановлена по бюджету времени; состояние выезда сохранено."
 	return _finalize_autopilot_report(report)
 
 func _autopilot_event_choice(event: Dictionary, profile: Dictionary = {}) -> Dictionary:
@@ -1285,13 +1323,13 @@ func _finalize_autopilot_report(report: Dictionary) -> Dictionary:
 	if state != null:
 		var start_time: float = float(report.get("_startingTime", state.run.resources.get("gameTimeMs", 0.0) if state.run != null else 0.0))
 		var current_time: float = float(state.run.resources.get("gameTimeMs", start_time)) if state.run != null else start_time
-		report["simulatedMs"] = maxi(0, roundi(current_time - start_time)) + int(report.get("_combatTime", 0))
+		report["simulatedMs"] = int(report.get("_completedRunTime", 0)) + maxi(0, roundi(current_time - start_time)) + int(report.get("_combatTime", 0))
 		var start_items: int = int(report.get("_startingItems", 0))
 		var start_inventory: int = int(report.get("_startingInventory", state.meta.inventory.size()))
 		var current_run_items: int = state.run.unsecured_cargo.size() if state.run != null else 0
 		report["itemsFound"] = maxi(0, state.meta.inventory.size() + current_run_items - start_inventory - start_items)
 		report["itemsSecured"] = maxi(0, state.meta.inventory.size() - start_inventory)
-	for internal_key: String in ["_startingTime", "_startingItems", "_startingInventory", "_combatTime"]:
+	for internal_key: String in ["_startingTime", "_startingItems", "_startingInventory", "_combatTime", "_completedRunTime"]:
 		report.erase(internal_key)
 	last_autopilot_report = report.duplicate(true)
 	if state != null:
@@ -2041,10 +2079,13 @@ func checkpoint_repair_quote() -> Dictionary:
 	var repair_amount: float = 30.0 * (1.15 if state.meta.campaign_flags.has("quest-service-upgrade") else 1.0)
 	return {"valid": true, "affordable": state.run.wallet.credits >= float(credits), "credits": credits, "repair": minf(missing, repair_amount), "error": "" if state.run.wallet.credits >= float(credits) else "Недостаточно незакреплённых кредитов."}
 
-func repair_checkpoint_hull() -> bool:
+func repair_checkpoint_hull(autopilot_repair_budget: float = -1.0) -> bool:
 	var quote: Dictionary = checkpoint_repair_quote()
 	if not bool(quote.get("valid", false)) or not bool(quote.get("affordable", false)):
 		last_error = str(quote.get("error", "Ремонт корпуса недоступен."))
+		return false
+	if autopilot_repair_budget >= 0.0 and float(state.run.autopilot_repair_spend) + float(quote["credits"]) > autopilot_repair_budget:
+		last_error = "Лимит ремонта автопилота (%d ¤) исчерпан." % int(autopilot_repair_budget)
 		return false
 	var payload: Dictionary = state.to_payload()
 	var run_payload: Dictionary = payload["run"]
@@ -2052,6 +2093,8 @@ func repair_checkpoint_hull() -> bool:
 	var resources: Dictionary = run_payload["resources"]
 	wallet["CREDITS"] = float(wallet.get("CREDITS", 0.0)) - float(quote["credits"])
 	resources["hull"] = minf(float(resources.get("maxHull", 0.0)), float(resources.get("hull", 0.0)) + float(quote["repair"]))
+	if autopilot_repair_budget >= 0.0:
+		run_payload["autopilotRepairSpend"] = float(run_payload.get("autopilotRepairSpend", 0.0)) + float(quote["credits"])
 	resources["gameTimeMs"] = float(resources.get("gameTimeMs", 0.0)) + 8000.0
 	run_payload["lastCommandId"] = "checkpoint:repair:%s:%d" % [str(run_payload.get("seed", "")), int(resources["gameTimeMs"])]
 	return _commit_payload(payload)

@@ -2,13 +2,13 @@
 
 ## Current live continuation (2026-11-12; supersedes checkpoint below)
 
-### Current status override (2026-11-13)
+### Current status override (2026-11-13; bounded auto-restart WIP)
 
-- Branch `development/codex`; pushed base `35aa7de31a131340f815a88f2af322259d36447b` is verified equal to `origin/development/codex`. Current local WIP adds backward-compatible persistent autopilot report history (latest 20, with the latest five shown on the road screen). It is not committed yet.
-- Implementation: `GameSaveState.MetaState` serializes the optional report history only when nonempty, so older/untouched saves retain the exact prior payload shape. `GameSaveSchema` validates report structure and bounds the list to 20. `GameSession` appends after each finished simulation through the normal save transaction. The route UI shows recent status, stop code, node and battle counts.
-- Actual checks: Godot 4.7.2 editor import exit 0; headless suite 22 scripts / 87,580 assertions / 0 failures; `git diff --check` exit 0. Windows export and TypeScript checks have not been rerun for this WIP; changes are Godot-only.
-- Remaining autopilot §16.5 gap: `autoRestartAllowed` and `maxRuns` are validated/defaulted but still have no UI/runtime behavior. Do not claim automatic restart is implemented. Report history is now present; see next task below.
-- Exact next action: commit/push report history, then implement explicit opt-in auto-restart after successful extraction with a persisted run limit and repair spending bound. Continue broad functional coverage afterward; do not spend time on Lab presets, report exports, or polish.
+- Branch `development/codex`; pushed base before this WIP: `5d93542d17a5068d209009ae6e5c3b49af4edb92`. Latest local WIP completes the normal §16.5 auto-restart path and is not committed yet.
+- Settings/UI: the profile editor now exposes `autoRestartAllowed` and `maxRuns` (1–100), and explains that extraction policy must be set to EXTRACT or reach a conditional extraction. Runtime restarts only after successful extraction; death/tow/abandon do not restart. Before restart it uses existing checkpoint hull repair, capped by the saved `maxSpendRepair` budget. If repair cannot be paid or exceeds the cap, loot is still extracted and the report explains why another outing did not start.
+- Persistence: `autopilotRunCount` is an optional backward-compatible RUN field. New auto-started outings carry the count and keep offline autopilot enabled. The simulation budget now accounts for elapsed game-time across multiple outings. Completed reports are stored (latest 20) and latest five shown in the road screen.
+- Actual checks: Godot 4.7.2 editor import exit 0; 22 scripts / 87,587 assertions / 0 failures, including a reload and maxRuns=2 no-third-run regression; Windows Desktop export exit 0; exported EXE `--headless --quit-after 3` exit 0; `git diff --check` exit 0. TypeScript checks were not run because the changes are native Godot only.
+- Next action: review/commit/push this checkpoint, then continue functional coverage in remaining campaign, event/quest/faction, combat, offline, and save recovery requirements. Preserve the external campaign E2E profile and safety copy below; do not spend time on Lab presets, report exports, or polish.
 - Preserve `%APPDATA%\\Godot\\app_userdata\\CYDLE\\campaign-e2e-repro` and `%TEMP%\\CYDLE-campaign-e2e-repro-20261112-204651\\cylde-main.json`.
 
 ### Current status override (later than the older bullets immediately below)

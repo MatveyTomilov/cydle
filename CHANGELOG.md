@@ -1,10 +1,16 @@
 # Changelog
 
+## Unreleased — bounded autopilot restart
+
+- Added the policy editor controls for explicitly opting into a follow-up outing and setting `maxRuns` (1–100). After extraction only, the shared autopilot may repair the transport at the existing checkpoint service within `maxSpendRepair`, then starts a new sortie from the open outpost. It pauses the restart if repair cannot be paid for or exceeds the policy budget. Defeat never auto-restarts.
+- Persisted the outing count across save/load, preserved the active offline autopilot for restarted runs, and accounted for game-time across sortie boundaries. Reports expose `runsStarted` and give a specific stop reason for time, max runs, restart rejection, or repair limits.
+- Checks: Godot 4.7.2 editor import exit 0; 22 scripts / 87,587 assertions / 0 failures; Windows Desktop export exit 0; exported EXE `--headless --quit-after 3` smoke exit 0; `git diff --check` exit 0. Tests verify the persisted outing count and that the simulator stops before starting run 3 after `maxRuns=2`.
+
 ## Unreleased — persistent autopilot reports
 
 - Added backward-compatible META storage for the 20 latest autopilot reports, strict structural validation, and a road-screen view of the latest five stop summaries. Empty history is omitted from saves, preserving the prior payload shape.
 - Appended every completed online/offline simulation through the regular validated save transaction. Session coverage checks online/offline ordering and persistence after reload.
-- Checks: Godot 4.7.2 editor import exit 0; 22 scripts / 87,580 assertions / 0 failures; `git diff --check` exit 0. Windows export and TypeScript checks have not been rerun for this WIP.
+- Checks for this preceding checkpoint: Godot 4.7.2 editor import exit 0; 22 scripts / 87,580 assertions / 0 failures; `git diff --check` exit 0. Windows export was completed at the bounded-restart checkpoint above; TypeScript checks were not run for either Godot-only change.
 
 ## Unreleased — configurable autopilot policies
 
