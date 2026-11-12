@@ -1009,6 +1009,17 @@ func run(_tree: SceneTree) -> bool:
 		check(event_session.travel_to("mutation-test"), "game_session: mutation event travel failed")
 		check(event_session.resolve_event("A"), "game_session: temporary mutation event failed: %s" % event_session.last_error)
 		check(event_session.state.run.temporary_mutation_ids == ["MUT_REGEN"], "game_session: event mutation did not enter the temporary run build")
+		var codex_payload: Dictionary = event_session.state.to_payload()
+		codex_payload["run"]["graph"] = {"layers": [[{"id": "codex-event", "layer": 0, "type": "EVENT", "eventId": "EV15", "threat": "medium", "enemies": [], "revealLevel": 1, "lootHint": "event"}]], "edges": [{"from": event_session.state.run.current_node_id, "to": "codex-event", "fromLayer": -1, "toLayer": 0, "fuelCost": 1}]}
+		check(event_session._commit_payload(codex_payload) and event_session.travel_to("codex-event") and event_session.resolve_event("A"), "game_session: EV15 did not grant a real codex entry: %s" % event_session.last_error)
+		check(event_session.state.meta.codex_enemy_ids.size() == 1 and EnemyCatalog.new().load_catalog().get("ok", false), "game_session: EV15 codex reward was not added to permanent META")
+		var boss_intel_payload: Dictionary = event_session.state.to_payload()
+		boss_intel_payload["run"]["graph"] = {"layers": [[{"id": "weakness-event", "layer": 0, "type": "EVENT", "eventId": "EV10", "threat": "medium", "enemies": [], "revealLevel": 1, "lootHint": "event"}], [{"id": "weakness-boss", "layer": 1, "type": "BOSS", "threat": "boss", "enemies": [{"templateId": "BOSS_A"}], "revealLevel": 1, "lootHint": "boss"}]], "edges": [{"from": event_session.state.run.current_node_id, "to": "weakness-event", "fromLayer": -1, "toLayer": 0, "fuelCost": 1}, {"from": "weakness-event", "to": "weakness-boss", "fromLayer": 0, "toLayer": 1, "fuelCost": 1}]}
+		check(event_session._commit_payload(boss_intel_payload) and event_session.travel_to("weakness-event") and event_session.resolve_event("B"), "game_session: EV10 boss scan did not resolve: %s" % event_session.last_error)
+		check(event_session.state.meta.campaign_flags.has("BOSS_WEAKNESS:1:BOSS_A:DIGITAL"), "game_session: EV10 scan did not persist the biome boss weak tag")
+		var codex_reload: GameSession = GameSession.new()
+		codex_reload.configure_save_directory("user://test-saves/game-session-events")
+		check(codex_reload.load_saved_game() and codex_reload.state.meta.codex_enemy_ids == event_session.state.meta.codex_enemy_ids, "game_session: codex unlock did not survive save validation/reload")
 	var tow_session: GameSession = GameSession.new()
 	tow_session.configure_save_directory("user://test-saves/emergency-tow")
 	if check(tow_session.start_new_game(1762900000102), "game_session: could not create an emergency-tow profile") and check(tow_session.start_expedition("emergency-tow"), "game_session: could not start emergency-tow sortie"):

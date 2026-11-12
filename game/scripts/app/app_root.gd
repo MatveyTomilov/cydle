@@ -315,6 +315,9 @@ func _show_garage() -> void:
 	var journal_button: Button = _button("ЖУРНАЛ ЗАДАНИЙ", false)
 	journal_button.pressed.connect(_show_quest_journal)
 	actions.add_child(journal_button)
+	var codex_button: Button = _button("АРХИВ ВРАГОВ · %d / 24" % meta.codex_enemy_ids.size(), false)
+	codex_button.pressed.connect(_show_enemy_codex)
+	actions.add_child(codex_button)
 	var save_button: Button = _button("СОХРАНИТЬ", false)
 	save_button.pressed.connect(_on_save)
 	actions.add_child(save_button)
@@ -768,6 +771,9 @@ func _show_quest_journal() -> void:
 		return
 	var can_accept: bool = _session.state.run == null or ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(_session.state.run.phase)
 	_body.add_child(_label("VANTA %d · RUST %d · CHOIR %d · ECHO %d" % [int(_session.state.meta.reputation.get("F_VANTA", 0)), int(_session.state.meta.reputation.get("F_RUST", 0)), int(_session.state.meta.reputation.get("F_CHOIR", 0)), int(_session.state.meta.reputation.get("F_ECHO", 0))], 13, COLOR_AMBER))
+	var codex_button: Button = _button("АРХИВ ВРАГОВ · %d / 24" % _session.state.meta.codex_enemy_ids.size(), false)
+	codex_button.pressed.connect(_show_enemy_codex)
+	_body.add_child(codex_button)
 	for quest: Dictionary in _session.quest_journal():
 		var status: String = str(quest.get("status", "AVAILABLE"))
 		var card: PanelContainer = PanelContainer.new()
@@ -795,6 +801,35 @@ func _on_accept_quest(quest_id: String) -> void:
 	if not _session.accept_quest(quest_id):
 		_footer.text = _session.last_error
 	_show_quest_journal()
+
+func _show_enemy_codex() -> void:
+	_screen = "enemy_codex"
+	_clear_body()
+	_body.add_child(_label("РАЗВЕДДАННЫЕ · ВРАЖЕСКИЕ СИГНАТУРЫ", 12, COLOR_CYAN))
+	_body.add_child(_label("Архив врагов · %d / 24" % _session.state.meta.codex_enemy_ids.size(), 28, COLOR_TEXT))
+	if _session.state.meta.codex_enemy_ids.is_empty():
+		_body.add_child(_label("Записи открываются в событиях разведки. Выбор архива из EV15 добавляет новое существо навсегда.", 12, COLOR_MUTED))
+	else:
+		var catalog: EnemyCatalog = EnemyCatalog.new()
+		var loaded: Dictionary = catalog.load_catalog()
+		if not bool(loaded.get("ok", false)):
+			_body.add_child(_label("Каталог противников недоступен: %s" % str(loaded.get("error", "")), 12, COLOR_RED))
+		else:
+			var discovered: Array[String] = _session.state.meta.codex_enemy_ids.duplicate()
+			discovered.sort()
+			for enemy_id: String in discovered:
+				var enemy: Dictionary = catalog.get_template(enemy_id)
+				var card: PanelContainer = PanelContainer.new()
+				card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				_body.add_child(card)
+				var details: VBoxContainer = VBoxContainer.new()
+				card.add_child(details)
+				details.add_child(_label("%s · %s" % [enemy_id, str(enemy.get("name", "Неизвестная сигнатура"))], 14, COLOR_CYAN))
+				details.add_child(_label(str(enemy.get("desc", "")), 11, COLOR_MUTED))
+				details.add_child(_label("HP %s · ЩИТ %s · БРОНЯ %s · RES E/D %s/%s · РОЛЬ %s" % [_fmt(enemy.get("hp", 0)), _fmt(enemy.get("shield", 0)), _fmt(enemy.get("armor", 0)), _fmt(enemy.get("resE", 0)), _fmt(enemy.get("resD", 0)), str(enemy.get("role", "—"))], 10, COLOR_TEXT))
+	var back: Button = _button("НАЗАД К ЖУРНАЛУ", false)
+	back.pressed.connect(_show_quest_journal)
+	_body.add_child(back)
 
 func _on_resolve_quest_choice(quest_id: String, choice_id: String) -> void:
 	if not _session.resolve_quest_choice(quest_id, choice_id):
@@ -1042,6 +1077,14 @@ func _show_road() -> void:
 				var intel: Dictionary = map_intel.get(node_id, {})
 				var node_type: String = str(intel.get("type", "НЕИЗВЕСТНО"))
 				var secondary: String = "%s · %s" % [str(intel.get("threat", "")), str(intel.get("lootHint", ""))] if intel.has("threat") else ("УЖЕ ПОСЕЩЁН" if visited else "РАЗВЕДДАННЫХ НЕТ")
+				if str(node.get("type", "")) == "BOSS":
+					var boss_enemies: Array = node.get("enemies", [])
+					var boss_id: String = str(boss_enemies[0].get("templateId", "")) if not boss_enemies.is_empty() else ""
+					for intel_flag: String in _session.state.meta.campaign_flags:
+						var intel_parts: PackedStringArray = intel_flag.split(":")
+						if intel_parts.size() == 4 and intel_parts[0] == "BOSS_WEAKNESS" and int(intel_parts[1]) == run.depth and intel_parts[2] == boss_id:
+							secondary = "СЛАБОЕ МЕСТО · %s · %s" % [intel_parts[3], secondary]
+							break
 				if bool(intel.get("questTarget", false)):
 					secondary = "ЦЕЛЬ ЗАДАНИЯ · " + secondary
 				if bool(intel.get("preview", false)):

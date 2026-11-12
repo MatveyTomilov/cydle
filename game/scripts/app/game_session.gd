@@ -1489,6 +1489,18 @@ func resolve_event(choice_id: String) -> bool:
 	if next_combat.has("bountyCredits"):
 		pending_next["bountyCreditsBonus"] = float(pending_next.get("bountyCreditsBonus", 0.0)) + float(next_combat["bountyCredits"])
 	var flag: String = str(choice.get("flag", ""))
+	if flag == "codexEntry":
+		var codex_id: String = _roll_codex_enemy_id(run_payload)
+		if not codex_id.is_empty() and not meta.get("codexEnemyIds", []).has(codex_id):
+			meta["codexEnemyIds"] = meta.get("codexEnemyIds", [])
+			meta["codexEnemyIds"].append(codex_id)
+	if flag == "bossWeakness":
+		var weakness_flag: String = _boss_weakness_flag(run_payload)
+		if weakness_flag.is_empty():
+			last_error = "В каталоге не удалось определить уязвимость босса этого биома."
+			return false
+		if not meta["campaignFlags"].has(weakness_flag):
+			meta["campaignFlags"].append(weakness_flag)
 	if flag == "bountyE21":
 		pending_next["bountyEnemyId"] = "E21"
 		pending_next["extraRareItemRoll"] = true
@@ -1529,6 +1541,48 @@ func resolve_event(choice_id: String) -> bool:
 	run_payload["phase"] = "ROUTE"
 	run_payload["lastCommandId"] = "event:%s:%s" % [node_id, choice_id]
 	return _commit_payload(payload)
+
+func _roll_codex_enemy_id(run_payload: Dictionary) -> String:
+	var catalog: EnemyCatalog = EnemyCatalog.new()
+	if not bool(catalog.load_catalog().get("ok", false)):
+		return ""
+	var known: Array = state.meta.codex_enemy_ids
+	var candidates: Array[String] = []
+	for enemy_value: Variant in catalog.enemies.values():
+		var enemy: Dictionary = enemy_value
+		if int(enemy.get("unlockDepth", 1)) <= int(run_payload.get("depth", 1)) and (enemy.get("biomes", []) as Array).has(str(run_payload.get("biome", ""))) and not known.has(str(enemy.get("id", ""))):
+			candidates.append(str(enemy.get("id", "")))
+	if candidates.is_empty():
+		for enemy_value: Variant in catalog.enemies.values():
+			var enemy: Dictionary = enemy_value
+			if int(enemy.get("unlockDepth", 1)) <= int(run_payload.get("depth", 1)) and not known.has(str(enemy.get("id", ""))):
+				candidates.append(str(enemy.get("id", "")))
+	if candidates.is_empty():
+		return ""
+	candidates.sort()
+	var rng: DeterministicRng = DeterministicRng.new()
+	rng.seed("event-codex", "%s:%s" % [str(run_payload.get("seed", "")), str(run_payload.get("currentNodeId", ""))])
+	return candidates[rng.int_range(0, candidates.size() - 1)]
+
+func _boss_weakness_flag(run_payload: Dictionary) -> String:
+	var boss_id: String = ""
+	for layer: Array in run_payload.get("graph", {}).get("layers", []):
+		for node: Dictionary in layer:
+			if str(node.get("type", "")) == "BOSS":
+				var enemies: Array = node.get("enemies", [])
+				if not enemies.is_empty():
+					boss_id = str(enemies[0].get("templateId", ""))
+				break
+		if not boss_id.is_empty():
+			break
+	var catalog: EnemyCatalog = EnemyCatalog.new()
+	if boss_id.is_empty() or not bool(catalog.load_catalog().get("ok", false)):
+		return ""
+	var boss: Dictionary = catalog.get_template(boss_id)
+	if boss.is_empty():
+		return ""
+	var weakness_tag: String = "DIGITAL" if float(boss.get("resD", 0.0)) <= float(boss.get("resE", 0.0)) else "ENERGY"
+	return "BOSS_WEAKNESS:%d:%s:%s" % [int(run_payload.get("depth", 1)), boss_id, weakness_tag]
 
 func _next_route_nodes(origin_id: String, limit: int) -> Array[String]:
 	var selected: Array[String] = []

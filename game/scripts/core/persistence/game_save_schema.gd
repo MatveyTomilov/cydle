@@ -49,6 +49,7 @@ func _validate_meta(value: Variant) -> Dictionary:
 	meta_allowed.append("disassemblyUndo")
 	meta_allowed.append("activeAutopilotProfileId")
 	meta_allowed.append("autopilotReportHistory")
+	meta_allowed.append("codexEnemyIds")
 	if not _has_keys(meta, keys) or not _has_only_keys(meta, meta_allowed):
 		return _failure("meta: отсутствуют обязательные поля или есть неизвестные поля.")
 	if meta.has("questProgress") and not _validate_quest_progress(meta["questProgress"]):
@@ -59,6 +60,8 @@ func _validate_meta(value: Variant) -> Dictionary:
 		return _failure("meta.disassemblyUndo: запись отмены разбора повреждена.")
 	if meta.has("autopilotReportHistory") and not _validate_autopilot_report_history(meta["autopilotReportHistory"]):
 		return _failure("meta.autopilotReportHistory: история автопилота повреждена.")
+	if meta.has("codexEnemyIds") and not _validate_codex_enemy_ids(meta["codexEnemyIds"]):
+		return _failure("meta.codexEnemyIds: список записей кодекса повреждён.")
 	var operator_value: Variant = meta["operator"]
 	if not operator_value is Dictionary or not _has_exact_keys(operator_value, ["level", "xp", "attributes", "attributePoints", "treePoints"]):
 		return _failure("meta.operator: неверная структура.")
@@ -158,6 +161,17 @@ func _validate_autopilot_report_history(value: Variant) -> bool:
 		for key: String in ["simulatedMs", "nodesVisited", "battles", "itemsFound", "itemsSecured"]:
 			if not _is_integer(report.get(key)) or int(report[key]) < 0:
 				return false
+	return true
+
+func _validate_codex_enemy_ids(value: Variant) -> bool:
+	if not value is Array or value.size() > 24 or not _string_array(value) or not _unique_strings(value):
+		return false
+	var catalog: EnemyCatalog = EnemyCatalog.new()
+	if not bool(catalog.load_catalog().get("ok", false)):
+		return false
+	for enemy_id: Variant in value:
+		if not catalog.enemies.has(str(enemy_id)):
+			return false
 	return true
 
 func _validate_run(value: Variant, meta: Dictionary) -> Dictionary:

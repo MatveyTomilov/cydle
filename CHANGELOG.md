@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — functional enemy intel events
+
+- EV15's archive option now selects a deterministic, previously unknown catalog enemy eligible for the current depth/biome and stores its ID in permanent META. Added a browsable enemy archive from the garage/quest journal with the discovered enemy's real catalog stats and description; the list is validated and save-compatible.
+- EV10's boss scan now resolves the current route's actual boss, reveals the lower of its energy/digital resistance tags, and stores depth/boss-specific intel. The revealed weakness appears on that boss node in the road map.
+- Regression covers EV15 grant and reload plus EV10's BOSS_A DIGITAL weakness. Checks: Godot 4.7.2 editor import exit 0; 22 scripts / 87,592 assertions / 0 failures; Windows Desktop export exit 0; exported EXE `--headless --quit-after 3` exit 0; `git diff --check` exit 0. TypeScript not run (native Godot only).
+
 ## Unreleased — bounded autopilot restart
 
 - Added the policy editor controls for explicitly opting into a follow-up outing and setting `maxRuns` (1–100). After extraction only, the shared autopilot may repair the transport at the existing checkpoint service within `maxSpendRepair`, then starts a new sortie from the open outpost. It pauses the restart if repair cannot be paid for or exceeds the policy budget. Defeat never auto-restarts.

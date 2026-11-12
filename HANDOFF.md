@@ -2,13 +2,20 @@
 
 ## Current live continuation (2026-11-12; supersedes checkpoint below)
 
-### Current status override (2026-11-13; bounded auto-restart WIP)
+### Current status override (2026-11-13; enemy intel event WIP)
 
-- Branch `development/codex`; pushed base before this WIP: `5d93542d17a5068d209009ae6e5c3b49af4edb92`. Latest local WIP completes the normal §16.5 auto-restart path and is not committed yet.
-- Settings/UI: the profile editor now exposes `autoRestartAllowed` and `maxRuns` (1–100), and explains that extraction policy must be set to EXTRACT or reach a conditional extraction. Runtime restarts only after successful extraction; death/tow/abandon do not restart. Before restart it uses existing checkpoint hull repair, capped by the saved `maxSpendRepair` budget. If repair cannot be paid or exceeds the cap, loot is still extracted and the report explains why another outing did not start.
-- Persistence: `autopilotRunCount` is an optional backward-compatible RUN field. New auto-started outings carry the count and keep offline autopilot enabled. The simulation budget now accounts for elapsed game-time across multiple outings. Completed reports are stored (latest 20) and latest five shown in the road screen.
-- Actual checks: Godot 4.7.2 editor import exit 0; 22 scripts / 87,587 assertions / 0 failures, including a reload and maxRuns=2 no-third-run regression; Windows Desktop export exit 0; exported EXE `--headless --quit-after 3` exit 0; `git diff --check` exit 0. TypeScript checks were not run because the changes are native Godot only.
-- Next action: review/commit/push this checkpoint, then continue functional coverage in remaining campaign, event/quest/faction, combat, offline, and save recovery requirements. Preserve the external campaign E2E profile and safety copy below; do not spend time on Lab presets, report exports, or polish.
+- Pushed base: `a99510bc5b07e087052c0846e090d7ad7bf946cc` on `development/codex`; current event-content WIP is not committed yet.
+- EV15 A now grants a deterministic, previously undiscovered enemy codex entry eligible for the current run depth/biome, persists it in validated META, and exposes an enemy archive screen from the garage/quest journal. EV10 B records the actual sector boss and lower ENERGY/DIGITAL resistance as weakness intel; the road map shows it next to that boss. The generic event flags remain for compatibility.
+- Actual checks: Godot 4.7.2 editor import exit 0; 22 scripts / 87,592 assertions / 0 failures; regressions cover EV15 grant/save/reload and EV10 BOSS_A weakness; Windows Desktop export exit 0; exported EXE `--headless --quit-after 3` exit 0; `git diff --check` exit 0. TypeScript was not run (native Godot only).
+- Next action: verify export/smoke and diff, commit/push, then continue the event/quest audit for catalog-backed effects that are still markers. Do not claim all 24 events or quest story behavior complete based on these two effects.
+- Preserve the external campaign E2E profile and safety copy below; continue full-game coverage without Lab presets, report exports, or polish.
+
+### Previous continuation: bounded auto-restart
+
+- This continuation was committed as `a99510bc5b07e087052c0846e090d7ad7bf946cc` on `development/codex`.
+- The profile editor exposes `autoRestartAllowed` and `maxRuns` (1–100), and explains that extraction policy must be set to EXTRACT or reach a conditional extraction. Runtime restarts only after successful extraction; death/tow/abandon do not restart. Before restart it uses existing checkpoint hull repair, capped by the saved `maxSpendRepair` budget. If repair cannot be paid or exceeds the cap, loot is still extracted and the report explains why another outing did not start.
+- `autopilotRunCount` is an optional backward-compatible RUN field. New auto-started outings carry the count and keep offline autopilot enabled. The simulation budget accounts for elapsed game-time across outings. Reports persist (latest 20), with latest five shown on road screen.
+- Actual checks: Godot 4.7.2 import exit 0; 22 scripts / 87,587 assertions / 0 failures; Windows Desktop export and EXE headless smoke exit 0; `git diff --check` exit 0. TypeScript was not run (native Godot only).
 - Preserve `%APPDATA%\\Godot\\app_userdata\\CYDLE\\campaign-e2e-repro` and `%TEMP%\\CYDLE-campaign-e2e-repro-20261112-204651\\cylde-main.json`.
 
 ### Current status override (later than the older bullets immediately below)
