@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — checkpoint sector progression
+
+- Continuing past any depth checkpoint now persists that depth as cleared, independently of the d4/d8/d12 boss-gate unlock. This makes depth based quest availability and the Master Spec's HANGAR L2 after d6 progression reachable at the correct point.
+- Added a session regression that advances past d6 and verifies both the META milestone and HANGAR L2 gate. The campaign diagnostic equips the second drone when the upgrade is available and affordable.
+- Godot headless suite: 22 scripts, 87,512 assertions, 0 failures; Godot editor import exit 0. Full d8 boss and campaign validation remains active/incomplete.
+
 ## Unreleased — stable save checksum round-trips
 
 - Fixed a save-integrity failure where Godot's JSON float serialization alternated between adjacent numeric representations after repeated load/write cycles. New checksums canonicalize numeric precision without changing stored gameplay values; old checksum documents remain loadable. Added repeated file/JSON round-trip regression coverage.

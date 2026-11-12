@@ -44,6 +44,21 @@ func run(_tree: SceneTree) -> bool:
 		check(sortie_fuel_session.start_expedition("sortie-refill-test"), "game_session: sortie could not start from a depleted garage tank: %s" % sortie_fuel_session.last_error)
 		check(is_equal_approx(float(sortie_fuel_session.state.run.resources.get("fuel", 0.0)), sortie_fuel_session.state.meta.transport.fuel_max), "game_session: a new sortie did not leave with a full transport tank")
 
+	var sector_progress_session: GameSession = GameSession.new()
+	sector_progress_session.configure_save_directory("user://test-saves/sector-progress")
+	if check(sector_progress_session.start_new_game(17629000000491), "game_session: could not create a sector progression profile"):
+		var progression_payload: Dictionary = sector_progress_session.state.to_payload()
+		progression_payload["meta"]["unlockedForpost"] = 4
+		progression_payload["meta"]["maxSectorCleared"] = 4
+		check(sector_progress_session._commit_payload(progression_payload), "game_session: sector progression fixture could not be saved")
+		check(sector_progress_session.start_expedition("sector-six-clear"), "game_session: sector progression sortie could not start")
+		sector_progress_session.state.run.depth = 6
+		sector_progress_session.state.run.phase = "CHECKPOINT"
+		check(sector_progress_session.continue_campaign(), "game_session: checkpoint continuation failed to clear its completed depth")
+		check(sector_progress_session.state.run.depth == 7 and sector_progress_session.state.meta.max_sector_cleared == 6, "game_session: advancing past d6 did not persist the sector-clear milestone")
+		sector_progress_session.state.run.phase = "EXTRACTED"
+		check(bool(sector_progress_session.garage_upgrade_quote("HANGAR").get("valid", false)), "game_session: clearing d6 did not unlock the authored HANGAR L2 gate")
+
 	var autopilot_session: GameSession = GameSession.new()
 	autopilot_session.configure_save_directory("user://test-saves/autopilot")
 	if check(autopilot_session.start_new_game(1762900000050), "game_session: could not create an autopilot profile"):

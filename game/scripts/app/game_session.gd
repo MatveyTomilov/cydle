@@ -1788,6 +1788,10 @@ func continue_campaign(escalation_ids: Array[String] = []) -> bool:
 		last_error = str(generated.get("error", "Не удалось создать следующий сектор."))
 		return false
 	var payload: Dictionary = state.to_payload()
+	# A checkpoint is the sector-clear boundary even when the next boss gate is
+	# several depths away. Persisting this lets depth-gated quests and garage
+	# upgrades unlock on the authored d5/d6 progression rather than only on d8/d12.
+	payload["meta"]["maxSectorCleared"] = maxi(int(payload["meta"].get("maxSectorCleared", 0)), int(state.run.depth))
 	_expire_quest_deadlines(payload["meta"], next_depth)
 	_record_campaign_biome(payload["meta"], next_depth, biome)
 	var run_payload: Dictionary = payload["run"]

@@ -214,6 +214,15 @@ func _prepare_garage(session: GameSession) -> bool:
 		print("E2E garage rejected: item catalog")
 		return false
 	var current_slots: Array[String] = ["MAIN", "ARMOR", "OFFHAND", "DRONE_1", "IMP_1", "IMP_2", "IMP_3", "IMP_4"]
+	if session.state.meta.unlocked_drone_slots < 2:
+		var hangar_quote: Dictionary = session.garage_upgrade_quote("HANGAR")
+		if bool(hangar_quote.get("valid", false)) and bool(hangar_quote.get("affordable", false)):
+			if not session.upgrade_garage_object("HANGAR"):
+				print("E2E hangar upgrade rejected: %s" % session.last_error)
+				return false
+			print("E2E unlocked the second drone through the d6 HANGAR L2 progression gate")
+	if session.state.meta.unlocked_drone_slots >= 2:
+		current_slots.append("DRONE_2")
 	for slot: String in current_slots:
 		var current_id: String = str(session.state.meta.equipment.get(slot, ""))
 		var expected_category: String = "IMPLANT" if slot.begins_with("IMP_") else "DRONE" if slot.begins_with("DRONE_") else slot
