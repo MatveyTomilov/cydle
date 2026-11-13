@@ -1459,11 +1459,16 @@ func _show_current_node(run: GameSaveState.RunState) -> void:
 				else:
 					var choose: Button = _button("%s · %s" % [str(choice.get("id", "")), str(choice.get("label", "Выбрать"))], str(choice.get("id", "")) == "A")
 					choose.custom_minimum_size.x = 370
+					var choice_affordability: Dictionary = _session.quest_choice_affordability(choice) if node_type == "QUEST" else _session.event_choice_affordability(choice)
+					choose.disabled = not bool(choice_affordability.get("affordable", false))
+					choose.tooltip_text = str(choice_affordability.get("reason", ""))
 					if node_type == "QUEST":
 						choose.pressed.connect(_on_resolve_quest_choice.bind(str(event.get("questId", "")), str(choice.get("id", ""))))
 					else:
 						choose.pressed.connect(_on_event_choice.bind(str(choice.get("id", "")), ""))
 					_body.add_child(choose)
+					if choose.disabled:
+						_body.add_child(_label(str(choice_affordability.get("reason", "")), 10, COLOR_RED))
 				var description: Label = _label(str(choice.get("desc", "")), 11, COLOR_MUTED)
 				_body.add_child(description)
 	else:
@@ -1477,9 +1482,14 @@ func _show_current_node(run: GameSaveState.RunState) -> void:
 		for choice: Dictionary in stage.get("choices", []):
 			var quest_choice: Button = _button("%s · %s" % [str(choice.get("id", "")), str(choice.get("label", "Решить"))], false)
 			quest_choice.custom_minimum_size.x = 370
+			var quest_affordability: Dictionary = _session.quest_choice_affordability(choice)
+			quest_choice.disabled = not bool(quest_affordability.get("affordable", false))
+			quest_choice.tooltip_text = str(quest_affordability.get("reason", ""))
 			quest_choice.pressed.connect(_on_resolve_quest_choice.bind(str(quest.get("id", "")), str(choice.get("id", ""))))
 			_body.add_child(quest_choice)
 			_body.add_child(_label(str(choice.get("desc", "")), 11, COLOR_MUTED))
+			if quest_choice.disabled:
+				_body.add_child(_label(str(quest_affordability.get("reason", "")), 10, COLOR_RED))
 	if not ["COMBAT", "ELITE", "BOUNTY", "BOSS", "ANOMALY"].has(node_type):
 		var leave: Button = _button("ПОКИНУТЬ УЗЕЛ", false)
 		leave.pressed.connect(_on_service_action.bind("LEAVE_NODE", ""))

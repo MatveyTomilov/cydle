@@ -1703,16 +1703,12 @@ func resolve_event(choice_id: String, cargo_item_id: String = "") -> bool:
 		if surrendered_index < 0:
 			last_error = "Для сделки VANTA выберите незакреплённый предмет груза, не установленный в слот рейда."
 			return false
-	var costs: Dictionary = choice.get("cost", {}).duplicate(true)
+	var costs: Dictionary = event_choice_costs(choice)
 	var special: String = str(choice.get("special", ""))
-	if special == "dataForCredits":
-		costs["DATA"] = ceili(10.0 * scale)
-	if special == "greyDealer":
-		costs["CREDITS"] = ceili((25.0 + 7.0 * state.run.depth) * 2.0 * scale * 0.6)
-	for currency: String in ["CREDITS", "SCRAP", "DATA"]:
-		if float(wallet.get(currency, 0.0)) < float(costs.get(currency, 0.0)):
-			last_error = "Для выбора недостаточно незакреплённых средств: %s." % currency
-			return false
+	var affordability: Dictionary = _run_wallet_affordability(costs)
+	if not bool(affordability.get("affordable", false)):
+		last_error = str(affordability.get("reason", "Для выбора недостаточно незакреплённых средств."))
+		return false
 	for currency: String in ["CREDITS", "SCRAP", "DATA"]:
 		var gain: float = float(choice.get("gains", {}).get(currency, 0.0))
 		if bool(choice.get("scaled", false)):
@@ -1910,6 +1906,40 @@ func quest_journal() -> Array[Dictionary]:
 		result.append(definition)
 	return result
 
+func event_choice_costs(choice: Dictionary) -> Dictionary:
+	var costs: Dictionary = choice.get("cost", {}).duplicate(true)
+	var special: String = str(choice.get("special", ""))
+	if state != null and state.run != null:
+		var scale: float = CydleFormula.new().reward_scale(float(state.run.depth))
+		if special == "dataForCredits":
+			costs["DATA"] = ceili(10.0 * scale)
+		elif special == "greyDealer":
+			costs["CREDITS"] = ceili((25.0 + 7.0 * state.run.depth) * 2.0 * scale * 0.6)
+	return costs
+
+func quest_choice_costs(choice: Dictionary) -> Dictionary:
+	var costs: Dictionary = choice.get("cost", {}).duplicate(true)
+	if state != null and state.run != null and str(choice.get("special", "")) == "buyEngine":
+		costs["CREDITS"] = ceili(20.0 * CydleFormula.new().reward_scale(float(state.run.depth)))
+	return costs
+
+func event_choice_affordability(choice: Dictionary) -> Dictionary:
+	return _run_wallet_affordability(event_choice_costs(choice))
+
+func quest_choice_affordability(choice: Dictionary) -> Dictionary:
+	return _run_wallet_affordability(quest_choice_costs(choice))
+
+func _run_wallet_affordability(costs: Dictionary) -> Dictionary:
+	if state == null or state.run == null:
+		return {"affordable": false, "reason": "Для этого выбора нужен активный выезд.", "costs": costs}
+	var wallet: Dictionary = state.run.to_dictionary().get("runWallet", {})
+	for currency: String in ["CREDITS", "SCRAP", "DATA"]:
+		var required: float = float(costs.get(currency, 0.0))
+		var available: float = float(wallet.get(currency, 0.0))
+		if available < required:
+			return {"affordable": false, "reason": "Нужно %s %d; в выезде доступно %d." % [currency, ceili(required), floori(available)], "costs": costs}
+	return {"affordable": true, "reason": "", "costs": costs}
+
 func accept_quest(quest_id: String) -> bool:
 	if state == null or not _garage_action_allowed():
 		last_error = "Задание принимается в гараже между выездами."
@@ -1996,14 +2026,12 @@ func resolve_quest_choice(quest_id: String, choice_id: String) -> bool:
 	var run_payload: Dictionary = payload["run"]
 	var wallet: Dictionary = run_payload["runWallet"]
 	var scale: float = CydleFormula.new().reward_scale(float(state.run.depth))
-	var costs: Dictionary = choice.get("cost", {}).duplicate(true)
+	var costs: Dictionary = quest_choice_costs(choice)
 	var special: String = str(choice.get("special", ""))
-	if special == "buyEngine":
-		costs["CREDITS"] = ceili(20.0 * scale)
-	for currency: String in ["CREDITS", "SCRAP", "DATA"]:
-		if float(wallet.get(currency, 0.0)) < float(costs.get(currency, 0.0)):
-			last_error = "Для квестового выбора недостаточно незакреплённых средств: %s." % currency
-			return false
+	var affordability: Dictionary = _run_wallet_affordability(costs)
+	if not bool(affordability.get("affordable", false)):
+		last_error = str(affordability.get("reason", "Для квестового выбора недостаточно незакреплённых средств."))
+		return false
 	for currency: String in ["CREDITS", "SCRAP", "DATA"]:
 		wallet[currency] = float(wallet.get(currency, 0.0)) - float(costs.get(currency, 0.0))
 		var gain: float = float(choice.get("gains", {}).get(currency, 0.0))

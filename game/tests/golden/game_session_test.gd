@@ -1144,9 +1144,15 @@ func run(_tree: SceneTree) -> bool:
 	if check(event_session.start_new_game(1762900000100), "game_session: could not create an event-test profile") and check(event_session.start_expedition("fixed-event-seed"), "game_session: could not start event-test run"):
 		var event_payload: Dictionary = event_session.state.to_payload()
 		event_payload["run"]["graph"] = {"layers": [[{"id": "event-test", "layer": 0, "type": "EVENT", "eventId": "EV02", "threat": "medium", "enemies": [], "revealLevel": 1, "lootHint": "event"}]], "edges": [{"from": "START", "to": "event-test", "fromLayer": -1, "toLayer": 0, "fuelCost": 1}]}
+		event_payload["run"]["runWallet"]["CREDITS"] = 0.0
 		check(event_session._commit_payload(event_payload), "game_session: could not install isolated event fixture: %s" % event_session.last_error)
 		check(event_session.travel_to("event-test"), "game_session: event node travel failed: %s" % event_session.last_error)
 		check(event_session.current_event().get("id", "") == "EV02", "game_session: event node did not resolve its canonical definition")
+		var event_choices: Array = event_session.current_event().get("choices", [])
+		var paid_choice: Dictionary = event_choices[1] if event_choices.size() > 1 else {}
+		var paid_choice_quote: Dictionary = event_session.event_choice_affordability(paid_choice)
+		check(not bool(paid_choice_quote.get("affordable", true)) and str(paid_choice_quote.get("reason", "")).contains("CREDITS"), "game_session: unaffordable event choice did not expose a currency-specific disabled reason")
+		check(not event_session.resolve_event("B") and event_session.state.run.events_seen.is_empty(), "game_session: unaffordable event choice changed run state")
 		check(event_session.resolve_event("A"), "game_session: event choice did not resolve: %s" % event_session.last_error)
 		check(event_session.state.run.events_seen.has("EV02") and event_session.state.run.wanted == 10.0, "game_session: event outcome flags were not persisted")
 		var elite_contract_payload: Dictionary = event_session.state.to_payload()
