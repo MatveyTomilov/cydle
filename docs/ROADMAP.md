@@ -6,7 +6,11 @@
 
 Current strategy is **FEATURE COMPLETE BETA**: audit against the normative Master Spec, close significant runtime/UI gaps, and validate real state transitions. Boss balancing and repeated automatic boss retries are deferred unless a concrete gameplay defect requires them. Preserve all profile/save data; use short deterministic integration scenarios.
 
-### Current status override (2026-11-13; QUEST route invariant)
+### Current status override (2026-11-13; E10 authored summon)
+
+Enemy-catalog combat audit found `summon` in the legal E10 ability data but absent from the runtime enemy-ability scheduler/resolver; E10 therefore never deployed its authored E20. Added the legal scheduler kind and resolved through the existing two-summon cap/no-loot path. A deterministic regression observes the cast telegraph, summon owner/template and combat snapshot roundtrip. Editor import exit 0; 22 scripts / 88,243 assertions / 0 failures. Remaining ability/config coverage audit is in progress; no boss E2E was run.
+
+### Previous status override (2026-11-13; QUEST route invariant)
 
 Confirmed/fixed the multi-quest branch expansion defect in `GameSession`: quest events now reuse existing layer-3 nodes without adding outgoing edges, preserving the map's optional-node count and max-three exits. `SectorGenerator.validate_graph()` now checks graph shape, layer progression, unique nodes/edges, fuel cost, max out-degree, reachability from START, and a route to an endpoint. `start_expedition()` validates the finalized graph after all quest/contract/faction changes. Regression covers two active B03 stages, GameSession expedition save, and reload. Godot 4.7.2 editor import exit 0; 22 scripts / 88,179 assertions / 0 failures. Current code/docs WIP is not yet pushed; record the next commit SHA here after pushing. Combat config guard inventory remains in progress; see current HANDOFF.
 

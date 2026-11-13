@@ -78,6 +78,7 @@ func run(_tree: SceneTree) -> bool:
 	_test_before_hit_and_shield_absorb(config, build)
 	_test_unsupported_trigger_is_rejected(config, build)
 	_test_event_turret_ally(config, build)
+	_test_enemy_summoner(config, build)
 	return failure_count == 0
 
 func _test_unsupported_trigger_is_rejected(config: Dictionary, build: Dictionary) -> void:
@@ -256,6 +257,29 @@ func _test_event_turret_ally(config: Dictionary, build: Dictionary) -> void:
 		return
 	state = stepped["state"] as CombatState
 	check(state.log.any(func(event: Dictionary) -> bool: return str(event.get("kind", "")) == "ATTACK" and str(event.get("actorId", "")) == turret.id), "combat_step: EV18 turret did not make a real combat attack")
+
+func _test_enemy_summoner(config: Dictionary, build: Dictionary) -> void:
+	var initialized: Dictionary = CombatSimulator.new().create_state({
+		"seed": "enemy-summon-e10", "depth": 2, "biome": "B03", "nodeType": "COMBAT", "build": build,
+		"enemies": [{"templateId": "E10"}], "tactics": config.get("tactics", {}),
+	})
+	if not check(bool(initialized.get("ok", false)), "combat_step: E10 summoner encounter failed to initialize: %s" % str(initialized.get("error", ""))):
+		return
+	var simulator: CombatSimulator = CombatSimulator.new()
+	var state: CombatState = initialized["state"] as CombatState
+	state.operator.next_attack_at = 999999.0
+	var steps: int = 0
+	while steps < 80 and not state.enemies.any(func(enemy: CombatActorState) -> bool: return enemy.summoned):
+		var stepped: Dictionary = simulator.step_combat(state)
+		if not check(bool(stepped.get("ok", false)), "combat_step: authored E10 summon configuration was rejected at %d ms: %s" % [state.time_ms, str(stepped.get("error", ""))]):
+			return
+		state = stepped["state"] as CombatState
+		steps += 1
+	var summons: Array[CombatActorState] = state.enemies.filter(func(enemy: CombatActorState) -> bool: return enemy.summoned)
+	check(summons.size() == 1 and summons[0].template_id == "E20" and summons[0].owner_id == state.enemies[0].id, "combat_step: E10 did not deploy its authored E20 summon once")
+	check(state.log.any(func(event: Dictionary) -> bool: return str(event.get("kind", "")) == "TELEGRAPH" and str(event.get("data", {}).get("abilityId", "")) == "E10_summon"), "combat_step: E10 summon cast did not expose its telegraph")
+	var restored: CombatState = CombatState.from_dictionary(state.to_dictionary(), build)
+	check(restored != null and restored.enemies.any(func(enemy: CombatActorState) -> bool: return enemy.summoned and enemy.template_id == "E20"), "combat_step: E10 summon did not survive a combat snapshot roundtrip")
 
 func _test_direct_status_tree_trigger(config: Dictionary, build: Dictionary) -> void:
 	var trigger_build: Dictionary = build.duplicate(true)

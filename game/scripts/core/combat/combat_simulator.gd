@@ -1313,7 +1313,7 @@ func _ready_enemy_ability(state: CombatState, actor: CombatActorState) -> Dictio
 	for ability: Dictionary in _enemy_ability_definitions(actor, state):
 		var kind: String = str(ability.get("kind", ""))
 		var scheduled_status: bool = kind == "applyStatus" and (float(ability.get("firstAtMs", 0.0)) > 0.0 or float(ability.get("everyMs", 0.0)) > 0.0)
-		if kind not in ["heavyAttack", "shieldBypass", "heal", "heat", "shieldRestore", "mark", "escape", "wantedBoost", "protectAlly"] and not scheduled_status:
+		if kind not in ["heavyAttack", "shieldBypass", "heal", "heat", "shieldRestore", "mark", "escape", "wantedBoost", "protectAlly", "summon"] and not scheduled_status:
 			continue
 		if float(actor.ability_next.get(str(ability.get("id", "")), 999999999.0)) <= float(state.time_ms):
 			ready.append(ability)
@@ -1430,6 +1430,10 @@ func _resolve_enemy_ability(state: CombatState, rng: DeterministicRng, actor: Co
 			var before_shield: float = actor.shield
 			actor.shield = minf(float(_effective_sheet(state, actor).get("maxShield", 0.0)), actor.shield + float(ability.get("amount", 0.0)))
 			_emit(state, "SHIELD_GAIN", actor.id, {"actionId": action_id, "text": "%s: щит +%s." % [actor.display_name, _one_decimal(actor.shield - before_shield)], "data": {"abilityId": ability_id, "amount": actor.shield - before_shield}})
+		"summon":
+			var summon_count: int = maxi(1, int(ability.get("summonCount", 1)))
+			for _summon_index: int in range(summon_count):
+				_spawn_summoned_enemy(state, actor, str(ability.get("summonId", "")))
 		"escape":
 			actor.alive = false
 			actor.flags["escaped"] = true

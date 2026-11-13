@@ -1,6 +1,14 @@
 # CYDLE — Project handoff and development history
 
-## Current checkpoint (2026-11-13; QUEST graph invariant fix)
+## Current checkpoint (2026-11-13; E10 summon action)
+
+- Base commit is `c14cf5e502daa10b384b3021d38a4b49ec35343c` on `development/codex`; no balance or save-schema changes in this block.
+- Catalog audit found E10's authored `summon` ability was accepted by `EnemyCatalog` but filtered out by `_ready_enemy_ability`; regular enemy summon actions had no resolve branch. E10 never spawned its E20 despite a telegraphed, interruptible 5-second ability in the Master Spec data.
+- The shared `CombatSimulator` now schedules `summon`, creates the requested count through the existing 2-live-summon cap/no-loot path, and emits normal summon/trigger events. The regression holds E10 alive while the timeline advances, checks the authored telegraph and E20 ownership, and round-trips the summoned actor through a combat snapshot.
+- Godot 4.7.2 editor import exit 0; 22 scripts / 88,243 assertions / 0 failures. No full campaign E2E was run. Commit/push for this block is still pending at the time of this entry.
+- Next: continue matching cataloged combat actions and skill/tactic configurations against reachable simulator dispatch; write a compact matrix for remaining systems from the Master Spec and actual UI/session code. Preserve the existing quest graph regression and do not resume long boss E2E.
+
+## Previous checkpoint (2026-11-13; QUEST graph invariant fix)
 
 - Continuation starts from the PLAYABLE ALPHA commit `05f8bba73d36afc92ac0832927c4a51c5b350068` on `development/codex`. The alpha ZIP remains local at `dist/CYDLE-Playable-Alpha.zip`; this block changes runtime route generation, not stored profile schemas.
 - Confirmed defect: `_apply_active_quest_event_ids` added each eligible stage as a new layer-3 node and connected it from every layer-2 source. With two active stages matching B03 (Q02/S2 and Q03/S1), all three sources exceeded the Master Spec max-three outgoing transition invariant; the test reproduced three violations.

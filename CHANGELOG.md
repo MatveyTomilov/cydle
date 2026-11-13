@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — enable the authored E10 summon
+
+- Added scheduled enemy `summon` ability resolution, using the existing summon cap and no-loot handling. E10 now executes its catalogued E20 spawn after its telegraph instead of silently skipping the unsupported action kind.
+- Added a deterministic test for cast scheduling, telegraph event, summon ownership/template, and combat snapshot roundtrip.
+- Godot 4.7.2: editor import exit 0; 22 scripts / 88,243 assertions / 0 failures.
+
 ## Unreleased — validate quest-augmented sector routes
 
 - Fixed active multi-stage quest routing: quest events reuse existing layer-three map nodes and preserve their edges instead of expanding every source's outgoing degree.
