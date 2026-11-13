@@ -21,6 +21,11 @@
 - Commit `40a662322610b12b1c38a35c5b72ad4c4d3ca107` is pushed to `development/codex`; local and remote SHA matched and worktree is clean. Local and independent Godot 4.7.2 import exit 0; full native suite 23 tests / 88,683 assertions / 0 failures. Independent detached worktree and diff check are clean. Logs: `C:\Users\Matve\AppData\Local\Temp\cydle-regression-logs-40a662322610b12b\`.
 - Second bounded BOSS_B seed-sensitivity assignment completed on `40a6623`: two new seeds × three legal builds (6 fights). Kinetic lost twice (boss remaining 40/350 HP); Tech/Energy lost twice (2,231/2,983 boss HP remaining); Drone/Hybrid lost once (210 HP remaining) and won once (operator 79 HP). Five of six losses is a balance risk for these exact builds. No simulator rejection or confirmed implementation defect. Report: `C:\Users\Matve\AppData\Local\Temp\cydle-balance-followup-report-40a662322610\BOSS_B_SEED_SENSITIVITY_REPORT.md`; full log `followup-run.log`, external script `%TEMP%\cydle_balance_followup_40a662322610.gd`. No balance values were changed. Suggested follow-up: up to 8 fights using alternate legal Kinetic/Tech builds across the same seeds, then at most 2 naturally equipped d8 attempts; still test alternative builds before deciding this is archetype-wide.
 
+## Current game-code block — EV16 next-combat skip integration
+
+- Added an end-to-end `GameSession` test that takes EV16's paid option, travels to the next ordinary COMBAT node, and verifies the node is consumed without XP/cargo/grants and the skip flag resets.
+- Local Godot 4.7.2 import exit 0; full native suite 23 tests / 88,689 assertions / 0 failures. Commit and independent regression are pending.
+
 ## Latest game checkpoint (2026-11-13; offline diagnostics precision and history)
 
 - Game-code checkpoint: `50e61651290083ddb75893757d723b334607faab`. An explicit boolean now distinguishes an observed wall-clock delta from the API's default sentinel, so an exact -1 ms rollback is preserved instead of being rounded to -2 ms. The offline report history rows now show excess time or clock rollback, matching the current report.

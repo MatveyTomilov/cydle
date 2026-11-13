@@ -10,6 +10,8 @@ Current strategy is **FEATURE COMPLETE BETA**: audit against the normative Maste
 
 Pushed game-code checkpoint `40a662322610b12b1c38a35c5b72ad4c4d3ca107`: EV13 charges `ceil(60% × ceil(rare shop price))`, so its d12 price is 267 credits, and EV07 removes 10% of maximum hull instead of 10 flat hull. Local and independent transaction regressions confirm both consequences. Godot 4.7.2 import exit 0; full suite 23 tests / 88,683 assertions / 0 failures. Independent EV07 check used a clean detached worktree and diff check. No TypeScript or Windows export was run for these Godot changes.
 
+The current local EV16 test adds a real next-node skip scenario and verifies that the skipped encounter produces no XP or loot and consumes the one-use flag. Local full suite: 23 / 88,689 assertions, exit 0; commit and detached regression are pending.
+
 ### Latest checkpoint — offline diagnostics precision and history (2026-11-13)
 
 `50e61651290083ddb75893757d723b334607faab` fixes exact -1 ms rollback disclosure, persists the new diagnostics in report history, and renders them in historical UI rows. Tests cover +1 ms above the 12-hour cap and -1 ms rollback without game-time advancement. Local Godot import exit 0; 23 tests / 88,679 assertions / 0 failures. Independent regression/review are pending. No long offline simulation. Continue with interruption/retry idempotency and bounded long-window performance measurement.

@@ -30,6 +30,35 @@ func _test_grey_dealer_price_rounding(catalog: EventCatalog) -> void:
 	var expected_cost: int = ceili(float(rare_shop_price) * 0.6)
 	var actual_costs: Dictionary = session.event_choice_costs(rare_choice)
 	check(not rare_choice.is_empty() and expected_cost == 267 and int(actual_costs.get("CREDITS", -1)) == expected_cost, "event_catalog: EV13 did not apply ceil(60%% × rounded rare shop price) at depth 12; shop=%d expected=%d actual=%s" % [rare_shop_price, expected_cost, str(actual_costs)])
+	_test_ev16_skip_real_encounter(catalog)
+
+func _test_ev16_skip_real_encounter(catalog: EventCatalog) -> void:
+	var session: GameSession = GameSession.new()
+	session.configure_save_directory("user://test-saves/event-ev16-skip")
+	if not check(session.start_new_game(1762900000989) and session.start_expedition("event-ev16-skip"), "event_catalog: could not prepare EV16 skip transaction"):
+		return
+	var event_node: Dictionary = {"id": "ev16-skip-event", "layer": 0, "type": "EVENT", "eventId": "EV16", "threat": "medium", "enemies": [], "revealLevel": 1, "lootHint": "event"}
+	var combat_node: Dictionary = {"id": "ev16-skipped-combat", "layer": 1, "type": "COMBAT", "threat": "low", "enemies": [{"templateId": "E01"}], "revealLevel": 1, "lootHint": "low"}
+	var payload: Dictionary = session.state.to_payload()
+	var run: Dictionary = payload["run"]
+	run["graph"] = {"layers": [[event_node], [combat_node]], "edges": [{"from": "START", "to": event_node["id"], "fromLayer": -1, "toLayer": 0, "fuelCost": 1}, {"from": event_node["id"], "to": combat_node["id"], "fromLayer": 0, "toLayer": 1, "fuelCost": 1}]}
+	run["phase"] = "ROUTE"
+	run["currentNodeId"] = "START"
+	run["visitedNodeIds"] = []
+	run["clearedNodeIds"] = []
+	run["eventsSeen"] = []
+	run["runWallet"] = {"CREDITS": 100000.0, "SCRAP": 100000.0, "DATA": 100000.0}
+	run["resources"]["fuel"] = maxf(10.0, float(run["resources"].get("maxFuel", 10.0)))
+	if not check(session._commit_payload(payload) and session.travel_to(str(event_node["id"])) and session.resolve_event("A"), "event_catalog: EV16 paid skip choice failed: %s" % session.last_error):
+		return
+	var experience_before: int = session.state.meta.operator.xp
+	var cargo_before: int = session.state.run.unsecured_cargo.size()
+	var grants_before: int = session.state.run.grant_ids.size()
+	if not check(session.travel_to(str(combat_node["id"])) and session.begin_combat(), "event_catalog: EV16 did not reach the next ordinary encounter: %s" % session.last_error):
+		return
+	check(session.state.run.phase == "ROUTE" and session.state.run.cleared_node_ids.has(str(combat_node["id"])) and session.combat_state() == null, "event_catalog: EV16 failed to consume exactly the next ordinary encounter")
+	check(session.state.meta.operator.xp == experience_before and session.state.run.unsecured_cargo.size() == cargo_before and session.state.run.grant_ids.size() == grants_before, "event_catalog: skipped ordinary encounter incorrectly granted XP, cargo, or grants")
+	check(not bool(session.state.run.pending_next_combat.get("skipOrdinary", false)), "event_catalog: EV16 skip flag remained set after its ordinary encounter")
 
 func _test_all_event_choice_transactions(catalog: EventCatalog) -> void:
 	var session: GameSession = GameSession.new()

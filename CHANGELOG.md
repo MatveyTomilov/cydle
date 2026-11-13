@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — EV16 real encounter skip verification
+
+- Added a generated-route integration scenario: EV16's paid choice then consumes the next ordinary COMBAT node, clears its skip flag, and grants no XP, cargo, or item grants.
+- Godot 4.7.2 full native suite: 23 tests / 88,689 assertions / 0 failures. The first attempt surfaced a test-only wrong field name (`experience` instead of `xp`); corrected before the passing run. Independent verification is pending.
+
 ## Unreleased — EV07 percentage hull damage
 
 - EV07's scrap option now removes 10% of maximum hull instead of a flat 10 hull, matching Master Spec §20.1. The data-driven event transaction regression checks the actual before/after hull values.
