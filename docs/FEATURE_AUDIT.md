@@ -30,7 +30,7 @@ This is an implementation audit, not a release checklist. “Complete” means t
 ## Current checkpoint
 
 - Branch: `development/codex`.
-- HEAD / remote SHA: `86528a524b126cf72d0cd59d93da02ab7ac3e1f0`.
+- HEAD / remote SHA: `24668e57b181db526a3e4068e098a8c1fe501726`.
 - Godot 4.7.2 editor import exit 0.
-- `res://tests/run_tests.gd`: 22 tests passed, 88,316 assertions, 0 failures.
+- `res://tests/run_tests.gd`: 22 tests passed, 88,319 assertions, 0 failures.
 - This is not a FEATURE COMPLETE BETA claim. Full spec coverage, campaign completion, and beta export are still outstanding.

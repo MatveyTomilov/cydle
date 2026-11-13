@@ -8,7 +8,7 @@ Current strategy is **FEATURE COMPLETE BETA**: audit against the normative Maste
 
 ### Current status override (2026-11-13; affordability-aware choices)
 
-Event and quest choice UI now calls shared GameSession cost quotes also used by the actual transaction. Unaffordable paid choices are disabled and show the missing currency/amount; special scaled event and Q03 engine prices share calculation logic with settlement. EV02 regression confirms the rejected paid choice leaves run state unchanged and the free alternative resolves. Godot editor import exit 0; 22 tests passed, 88,316 assertions / 0 failures; diff check exit 0. Pushed HEAD `86528a524b126cf72d0cd59d93da02ab7ac3e1f0`. This is an interface correctness fix, not systematic verification of all 48 event choices or all quest branches.
+Event and quest choice UI now calls shared GameSession cost quotes also used by the actual transaction. Unaffordable paid choices are disabled and show the missing currency/amount; special scaled event and Q03 engine prices share calculation logic with settlement. EV02 and Q03 regressions confirm rejected paid choices leave event/quest state unchanged while the valid alternative resolves. Godot editor import exit 0; 22 tests passed, 88,319 assertions / 0 failures; diff check exit 0. Pushed HEAD `24668e57b181db526a3e4068e098a8c1fe501726`. This is an interface correctness fix, not systematic verification of all 48 event choices or all quest branches.
 
 ### Previous status override (2026-11-13; R3D same-target tree trigger)
 

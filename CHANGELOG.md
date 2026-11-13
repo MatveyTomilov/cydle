@@ -4,7 +4,8 @@
 
 - Shared `GameSession` cost quotes now drive both actual event/quest transactions and road UI availability. Paid options are disabled with currency and required amount when the unsecured sortie wallet cannot cover them.
 - Scaled costs for EV13/data exchange and the Q03 engine choice use the same price calculation for UI and settlement. Regression confirms an unaffordable EV02 option leaves state untouched.
-- Godot 4.7.2: editor import exit 0; 22 tests / 88,316 assertions / 0 failures; diff check exit 0.
+- EV02 and Q03 integrations verify unavailable paid choices cannot mutate event/quest history; the free or paid-for legal alternative remains resolvable.
+- Godot 4.7.2: editor import exit 0; 22 tests / 88,319 assertions / 0 failures; diff check exit 0.
 
 ## Unreleased — execute R3D's same-target attack trigger
 
