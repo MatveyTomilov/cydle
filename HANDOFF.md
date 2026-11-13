@@ -4,7 +4,7 @@
 
 - User-approved new combat model codified in CYDLE_MASTER_SPEC.md v2.1 §8 on isolated feature/autobattle-v2 branch, based on Codex checkpoint 6d2a8fe. It replaces V1 programmable tactics with equipment-authored automatic behavior.
 - Added isolated game/scripts/core/combat/autobattle_v2_contract.gd and the autobattle_v2_contract_test.gd headless test; these cover scheduling, phases, proc budgets, targeting and denial reasons.
-- Important: this code is not wired into live GameSession or CombatSimulator; no V2 duel, Heat synergy, live Why/Why Not, consumables, offline parity or campaign balance has been verified. Preserve V1 replay, save data and executable results. CI unverified until checks are inspected.
+- Added AutobattleV2Duel, a runnable headless ARC-9 vs single-enemy prototype with canonical hit/mitigation/Shield/HP math, energy and heat, authored Vent, Heat-to-Shield conversion, reasoned events, snapshot/resume and deterministic seed replay checks. Action cooldown no longer blocks the main channel after recovery. This is NOT wired to GameSession or CombatSimulator. The prototype does NOT yet include item catalog integration, full Heat synergy (SCORCH, armor, passive, KITE-3), enemy telegraphs, consumables, Build Lab, offline parity or campaign balance. Preserve V1 replay, saves and executable results. The new duel code's CI status must be checked at its exact SHA.
 
 
 ## Latest checkpoint (2026-11-13; full field equipment and live combat build)
