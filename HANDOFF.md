@@ -1,5 +1,13 @@
 # CYDLE — Project handoff and development history
 
+## Live continuation (2026-11-13; direct-hit trigger actions)
+
+- Repository root: `E:\cydle\project`; branch `development/codex`; base HEAD/origin before this WIP: `0555a2326e1e29d270308ac25bc6b795d42554a7`. The current WIP is limited to `game/scripts/core/combat/combat_simulator.gd`, `game/tests/golden/combat_step_test.gd`, `CHANGELOG.md`, `docs/ROADMAP.md`, and this handoff.
+- The shared deterministic 100 ms simulator executes active direct player-hit trigger actions for status application, energy/shield recovery, status-duration extension, and secondary damage. Proc chance, direct/damage/skill filters, status conditions, ICD, once-per-combat and once-per-drone guards are honored. Temporary stat buffs are included in the existing StatMath sheet resolution while active.
+- Targeted regressions exercise K4B shield restore, U12 energy recovery conditioned on VIRUS, X2 VIRUS extension, X4 secondary damage, and explicit rejection of an unsupported ON_HEAT_FULL trigger. Godot 4.7.2 editor import exit 0; all 22 headless scripts exit 0 with 88,071 assertions and 0 failures; `git diff --check` passes. Windows export and EXE smoke were not run for this WIP. TypeScript was not run; only native Godot code/docs changed.
+- Combat remains partial. ON_KILL, ON_BEFORE_HIT, ON_SHIELD_ABSORB, ON_DODGE, ON_CAST, and many other trigger event/action pairs are not implemented and remain rejected where the simulator detects them. This is not complete combat parity or campaign acceptance.
+- Next continue directly with the largest remaining campaign blocker: broaden native trigger event dispatch in the existing simulator, comparing the TypeScript oracle and keeping unsupported combinations rejected until their actions execute. Then exercise the combat configuration through the preserved isolated campaign profile. Do not change boss balance or touch `%APPDATA%\Godot\app_userdata\CYDLE`.
+
 ## Live continuation (2026-11-13; EV12 energy refill runtime fix)
 
 - Current pushed base: `913d9138f646c9412e2867cf77ea44f5af9712ea` on `development/codex`. Local WIP fixes a gameplay exception exposed by the isolated campaign route: EV12 read nonexistent `run.resources.maxEnergy` while calculating its refill. It now uses the already validated `BuildResolver` max-energy result, with a safe current-resource fallback.

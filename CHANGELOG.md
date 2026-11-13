@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — executable direct-hit build triggers
+
+- Direct player-hit triggers now execute catalogued `restoreShield`, `restoreEnergy`, `extendStatus`, and `secondaryDamage` actions alongside `applyStatus`. Filters, proc chance, owner ICDs, and once-per-combat/drone guards are honored; unsupported event/action pairs remain rejected instead of being silently accepted.
+- Active temporary stat buffs are included in the existing StatMath resolution path while unexpired.
+- Regression covers K4B shield recovery, U12 energy recovery against VIRUS, X2 duration extension, X4 secondary damage, and rejection of an unimplemented heat trigger. Godot editor import and all 22 headless scripts passed (88,071 assertions); export not run for this delta.
+
 ## Unreleased — EV12 energy refill
 
 - EV12 now refills from the current `BuildResolver` max-energy result without looking up a nonexistent energy-cap field in route resources. The event still applies its authored −5 hull consequence.

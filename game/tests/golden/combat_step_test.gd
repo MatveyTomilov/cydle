@@ -71,8 +71,56 @@ func run(_tree: SceneTree) -> bool:
 	_test_support_relay(config, operator)
 	_test_attack_counter_items(config, operator)
 	_test_direct_status_tree_trigger(config, build)
+	_test_direct_hit_trigger_actions(config, build)
+	_test_unsupported_trigger_is_rejected(config, build)
 	_test_event_turret_ally(config, build)
 	return failure_count == 0
+
+func _test_unsupported_trigger_is_rejected(config: Dictionary, build: Dictionary) -> void:
+	var trigger_build: Dictionary = build.duplicate(true)
+	trigger_build["triggerEffects"] = [{
+		"sourceId": "U01_discharge", "sourceName": "Перегрузка", "sourceKind": "item",
+		"effect": {"type": "trigger", "id": "U01_discharge", "event": "ON_HEAT_FULL", "action": {"kind": "consumeShieldForDamage", "fraction": 0.5}},
+	}]
+	var initialized: Dictionary = CombatSimulator.new().create_state({
+		"seed": "unsupported-trigger-guard", "depth": int(config.get("depth", 1)), "biome": str(config.get("biome", "B01")),
+		"nodeType": "COMBAT", "build": trigger_build, "enemies": [config.get("enemy", {})], "tactics": config.get("tactics", {}),
+	})
+	if not check(bool(initialized.get("ok", false)), "combat_step: trigger guard fixture failed to initialize"):
+		return
+	var stepped: Dictionary = CombatSimulator.new().step_combat(initialized["state"] as CombatState)
+	check(not bool(stepped.get("ok", false)) and str(stepped.get("error", "")).contains("триггеры"), "combat_step: unsupported ON_HEAT_FULL trigger was silently accepted")
+
+func _test_direct_hit_trigger_actions(config: Dictionary, build: Dictionary) -> void:
+	var trigger_build: Dictionary = build.duplicate(true)
+	trigger_build["triggerEffects"] = [
+		{"sourceId": "K4B", "sourceKind": "tree", "effect": {"type": "trigger", "id": "K4B", "event": "ON_HIT", "chance": 1.0, "action": {"kind": "restoreShield", "amount": 12}}},
+		{"sourceId": "U12", "sourceKind": "item", "effect": {"type": "trigger", "id": "U12_leech", "event": "ON_HIT", "chance": 1.0, "condition": {"kind": "targetStatus", "status": "VIRUS", "minStacks": 1}, "action": {"kind": "restoreEnergy", "amount": 4, "perSecondCap": 12}}},
+		{"sourceId": "X2", "sourceKind": "tree", "effect": {"type": "trigger", "id": "X2", "event": "ON_HIT", "chance": 1.0, "action": {"kind": "extendStatus", "status": "VIRUS", "ms": 1000, "stacks": 1}}},
+		{"sourceId": "X4", "sourceKind": "tree", "effect": {"type": "trigger", "id": "X4", "event": "ON_HIT", "chance": 1.0, "action": {"kind": "secondaryDamage", "basis": "techPower", "coefficient": 0.3, "damageType": "DIGITAL", "targeting": "target", "canProc": false}}},
+	]
+	var initialized: Dictionary = CombatSimulator.new().create_state({
+		"seed": "direct-trigger-action-fixture", "depth": int(config.get("depth", 1)), "biome": str(config.get("biome", "B01")),
+		"nodeType": "COMBAT", "build": trigger_build, "enemies": [config.get("enemy", {})], "tactics": config.get("tactics", {}),
+	})
+	if not check(bool(initialized.get("ok", false)), "combat_step: direct-hit action fixture failed to initialize"):
+		return
+	var simulator: CombatSimulator = CombatSimulator.new()
+	var state: CombatState = initialized["state"] as CombatState
+	var target: CombatActorState = state.enemies[0]
+	target.statuses["VIRUS"] = [{"sourceId": "test", "sourceActorId": state.operator.id, "expiresAt": 2000.0, "nextTickAt": 1000.0, "snapshot": 0.0, "stacks": 1}]
+	state.operator.shield = maxf(0.0, float(state.operator.base_sheet.get("maxShield", 0.0)) - 20.0)
+	state.operator.energy = maxf(0.0, state.operator.energy - 10.0)
+	var energy_before: float = state.operator.energy
+	var shield_before: float = state.operator.shield
+	var enemy_hp_before: float = target.hp
+	var rng: DeterministicRng = DeterministicRng.new()
+	rng.seed("direct-trigger-action-fixture", "triggers")
+	simulator._dispatch_direct_status_triggers(state, rng, state.operator, target, "KINETIC", "direct-trigger", "", true, 1.0)
+	check(is_equal_approx(state.operator.shield, shield_before + 12.0), "combat_step: K4B ON_HIT did not restore shield")
+	check(is_equal_approx(state.operator.energy, energy_before + 4.0), "combat_step: U12 ON_HIT did not restore energy against VIRUS")
+	check(float(target.statuses["VIRUS"][0].get("expiresAt", 0.0)) == 3000.0, "combat_step: X2 ON_HIT did not extend VIRUS duration")
+	check(target.hp < enemy_hp_before, "combat_step: X4 ON_HIT did not deal secondary damage")
 
 func _test_event_turret_ally(config: Dictionary, build: Dictionary) -> void:
 	var initialized: Dictionary = CombatSimulator.new().create_state({

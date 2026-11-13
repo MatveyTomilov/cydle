@@ -88,9 +88,6 @@ func step_combat(state: CombatState) -> Dictionary:
 	if not state.outcome.is_empty():
 		return {"ok": true, "state": state, "error": ""}
 	if not _supports_basic_auto_step(state):
-		for actor: CombatActorState in state.all_actors():
-			if actor.cast != null or actor.reaction_cast != null: print("UNSUPPORTED_CAST actor=", actor.id, " kind=", actor.kind, " cast=", actor.cast, " reaction=", actor.reaction_cast)
-		if not _supports_skill_trigger_effects(state): print("UNSUPPORTED_TRIGGERS ", state.build.get("triggerEffects", []))
 		return _failure("Эта боевая конфигурация требует ещё не перенесённые способности, статусы, триггеры или тактические правила.")
 	var next: CombatState = state.clone()
 	var rng: DeterministicRng = DeterministicRng.new()
@@ -155,8 +152,6 @@ func _supports_basic_auto_step(state: CombatState) -> bool:
 	if state.extra_enemy_digital_bonus != 0.0:
 		return false
 	for actor: CombatActorState in state.all_actors():
-		if not actor.buffs.is_empty():
-			return false
 		if actor.reaction_cast != null:
 			if not actor.reaction_cast is Dictionary:
 				return false
@@ -189,16 +184,28 @@ func _supports_skill_trigger_effects(state: CombatState) -> bool:
 	for trigger_value: Variant in state.build.get("triggerEffects", []):
 		if not trigger_value is Dictionary:
 			return false
-		var source_id: String = str(trigger_value.get("sourceId", ""))
 		var effect: Dictionary = trigger_value.get("effect", {})
+		var source_id: String = str(trigger_value.get("sourceId", ""))
 		var effect_id: String = str(effect.get("id", ""))
 		var skill_trigger: bool = source_id in ["SK_BLADE", "SK_NEURO", "SK_SEED", "SK_BREAK"]
 		var periodic_item_trigger: bool = effect_id in ["DR_MED_heal", "DR_EMP_interrupt", "TR_SUPPORT_blast"] and str(effect.get("event", "")) == "PERIODIC" and str(trigger_value.get("sourceKind", "")) == "item"
 		var attack_counter_trigger: bool = effect_id in ["ARC_E2_splash", "FOCUS_D1_virus", "DR_ARC_shock"] and str(effect.get("event", "")) == "ON_ATTACK_COUNTER" and str(trigger_value.get("sourceKind", "")) == "item"
-		var direct_status_trigger: bool = str(effect.get("event", "")) == "ON_HIT" and str(effect.get("type", "")) == "trigger" and str(effect.get("action", {}).get("kind", "")) == "applyStatus" and not str(effect.get("action", {}).get("status", "")).is_empty()
-		if not skill_trigger and not periodic_item_trigger and not attack_counter_trigger and not direct_status_trigger:
+		var direct_hit_trigger: bool = str(effect.get("event", "")) == "ON_HIT" and str(trigger_value.get("sourceKind", "")) != "skill" and _supports_direct_hit_trigger(effect)
+		if not skill_trigger and not periodic_item_trigger and not attack_counter_trigger and not direct_hit_trigger:
 			return false
 	return true
+
+func _supports_direct_hit_trigger(effect: Dictionary) -> bool:
+	var action: Dictionary = effect.get("action", {})
+	var condition: Dictionary = effect.get("condition", {})
+	if not condition.is_empty() and str(condition.get("kind", "")) not in ["targetStatus", "targetNoStatus", "heatAtLeast", "hpBelow"]:
+		return false
+	match str(action.get("kind", "")):
+		"applyStatus": return STEP_STATUS_IDS.has(str(action.get("status", ""))) and str(action.get("target", "target")) in ["target", "self", "otherEnemy", "allEnemies"]
+		"restoreEnergy", "restoreShield": return float(action.get("amount", 0.0)) > 0.0
+		"extendStatus": return STEP_STATUS_IDS.has(str(action.get("status", ""))) and float(action.get("ms", 0.0)) > 0.0
+		"secondaryDamage": return float(action.get("coefficient", 0.0)) > 0.0 and str(action.get("targeting", "")) in ["target", "otherEnemy", "allEnemies"] and str(action.get("damageType", "ENERGY")) in ["KINETIC", "ENERGY", "DIGITAL"]
+		_: return false
 
 func _trigger_owner(state: CombatState, source_id: String) -> CombatActorState:
 	for drone: CombatActorState in state.drones:
@@ -1289,7 +1296,13 @@ func _has_status(actor: CombatActorState, status_id: String) -> bool:
 func _effective_sheet(state: CombatState, actor: CombatActorState, target: CombatActorState = null) -> Dictionary:
 	var sheet: Dictionary = actor.base_sheet.duplicate(true)
 	var has_conditions: bool = false
-	for modifier: Dictionary in actor.base_mods:
+	var modifiers: Array[Dictionary] = actor.base_mods.duplicate()
+	for buff: Dictionary in actor.buffs:
+		if float(buff.get("expiresAt", 0.0)) > float(state.time_ms):
+			for modifier: Variant in buff.get("mods", []):
+				if modifier is Dictionary:
+					modifiers.append(modifier)
+	for modifier: Dictionary in modifiers:
 		if modifier.has("condition"):
 			has_conditions = true
 			break
@@ -1324,7 +1337,7 @@ func _effective_sheet(state: CombatState, actor: CombatActorState, target: Comba
 					if not uniques.has(str(unique_id)):
 						uniques.append(str(unique_id))
 		context["uniques"] = uniques
-		var resolved: Dictionary = _stats.resolve_stats(_stats.bundle(actor.base_mods), context)
+		var resolved: Dictionary = _stats.resolve_stats(_stats.bundle(modifiers), context)
 		if not resolved.has("_error") and not resolved.is_empty():
 			sheet = _stats.sheet_of(resolved)
 	var armor_break: int = _status_stacks(actor, "ARMOR_BREAK")
@@ -1623,7 +1636,7 @@ func _dispatch_direct_status_triggers(state: CombatState, rng: DeterministicRng,
 		if not trigger_value is Dictionary:
 			continue
 		var effect: Dictionary = trigger_value.get("effect", {})
-		if str(effect.get("event", "")) != "ON_HIT" or str(effect.get("action", {}).get("kind", "")) != "applyStatus":
+		if str(effect.get("event", "")) != "ON_HIT" or not _supports_direct_hit_trigger(effect):
 			continue
 		if str(trigger_value.get("sourceKind", "")) == "skill":
 			continue
@@ -1632,40 +1645,95 @@ func _dispatch_direct_status_triggers(state: CombatState, rng: DeterministicRng,
 		var damage_type_filter: Array = effect.get("damageTypeFilter", [])
 		if not damage_type_filter.is_empty() and not damage_type_filter.has(damage_type):
 			continue
+		var skill_filter: Array = effect.get("skillFilter", [])
+		if not skill_filter.is_empty() and not skill_filter.has(skill_id):
+			continue
+		if bool(effect.get("requireDrone", false)) and actor.kind != "drone":
+			continue
 		if not _trigger_status_condition_passes(state, actor, target, effect.get("condition", {})):
 			continue
 		var trigger_id: String = str(effect.get("id", ""))
 		var source_id: String = str(trigger_value.get("sourceId", ""))
 		var owner: CombatActorState = _trigger_owner(state, source_id)
 		var trigger_key: String = "%s:%s" % [source_id, trigger_id]
+		if bool(effect.get("oncePerCombat", false)) and bool(owner.once_per_combat.get(trigger_key, false)):
+			continue
+		if bool(effect.get("oncePerDrone", false)) and bool(owner.once_per_combat.get("%s:%s" % [trigger_key, actor.id], false)):
+			continue
 		if float(owner.icds.get(trigger_key, 0.0)) > float(state.time_ms):
 			continue
 		var proc_chance: float = clampf(float(effect.get("chance", 1.0)) * proc_weight * float(_effective_sheet(state, owner, target).get("procMultiplier", 1.0)), 0.0, 1.0)
 		if not rng.chance(proc_chance):
 			continue
 		var action: Dictionary = effect.get("action", {})
-		var status_id: String = str(action.get("status", ""))
-		if status_id.is_empty() or not STEP_STATUS_IDS.has(status_id):
-			continue
 		owner.icds[trigger_key] = float(state.time_ms) + float(effect.get("icdMs", 0.0))
+		if bool(effect.get("oncePerCombat", false)):
+			owner.once_per_combat[trigger_key] = true
+		if bool(effect.get("oncePerDrone", false)):
+			owner.once_per_combat["%s:%s" % [trigger_key, actor.id]] = true
 		state.metrics["procsTriggered"] = int(state.metrics.get("procsTriggered", 0)) + 1
 		var trigger_action_id: String = "%s:trigger:%s" % [action_id, trigger_id]
 		_emit(state, "TRIGGER", owner.id, {"targetId": target.id, "actionId": trigger_action_id, "skillId": skill_id if not skill_id.is_empty() else "", "damageType": damage_type, "text": "%s: сработал эффект «%s» после попадания %s." % [owner.display_name, trigger_id, actor.display_name], "data": {"sourceId": source_id, "chance": proc_chance}})
-		var action_target: CombatActorState = target
-		var action_target_kind: String = str(action.get("target", "target"))
-		if action_target_kind == "self":
-			action_target = owner
-		if action_target_kind == "allEnemies":
-			for enemy: CombatActorState in state.enemies:
-				if enemy.alive:
-					_add_simple_status(state, owner, enemy, status_id, float(action.get("durationMs", _status_catalog.get_definition(status_id).get("durationMs", 0.0))))
-		elif action_target_kind == "otherEnemy":
-			for enemy: CombatActorState in state.enemies:
-				if enemy.alive and enemy.id != target.id:
-					action_target = enemy
-					break
-		if action_target_kind not in ["allEnemies", "otherEnemy"] and action_target != null:
-			_add_simple_status(state, owner, action_target, status_id, float(action.get("durationMs", _status_catalog.get_definition(status_id).get("durationMs", 0.0))))
+		var action_target: CombatActorState = owner if str(action.get("target", "target")) == "self" else target
+		match str(action.get("kind", "")):
+			"applyStatus":
+				var status_id: String = str(action.get("status", ""))
+				var duration_ms: float = float(action.get("durationMs", _status_catalog.get_definition(status_id).get("durationMs", 0.0)))
+				var status_target: String = str(action.get("target", "target"))
+				if status_target == "allEnemies":
+					for enemy: CombatActorState in state.enemies:
+						if enemy.alive: _add_simple_status(state, owner, enemy, status_id, duration_ms)
+				elif status_target == "otherEnemy":
+					for enemy: CombatActorState in state.enemies:
+						if enemy.alive and enemy.id != target.id:
+							_add_simple_status(state, owner, enemy, status_id, duration_ms)
+							break
+				else:
+					_add_simple_status(state, owner, action_target, status_id, duration_ms)
+			"restoreEnergy":
+				var bucket: int = floori(float(state.time_ms) / 1000.0)
+				if int(owner.flags.get("energyGainSecond", -1)) != bucket:
+					owner.flags["energyGainSecond"] = bucket
+					owner.flags["energyGainInSecond"] = 0.0
+				var cap: float = float(action.get("perSecondCap", 1.0e30))
+				var gain: float = minf(float(action.get("amount", 0.0)), maxf(0.0, cap - float(owner.flags.get("energyGainInSecond", 0.0))))
+				var before_energy: float = owner.energy
+				owner.energy = minf(float(_effective_sheet(state, owner).get("maxEnergy", 0.0)), owner.energy + gain)
+				var restored_energy: float = owner.energy - before_energy
+				owner.flags["energyGainInSecond"] = float(owner.flags.get("energyGainInSecond", 0.0)) + restored_energy
+				if restored_energy > 0.0:
+					_emit(state, "ENERGY", owner.id, {"actionId": trigger_action_id, "text": "%s: +%s энергии." % [owner.display_name, _one_decimal(restored_energy)], "data": {"amount": restored_energy}})
+			"restoreShield":
+				var shield_target: CombatActorState = state.operator if owner.kind == "drone" and owner.drone_role == "medic" else owner
+				var max_shield: float = float(_effective_sheet(state, shield_target).get("maxShield", 0.0))
+				var restored_shield: float = minf(float(action.get("amount", 0.0)), maxf(0.0, max_shield - shield_target.shield))
+				shield_target.shield += restored_shield
+				if restored_shield > 0.0:
+					_emit(state, "SHIELD_GAIN", owner.id, {"targetId": shield_target.id, "actionId": trigger_action_id, "text": "%s: +%s щита." % [shield_target.display_name, _one_decimal(restored_shield)], "data": {"amount": restored_shield}})
+			"extendStatus":
+				var entries: Array = target.statuses.get(str(action.get("status", "")), [])
+				var stacks: int = maxi(1, int(action.get("stacks", 1)))
+				for index: int in range(mini(stacks, entries.size())):
+					entries[index]["expiresAt"] = float(entries[index].get("expiresAt", state.time_ms)) + float(action.get("ms", 0.0))
+			"secondaryDamage":
+				var basis: float = float(_effective_sheet(state, owner).get("techPower", 0.0))
+				match str(action.get("basis", "techPower")):
+					"mainWeapon": basis = float(state.build.get("mainWeapon", {}).get("damage", 0.0))
+					"flat": basis = 1.0
+				var raw: float = basis * float(action.get("coefficient", 0.0))
+				var targets: Array[CombatActorState] = []
+				match str(action.get("targeting", "target")):
+					"target": targets.append(target)
+					"otherEnemy":
+						for enemy: CombatActorState in state.enemies:
+							if enemy.alive and enemy.id != target.id:
+								targets.append(enemy)
+								break
+					"allEnemies":
+						for enemy: CombatActorState in state.enemies:
+							if enemy.alive: targets.append(enemy)
+				for secondary: CombatActorState in targets:
+					_resolve_basic_hit(state, rng, owner, secondary, raw, str(action.get("damageType", "ENERGY")), "%s:secondary" % trigger_action_id, false, "", 0.0, false, 0.0)
 
 func _trigger_status_condition_passes(state: CombatState, actor: CombatActorState, target: CombatActorState, condition_value: Variant) -> bool:
 	if not condition_value is Dictionary or condition_value.is_empty():

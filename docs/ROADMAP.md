@@ -6,6 +6,10 @@
 
 The active strategy is **FULL GAME FIRST**: connect every major Master Spec system into a campaign that can be completed, then deepen edge cases, balance, and presentation. The entries below report implementation status; they are not a queue of isolated feature slices. A checkpoint commit is a safety measure, so continue to the next missing campaign-critical system while the session permits. Defer saved Simulation Lab presets, report exports, cosmetic polish, secondary settings, and redundant tests until functional campaign coverage exists.
 
+### Current status override (2026-11-13; direct-hit trigger actions)
+
+The native 100 ms simulator now executes active `ON_HIT` tree/item actions for status application, energy/shield recovery, status extension, and secondary damage. Proc filters, chance, ICD and one-time guards are enforced. A targeted regression passes for K4B, U12, X2, and X4; an unsupported ON_HEAT_FULL effect is still rejected. This closes only part of combat-trigger coverage: ON_KILL, ON_BEFORE_HIT, ON_SHIELD_ABSORB, ON_DODGE, ON_CAST, boss/elite interactions, and other authored trigger/event families remain incomplete. Godot editor import and 22 headless scripts pass (88,071 assertions); export is not run for this delta.
+
 ### Current status override (2026-11-13; combat roster integration)
 
 Ordinary route COMBAT nodes now use biome-themed multi-enemy rosters bounded by §17 threat units, unlock depth, and six active actors; E20 uses a bounded 2–4 unit pack. This closes the previous single-enemy encounter gap, but does not establish complete tactical counter coverage or campaign balance. Save checksum writes use a wider float bucket while preserving validation for prior 1e-8 and legacy saves. Godot editor import and 22 headless scripts passed at 88,058 assertions before adding an explicit previous-bucket regression; rerun checks after that test addition. Isolated full campaign E2E has reached d4 BOSS_A but its first attempt failed; the resumed outing is still exercising route progression. Do not treat d12/endgame acceptance as verified by this run.
