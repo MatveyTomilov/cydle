@@ -6,6 +6,10 @@
 
 Current strategy is **FEATURE COMPLETE BETA**: audit against the normative Master Spec, close significant runtime/UI gaps, and validate real state transitions. Boss balancing and repeated automatic boss retries are deferred unless a concrete gameplay defect requires them. Preserve all profile/save data; use short deterministic integration scenarios.
 
+### Latest checkpoint — HUNT contract natural settlement regression (2026-11-13)
+
+Commit `418998d149c29aa1311e8f28c7b979fedc905a01` adds a seeded end-to-end GameSession flow: accept HUNT, travel to its reachable marked ELITE, complete a real shared-simulator battle, pay the contract reward/item, and reload the save. Seed `hunt-runtime-fixed-seed` wins and restores the COMPLETE contract plus unsecured guaranteed item. Godot import exit 0; 23 tests / 88,634 assertions / 0 failures. No export/GUI or full campaign E2E. Next: natural TECH cache-choice and SIGNAL reward paths, then ESCORT checkpoint completion/failure and death persistence.
+
 ### Latest checkpoint — contract objectives surfaced for players (2026-11-13)
 
 Commit `26161dea2aaa463e940abeff5985fb6fd90643a3` marks and reveals the accepted contract's target node on the route map. The active contract summary now exposes objective and live ESCORT thresholds and makes unsecured reward status legible. Regression confirms an accepted HUNT target is shown as an ELITE objective. Godot editor import exit 0; 23 tests / 88,625 assertions / 0 failures; no export or GUI smoke. This closes contract target visibility, not the full contract lifecycle. Next: natural HUNT battle-to-reward and TECH/ESCORT success/failure.

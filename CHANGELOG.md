@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — natural HUNT contract settlement
+
+- Added a deterministic GameSession integration flow from accepting HUNT through travel, actual shared-simulator ELITE victory, the authored contract credit/item reward, and save reload.
+- Seed `hunt-runtime-fixed-seed` verifies `COMPLETE`/reward claimed, one guaranteed RARE contract item in unsecured cargo and persistent settlement. No combat balance or runtime transaction logic changed.
+- Godot 4.7.2 headless import exit 0; 23 tests / 88,634 assertions passed. No Windows export or GUI smoke.
+
 ## Unreleased — contract target visibility
 
 - Accepted contract targets are now revealed and marked on the route map. The active contract panel shows objective details, live ESCORT requirements, and whether a completion reward is still unsecured or the objective failed.

@@ -1,5 +1,11 @@
 # CYDLE — Project handoff and development history
 
+## Latest game checkpoint (2026-11-13; HUNT contract through real combat)
+
+- Commit `418998d149c29aa1311e8f28c7b979fedc905a01` adds a deterministic HUNT integration flow: a fresh profile accepts the offer, follows the marked/reachable target, runs the shared 100 ms combat simulator to an outcome, settles combat, checks the exact contract grant and payout, then reloads the save. Fixed seed `hunt-runtime-fixed-seed` won the target ELITE and retained a COMPLETE, reward-claimed contract with the unsecured contract item after reload.
+- Godot 4.7.2 editor import exit 0; full native suite 23 tests / 88,634 assertions / 0 failures; `git diff --check` exit 0. No Windows export, GUI smoke, or campaign E2E.
+- Contract coverage now proves one natural HUNT target-clear-to-reward transaction. SIGNAL's actual target-clear reward, TECH cache choice and death/blueprint behavior, and ESCORT checkpoint success/failure remain unverified; consult `docs/FEATURE_AUDIT.md`.
+
 ## Latest checkpoint (2026-11-13; contract objective UI)
 
 - Implementation commit: `26161dea2aaa463e940abeff5985fb6fd90643a3` on `development/codex`, following `10119bd1fe1a87d09e1504598bbd60535207d9b6`.
