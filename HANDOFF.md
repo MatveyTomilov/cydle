@@ -1,5 +1,21 @@
 # CYDLE — Project handoff and development history
 
+## Latest checkpoint (2026-11-13; combat playback unblocked)
+
+- `GameSession` gained `advance_combat_playback(delta_ms, persist_interval_ms = 1000)`, `skip_combat_to_outcome(max_ticks = 1800)` and `flush_combat_snapshot()`. `advance_combat_step()` is unchanged because `game_session_test.gd` requires an exact state-hash resume after three ticks, and the transactional save protocol is unchanged.
+- Cadence is computed from the existing `combatSnapshot.simTimeMs` (`_combat_unpersisted_ms()`), so no new persisted field, no save-format version bump and no migration. `state.run.combat_snapshot` is only read at load, so throttling cannot desync the live battle.
+- Measured on one 47-tick two-enemy battle, Godot 4.7.2 headless, isolated `APPDATA`: `advance_combat_step()` 10,493 ms total / **223.3 ms per tick**; `skip_combat_to_outcome()` **250 ms** (42×); `advance_combat_playback(100)` driven per tick **1,083 ms / 23.0 ms per tick** (9.7×). The remaining playback cost is the ~200 ms snapshot write amortised over ten ticks.
+- At ×4 the default 1000 sim-ms cadence would mean four saves per second (~92% I/O duty cycle), so the interval is a parameter: the battle screen is expected to pass `1000 × speed`, which keeps the crash-loss window near one second of wall-clock time at every speed.
+- `app_root._on_combat_skip()` now calls `skip_combat_to_outcome()` instead of looping `advance_combat_step()`, so the existing text battle screen already gets the 42× speedup.
+- New regression `game/tests/golden/combat_playback_test.gd`, registered in `run_tests.gd`; CI floor raised from 23 to 24 tests. Local verification: import exit 0, **24 tests / 88,857 assertions / 0 failures** exit 0, asset validation exit 0.
+- The animated side-view battle screen (Master Spec §25) is the next task; this checkpoint is what makes it feasible.
+
+### Two pre-existing serialization properties (measured, not introduced here)
+
+- **Profile identity is wall-clock derived.** `start_new_game()` builds `saveId = "CYDLE-<timestamp>-<Time.get_ticks_usec()>"`, and starter item ids embed it (`it:starter%3ACYDLE-…-564142%3AMAIN:PISTOL_K1`). Two profiles rolled from the same seed therefore differ in `operator.baseMods[].id/sourceId` and `drones[].droneItemId`, and can never produce equal state hashes. Any test comparing two independently created profiles must clone one template (`SaveRepository.export_text` → `import_text`) instead. `offline_budget_test.gd` avoids this by comparing only metrics and an economy subset.
+- **JSON keeps ~15 significant digits.** A combat snapshot round-trip turns `hpLost 9.999999999999979` into `9.99999999999998` and `damageDealt 29.417475728155317` into `29.4174757281553`. This is identical for `advance_combat_step()` and for the new playback path — it is a property of the save format, not of the cadence change. Consequence: a battle resumed from disk is not bit-identical to an uninterrupted one, so in rare edge cases a resumed fight can diverge in its last digits. `combat_playback_test.gd` normalises both sides through JSON before hashing and says so in a comment. Fixing this properly would mean changing how combat floats are persisted; that is a save-format decision and was deliberately not made here.
+- Scratch probes used to measure both properties were deleted and are not in Git.
+
 ## Latest checkpoint (2026-11-13; GitHub CI restored and Windows artifact verified)
 
 - Checkpoint `4f7d19c78af8a4ea505d001eaaca200342143a87` on `development/codex`. GitHub Actions run `43409888278` is **success** on all 17 steps. This is the first run in which the Godot steps actually executed.
@@ -10,7 +26,7 @@
 - Local pre-push verification reproduced the same gates: import exit 0, 23 tests / 88,689 assertions / 0 failures, asset manifest valid (16 planned/concept entries, 0 integrated), export exit 0, EXE smoke exit 0.
 - CI now cancels superseded runs on the same ref and uploads a `cydle-ci-logs-<sha>` artifact for diagnosis.
 
-### Measured combat performance defect (new finding, not yet fixed)
+### Measured combat performance defect (fixed in the checkpoint above)
 
 - A scratch headless probe on this checkpoint measured one interactive combat tick at **~155–165 ms**, while the pure simulator step is **~1.05 ms**. Breakdown for a 30 KB save: `state.to_payload()` 0.37 ms, `GameSaveState.parse_payload()` 25 ms, `SaveRepository.save_game()` **104 ms**.
 - `save_game` runs the full transactional protocol on every tick: schema validation, checksum validation, temp write, temp read-back verification, backup rotation (read + validate backup 1, write backup 2, write backup 1), then promote. That is ~4 writes and ~3 read/parse/validate passes per 100 ms of game time.

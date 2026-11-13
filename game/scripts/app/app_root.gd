@@ -1785,12 +1785,8 @@ func _on_combat_tick() -> void:
 		_footer.text = _session.last_error
 
 func _on_combat_skip() -> void:
-	var steps: int = 0
-	while steps < 1800 and _session.combat_state() != null and _session.combat_state().outcome.is_empty():
-		if not _session.advance_combat_step():
-			_footer.text = _session.last_error
-			break
-		steps += 1
+	if not _session.skip_combat_to_outcome():
+		_footer.text = _session.last_error
 	_show_battle()
 
 func _on_resolve_combat() -> void:

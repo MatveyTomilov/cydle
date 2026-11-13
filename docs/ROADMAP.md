@@ -6,6 +6,12 @@
 
 Current strategy is **FEATURE COMPLETE BETA**: audit against the normative Master Spec, close significant runtime/UI gaps, and validate real state transitions. Boss balancing and repeated automatic boss retries are deferred unless a concrete gameplay defect requires them. Preserve all profile/save data; use short deterministic integration scenarios.
 
+### Latest checkpoint — CI restored, then combat playback unblocked (2026-11-13)
+
+GitHub Actions is green on `4f7d19c78af8a4ea505d001eaaca200342143a87` (run `43409888278`, all 17 steps). Every earlier red run was a false positive in the other direction: the Godot steps never executed because only the GUI-subsystem editor executable was installed. CI now installs the console wrapper, gates on the real runner summary, asserts the exported EXE size, boots it headless with an isolated `APPDATA`, and publishes `cydle-windows-<sha>`. That artifact was downloaded and launched independently (116,396,408 bytes, exit 0, `CYDLE shell ready: menu`).
+
+The next blocker was measured, not assumed: one interactive combat tick cost ~223 ms because `advance_combat_step()` ran the whole transactional save protocol every 100 ms, which made Master Spec §25 real-time autobattle impossible and froze the skip button for the length of a fight. `GameSession` now has `advance_combat_playback()`, `skip_combat_to_outcome()` and `flush_combat_snapshot()`; the skip button measured 250 ms instead of 10.5 s on a 47-tick battle. `advance_combat_step()` and the save protocol are unchanged, and no save-format version was bumped. Local Godot 4.7.2 import exit 0; full native suite 24 tests / 88,857 assertions / 0 failures; asset validation exit 0. The animated side-view battle screen with pause/×1/×2/×4/skip is the next implementation target.
+
 ### Latest game-code checkpoint — event rounding and hull consequence fixes
 
 Pushed game-code checkpoint `40a662322610b12b1c38a35c5b72ad4c4d3ca107`: EV13 charges `ceil(60% × ceil(rare shop price))`, so its d12 price is 267 credits, and EV07 removes 10% of maximum hull instead of 10 flat hull. Local and independent transaction regressions confirm both consequences. Godot 4.7.2 import exit 0; full suite 23 tests / 88,683 assertions / 0 failures. Independent EV07 check used a clean detached worktree and diff check. No TypeScript or Windows export was run for these Godot changes.

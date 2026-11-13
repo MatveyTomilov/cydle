@@ -2,6 +2,7 @@ class_name GameSession
 extends RefCounted
 
 const SLOT_ID: String = "cylde-main"
+const COMBAT_PLAYBACK_PERSIST_INTERVAL_MS: int = 1000
 const ENDGAME_ESCALATIONS: Array[String] = ["WANTED_PLUS", "HUNT_FAST", "REPAIR_RARE", "SCAN_DARK", "DRONE_WAR", "HEAT_FOG", "SHIELD_BREAK", "LONG_RUN"]
 
 var state: GameSaveState
@@ -2821,6 +2822,64 @@ func advance_combat_step() -> bool:
 		return false
 	last_error = ""
 	return true
+
+## Real-time playback advances in memory and writes the durable snapshot on a bounded
+## cadence: the full transactional save protocol costs ~200 ms, far more than a 100 ms tick.
+## Callers scale the interval with the playback speed so the crash-loss window stays about
+## one second of wall-clock time at any speed multiplier.
+func advance_combat_playback(delta_ms: int, persist_interval_ms: int = COMBAT_PLAYBACK_PERSIST_INTERVAL_MS) -> bool:
+	if _combat == null:
+		last_error = "Нет активного боя."
+		return false
+	var interval_ms: int = maxi(CombatSimulator.TICK_MS, persist_interval_ms)
+	var remaining: int = maxi(0, delta_ms)
+	while remaining >= CombatSimulator.TICK_MS and _combat.outcome.is_empty():
+		var stepped: Dictionary = _simulator.step_combat(_combat)
+		if not bool(stepped.get("ok", false)):
+			last_error = str(stepped.get("error", "Боевой шаг отклонён."))
+			return false
+		_combat = stepped["state"] as CombatState
+		remaining -= CombatSimulator.TICK_MS
+		if not _combat.outcome.is_empty() or _combat_unpersisted_ms() >= interval_ms:
+			if not _persist_combat_snapshot():
+				return false
+	last_error = ""
+	return true
+
+## Renders the rest of the battle without paying for a save on every tick.
+func skip_combat_to_outcome(max_ticks: int = 1800) -> bool:
+	if _combat == null:
+		last_error = "Нет активного боя."
+		return false
+	var ticks: int = 0
+	while ticks < max_ticks and _combat.outcome.is_empty():
+		var stepped: Dictionary = _simulator.step_combat(_combat)
+		if not bool(stepped.get("ok", false)):
+			last_error = str(stepped.get("error", "Боевой шаг отклонён."))
+			return false
+		_combat = stepped["state"] as CombatState
+		ticks += 1
+	if ticks > 0 and not _persist_combat_snapshot():
+		return false
+	last_error = ""
+	return true
+
+## Writes any in-memory combat progress before leaving the battle or closing the app.
+func flush_combat_snapshot() -> bool:
+	if _combat == null or _combat_unpersisted_ms() <= 0:
+		return true
+	if not _persist_combat_snapshot():
+		return false
+	last_error = ""
+	return true
+
+func _combat_unpersisted_ms() -> int:
+	if _combat == null:
+		return 0
+	var persisted_ms: int = 0
+	if state != null and state.run != null and state.run.combat_snapshot != null:
+		persisted_ms = state.run.combat_snapshot.sim_time_ms
+	return maxi(0, _combat.time_ms - persisted_ms)
 
 func resolve_active_combat() -> bool:
 	if _combat == null or _combat.outcome.is_empty() or state == null or state.run == null:

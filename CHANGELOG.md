@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — real-time combat playback no longer saves on every tick
+
+- `advance_combat_step()` wrote the full transactional save on every 100 ms tick. Measured on a 47-tick battle: **223 ms per tick**, 10.5 s total, so `ПРОСЧИТАТЬ ДО ИСХОДА` froze the UI for the whole fight and Master Spec §25 real-time autobattle was impossible.
+- Added three playback entry points to `GameSession`, leaving `advance_combat_step()` and the save protocol byte-identical: `advance_combat_playback(delta_ms, persist_interval_ms = 1000)` steps in memory and persists on a bounded cadence, `skip_combat_to_outcome(max_ticks = 1800)` simulates the rest of the battle and persists once, and `flush_combat_snapshot()` forces any in-memory progress to disk before leaving the battle or closing the app.
+- The cadence is derived from the already-persisted `combatSnapshot.simTimeMs`, so it is self-correcting and adds no new persisted field or save-format version. The interval scales with the playback speed, keeping the crash-loss window at roughly one second of wall-clock time at ×1/×2/×4.
+- `ПРОСЧИТАТЬ ДО ИСХОДА` now calls `skip_combat_to_outcome()`. Measured on the same 47-tick battle: skip **250 ms (42× faster)**, real-time playback **23 ms per tick (9.7× faster)**.
+- New regression `game/tests/golden/combat_playback_test.gd` (168 assertions): playback is bit-identical to the per-tick reference; sub-tick and negative budgets are inert; snapshots land only on cadence boundaries; a scaled interval changes persistence but not the simulation; an interrupted run resumes from the last durable boundary and replaying the lost window converges; flush + reload reproduces the battle; skip and streamed playback reach the same outcome, state and settlement; a settled battle cannot simulate further or pay twice, including after reload.
+- The CI test gate now requires at least 24 tests (was 23).
+- Verified locally with Godot 4.7.2 and an isolated `APPDATA`: import exit 0, full native suite **24 tests / 88,857 assertions / 0 failures** exit 0, asset manifest validation exit 0.
+- Two pre-existing properties were measured while writing the regression, neither introduced nor changed here: item identifiers embed the profile `saveId` (which contains `Time.get_ticks_usec()`), so two freshly rolled profiles can never hash identically — the test clones one template profile instead; and Godot's JSON writer keeps ~15 significant digits, so a reloaded battle differs from the in-memory one in the last digits (`9.999999999999979` → `9.99999999999998`). This affects `advance_combat_step()` reloads identically and is now documented in HANDOFF.md.
+
 ## Unreleased — CI actually runs Godot and publishes a Windows build
 
 - Root cause of every red GitHub Actions run: `chickensoft-games/setup-godot` exposes only the GUI-subsystem editor executable. PowerShell neither waits for it nor captures its output, so import, tests, asset validation and export each returned exit 0 in under a second without executing anything. The export therefore produced no file and `upload-artifact` failed with `No files were found with the provided path: game/build/CYDLE.exe`. The green Godot steps were false positives, not passing checks.
