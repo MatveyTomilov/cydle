@@ -28,14 +28,11 @@ func create_state(config: Dictionary) -> Dictionary:
 	# Incremental adapter: never silently drop unported authored abilities.
 	if requested_version == CombatState.V2_RULES_VERSION:
 		var v2_build: Dictionary = config.get("build", {})
-		if not config.get("tactics", {}).is_empty() or not v2_build.get("triggerEffects", []).is_empty() or not v2_build.get("drones", []).is_empty():
-			return _failure("V2 adapter: proc-эффекты и дроны ещё не подключены; тактики V1 запрещены.")
-		for skill: Variant in v2_build.get("skills", []):
-			if not skill is Dictionary or str(skill.get("channel", "main")) != "main" or not AutobattleV2Contract.SUPPORTED_MAIN_SKILLS.has(str(skill.get("id", ""))):
-				return _failure("V2 adapter: неподдерживаемая способность отклонена явно (%s)." % str(skill.get("id", "unknown")) if skill is Dictionary else "V2 adapter: некорректная запись способности.")
-			var compiled_target: Dictionary = AutobattleV2Contract.compile_target(str(skill.get("targetMode", "HIGHEST_THREAT")))
-			if not bool(compiled_target.get("ok", false)):
-				return _failure("V2 adapter: %s" % str(compiled_target.get("error", "UNSUPPORTED_TARGET_MODE")))
+		if not config.get("tactics", {}).is_empty():
+			return _failure("V2 adapter: пользовательские тактики V1 ещё не поддерживаются.")
+		var build_error: String = AutobattleV2Contract.validate_build(v2_build)
+		if not build_error.is_empty():
+			return _failure("V2 adapter: %s." % build_error)
 	var seed_value: Variant = config.get("seed", "")
 	var depth_value: Variant = config.get("depth", 0)
 	var enemy_value: Variant = config.get("enemies", [])
@@ -203,9 +200,14 @@ func _step_v2_weapon_channel(state: CombatState, rng: DeterministicRng) -> Dicti
 		target = _actor_by_id(state, target_ids[0]) if not target_ids.is_empty() else null
 		if target != null:
 			context["targetIds"] = target_ids.duplicate()
+			context["action"]["targetIds"] = target_ids.duplicate()
 			_emit(state, "TARGET_REACQUIRED", actor.id, {"actionId": context.get("instanceId", ""), "targetId": target.id, "targetIds": target_ids.duplicate(), "reason": "PREPARED_TARGET_UNAVAILABLE"})
 	elif not advanced["commit"].is_empty() and not target_ids.is_empty():
 		context["targetIds"] = target_ids.duplicate()
+		context["action"]["targetIds"] = target_ids.duplicate()
+	if not state.action_channel.get("active", {}).is_empty():
+		state.action_channel["active"]["targetIds"] = context.get("targetIds", []).duplicate()
+		state.action_channel["active"]["action"]["targetIds"] = context.get("targetIds", []).duplicate()
 	if not advanced["commit"].is_empty():
 		var committed: Dictionary = advanced["commit"]
 		var reason: String = ""
@@ -310,10 +312,12 @@ func _resolve_v2_action(state: CombatState, rng: DeterministicRng, actor: Combat
 	var cooldown: float = _formula.cooldown_ms(float(skill.get("cooldownMs", 0.0)), float(sheet.get("cooldownRecovery", 0.0)))
 	if skill.get("tags", []).has("D") and _has_status(actor, "JAM"):
 		cooldown *= 1.3
-	actor.cooldowns[str(skill["id"])] = float(state.time_ms) + cooldown
+	var timeline: Dictionary = context.get("timeline", {})
+	var action_start_ms: int = int(timeline.get("commitAtMs", state.time_ms)) - int(action.get("prepareMs", 0))
+	actor.cooldowns[str(skill["id"])] = float(action_start_ms) + cooldown
 	var channel_cooldowns: Dictionary = state.action_channel.get("cooldowns", {})
-	var recovery_until: int = int(state.action_channel.get("active", {}).get("timeline", {}).get("recoveryUntilMs", state.time_ms))
-	channel_cooldowns[str(action.get("actionId", ""))] = maxi(recovery_until, state.time_ms + int(ceili(cooldown / float(TICK_MS))) * TICK_MS)
+	var recovery_until: int = int(timeline.get("recoveryUntilMs", state.time_ms))
+	channel_cooldowns[str(action.get("actionId", ""))] = maxi(recovery_until, action_start_ms + int(ceili(cooldown / float(TICK_MS))) * TICK_MS)
 	state.action_channel["cooldowns"] = channel_cooldowns
 	actor.counters["casts"] = int(actor.counters.get("casts", 0)) + 1
 	var cast: Dictionary = {

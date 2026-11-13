@@ -26,6 +26,11 @@ func run(_tree: SceneTree) -> bool:
 	var restored: CombatState = CombatState.from_dictionary(current.to_dictionary(), build)
 	if not check(restored != null, "v2_runtime: V2 channel snapshot did not restore"):
 		return false
+	var forged_target_snapshot: Dictionary = current.to_dictionary()
+	var original_targets: Array = forged_target_snapshot["actionChannel"]["active"].get("targetIds", [])
+	if not original_targets.is_empty():
+		forged_target_snapshot["actionChannel"]["active"]["targetIds"] = ["enemy:1"] if str(original_targets[0]) != "enemy:1" else ["enemy:0"]
+		check(CombatState.from_dictionary(forged_target_snapshot, build) == null, "v2_runtime: restore accepted a target that differed from the compiled action's doctrine selection")
 	var changed_build: Dictionary = build.duplicate(true)
 	changed_build["mainWeapon"]["damage"] = float(changed_build["mainWeapon"]["damage"]) + 1.0
 	check(CombatState.from_dictionary(current.to_dictionary(), changed_build) == null, "v2_runtime: changed build silently reinterpreted an active snapshot")
@@ -120,6 +125,14 @@ func run(_tree: SceneTree) -> bool:
 	check(skill_committed and skill_damaged_target and skill_state.enemies[0].hp < skill_before_hp, "v2_runtime: BuildResolver skill did not execute real damage in shared simulator")
 	check(skill_state.operator.energy < skill_before_energy and float(skill_state.operator.cooldowns.get("SK_PIERCE", 0.0)) > float(skill_state.time_ms), "v2_runtime: skill cost/cooldown mismatch energy=%.2f→%.2f cooldown=%.2f time=%d" % [skill_before_energy, skill_state.operator.energy, float(skill_state.operator.cooldowns.get("SK_PIERCE", 0.0)), skill_state.time_ms])
 	check(int(skill_state.action_channel.get("cooldowns", {}).get("skill:SK_PIERCE", 0)) > skill_state.time_ms, "v2_runtime: action channel lost the committed skill cooldown")
+	var expected_skill_ready_at: int = -1
+	for event: Dictionary in skill_state.log:
+		if str(event.get("kind", "")) == "ACTION_PREPARE" and str(event.get("sourceId", "")) == "SK_PIERCE":
+			var prepared_action: Dictionary = event.get("data", {})
+			var prepare_at: int = int(event.get("timestamp", 0))
+			expected_skill_ready_at = maxi(prepare_at + int(prepared_action.get("prepareMs", 0)) + int(prepared_action.get("recoveryMs", 0)), prepare_at + int(prepared_action.get("cooldownMs", 0)))
+			break
+	check(int(skill_state.action_channel.get("cooldowns", {}).get("skill:SK_PIERCE", 0)) == expected_skill_ready_at, "v2_runtime: cooldown did not expire from cast start after accounting for recovery")
 	for _recovery_tick: int in range(8):
 		if skill_state.action_channel.get("active", {}).is_empty(): break
 		var recovery_step: Dictionary = simulator.step_combat(skill_state)
@@ -152,6 +165,10 @@ func run(_tree: SceneTree) -> bool:
 	check(not recovered_action.is_empty() and int(recovered_action["prepareMs"]) == int(normal["prepareMs"]), "v2_runtime: expired SHOCK left permanent slow timing")
 	config["tactics"] = {"rules": [{"priority": 100}]}
 	check(not bool(simulator.create_state(config).get("ok", true)), "v2_runtime: V1 tactics accepted")
+	var unsupported_trigger_config: Dictionary = {"combatRulesVersion": CombatState.V2_RULES_VERSION, "seed": "v2-unsupported-item-trigger", "depth": 1, "build": build.duplicate(true), "enemies": [{"templateId": "E01"}]}
+	unsupported_trigger_config["build"]["triggerEffects"] = [{"sourceKind": "item", "sourceId": "ITEM:UNPORTED", "effect": {"id": "unported", "event": "ON_HIT", "action": {"kind": "applyStatus", "status": "VIRUS", "target": "target"}}}]
+	var unsupported_trigger: Dictionary = simulator.create_state(unsupported_trigger_config)
+	check(not bool(unsupported_trigger.get("ok", true)) and str(unsupported_trigger.get("error", "")).contains("UNSUPPORTED_V2_TRIGGER"), "v2_runtime: item trigger configuration was not explicitly rejected")
 	return failure_count == 0
 
 func _build_with_skill(skill_id: String) -> Dictionary:

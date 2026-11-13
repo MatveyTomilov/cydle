@@ -80,11 +80,8 @@ static func from_dictionary(value: Dictionary, resolved_build: Dictionary) -> Co
 	if version == V2_RULES_VERSION:
 		if str(value.get("rulesHash", "")) != CombatFactory.new().v2_build_rules_hash(resolved_build):
 			return null
-		if not value.get("tactics", {}).is_empty() or not resolved_build.get("triggerEffects", []).is_empty() or not resolved_build.get("drones", []).is_empty():
+		if not value.get("tactics", {}).is_empty() or not AutobattleV2Contract.validate_build(resolved_build).is_empty():
 			return null
-		for skill: Variant in resolved_build.get("skills", []):
-			if not skill is Dictionary or str(skill.get("channel", "main")) != "main" or not AutobattleV2Contract.SUPPORTED_MAIN_SKILLS.has(str(skill.get("id", ""))):
-				return null
 		if not value.get("actionChannel") is Dictionary or not AutobattleV2Channel.new()._validate(value["actionChannel"], int(value.get("timeMs", 0))).is_empty():
 			return null
 		var active: Dictionary = value["actionChannel"].get("active", {})
@@ -103,6 +100,10 @@ static func from_dictionary(value: Dictionary, resolved_build: Dictionary) -> Co
 					continue
 				if active["action"].get(field) != canonical[field]:
 					return null
+			var locked_targets: Variant = active.get("targetIds", null)
+			var action_targets: Variant = active["action"].get("targetIds", null)
+			if not locked_targets is Array or not action_targets is Array or locked_targets != action_targets:
+				return null
 	if not value.get("operator") is Dictionary or resolved_build.is_empty():
 		return null
 	var state: CombatState = CombatState.new()
@@ -124,8 +125,16 @@ static func from_dictionary(value: Dictionary, resolved_build: Dictionary) -> Co
 	if version == V2_RULES_VERSION:
 		var active: Dictionary = state.action_channel.get("active", {})
 		if not active.is_empty():
-			for target_id: Variant in active.get("targetIds", active.get("action", {}).get("targetIds", [])):
-				if _actor_by_id(state, str(target_id)) == null: return null
+			var doctrine: int = int(active.get("action", {}).get("targetDoctrine", -1))
+			var locked_targets: Array = active.get("targetIds", [])
+			var seen_targets: Dictionary = {}
+			for target_id: Variant in locked_targets:
+				var target_actor: CombatActorState = _actor_by_id(state, str(target_id))
+				if target_actor == null or seen_targets.has(str(target_id)): return null
+				seen_targets[str(target_id)] = true
+				if doctrine == AutobattleV2Contract.Doctrine.SELF and target_actor.id != state.operator.id: return null
+				if doctrine == AutobattleV2Contract.Doctrine.ALLY and target_actor.side != "player": return null
+				if doctrine not in [AutobattleV2Contract.Doctrine.SELF, AutobattleV2Contract.Doctrine.ALLY] and target_actor.side != "enemy": return null
 	var rng_value: Variant = value.get("rng", {})
 	if not rng_value is Dictionary:
 		return null

@@ -12,6 +12,7 @@ const SUPPORTED_MAIN_SKILLS: Array[String] = [
 	"SK_OVR", "SK_NEURO", "SK_SEED", "SK_DETONATE", "SK_BREAK", "SK_SCAN",
 	"SK_LEECH", "SK_CHAIN", "SK_KINETIC", "SK_SIDE_FIRE",
 ]
+const SUPPORTED_SKILL_TRIGGER_STATUSES: Array[String] = ["BLEED", "VIRUS", "ARMOR_BREAK"]
 enum Doctrine { HIGHEST_THREAT, FOCUS, NEAREST, LOWEST_HP, LOWEST_HP_PERCENT, INFECTED, BOSS, ALL_ENEMIES, MARKED, RANDOM_SEEDED, ALL, SELF, ALLY }
 const DOCTRINE_NAMES: Array[String] = [
 	"HIGHEST_THREAT", "FOCUS", "NEAREST", "LOWEST_HP", "LOWEST_HP_PERCENT",
@@ -38,6 +39,38 @@ static func compile_target(mode: String) -> Dictionary:
 
 static func target_name(doctrine: int) -> String:
 	return DOCTRINE_NAMES[doctrine] if doctrine >= 0 and doctrine < DOCTRINE_NAMES.size() else ""
+
+static func validate_build(build: Dictionary) -> String:
+	if not build.get("drones", []).is_empty():
+		return "UNSUPPORTED_V2_DRONES"
+	var skills_by_id: Dictionary = {}
+	for skill_value: Variant in build.get("skills", []):
+		if not skill_value is Dictionary:
+			return "INVALID_V2_SKILL_DEFINITION"
+		var skill: Dictionary = skill_value
+		if str(skill.get("channel", "main")) != "main" or not SUPPORTED_MAIN_SKILLS.has(str(skill.get("id", ""))):
+			return "UNSUPPORTED_V2_SKILL:%s" % str(skill.get("id", "unknown"))
+		var target: Dictionary = compile_target(str(skill.get("targetMode", "HIGHEST_THREAT")))
+		if not bool(target.get("ok", false)):
+			return str(target.get("error", "UNSUPPORTED_TARGET_MODE"))
+		skills_by_id[str(skill.get("id", ""))] = skill
+	for trigger_value: Variant in build.get("triggerEffects", []):
+		if not trigger_value is Dictionary:
+			return "INVALID_V2_TRIGGER"
+		var trigger: Dictionary = trigger_value
+		var effect: Dictionary = trigger.get("effect", {})
+		var action: Dictionary = effect.get("action", {})
+		var source_skill: Dictionary = skills_by_id.get(str(trigger.get("sourceId", "")), {})
+		var effect_is_authored: bool = false
+		for authored_effect: Variant in source_skill.get("extraEffects", []):
+			if authored_effect is Dictionary and authored_effect == effect:
+				effect_is_authored = true
+				break
+		if str(trigger.get("sourceKind", "")) != "skill" or not SUPPORTED_MAIN_SKILLS.has(str(trigger.get("sourceId", ""))) or not effect_is_authored \
+			or str(effect.get("event", "")) != "ON_HIT" or str(action.get("kind", "")) != "applyStatus" \
+			or str(action.get("target", "")) != "target" or not SUPPORTED_SKILL_TRIGGER_STATUSES.has(str(action.get("status", ""))):
+			return "UNSUPPORTED_V2_TRIGGER:%s" % str(effect.get("id", "unknown"))
+	return ""
 const FORBIDDEN_EDITABLE_FIELDS: Array[String] = [
 	"priority", "conditions", "logic", "targetPriority",
 	"userRule", "when", "script", "ruleId",
@@ -101,7 +134,8 @@ func _candidate_rejection(action: Dictionary, now_ms: int, energy: float, heat: 
 func begin_action(action: Dictionary, now_ms: int) -> Dictionary:
 	var commit_at: int = now_ms + _ceil_tick(maxi(0, int(action.get("prepareMs", 0))))
 	var recover_at: int = commit_at + _ceil_tick(maxi(0, int(action.get("recoveryMs", 0))))
-	var ready_at: int = recover_at + _ceil_tick(maxi(0, int(action.get("cooldownMs", 0))))
+	# Cooldown starts at PREPARE, while the channel remains occupied through recovery.
+	var ready_at: int = maxi(recover_at, now_ms + _ceil_tick(maxi(0, int(action.get("cooldownMs", 0)))))
 	return {
 		"actionId": str(action.get("actionId", "")), "phase": "PREPARE",
 		"commitAtMs": commit_at, "recoveryUntilMs": recover_at,

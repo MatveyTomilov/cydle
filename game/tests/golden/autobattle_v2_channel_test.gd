@@ -6,6 +6,7 @@ func run(_tree: SceneTree) -> bool:
 	var defense: Dictionary = {"sourceId": "armor:test", "actionId": "shield", "classId": "DEFENSE", "targetDoctrine": AutobattleV2Contract.Doctrine.SELF, "targetMode": "SELF", "prepareMs": 100, "recoveryMs": 100, "cooldownMs": 8000}
 	var started: Dictionary = channel.start(channel.new_state(), [attack, defense], 0, 100, 0, 100)
 	check(str(started["action"]["actionId"]) == "shield", "channel: first defense not selected")
+	check(int(started["state"]["active"]["timeline"]["readyAtMs"]) == 8000, "channel: cooldown did not start at PREPARE or outlast the recovery boundary")
 	check(not bool(channel.start(started["state"], [attack], 0, 100, 0, 100)["ok"]), "channel: occupied channel overwritten")
 	var advanced: Dictionary = channel.advance(started["state"], 100)
 	check(str(advanced["commit"].get("actionId", "")) == "shield", "channel: defense commit missing")
