@@ -365,6 +365,27 @@ func run(_tree: SceneTree) -> bool:
 		var escort_reload: GameSession = GameSession.new()
 		escort_reload.configure_save_directory("user://test-saves/escort-contract-runtime")
 		check(escort_reload.load_saved_game() and str(escort_reload.state.run.contract.get("status", "")) == "COMPLETE" and escort_reload.state.run.grant_ids.has(escort_completion_id) and int(escort_reload.state.meta.reputation.get(escort_faction_id, 0)) == escort_rep_before + 8, "game_session: ESCORT checkpoint completion or faction reward did not survive save reload")
+	var escort_failure: GameSession = GameSession.new()
+	escort_failure.configure_save_directory("user://test-saves/escort-contract-failure")
+	if check(escort_failure.start_new_game(1762900000143), "game_session: could not create an ESCORT failure profile") and check(escort_failure.start_expedition("escort-failure-seed", false, "CT_ESCORT"), "game_session: could not start the ESCORT failure sortie: %s" % escort_failure.last_error):
+		var failure_checkpoint_id: String = ""
+		var failure_checkpoint_from: String = ""
+		for layer: Array in escort_failure.state.run.graph.get("layers", []):
+			for candidate: Dictionary in layer:
+				if str(candidate.get("type", "")) == "CHECKPOINT": failure_checkpoint_id = str(candidate.get("id", ""))
+		for edge: Dictionary in escort_failure.state.run.graph.get("edges", []):
+			if str(edge.get("to", "")) == failure_checkpoint_id: failure_checkpoint_from = str(edge.get("from", ""))
+		var failure_payload: Dictionary = escort_failure.state.to_payload()
+		failure_payload["run"]["phase"] = "ROUTE"
+		failure_payload["run"]["currentNodeId"] = failure_checkpoint_from
+		failure_payload["run"]["wanted"] = 41.0
+		failure_payload["run"]["contract"]["combatNodes"] = 2
+		failure_payload["run"]["resources"]["fuel"] = 8.0
+		var escort_failure_rep: int = int(failure_payload["meta"]["reputation"].get(str(failure_payload["run"]["contract"].get("factionId", "")), 0))
+		check(not failure_checkpoint_id.is_empty() and not failure_checkpoint_from.is_empty() and escort_failure._commit_payload(failure_payload), "game_session: could not prepare the ESCORT threshold-failure checkpoint: %s" % escort_failure.last_error)
+		check(escort_failure.travel_to(failure_checkpoint_id), "game_session: could not enter the real generated checkpoint for ESCORT failure settlement: %s" % escort_failure.last_error)
+		check(str(escort_failure.state.run.contract.get("status", "")) == "FAILED" and not bool(escort_failure.state.run.contract.get("rewardClaimed", false)) and escort_failure.state.run.grant_ids.is_empty(), "game_session: ESCORT checkpoint ignored the over-40 wanted failure threshold")
+		check(int(escort_failure.state.meta.reputation.get(str(escort_failure.state.run.contract.get("factionId", "")), 0)) == escort_failure_rep, "game_session: failed ESCORT paid reputation despite missing its delivery conditions")
 	var favored_session: GameSession = GameSession.new()
 	favored_session.configure_save_directory("user://test-saves/faction-threshold-contract")
 	if check(favored_session.start_new_game(1762900000108), "game_session: could not create a favored faction profile"):
@@ -495,10 +516,28 @@ func run(_tree: SceneTree) -> bool:
 		if check(bool(death_catalog_result.get("ok", false)) and bool(death_item_result.get("ok", false)), "game_session: could not create the temporary cargo for contract-death settlement"):
 			var death_item: Dictionary = (death_item_result["item"] as ItemInstance).to_dictionary()
 			var death_payload: Dictionary = contract_death_session.state.to_payload()
+			var death_route_choices: Array[Dictionary] = contract_death_session.reachable_nodes()
+			var death_node_id: String = str(death_route_choices[0].get("id", "")) if not death_route_choices.is_empty() else ""
+			for layer: Array in death_payload["run"]["graph"].get("layers", []):
+				for candidate: Dictionary in layer:
+					if str(candidate.get("id", "")) == death_node_id:
+						candidate["type"] = "COMBAT"
+						candidate["enemies"] = [{"templateId": "E01"}]
 			death_payload["run"]["unsecuredCargo"] = [death_item]
 			death_payload["run"]["runWallet"] = {"CREDITS": 23.0, "SCRAP": 4.0, "DATA": 2.0}
-			check(contract_death_session._commit_payload(death_payload), "game_session: contract-death cargo fixture could not be saved: %s" % contract_death_session.last_error)
-			check(contract_death_session._resolve_combat_defeat(contract_death_session.state.run.to_dictionary(), "contract-death-fixture"), "game_session: defeat could not settle an active contract: %s" % contract_death_session.last_error)
+			var death_setup_saved: bool = not death_node_id.is_empty() and contract_death_session._commit_payload(death_payload)
+			var death_combat_started: bool = death_setup_saved and contract_death_session.travel_to(death_node_id) and contract_death_session.begin_combat()
+			check(death_combat_started, "game_session: contract-death combat fixture could not start through the real route: %s" % contract_death_session.last_error)
+			if death_combat_started:
+				contract_death_session.combat_state().enemies[0].attack_damage = 100000.0
+				contract_death_session.combat_state().enemies[0].attack_interval_ms = 100.0
+				contract_death_session.combat_state().enemies[0].next_attack_at = 0.0
+				var death_ticks: int = 0
+				while contract_death_session.combat_state() != null and contract_death_session.combat_state().outcome.is_empty() and death_ticks < 10:
+					if not contract_death_session.advance_combat_step(): break
+					death_ticks += 1
+			var real_defeat: bool = contract_death_session.combat_state() != null and contract_death_session.combat_state().outcome == "DEFEAT" and contract_death_session.resolve_active_combat()
+			check(real_defeat, "game_session: controlled real combat did not reach and settle DEFEAT through resolve_active_combat: %s" % contract_death_session.last_error)
 			check(str(contract_death_session.state.run.contract.get("status", "")) == "FAILED" and not bool(contract_death_session.state.run.contract.get("rewardClaimed", false)), "game_session: death left an undelivered active contract claimable")
 			check(contract_death_session.state.run.phase == "DEFEATED" and contract_death_session.state.run.unsecured_cargo.is_empty() and contract_death_session.state.run.wallet.credits == 0.0 and not contract_death_session.state.meta.inventory.any(func(item: Dictionary) -> bool: return str(item.get("itemId", "")) == str(death_item.get("itemId", ""))), "game_session: death did not discard unprotected cargo and sortie currency")
 			var death_reload: GameSession = GameSession.new()
