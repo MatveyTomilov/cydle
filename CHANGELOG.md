@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — authored event trigger coverage
+
+- The shared deterministic combat simulator now dispatches authored cast, dodge, incoming-damage/HP-threshold, status-expiry, interrupt, enemy-telegraph, drone-death, combat-start, heat-full and heat-release trigger actions. It reuses existing actor state, status definitions, combat RNG, damage pipeline and StatMath path.
+- Triggered status application now honors catalogued DoT snapshots, duration bonuses, independent stacks and caps. Reaction-extra windows bypass one reaction cooldown; consume-on-hit buffs are removed after the operator's next direct attack or cast. Negative heat and SK_VENT now run the common lockout transition and release event.
+- Godot 4.7.2 headless suite passed: 22 scripts, 88,085 assertions, 0 failures. `git diff --check` passed. Latest editor import and Windows export/EXE smoke were not run for this delta.
+
 ## Unreleased — packet and shield-response triggers
 
 - The shared combat engine now runs catalogued ON_BEFORE_HIT packet modifiers and flag spending, shield absorption responses, and ON_EFFECT_SHIELD_SPENT temporary shields. This connects K4C/H4D, U04 charge/release, S3A/S4D, and X1 through the same 100 ms combat path.

@@ -1,5 +1,13 @@
 # CYDLE — Project handoff and development history
 
+## Live continuation (2026-11-13; authored event trigger expansion)
+
+- Branch `development/codex`; base HEAD and remote HEAD are `10e0467837131d8a73dea9b56dd72947958191e8`. Current WIP extends the same deterministic `CombatSimulator` in `game/scripts/core/combat/combat_simulator.gd`; no parallel engine was added.
+- Implemented authored trigger paths for ON_COMBAT_START, ON_CAST, ON_DODGE, ON_TAKEN_DAMAGE, ON_HP_THRESHOLD, ON_STATUS_EXPIRE, ON_INTERRUPT, ON_ENEMY_TELEGRAPH, ON_DRONE_DEATH, ON_HEAT_FULL and ON_HEAT_LOCKOUT_END. Existing action helpers handle restoration, flags, buffs, cooldown, control, reveal/wanted deltas, secondary damage, and temporary shields. Authored status actions now use status definitions for independent stacks, snapshot, duration scaling and stack caps. Extra reactions bypass one reaction cooldown within their window; consume-on-hit buffs are removed after the next direct operator attack/cast. Heat release now occurs consistently after cooling, SK_VENT, and negative heat actions, and emits the authored release trigger.
+- A correctness restriction was added for ON_STATUS_EXPIRE (operator owner, enemy target); skill-sourced events are checked against their source skill. Current simulator support is still partial: catalogued trigger patterns outside the implemented event/action pairs fail the simulation's support gate. Do not claim full combat or campaign parity.
+- Checks on this WIP: Godot 4.7.2 headless suite exit 0, 22 scripts / 88,085 assertions / 0 failures; `git diff --check` exit 0. An earlier editor import on the preceding generic-dispatcher revision exited 0; import was not rerun after the latest authored-status helper. Windows export/EXE smoke and TypeScript oracle were not run.
+- Exact stop point: finish a current-source editor import, then save this combat checkpoint on `development/codex`. Next continue into the largest still-missing campaign behavior from the Master Spec, while retaining the shared simulator and preserving the isolated profile paths below. Full Windows release acceptance is still incomplete.
+
 ## Live continuation (2026-11-13; packet/shield trigger integration)
 
 - Pushed base: `6f94d3613e30724974b18c089a8b62011522d145` on `development/codex`. Current uncommitted WIP extends the shared simulator with ON_BEFORE_HIT flag spending and packet modifiers, ON_SHIELD_ABSORB energy/secondary responses, and ON_EFFECT_SHIELD_SPENT temporary shields.

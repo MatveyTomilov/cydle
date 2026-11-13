@@ -49,7 +49,9 @@ func run(_tree: SceneTree) -> bool:
 		var jam_abilities: Array[Dictionary] = simulator._enemy_ability_definitions(escalation_state.enemies[0], escalation_state)
 		check(jam_abilities.any(func(ability: Dictionary) -> bool: return str(ability.get("status", "")) == "DRONE_JAM"), "combat_step: DRONE_WAR elite did not gain its telegraphed drone-jam ability")
 		var telegraph_ability: Dictionary = {"id": "escalation-telegraph", "kind": "heavyAttack", "windupMs": 500, "telegraphMs": 500, "interruptible": true}
-		simulator._start_enemy_ability(escalation_state, escalation_state.enemies[0], telegraph_ability)
+		var telegraph_rng: DeterministicRng = DeterministicRng.new()
+		telegraph_rng.seed("escalation-telegraph", "combat")
+		simulator._start_enemy_ability(escalation_state, telegraph_rng, escalation_state.enemies[0], telegraph_ability)
 		check(is_equal_approx(float(escalation_state.enemies[0].cast.get("resolveAt", 0.0)), 600.0), "combat_step: HUNT_FAST violated its 600 ms telegraph floor")
 	var expected_frames: Array = fixture.get("frames", [])
 	var initial_payload: Dictionary = state.to_dictionary()
@@ -82,7 +84,7 @@ func _test_unsupported_trigger_is_rejected(config: Dictionary, build: Dictionary
 	var trigger_build: Dictionary = build.duplicate(true)
 	trigger_build["triggerEffects"] = [{
 		"sourceId": "U01_discharge", "sourceName": "Перегрузка", "sourceKind": "item",
-		"effect": {"type": "trigger", "id": "U01_discharge", "event": "ON_HEAT_FULL", "action": {"kind": "consumeShieldForDamage", "fraction": 0.5}},
+		"effect": {"type": "trigger", "id": "unsupported_heat_fixture", "event": "ON_HEAT_FULL", "action": {"kind": "notImplementedYet"}},
 	}]
 	var initialized: Dictionary = CombatSimulator.new().create_state({
 		"seed": "unsupported-trigger-guard", "depth": int(config.get("depth", 1)), "biome": str(config.get("biome", "B01")),
