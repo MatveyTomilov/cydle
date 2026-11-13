@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — disable unaffordable event and quest options
+
+- Shared `GameSession` cost quotes now drive both actual event/quest transactions and road UI availability. Paid options are disabled with currency and required amount when the unsecured sortie wallet cannot cover them.
+- Scaled costs for EV13/data exchange and the Q03 engine choice use the same price calculation for UI and settlement. Regression confirms an unaffordable EV02 option leaves state untouched.
+- Godot 4.7.2: editor import exit 0; 22 tests / 88,316 assertions / 0 failures; diff check exit 0.
+
 ## Unreleased — execute R3D's same-target attack trigger
 
 - Tree `ON_ATTACK_COUNTER` effects are accepted by the shared combat guard and now track successful operator attacks per target, resetting when the target changes. R3D grants and refreshes its authored accuracy buff on the fourth hit to a target.

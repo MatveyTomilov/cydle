@@ -1,5 +1,13 @@
 # CYDLE — Project handoff and development history
 
+## Current checkpoint (2026-11-13; affordability-aware event and quest choices)
+
+- Repository `https://github.com/MatveyTomilov/cydle`; workspace `E:\cydle\project`; branch `development/codex`.
+- HEAD and `origin/development/codex`: `86528a524b126cf72d0cd59d93da02ab7ac3e1f0`; working tree clean after push. This checkpoint adds to the prior R3D/QUEST/E10 work below.
+- Event and quest choice prices now come from shared `GameSession` quote helpers used by both UI and transaction validation. The road UI disables an unaffordable event/ready quest option and shows a currency-specific reason; special `dataForCredits`, `greyDealer`, and `buyEngine` prices use the same scale/formula in quote and transaction paths. EV02 regression verifies the blocked paid option cannot change event state while its free alternative still resolves.
+- Godot 4.7.2 headless editor import exit 0; `res://tests/run_tests.gd`: 22 tests passed, 88,316 assertions, 0 failures. `git diff --check` exit 0. No export, GUI smoke, campaign E2E or beta ZIP was run.
+- Continue with the next rows marked partial in `docs/FEATURE_AUDIT.md`. Verify each actual state transaction and UI path; do not infer completion from the large content catalogs or passing broad unit suite.
+
 ## Current checkpoint (2026-11-13; R3D same-target tree trigger)
 
 - Repository `https://github.com/MatveyTomilov/cydle`; workspace `E:\cydle\project`; branch `development/codex`.

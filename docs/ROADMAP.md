@@ -6,7 +6,11 @@
 
 Current strategy is **FEATURE COMPLETE BETA**: audit against the normative Master Spec, close significant runtime/UI gaps, and validate real state transitions. Boss balancing and repeated automatic boss retries are deferred unless a concrete gameplay defect requires them. Preserve all profile/save data; use short deterministic integration scenarios.
 
-### Current status override (2026-11-13; R3D same-target tree trigger)
+### Current status override (2026-11-13; affordability-aware choices)
+
+Event and quest choice UI now calls shared GameSession cost quotes also used by the actual transaction. Unaffordable paid choices are disabled and show the missing currency/amount; special scaled event and Q03 engine prices share calculation logic with settlement. EV02 regression confirms the rejected paid choice leaves run state unchanged and the free alternative resolves. Godot editor import exit 0; 22 tests passed, 88,316 assertions / 0 failures; diff check exit 0. Pushed HEAD `86528a524b126cf72d0cd59d93da02ab7ac3e1f0`. This is an interface correctness fix, not systematic verification of all 48 event choices or all quest branches.
+
+### Previous status override (2026-11-13; R3D same-target tree trigger)
 
 Catalog trigger coverage found R3D (`ON_ATTACK_COUNTER`) rejected at the shared simulator guard and missing target-specific counting. It now counts successful operator attacks on the same target, resets on target change, applies the authored accuracy buff and survives a combat snapshot roundtrip. Added a catalog trigger guard audit and targeted regression. Godot 4.7.2 editor import exit 0; 22 tests passed, 88,314 assertions / 0 failures; `git diff --check` exit 0. HEAD `13989af407cdf598db9fbe5a5a0add97b421bb01` is pushed. This is a narrow combat fix, not full trigger-context or beta acceptance; see `docs/FEATURE_AUDIT.md`.
 
