@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — EV13 rare price rounding
+
+- Grey Dealer now charges `ceil(60% × rounded rare shop price)` as specified. The d12 boundary was 266 before and is correctly 267 credits after the change.
+- Regression is part of the 23-script Godot suite. Godot 4.7.2 import exit 0; full suite: 23 tests / 88,682 assertions / 0 failures. TypeScript oracle is unchanged by this Godot-only fix.
+
 ## Unreleased — parallel balance research and persisted offline diagnostics
 
 - Added project agent `balance_qa` on GPT-6 Luna High. Bounded BOSS_B research (up to 24 fights, no more than 3 per archetype) runs in a detached read-only worktree alongside required regression checks.

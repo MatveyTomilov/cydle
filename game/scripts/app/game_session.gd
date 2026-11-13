@@ -1929,7 +1929,9 @@ func event_choice_costs(choice: Dictionary) -> Dictionary:
 		if special == "dataForCredits":
 			costs["DATA"] = ceili(10.0 * scale)
 		elif special == "greyDealer":
-			costs["CREDITS"] = ceili((25.0 + 7.0 * state.run.depth) * 2.0 * scale * 0.6)
+			# Master Spec prices EV13 at ceil(60% of the rounded rare shop price).
+			var rare_shop_price: int = ceili((25.0 + 7.0 * state.run.depth) * 2.0 * scale)
+			costs["CREDITS"] = ceili(float(rare_shop_price) * 0.6)
 	return costs
 
 func quest_choice_costs(choice: Dictionary) -> Dictionary:

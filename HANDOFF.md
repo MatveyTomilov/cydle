@@ -9,6 +9,12 @@
 - Follow-up source checkpoint `e1c4b33fd237fe5df5d424a8e368fd61622ca60a` adds offline-report history reload assertions. Independent regression: Godot 4.7.2 import exit 0; native suite 23 tests / 88,680 assertions / 0 failures; clean detached worktree and `git diff --check`.
 - Legacy TypeScript oracle on current code-equivalent HEAD `62c76fcbf5c2bb08af88cfcabd2839c49c12c393`: `npm test` exit 0 (22 files / 207 tests), `npm run typecheck` exit 0. No files changed by these checks.
 
+## Latest game-code checkpoint — EV13 price rounding
+
+- Godot change in progress on top of the balance-report documentation checkpoint: Grey Dealer computes `ceil(60% × ceil(rare shop price))`, matching Master Spec §20.1. At d12 this fixes the charge from 266 to 267 credits.
+- Regression added to `game/tests/golden/event_catalog_test.gd`. Godot 4.7.2 headless editor import exit 0; full native suite exit 0: 23 tests, 88,682 assertions, 0 failures. TypeScript suite/typecheck were already green at prior code-equivalent HEAD and are unaffected by this Godot-only change.
+- Exact commit SHA will be recorded after commit/push verification.
+
 ## Latest game checkpoint (2026-11-13; offline diagnostics precision and history)
 
 - Game-code checkpoint: `50e61651290083ddb75893757d723b334607faab`. An explicit boolean now distinguishes an observed wall-clock delta from the API's default sentinel, so an exact -1 ms rollback is preserved instead of being rounded to -2 ms. The offline report history rows now show excess time or clock rollback, matching the current report.

@@ -9,8 +9,27 @@ func run(_tree: SceneTree) -> bool:
 	check(event.size() > 0 and event.get("choices", []).size() == 2, "event_catalog: event choices are missing")
 	var used: Array[String] = ["EV22"]
 	check(not catalog.available_ids(used).has("EV22"), "event_catalog: used event remained available for the campaign")
+	_test_grey_dealer_price_rounding(catalog)
 	_test_all_event_choice_transactions(catalog)
 	return failure_count == 0
+
+func _test_grey_dealer_price_rounding(catalog: EventCatalog) -> void:
+	var session: GameSession = GameSession.new()
+	session.configure_save_directory("user://test-saves/event-grey-dealer-price")
+	if not check(session.start_new_game(1762900000990) and session.start_expedition("event-grey-dealer-price"), "event_catalog: could not prepare Grey Dealer price regression"):
+		return
+	session.state.run.depth = 12
+	var event: Dictionary = catalog.get_event("EV13")
+	var rare_choice: Dictionary = {}
+	for choice: Dictionary in event.get("choices", []):
+		if str(choice.get("special", "")) == "greyDealer":
+			rare_choice = choice
+			break
+	var scale: float = CydleFormula.new().reward_scale(12.0)
+	var rare_shop_price: int = ceili((25.0 + 7.0 * 12.0) * 2.0 * scale)
+	var expected_cost: int = ceili(float(rare_shop_price) * 0.6)
+	var actual_costs: Dictionary = session.event_choice_costs(rare_choice)
+	check(not rare_choice.is_empty() and expected_cost == 267 and int(actual_costs.get("CREDITS", -1)) == expected_cost, "event_catalog: EV13 did not apply ceil(60%% × rounded rare shop price) at depth 12; shop=%d expected=%d actual=%s" % [rare_shop_price, expected_cost, str(actual_costs)])
 
 func _test_all_event_choice_transactions(catalog: EventCatalog) -> void:
 	var session: GameSession = GameSession.new()
