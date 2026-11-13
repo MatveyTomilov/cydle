@@ -8,7 +8,7 @@ The active strategy is **FULL GAME FIRST**: connect every major Master Spec syst
 
 ### Current status override (2026-11-13; campaign E2E survival decision)
 
-Pushed HEAD `18b568fd5083ea40c3d9f2550be6c608e6fe34c7` improves the campaign E2E pilot's REPAIR choice: below 80% operator HP it attempts the authored HP service first; otherwise it attempts hull repair, with fallback. This changes only the scripted pilot, not repair rules or game balance. Godot 4.7.2 successfully launched and resumed the saved E2E combat; the campaign is still in progress in an isolated profile. Earlier d4 attempts ended in actual defeat; no full-campaign pass is claimed. Last confirmed full suite: 22 scripts / 88,091 assertions / 0 failures at the prior gameplay checkpoint. Export was not rerun for this harness-only change. See the current checkpoint block in `HANDOFF.md` for profile paths and continuation point.
+Pushed HEAD `18b568fd5083ea40c3d9f2550be6c608e6fe34c7` improves the campaign E2E pilot's REPAIR choice: below 80% operator HP it attempts the authored HP service first; otherwise it attempts hull repair, with fallback. This changes only the scripted pilot, not repair rules or game balance. A resumed campaign remains in progress in an isolated profile. The improved run reached BOSS_A, dealt 1,857 operator damage, then was defeated with BOSS_A at 1,001/2,269 HP; later attempts have failed in d4 regular combat. No full-campaign pass is claimed. Current checks on the checkpoint: editor import exit 0, 22 scripts / 88,091 assertions / 0 failures, Windows Desktop export and EXE headless smoke exit 0, and diff check exit 0. See `HANDOFF.md` for profile paths and continuation point.
 
 ### Current status override (2026-11-13; save checksum JSON-roundtrip fix)
 
