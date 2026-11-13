@@ -1229,7 +1229,12 @@ func _show_road() -> void:
 	_body.add_child(offline_toggle)
 	if not _session.last_autopilot_report.is_empty():
 		var report: Dictionary = _session.last_autopilot_report
-		var report_label: Label = _label("АВТОПИЛОТ · %s · %s · узлов %d · бои %d/%d · выездов %d/%d · game-time %s · офлайн %s" % [str(report.get("status", "")), str(report.get("reason", "")), int(report.get("nodesVisited", 0)), int(report.get("battlesWon", 0)), int(report.get("battlesLost", 0)), int(report.get("runsFinished", 0)), int(report.get("runsStarted", 0)), _fmt(float(report.get("simulatedMs", 0.0)) / 1000.0) + " с", _fmt(float(report.get("elapsedWallClockMs", 0.0)) / 1000.0) + " с"], 12, COLOR_CYAN)
+		var time_notice: String = ""
+		if int(report.get("unappliedTimeMs", 0)) > 0:
+			time_notice = " · не применено %s с из-за лимита 12 ч" % _fmt(float(report.get("unappliedTimeMs", 0)) / 1000.0)
+		elif int(report.get("clockRollbackMs", 0)) > 0:
+			time_notice = " · часы сдвинулись назад на %s с; время не применено" % _fmt(float(report.get("clockRollbackMs", 0)) / 1000.0)
+		var report_label: Label = _label("АВТОПИЛОТ · %s · %s · узлов %d · бои %d/%d · выездов %d/%d · game-time %s · офлайн %s%s" % [str(report.get("status", "")), str(report.get("reason", "")), int(report.get("nodesVisited", 0)), int(report.get("battlesWon", 0)), int(report.get("battlesLost", 0)), int(report.get("runsFinished", 0)), int(report.get("runsStarted", 0)), _fmt(float(report.get("simulatedMs", 0.0)) / 1000.0) + " с", _fmt(float(report.get("elapsedWallClockMs", 0.0)) / 1000.0) + " с", time_notice], 12, COLOR_CYAN)
 		report_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_body.add_child(report_label)
 		var report_currency: Dictionary = report.get("netCurrencyDelta", {})

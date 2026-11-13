@@ -33,9 +33,11 @@ func load_saved_game() -> bool:
 				return false
 		if state.run != null and state.run.autopilot_enabled and not ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(state.run.phase):
 			var now_ms: int = int(Time.get_unix_time_from_system() * 1000.0)
-			var offline_elapsed_ms: int = clampi(now_ms - offline_since_ms, 0, 43200000)
-			if offline_elapsed_ms >= 1000:
-				last_autopilot_report = simulate_autopilot(offline_elapsed_ms, offline_elapsed_ms)
+			var observed_offline_elapsed_ms: int = now_ms - offline_since_ms
+			if observed_offline_elapsed_ms < 0:
+				last_autopilot_report = simulate_autopilot(0, observed_offline_elapsed_ms if observed_offline_elapsed_ms < -1 else -2)
+			elif observed_offline_elapsed_ms >= 1000:
+				last_autopilot_report = simulate_autopilot(observed_offline_elapsed_ms, observed_offline_elapsed_ms)
 		last_error = ""
 		return true
 	if bool(loaded.get("empty", false)):
@@ -1114,8 +1116,12 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000, elapsed_wall_clock
 	const MAX_OFFLINE_MS: int = 43200000
 	const MAX_COMMANDS: int = 2048
 	var budget: int = clampi(simulation_budget_ms, 0, MAX_OFFLINE_MS)
-	var report: Dictionary = {"ok": true, "status": "RUNNING", "reasonCode": "BUDGET", "reason": "Достигнут лимит симуляции.", "simulatedMs": 0, "elapsedWallClockMs": 0, "nodesVisited": 0, "battles": 0, "battlesWon": 0, "battlesLost": 0, "itemsFound": 0, "itemsSecured": 0, "itemsLost": 0, "runsStarted": 1, "runsFinished": 0, "eventLog": [], "seed": "", "error": ""}
+	var report: Dictionary = {"ok": true, "status": "RUNNING", "reasonCode": "BUDGET", "reason": "Достигнут лимит симуляции.", "simulatedMs": 0, "elapsedWallClockMs": 0, "unappliedTimeMs": 0, "clockRollbackMs": 0, "nodesVisited": 0, "battles": 0, "battlesWon": 0, "battlesLost": 0, "itemsFound": 0, "itemsSecured": 0, "itemsLost": 0, "runsStarted": 1, "runsFinished": 0, "eventLog": [], "seed": "", "error": ""}
 	report["_elapsedWallClockMs"] = clampi(elapsed_wall_clock_ms, 0, MAX_OFFLINE_MS) if elapsed_wall_clock_ms >= 0 else -1
+	if elapsed_wall_clock_ms > MAX_OFFLINE_MS:
+		report["unappliedTimeMs"] = elapsed_wall_clock_ms - MAX_OFFLINE_MS
+	elif elapsed_wall_clock_ms < -1:
+		report["clockRollbackMs"] = absi(elapsed_wall_clock_ms)
 	report["_wallClockStartedAtMs"] = int(Time.get_unix_time_from_system() * 1000.0)
 	if state == null or state.run == null or ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(state.run.phase):
 		return _autopilot_stop("PAUSED_FOR_DECISION", "NO_ACTIVE_RUN", "Автопилот продолжит движение только из активного выезда.", report)
