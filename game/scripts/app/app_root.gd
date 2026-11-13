@@ -41,6 +41,7 @@ func _ready() -> void:
 	_reduced_motion = bool(_settings.get_value("accessibility", "reduced_motion", false))
 	_build_shell()
 	_show_menu()
+	print("CYDLE shell ready: %s" % _screen)
 
 func _build_shell() -> void:
 	for child: Node in get_children():

@@ -10,10 +10,18 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: cydle-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: 4.7.2
+  GODOT_CI_ROOT: ${{ github.workspace }}\.godot-ci
+
 jobs:
   windows-checks:
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -39,24 +47,81 @@ jobs:
       - name: Build legacy reference
         run: npm run build
 
-      - name: Set up Godot 4.7.2 and Windows export templates
-        uses: chickensoft-games/setup-godot@ac93246ea68518a384c1c280a496e5989341f2f6
+      - name: Cache Godot editor and Windows export templates
+        uses: actions/cache@v4
         with:
-          version: 4.7.2
-          use-dotnet: false
-          include-templates: true
+          path: ${{ env.GODOT_CI_ROOT }}
+          key: godot-ci-${{ env.GODOT_VERSION }}-stable-win64-v1
+
+      - name: Install Godot with console wrapper and export templates
+        shell: pwsh
+        run: ./scripts/ci/install-godot.ps1 -Version $env:GODOT_VERSION -InstallRoot $env:GODOT_CI_ROOT
 
       - name: Import native project
-        run: godot --headless --path game --editor --quit
+        shell: pwsh
+        run: |
+          & $env:GODOT_CONSOLE --headless --path game --editor --quit *> godot-import.log
+          $code = $LASTEXITCODE
+          Get-Content godot-import.log | Write-Host
+          if ($code -ne 0) { throw "Godot import failed with exit code $code" }
 
       - name: Run native headless tests
-        run: godot --headless --path game --script res://tests/run_tests.gd
+        shell: pwsh
+        run: |
+          & $env:GODOT_CONSOLE --headless --path game --script res://tests/run_tests.gd *> godot-tests.log
+          $code = $LASTEXITCODE
+          Get-Content godot-tests.log | Write-Host
+          if ($code -ne 0) { throw "Native tests failed with exit code $code" }
+          $summary = Select-String -Path godot-tests.log -Pattern 'CYDLE headless tests: (\d+) tests passed, (\d+) tests failed; (\d+) assertions, (\d+) assertion failures'
+          if ($null -eq $summary) { throw 'Native test summary is missing: the test runner did not actually execute' }
+          $groups = $summary.Matches[0].Groups
+          $passed = [int]$groups[1].Value
+          $failed = [int]$groups[2].Value
+          $assertions = [int]$groups[3].Value
+          $assertionFailures = [int]$groups[4].Value
+          if ($failed -ne 0 -or $assertionFailures -ne 0) { throw "Native tests reported $failed failed tests and $assertionFailures failed assertions" }
+          if ($passed -lt 23 -or $assertions -lt 80000) { throw "Native suite ran only $passed tests / $assertions assertions; expected at least 23 / 80000" }
+          Write-Host "Verified native suite: $passed tests, $assertions assertions, 0 failures"
 
       - name: Validate asset manifest
-        run: godot --headless --path game --script res://tools/validate_assets.gd
+        shell: pwsh
+        run: |
+          & $env:GODOT_CONSOLE --headless --path game --script res://tools/validate_assets.gd *> godot-assets.log
+          $code = $LASTEXITCODE
+          Get-Content godot-assets.log | Write-Host
+          if ($code -ne 0) { throw "Asset manifest validation failed with exit code $code" }
 
       - name: Export Windows release
-        run: godot --headless --path game --export-release "Windows Desktop" build/CYDLE.exe
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path game/build | Out-Null
+          & $env:GODOT_CONSOLE --headless --path game --export-release "Windows Desktop" build/CYDLE.exe *> godot-export.log
+          $code = $LASTEXITCODE
+          Get-Content godot-export.log | Write-Host
+          if ($code -ne 0) { throw "Windows export failed with exit code $code" }
+          if (-not (Test-Path game/build/CYDLE.exe)) { throw 'Windows export produced no executable' }
+          $bytes = (Get-Item game/build/CYDLE.exe).Length
+          if ($bytes -lt 50MB) { throw "Exported executable is unexpectedly small: $bytes bytes" }
+          Write-Host ("Exported game/build/CYDLE.exe ({0:N0} bytes)" -f $bytes)
+
+      - name: Smoke test exported executable
+        shell: pwsh
+        run: |
+          $smokeAppData = Join-Path $env:RUNNER_TEMP 'cydle-smoke-appdata'
+          if (Test-Path $smokeAppData) { Remove-Item $smokeAppData -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path $smokeAppData | Out-Null
+          $env:APPDATA = $smokeAppData
+          $exe = (Resolve-Path 'game/build/CYDLE.exe').Path
+          $out = Join-Path $env:RUNNER_TEMP 'cydle-smoke-out.log'
+          $err = Join-Path $env:RUNNER_TEMP 'cydle-smoke-err.log'
+          $process = Start-Process -FilePath $exe -ArgumentList '--headless', '--quit-after', '300' -NoNewWindow -Wait -PassThru -RedirectStandardOutput $out -RedirectStandardError $err
+          Get-Content $out, $err | Write-Host
+          if ($process.ExitCode -ne 0) { throw "Exported executable exited with code $($process.ExitCode)" }
+          $log = "$(Get-Content $out -Raw)`n$(Get-Content $err -Raw)"
+          if ($log -notmatch 'CYDLE shell ready') { throw 'Exported executable did not reach the game shell' }
+          if ($log -match 'SCRIPT ERROR|Parse Error|Failed to load|Cannot open file') { throw 'Exported executable reported runtime errors' }
+          if (-not (Test-Path (Join-Path $smokeAppData 'Godot\app_userdata\CYDLE'))) { throw 'Exported executable did not initialize its user data directory' }
+          Write-Host 'Exported executable booted the game shell and exited cleanly'
 
       - name: Upload Windows release artifact
         uses: actions/upload-artifact@v4
@@ -65,3 +130,17 @@ jobs:
           path: game/build/CYDLE.exe
           if-no-files-found: error
           retention-days: 14
+          compression-level: 6
+
+      - name: Upload verification logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cydle-ci-logs-${{ github.sha }}
+          path: |
+            godot-import.log
+            godot-tests.log
+            godot-assets.log
+            godot-export.log
+          if-no-files-found: warn
+          retention-days: 7
