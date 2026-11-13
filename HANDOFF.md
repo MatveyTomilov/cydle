@@ -1,9 +1,19 @@
 # CYDLE — Project handoff and development history
 
+## SAFE PAUSE checkpoint (2026-11-13)
+
+- **Development is paused by owner request. Do not continue implementation until a new instruction.** Repository: `https://github.com/MatveyTomilov/cydle`; workspace: `E:\cydle\project`; branch: `development/codex`.
+- Verified source checkpoint: `67d83499a441d0625497bd85d9aac535336e592c`. Current local and remote HEAD before this pause-document update: `47942c3779d86b855c86073df0ff2165d60af909`; branch matched remote and tree was clean. The commit following this paragraph updates handoff docs only. Use the final reply's SHA for the pushed pause checkpoint.
+- This session completed the all-quest-choice regression: all 36 choices from Q01–Q06 transact via `GameSession.resolve_quest_choice()` on prepared fixtures and survive save-schema parsing. The preceding all-event smoke runs all 48 event choices via `resolve_event()`. It also fixed fresh-session event item grants by loading the item catalog inside `resolve_event()`, fixed the R3D same-target tree trigger, and retained the earlier quest graph/E10 summon fixes. Those are functional checkpoints, not feature completeness.
+- Current verification: Godot 4.7.2 headless editor import just ran and exited 0. Full `res://tests/run_tests.gd` ran after the last game-code change: 22 tests passed, 88,578 assertions, 0 failures. `git diff --check` exited 0 before documentation changes. Full tests were not rerun after docs-only commits. No Windows export, GUI smoke, current CI query or campaign E2E was done for this pause.
+- Overall CYDLE remains **incomplete**: see `docs/FEATURE_AUDIT.md`. All event and quest choices transaction-tested does not prove their exact balance/consequences, natural campaign path, or release coverage. 12-sector campaign completion, contract lifecycle acceptance, combat family/context coverage, 12-hour offline parity, endgame, and feature-complete Windows packaging remain unverified or partial. No FEATURE COMPLETE claim is made.
+- Preserve `dist/CYDLE-Playable-Alpha.zip` and all existing user profiles/backups. The new test harnesses use the isolated directories `user://test-saves/event-catalog-matrix` and `user://test-saves/quest-choice-matrix`; do not delete them. CI status was not queried; inspect GitHub Actions before treating CI as green.
+- Suggested first atomic task after the pause is lifted: follow one accepted HUNT contract from natural route travel through the target elite's real shared-engine battle and reward settlement, then cover TECH/ESCORT success and failure lifecycle. Update the feature matrix from observed behavior; do not begin with boss balancing.
+
 ## Current checkpoint (2026-11-13; execute all authored quest choices)
 
 - Repository `https://github.com/MatveyTomilov/cydle`; workspace `E:\cydle\project`; branch `development/codex`.
-- HEAD and `origin/development/codex`: `67d83499a441d0625497bd85d9aac535336e592c`; clean after push.
+- Implementation checkpoint: `67d83499a441d0625497bd85d9aac535336e592c`; pause-document checkpoint is the final SHA in the current Git history.
 - Added a data-driven GameSession regression for all 36 choices across the six three-stage quests. It prepares the stage's authored biome/gate/target, runs the real `resolve_quest_choice()` transaction, and checks decision history plus save-schema roundtrip. All 36 choices currently resolve on supported fixtures; this does not verify exact narrative/reward balance or all route arrival sequences.
 - Latest full checks: Godot 4.7.2 headless editor import exit 0; 22 tests passed, 88,578 assertions, 0 failures; `git diff --check` exit 0. The all-event 48-choice smoke remains passing in the same suite. No Windows export, GUI smoke or campaign E2E was run.
 - Continue with contract lifecycle completion and remaining partial systems in `docs/FEATURE_AUDIT.md`. Keep boss campaign auto retries deferred.

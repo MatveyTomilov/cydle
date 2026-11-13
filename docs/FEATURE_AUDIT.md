@@ -30,7 +30,8 @@ This is an implementation audit, not a release checklist. “Complete” means t
 ## Current checkpoint
 
 - Branch: `development/codex`.
-- HEAD / remote SHA: `67d83499a441d0625497bd85d9aac535336e592c`.
+- Last verified game-code SHA: `67d83499a441d0625497bd85d9aac535336e592c`; latest branch/document checkpoint is the final SHA in the current Git history.
 - Godot 4.7.2 editor import exit 0.
 - `res://tests/run_tests.gd`: 22 tests passed, 88,578 assertions, 0 failures.
+- CI status was not queried. The complete test suite was not rerun after docs-only updates.
 - This is not a FEATURE COMPLETE BETA claim. Full spec coverage, campaign completion, and beta export are still outstanding.
