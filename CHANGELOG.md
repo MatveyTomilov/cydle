@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — contract target visibility
+
+- Accepted contract targets are now revealed and marked on the route map. The active contract panel shows objective details, live ESCORT requirements, and whether a completion reward is still unsecured or the objective failed.
+- Regression verifies an accepted HUNT target is exposed as an ELITE node in route intel. Godot 4.7.2 editor import exit 0; 23 tests / 88,625 assertions / 0 failures. No Windows export or GUI smoke was run.
+
 ## Unreleased — exercise all authored quest choices
 
 - Added real GameSession transaction scenarios for all 36 authored choices across Q01–Q06, including stage gates/targets, quest progress, event completion and save-schema roundtrip.

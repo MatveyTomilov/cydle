@@ -6,6 +6,10 @@
 
 Current strategy is **FEATURE COMPLETE BETA**: audit against the normative Master Spec, close significant runtime/UI gaps, and validate real state transitions. Boss balancing and repeated automatic boss retries are deferred unless a concrete gameplay defect requires them. Preserve all profile/save data; use short deterministic integration scenarios.
 
+### Latest checkpoint — contract objectives surfaced for players (2026-11-13)
+
+Commit `26161dea2aaa463e940abeff5985fb6fd90643a3` marks and reveals the accepted contract's target node on the route map. The active contract summary now exposes objective and live ESCORT thresholds and makes unsecured reward status legible. Regression confirms an accepted HUNT target is shown as an ELITE objective. Godot editor import exit 0; 23 tests / 88,625 assertions / 0 failures; no export or GUI smoke. This closes contract target visibility, not the full contract lifecycle. Next: natural HUNT battle-to-reward and TECH/ESCORT success/failure.
+
 ### Current checkpoint — resumed offline and quest transaction fixes (2026-11-13)
 
 Implementation checkpoint `10119bd1fe1a87d09e1504598bbd60535207d9b6`, resumed from pause `bf2c8c1c767159b2a454b95b868c28bb09c5374c`. Fixed resumed-combat offline budget double charging, Q03/Q04 stage-2 paid alternative objective gating (combat reward branches remain gated), and Q02 stage-3 B03 routing. Added offline save/reload and quest readiness regressions and hardened the test runner's parse-error handling. Godot import exit 0; 23 tests / 88,624 assertions / 0 failures; npm unit tests 207 passed; npm production build exit 0. No Windows export, GUI smoke, CI query, or campaign E2E was run. CYDLE remains incomplete; see `docs/FEATURE_AUDIT.md`. Next: natural HUNT contract target-battle-reward lifecycle, then TECH/ESCORT success and failure. Keep boss retries deferred.

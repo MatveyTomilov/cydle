@@ -1,5 +1,12 @@
 # CYDLE — Project handoff and development history
 
+## Latest checkpoint (2026-11-13; contract objective UI)
+
+- Implementation commit: `26161dea2aaa463e940abeff5985fb6fd90643a3` on `development/codex`, following `10119bd1fe1a87d09e1504598bbd60535207d9b6`.
+- Active contracts now reveal their authored target node in route intel and mark it on the map. The road view describes HUNT/SIGNAL/TECH objectives, live ESCORT conditions, and whether an unsecured reward is complete or the objective failed. A HUNT offer regression confirms objective reveal and type.
+- Godot 4.7.2 editor import exit 0; full native suite: 23 tests / 88,625 assertions / 0 failures; diff check exit 0. No export, GUI smoke or natural HUNT campaign battle/reward flow was run.
+- Contract system remains partial: exact end-to-end objective completion and claim/save/death-loss lifecycle still need testing. Next: a natural HUNT target encounter through exactly-once reward, then TECH and ESCORT success/failure scenarios.
+
 ## Current checkpoint (2026-11-13; offline budget, quest alternatives and Q02 routing)
 
 - Repository: `https://github.com/MatveyTomilov/cydle`; workspace: `E:\cydle\project`; branch: `development/codex`. Implementation checkpoint: `10119bd1fe1a87d09e1504598bbd60535207d9b6`; this resumes work after pause checkpoint `bf2c8c1c767159b2a454b95b868c28bb09c5374c`.
