@@ -1,5 +1,12 @@
 # CYDLE — Project handoff and development history
 
+## Experimental feature checkpoint — Autobattle V2 (2026-11-13)
+
+- User-approved new combat model codified in CYDLE_MASTER_SPEC.md v2.1 §8 on isolated feature/autobattle-v2 branch, based on Codex checkpoint 6d2a8fe. It replaces V1 programmable tactics with equipment-authored automatic behavior.
+- Added isolated game/scripts/core/combat/autobattle_v2_contract.gd and the autobattle_v2_contract_test.gd headless test; these cover scheduling, phases, proc budgets, targeting and denial reasons.
+- Important: this code is not wired into live GameSession or CombatSimulator; no V2 duel, Heat synergy, live Why/Why Not, consumables, offline parity or campaign balance has been verified. Preserve V1 replay, save data and executable results. CI unverified until checks are inspected.
+
+
 ## Latest checkpoint (2026-11-13; full field equipment and live combat build)
 
 - Checkpoint `405d88d` addressed a concrete player-facing hole behind early BOSS_A attempts: run cargo could not be equipped, and combat always resolved the garage (`meta.equipment`) build even though a run has its own `run.equipment`. Its follow-up adds all six transport/service categories so field installation covers every equipment slot category (`MAIN`, `OFFHAND`, `ARMOR`, `IMPLANT`, `DRONE`, `ENGINE`, `CHASSIS`, `SCANNER`, `SERVICE`, `CARGO`, `SUPPORT`). A sortie player can install compatible unsecured loot between fights, inspect its actual field Build Lab values, use the same resolved field kit in combat, save/load it, and carry it across sector continuation. This preserves the Master Spec rule that field cargo remains unsecured until extraction.
