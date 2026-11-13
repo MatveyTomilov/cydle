@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — fail active contracts on death
+
+- A sortie defeat now closes any still-active contract as `FAILED` while applying the existing death rule that loses unsecured cargo and run currency.
+- Added a persistence regression covering the failed status and temporary cargo loss. Godot 4.7.2 import exit 0; 23 tests / 88,655 assertions passed.
+
+## Unreleased — natural SIGNAL unique reward
+
+- Replaced the direct reward-helper fixture with a real route flow to the SIGNAL target ELITE, shared-simulator battle, guaranteed U09 UNIQUE reward and save reload.
+- Godot 4.7.2 import exit 0; 23 tests / 88,647 assertions passed. No Windows export or GUI smoke.
+
 ## Unreleased — natural ESCORT checkpoint settlement
 
 - Added a deterministic runtime flow that follows reachable route nodes, clears two real shared-simulator battles, reaches the generated checkpoint and verifies the ESCORT credit/faction rewards and completion grant after save reload.

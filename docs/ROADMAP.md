@@ -6,9 +6,13 @@
 
 Current strategy is **FEATURE COMPLETE BETA**: audit against the normative Master Spec, close significant runtime/UI gaps, and validate real state transitions. Boss balancing and repeated automatic boss retries are deferred unless a concrete gameplay defect requires them. Preserve all profile/save data; use short deterministic integration scenarios.
 
-### Latest checkpoint — HUNT, TECH and ESCORT natural contract paths (2026-11-13)
+### Latest checkpoint — contract reward paths and death settlement (2026-11-13)
 
-The latest contract integration also runs ESCORT from a fresh profile through two actual shared-simulator battles and onto the generated checkpoint, then verifies credits, faction reputation, exactly-once grant state and reload. Full native suite: 23 tests / 88,648 assertions / 0 failures; Godot import exit 0. No Windows export, GUI smoke or CI query. ESCORT failure-state behavior and SIGNAL unique-reward battle remain unverified.
+`06390ad706222fc47361b58de66093d5a9067721` adds natural SIGNAL completion: follow the generated route, clear the preceding encounters through the shared simulator, win the target ELITE, verify its exact U09 UNIQUE grant and reload. `517eca506f21f3a7251c6f231174f5c249bf8955` marks any ACTIVE contract FAILED when death settles and tests loss of sortie cargo/currency plus persisted failed state. Latest local Godot import exit 0 and 23 tests / 88,655 assertions / 0 failures; independent tester is checking `517eca5`. No Windows export, GUI smoke or CI query. ESCORT failure thresholds, loss of completed unsecured contract rewards, faction effects and offer/restart persistence still need work.
+
+### Prior checkpoint — HUNT, TECH and ESCORT natural contract paths (2026-11-13)
+
+The prior contract integration also runs ESCORT from a fresh profile through two actual shared-simulator battles and onto the generated checkpoint, then verifies credits, faction reputation, exactly-once grant state and reload. Full native suite: 23 tests / 88,648 assertions / 0 failures; Godot import exit 0. ESCORT failure-state behavior remains unverified.
 
 ### Prior checkpoint — HUNT and TECH natural contract paths (2026-11-13)
 
