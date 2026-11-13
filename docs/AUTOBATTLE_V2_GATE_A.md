@@ -20,6 +20,10 @@ Working branch: `feature/autobattle-v2`; draft PR #3. Gate A is **OPEN**.
 
 ## Initial evidence
 
+- Source `5d9e059`, CI run 43460440500: all checks successful, Windows artifact 14055363627 (40,881,686 B), exported EXE smoke successful. PR tests use merge commit `a8021caf645a13c95537246992cb211aa184a4c4`. This executable still boots V1 gameplay.
+
+- `5d9e059b3a81a874b0690b8c057c8c886c50b496`: independent detached regression, 30 native scripts / 89,232 assertions / 0 failures; import/diff check exit 0. Real weapon/channel runs through the shared simulator and resumes a typed snapshot. GameSession activation, JSON float persistence parity and full V2 build integration remain open.
+
 - `23194c2e2f8f0ce475247303b8409ce766d6322a`: independent detached regression, 29 native scripts / 89,072 assertions / 0 failures, import and diff check exit 0. First shared-runtime adapter is a subsequent checkpoint; it is not a playable migration yet.
 
 - Base `d6dc327`: CI run 43452520024 passed 28 scripts / 89,045 assertions and exported/smoked Windows EXE. This proves prototype and V1 only.

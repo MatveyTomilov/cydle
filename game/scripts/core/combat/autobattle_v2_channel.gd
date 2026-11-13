@@ -75,10 +75,15 @@ func interrupt(current: Dictionary, now_ms: int) -> Dictionary:
 func _validate(state: Dictionary, now_ms: int) -> String:
 	if str(state.get("version", "")) != VERSION:
 		return "INCOMPATIBLE_ACTION_CHANNEL"
+	if not _is_tick_value(state.get("lastTimeMs")) or not _is_nonnegative_integer(state.get("supportStreak")):
+		return "INVALID_ACTION_CHANNEL"
 	if now_ms < int(state.get("lastTimeMs", 0)) or now_ms < 0 or now_ms % AutobattleV2Contract.TICK_MS != 0:
 		return "INVALID_CHANNEL_TIME"
 	if not state.get("active") is Dictionary or not state.get("cooldowns") is Dictionary:
 		return "INVALID_ACTION_CHANNEL"
+	for action_id: Variant in state["cooldowns"]:
+		if not action_id is String or str(action_id).is_empty() or not _is_tick_value(state["cooldowns"][action_id]):
+			return "INVALID_ACTION_CHANNEL"
 	var active: Dictionary = state["active"]
 	if not active.is_empty() and (not active.get("action") is Dictionary or not active.get("timeline") is Dictionary):
 		return "INVALID_ACTION_CHANNEL"
@@ -91,8 +96,14 @@ func _validate(state: Dictionary, now_ms: int) -> String:
 			return "INVALID_ACTION_CHANNEL"
 		for field: String in ["commitAtMs", "recoveryUntilMs", "readyAtMs"]:
 			var value: Variant = timeline.get(field)
-			if not (value is int or value is float) or not is_finite(float(value)) or float(value) != floorf(float(value)) or int(value) < 0 or int(value) % AutobattleV2Contract.TICK_MS != 0:
+			if not _is_tick_value(value):
 				return "INVALID_ACTION_CHANNEL"
 		if int(timeline["commitAtMs"]) > int(timeline["recoveryUntilMs"]) or int(timeline["recoveryUntilMs"]) > int(timeline["readyAtMs"]):
 			return "INVALID_ACTION_CHANNEL"
 	return ""
+
+func _is_tick_value(value: Variant) -> bool:
+	return _is_nonnegative_integer(value) and int(value) % AutobattleV2Contract.TICK_MS == 0
+
+func _is_nonnegative_integer(value: Variant) -> bool:
+	return (value is int or value is float) and is_finite(float(value)) and float(value) >= 0 and float(value) == floorf(float(value))

@@ -2,6 +2,12 @@
 
 ## Current V2 work — action channel and compatibility boundary (2026-11-13)
 
+- CI for source `5d9e059` succeeded: run `43460440500`, all native/reference/asset gates, Windows export and EXE smoke. PR merge artifact `cydle-windows-a8021caf645a13c95537246992cb211aa184a4c4`, id `14055363627`, 40,881,686 bytes. It launches the preserved V1 game shell; it is not a playable V2 build. Follow-up runtime regression now has 166 assertions, channel test 21; both pass locally. CI floor increased to 30 scripts / 89,000 assertions to require the expanded suite.
+
+- Independent detached verification of real-weapon adapter `5d9e059b3a81a874b0690b8c057c8c886c50b496`: import exit 0, **30 native tests / 89,232 assertions / 0 failures**, diff check exit 0, isolated APPDATA and clean worktree. Logs `%TEMP%/cydle-autobattle-v2-5d9e059-logs`. This confirms the narrow domain adapter and existing V1 regressions, not live V2 gameplay.
+
+- Adapter review follow-up: action timing now samples effective attack-speed stats and SHOCK at preparation, then persists that timing through status expiry. Preparation, actual ATTACK and damage `originActionId` now share an action instance; ATTACK links the source item and preparation event. Snapshot restore verifies the build fingerprint and canonical source/cost/class fields. Targeted runtime test **165 assertions**, legacy combat test **483**, both exit 0; full CI must verify the final checkpoint.
+
 - Follow-up adapter: `CombatFactory.compile_v2_weapon_action()` derives source, costs and timing from a real BuildResolver weapon; explicit `cydle-combat-2.0-development` dispatch now executes its channel in the existing CombatSimulator with its canonical damage/status/roster math. This is deliberately opt-in for direct domain tests. GameSession still creates/resumes V1 only. Unported equipped skills, drones, proc effects and V1 tactics are rejected, never silently ignored. V2 development snapshots validate the channel before domain restore. Actual weapon attacks, seeded continuation and version rejection are covered in `autobattle_v2_runtime_test.gd`; no playable V2 claim.
 - Independent verification of `23194c2e2f8f0ce475247303b8409ce766d6322a`: fresh detached worktree, import exit 0, full native suite **29 tests / 89,072 assertions / 0 failures**, exit 0, diff check exit 0, clean worktree. Logs under `%TEMP%/cydle-autobattle-v2-logs-23194c2e2f8f0ce4`. This resolves the stale-process test failure documented below. The follow-up adapter requires its own checks.
 

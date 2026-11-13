@@ -26,6 +26,9 @@ func run(_tree: SceneTree) -> bool:
 	var changed_build: Dictionary = build.duplicate(true)
 	changed_build["mainWeapon"]["damage"] = float(changed_build["mainWeapon"]["damage"]) + 1.0
 	check(CombatState.from_dictionary(current.to_dictionary(), changed_build) == null, "v2_runtime: changed build silently reinterpreted an active snapshot")
+	var forged: Dictionary = current.to_dictionary()
+	forged["actionChannel"]["active"]["action"]["sourceId"] = "fake-weapon"
+	check(CombatState.from_dictionary(forged, build) == null, "v2_runtime: unauthored action source restored")
 	for tick: int in range(150):
 		var first: Dictionary = simulator.step_combat(current)
 		var resumed: Dictionary = simulator.step_combat(restored)
@@ -35,6 +38,30 @@ func run(_tree: SceneTree) -> bool:
 		restored = resumed["state"]
 	check(StateHash.new().state_hash(current.to_dictionary()) == StateHash.new().state_hash(restored.to_dictionary()), "v2_runtime: channel restore changed real combat")
 	check(float(current.metrics.get("damageDealt", 0)) > 0, "v2_runtime: canonical damage path did no real damage")
+	var prepared: Dictionary = {}
+	var linked: bool = false
+	var linked_damage: bool = false
+	for event: Dictionary in current.log:
+		if str(event.get("kind", "")) == "ACTION_PREPARE":
+			prepared[str(event.get("actionId", ""))] = event
+		if str(event.get("kind", "")) == "ATTACK" and str(event.get("actorId", "")) == "operator":
+			var parent: Dictionary = prepared.get(str(event.get("actionId", "")), {})
+			linked = linked or (not parent.is_empty() and int(event.get("causeId", 0)) == int(parent.get("eventId", -1)) and str(event.get("sourceId", "")) == str(weapon["itemId"]))
+		if str(event.get("kind", "")) == "DAMAGE" and str(event.get("actorId", "")) == "operator":
+			linked_damage = linked_damage or prepared.has(str(event.get("originActionId", "")))
+	check(linked, "v2_runtime: real attack lost preparation/item causal identity")
+	check(linked_damage, "v2_runtime: canonical damage trace lost its prepared action identity")
+	var shocked: CombatState = created["state"].clone()
+	simulator._add_simple_status(shocked, shocked.enemies[0], shocked.operator, "SHOCK", 1000)
+	shocked = simulator.step_combat(shocked)["state"]
+	var slowed: Dictionary = shocked.action_channel["active"]["action"]
+	var normal: Dictionary = CombatFactory.new().compile_v2_weapon_action(build)
+	check(int(slowed["prepareMs"]) + int(slowed["recoveryMs"]) > int(normal["prepareMs"]) + int(normal["recoveryMs"]), "v2_runtime: SHOCK did not slow new action timing")
+	check(CombatState.from_dictionary(shocked.to_dictionary(), build) != null, "v2_runtime: slowed preparation failed snapshot restore")
+	for tick: int in range(20):
+		shocked = simulator.step_combat(shocked)["state"]
+	var recovered_action: Dictionary = shocked.action_channel["active"].get("action", {})
+	check(not recovered_action.is_empty() and int(recovered_action["prepareMs"]) == int(normal["prepareMs"]), "v2_runtime: expired SHOCK left permanent slow timing")
 	config["tactics"] = {"rules": [{"priority": 100}]}
 	check(not bool(simulator.create_state(config).get("ok", true)), "v2_runtime: V1 tactics accepted")
 	return failure_count == 0

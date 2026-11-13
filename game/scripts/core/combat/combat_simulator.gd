@@ -178,6 +178,7 @@ func _step_v2_weapon_channel(state: CombatState, rng: DeterministicRng) -> Dicti
 		state.action_channel = interrupted["state"]
 		if bool(interrupted.get("interrupted", false)):
 			_emit(state, "ACTION_INTERRUPTED", actor.id, {"data": {"reason": "STUN", "phase": "PREPARE"}})
+	var context: Dictionary = state.action_channel.get("active", {}).duplicate(true)
 	var advanced: Dictionary = channel.advance(state.action_channel, state.time_ms)
 	if not bool(advanced.get("ok", false)):
 		return _failure(str(advanced.get("error", "INVALID_ACTION_CHANNEL")))
@@ -195,13 +196,13 @@ func _step_v2_weapon_channel(state: CombatState, rng: DeterministicRng) -> Dicti
 		elif actor.heat_lockout and float(committed.get("heatDelta", 0)) > 0:
 			reason = "THERMAL_LOCK"
 		if reason.is_empty():
-			var applied: Dictionary = _resolve_basic_attack(state, rng, actor, target)
+			var applied: Dictionary = _resolve_basic_attack(state, rng, actor, target, context)
 			if not bool(applied.get("ok", false)):
 				return applied
 		else:
 			_emit(state, "ACTION_UNAVAILABLE", actor.id, {"data": {"reason": reason, "phase": "COMMIT", "sourceId": committed.get("sourceId", "")}})
 	if state.action_channel["active"].is_empty():
-		var action: Dictionary = _factory.compile_v2_weapon_action(state.build)
+		var action: Dictionary = _factory.compile_v2_weapon_action(state.build, _effective_sheet(state, actor), 1.0 / 0.7 if _has_status(actor, "SHOCK") else 1.0)
 		action["hasValidTarget"] = target != null
 		if _has_status(actor, "STUN"):
 			return {"ok": true}
@@ -212,7 +213,10 @@ func _step_v2_weapon_channel(state: CombatState, rng: DeterministicRng) -> Dicti
 		for rejected: Dictionary in chosen["rejected"]:
 			_emit(state, "ACTION_UNAVAILABLE", actor.id, {"data": rejected})
 		if not chosen["action"].is_empty():
-			_emit(state, "ACTION_PREPARE", actor.id, {"targetId": target.id if target != null else "", "data": chosen["action"]})
+			var instance_id: String = "%s:v2:%d" % [actor.id, state.time_ms]
+			var prepare_event: Dictionary = _emit(state, "ACTION_PREPARE", actor.id, {"actionId": instance_id, "sourceId": str(action["sourceId"]), "targetId": target.id if target != null else "", "data": chosen["action"]})
+			state.action_channel["active"]["instanceId"] = instance_id
+			state.action_channel["active"]["prepareEventId"] = int(prepare_event["eventId"])
 	return {"ok": true}
 
 func _supports_basic_auto_step(state: CombatState) -> bool:
@@ -2044,7 +2048,7 @@ func _pick_auto_target(state: CombatState, actor: CombatActorState) -> CombatAct
 				return enemy
 	return enemies[0] if not enemies.is_empty() else null
 
-func _resolve_basic_attack(state: CombatState, rng: DeterministicRng, actor: CombatActorState, target: CombatActorState) -> Dictionary:
+func _resolve_basic_attack(state: CombatState, rng: DeterministicRng, actor: CombatActorState, target: CombatActorState, context: Dictionary = {}) -> Dictionary:
 	if actor.kind == "operator":
 		_record_enemy_judge_program(state, "")
 	var weapon: Dictionary = state.build.get("mainWeapon", {}) if actor.kind == "operator" else {}
@@ -2062,8 +2066,14 @@ func _resolve_basic_attack(state: CombatState, rng: DeterministicRng, actor: Com
 		_gain_basic_heat(state, actor, heat_gain, rng)
 	actor.counters["attacks"] = int(actor.counters.get("attacks", 0)) + 1
 	var action_id: String = "%s:atk:%d" % [actor.id, int(actor.counters["attacks"])]
+	if not context.is_empty():
+		action_id = str(context.get("instanceId", action_id))
 	actor.last_main_attack_at = state.time_ms
-	_emit(state, "ATTACK", actor.id, {"targetId": target.id, "actionId": action_id, "text": "%s атакует %s." % [actor.display_name, target.display_name]})
+	var attack_fields: Dictionary = {"targetId": target.id, "actionId": action_id, "text": "%s атакует %s." % [actor.display_name, target.display_name]}
+	if not context.is_empty():
+		attack_fields["sourceId"] = str(context.get("action", {}).get("sourceId", ""))
+		attack_fields["causeId"] = int(context.get("prepareEventId", 0))
+	_emit(state, "ATTACK", actor.id, attack_fields)
 	actor.last_target_id = target.id
 	var packets: Array[Dictionary] = _attack_packets(actor, weapon)
 	var landed: bool = false

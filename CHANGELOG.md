@@ -1,5 +1,7 @@
 ## Unreleased — Autobattle V2 migration branch (13 November 2026)
 
+- V2 weapon timing samples runtime speed/SHOCK and restores it across status expiry. Added preparation-to-attack causal IDs and canonical build/source checks on snapshot restore.
+
 - Added opt-in real-weapon V2 adapter within the existing CombatSimulator, sourced from CombatFactory/BuildResolver, using canonical damage math and explicit versioned channel snapshots. Unported loadout features are rejected; live GameSession remains V1 until the migration gate is met.
 
 - Added serializable V2 action channel with independent cooldowns, exactly-once commit, interruption and bounded defensive scheduling; duel uses this channel.

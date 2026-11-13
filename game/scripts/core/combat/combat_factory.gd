@@ -15,15 +15,15 @@ func v2_build_rules_hash(build: Dictionary) -> String:
 
 # Compile from the canonical resolved weapon. This adapter owns timing only;
 # damage packets, hit/crit, statuses and procs stay in CombatSimulator.
-func compile_v2_weapon_action(build: Dictionary) -> Dictionary:
+func compile_v2_weapon_action(build: Dictionary, effective_stats: Dictionary = {}, timing_multiplier: float = 1.0) -> Dictionary:
 	if not bool(build.get("valid", false)) or not build.get("mainWeapon") is Dictionary:
 		return {}
 	var weapon: Dictionary = build["mainWeapon"]
 	if str(weapon.get("itemId", "")).is_empty():
 		return {}
-	var stats: Dictionary = build.get("stats", {})
+	var stats: Dictionary = effective_stats if not effective_stats.is_empty() else build.get("stats", {})
 	var interval: float = _formula.attack_interval_ms(float(weapon.get("intervalMs", 1000)), float(stats.get("attackSpeed", 0)), float(stats.get("moreAttackSpeed", 1)))
-	var duration: int = maxi(100, int(ceili(interval / 100.0)) * 100)
+	var duration: int = maxi(100, int(ceili(interval * timing_multiplier / 100.0)) * 100)
 	var prepare: int = maxi(100, int(floorf(float(duration) * 0.75 / 100.0)) * 100)
 	return {"sourceId": str(weapon["itemId"]), "actionId": "weapon:basic", "classId": "BASIC_ATTACK", "targetMode": "HIGHEST_THREAT", "prepareMs": prepare, "recoveryMs": duration - prepare, "cooldownMs": 0, "energyCost": float(weapon.get("energyPerAttack", 0)), "heatDelta": float(weapon.get("heatPerAttack", 0))}
 

@@ -84,6 +84,16 @@ static func from_dictionary(value: Dictionary, resolved_build: Dictionary) -> Co
 			return null
 		if not value.get("actionChannel") is Dictionary or not AutobattleV2Channel.new()._validate(value["actionChannel"], int(value.get("timeMs", 0))).is_empty():
 			return null
+		var active: Dictionary = value["actionChannel"].get("active", {})
+		if not active.is_empty():
+			var canonical: Dictionary = CombatFactory.new().compile_v2_weapon_action(resolved_build)
+			for field: Variant in canonical.keys():
+				# Timing is captured from effective runtime buffs at preparation;
+				# those buffs can expire before this snapshot is resumed.
+				if str(field) in ["prepareMs", "recoveryMs"]:
+					continue
+				if active["action"].get(field) != canonical[field]:
+					return null
 	if not value.get("operator") is Dictionary or resolved_build.is_empty():
 		return null
 	var state: CombatState = CombatState.new()

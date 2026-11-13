@@ -45,4 +45,10 @@ func run(_tree: SceneTree) -> bool:
 	var corrupt: Dictionary = channel.new_state()
 	corrupt["active"] = {"action": {}, "timeline": {}}
 	check(not bool(channel.advance(corrupt, 0)["ok"]), "channel: malformed active action reached dispatch")
+	corrupt = channel.new_state()
+	corrupt["cooldowns"] = {"basic": "tomorrow"}
+	check(not bool(channel.start(corrupt, [attack], 0, 100, 0, 100)["ok"]), "channel: invalid saved cooldown accepted")
+	corrupt = channel.new_state()
+	corrupt["supportStreak"] = -1
+	check(not bool(channel.advance(corrupt, 0)["ok"]), "channel: invalid fairness state accepted")
 	return failure_count == 0
