@@ -3,7 +3,7 @@
 ## Unreleased — EV07 percentage hull damage
 
 - EV07's scrap option now removes 10% of maximum hull instead of a flat 10 hull, matching Master Spec §20.1. The data-driven event transaction regression checks the actual before/after hull values.
-- Godot 4.7.2 import exit 0; full native suite: 23 tests / 88,683 assertions / 0 failures. Independent regression verification is pending.
+- Godot 4.7.2 import exit 0; full native suite: 23 tests / 88,683 assertions / 0 failures. Independent regression on exact SHA `40a6623` reproduced import and suite with clean detached worktree/diff check.
 
 ## Unreleased — EV13 rare price rounding
 
@@ -14,6 +14,7 @@
 
 - Added project agent `balance_qa` on GPT-6 Luna High. Bounded BOSS_B research (up to 24 fights, no more than 3 per archetype) runs in a detached read-only worktree alongside required regression checks.
 - First six-fight result on SHA `928afbac8fba74c4cf51e55668fbfed59ca05163`: at d8/B04 with a shared seed, Kinetic and Tech/Energy each repeated defeat; Drone/Hybrid repeated victory at 20.3s with 16.998 operator HP. Treat as a balance risk signal, not campaign acceptance. All combat configurations were accepted by the existing simulator. The raw drone metrics match (`interrupts=1` both repeats); a temporary display counter searched the wrong event name (`INTERRUPT` instead of `CAST_INTERRUPT`), so no simulator nondeterminism is verified.
+- Follow-up at SHA `40a662322610b12b1c38a35c5b72ad4c4d3ca107`: same three legal builds on two additional seeds; 5/6 losses overall. Kinetic and Tech/Energy lost both; Drone/Hybrid split, with one narrow win. This is risk evidence for sampled builds only; the simulator accepted every legal combat. Balance QA recommends alternative Kinetic/Tech builds in a capped next matrix before any tuning.
 - Concurrency is set to 3; the config checkpoint was accepted by Codex strict-config and all four project agent definitions were exercised/visible. Removed the stale quest-only agent from active delegation.
 - Added a reload check for the 12-hour cap and negative-clock diagnostics in saved autopilot report history. Local and independent Godot 4.7.2 checks passed: 23 tests / 88,680 assertions. Detached worktree and diff check were clean.
 - Legacy TypeScript oracle on current code-equivalent `62c76fcbf5c2bb08af88cfcabd2839c49c12c393`: 22 files / 207 tests and `npm run typecheck` both pass.
