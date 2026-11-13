@@ -334,7 +334,23 @@ func _prepare_garage(session: GameSession) -> bool:
 			var preserve_heavy_armor: bool = slot == "ARMOR" and current_template_id == "ARM_HEAVY" and str(template.get("id", "")) != "ARM_HEAVY" and _item_rank(item) <= current_rank + 100
 			var preserve_test_rifle: bool = slot == "MAIN" and current_template_id == "RIFLE_K2" and current_tech_level >= 3 and str(template.get("id", "")) != "RIFLE_K2" and _item_rank(item) <= current_rank + 15
 			var ranked_upgrade: bool = _item_rank(item) > current_rank and not preserve_test_rifle and not preserve_heavy_armor
-			if str(template.get("category", "")) == expected_category and (ranked_upgrade or is_compatible_kinetic or preferred_rifle or preferred_heavy_armor):
+			var unrepresented_drone_role: bool = false
+			if slot.begins_with("DRONE_") and str(template.get("category", "")) == "DRONE":
+				var candidate_role: String = str(template.get("drone", {}).get("role", ""))
+				var role_equipped: bool = false
+				for equipped_slot_value: Variant in session.state.meta.equipment.keys():
+					var equipped_slot: String = str(equipped_slot_value)
+					if not equipped_slot.begins_with("DRONE_") or equipped_slot == slot:
+						continue
+					for equipped_item: Dictionary in session.state.meta.inventory:
+						if str(equipped_item.get("itemId", "")) == str(session.state.meta.equipment.get(equipped_slot, "")):
+							var equipped_template: Dictionary = catalog.get_template(str(equipped_item.get("templateId", "")))
+							role_equipped = str(equipped_template.get("drone", {}).get("role", "")) == candidate_role
+							break
+					if role_equipped:
+						break
+				unrepresented_drone_role = not candidate_role.is_empty() and not role_equipped
+			if str(template.get("category", "")) == expected_category and (ranked_upgrade or is_compatible_kinetic or preferred_rifle or preferred_heavy_armor or unrepresented_drone_role):
 				candidates.append(item)
 		candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 			if slot == "ARMOR":
@@ -356,7 +372,7 @@ func _prepare_garage(session: GameSession) -> bool:
 			if slot.begins_with("DRONE_"):
 				var a_role: String = str(catalog.get_template(str(a.get("templateId", ""))).get("drone", {}).get("role", ""))
 				var b_role: String = str(catalog.get_template(str(b.get("templateId", ""))).get("drone", {}).get("role", ""))
-				var role_priority: Dictionary = {"bulwark": 3, "medic": 2, "emp": 1}
+				var role_priority: Dictionary = {"bulwark": 4, "medic": 3, "shock": 2, "mark": 2, "emp": 1}
 				var a_role_priority: int = int(role_priority.get(a_role, 0))
 				var b_role_priority: int = int(role_priority.get(b_role, 0))
 				if a_role_priority != b_role_priority:

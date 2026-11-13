@@ -13,6 +13,7 @@ const COLOR_MUTED: Color = Color("a4afb9")
 var _session: GameSession = GameSession.new()
 var _body: VBoxContainer
 var _footer: Label
+var _saved_badge: Label
 var _screen: String = "menu"
 var _combat_timer: Timer
 var _settings: ConfigFile = ConfigFile.new()
@@ -85,8 +86,11 @@ func _build_shell() -> void:
 	chapter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	chapter.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	header.add_child(chapter)
-	var saved_badge: Label = _label("СЕЙВ · %s" % ("ЗАГРУЖЕН" if _session.state != null else "НОВЫЙ ПРОФИЛЬ"), 11, COLOR_MUTED)
-	header.add_child(saved_badge)
+	_saved_badge = _label("СЕЙВ · %s" % ("ЗАГРУЖЕН" if _session.state != null else "НОВЫЙ ПРОФИЛЬ"), 11, COLOR_MUTED)
+	_saved_badge.custom_minimum_size.x = 150
+	_saved_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_saved_badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	header.add_child(_saved_badge)
 	var divider: ColorRect = ColorRect.new()
 	divider.custom_minimum_size.y = 1
 	divider.color = Color(0.34, 0.82, 0.77, 0.7)
@@ -212,8 +216,9 @@ func _show_garage() -> void:
 		summary.add_child(_label("ФОРПОСТ %d   ·   МАКСИМАЛЬНЫЙ СЕКТОР %d" % [meta.unlocked_forpost, meta.max_sector_cleared], 12, COLOR_MUTED))
 	var points_available: int = _session.attribute_points_available()
 	_body.add_child(_label("АТРИБУТЫ   ·   %d ОЧК. ДОСТУПНО" % points_available, 13, COLOR_CYAN))
-	var attribute_row: HBoxContainer = HBoxContainer.new()
-	attribute_row.add_theme_constant_override("separation", 7)
+	var attribute_row: HFlowContainer = HFlowContainer.new()
+	attribute_row.add_theme_constant_override("h_separation", 7)
+	attribute_row.add_theme_constant_override("v_separation", 7)
 	_body.add_child(attribute_row)
 	var attribute_names: Dictionary = {"POW": "МОЩЬ", "REF": "РЕАКЦИЯ", "INT": "ИНТЕЛЛЕКТ", "ENG": "ИНЖЕНЕРИЯ", "SYN": "СИНХРОНИЗАЦИЯ"}
 	for attribute_id: String in ["POW", "REF", "INT", "ENG", "SYN"]:
@@ -266,8 +271,9 @@ func _show_garage() -> void:
 			locked_upgrade.disabled = true
 			locked_upgrade.tooltip_text = str(upgrade_quote.get("error", ""))
 			upgrade_row.add_child(locked_upgrade)
-	var equipped: HBoxContainer = HBoxContainer.new()
-	equipped.add_theme_constant_override("separation", 8)
+	var equipped: HFlowContainer = HFlowContainer.new()
+	equipped.add_theme_constant_override("h_separation", 8)
+	equipped.add_theme_constant_override("v_separation", 6)
 	_body.add_child(equipped)
 	for slot_value: Variant in meta.equipment.keys():
 		var item_value: Dictionary = _item_by_id(str(meta.equipment[slot_value]))
@@ -276,6 +282,9 @@ func _show_garage() -> void:
 		if not template.is_empty():
 			item_name = str(template.get("name", item_name))
 		var chip: Label = _label("%s · %s" % [str(slot_value), item_name], 11, COLOR_TEXT)
+		chip.autowrap_mode = TextServer.AUTOWRAP_OFF
+		chip.custom_minimum_size = Vector2(180, 32)
+		chip.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		chip.add_theme_stylebox_override("normal", _panel_style(COLOR_STEEL, Color(0.25, 0.38, 0.43, 1)))
 		equipped.add_child(chip)
 	var actions: HFlowContainer = HFlowContainer.new()
@@ -695,6 +704,8 @@ func _show_simulation_lab() -> void:
 		item_selector.disabled = item_selector.item_count == 0
 		item_selector.item_selected.connect(_on_simulation_item_selected.bind(item_selector))
 		row.add_child(item_selector)
+		if candidates.is_empty():
+			_body.add_child(_label("Для этого слота пока нет предмета-кандидата. Получите или изготовьте дополнительное снаряжение, чтобы сравнить его на том же боевом симуляторе.", 12, COLOR_AMBER))
 		var enemy_selector: OptionButton = OptionButton.new()
 		var enemy_catalog: EnemyCatalog = EnemyCatalog.new()
 		var catalog_result: Dictionary = enemy_catalog.load_catalog()
@@ -730,7 +741,12 @@ func _show_simulation_lab() -> void:
 				if results.size() == 2:
 					_body.add_child(_label("СЦЕНАРИЙ %s · ГЛУБИНА %d · %d ПАРНЫХ ПРОГОНА" % [str(_simulation_report.get("enemyId", "")), int(_simulation_report.get("depth", 1)), int(_simulation_report.get("runs", 0))], 13, COLOR_CYAN))
 					_body.add_child(_simulation_result_card("ТЕКУЩАЯ СБОРКА", results[0]))
-					_body.add_child(_simulation_result_card("КАНДИДАТ · %s" % _simulation_item_id, results[1]))
+					var candidate_label: String = _simulation_item_id
+					for candidate: Dictionary in candidates:
+						if str(candidate.get("itemId", "")) == _simulation_item_id:
+							candidate_label = str(candidate.get("label", candidate_label))
+							break
+					_body.add_child(_simulation_result_card("КАНДИДАТ · %s" % candidate_label, results[1]))
 	_body.add_child(_button("НАЗАД В ГАРАЖ", false))
 	var back: Button = _body.get_child(_body.get_child_count() - 1) as Button
 	back.pressed.connect(_show_garage)
@@ -933,7 +949,9 @@ func _show_inventory() -> void:
 	var reward_formula: CydleFormula = CydleFormula.new()
 	_body.add_child(_label("ФИЛЬТР ДОБЫЧИ · РЕШЕНИЕ О ПОДБОРЕ ПРИМЕНЯЕТСЯ К БОЕВЫМ, КВЕСТОВЫМ И СОБЫТИЙНЫМ НАГРАДАМ", 11, COLOR_CYAN))
 	var loot_filter: Dictionary = _session.loot_filter_settings()
-	var filter_row: HBoxContainer = HBoxContainer.new()
+	var filter_row: HFlowContainer = HFlowContainer.new()
+	filter_row.add_theme_constant_override("h_separation", 8)
+	filter_row.add_theme_constant_override("v_separation", 8)
 	_body.add_child(filter_row)
 	var filter_mode: OptionButton = OptionButton.new()
 	var modes: Array[String] = ["ALL", "RARE_PLUS", "TAGS", "CUSTOM"]
@@ -1699,6 +1717,7 @@ func _navigate(destination: String) -> void:
 func _on_new_game() -> void:
 	_selected_escalations.clear()
 	if _session.start_new_game():
+		_saved_badge.text = "СЕЙВ · СОЗДАН"
 		_show_garage()
 	else:
 		_footer.text = _session.last_error

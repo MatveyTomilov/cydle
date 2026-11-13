@@ -2,11 +2,15 @@
 
 `CYDLE_MASTER_SPEC.md` is the normative source for game design and release requirements. `docs/godot/` records the current engine, architecture, visual direction, and asset production rules. This roadmap records what actually exists; a plan or catalog entry is not working gameplay.
 
-## Development strategy (2026-11-12)
+## Development strategy (2026-11-13)
 
-The active strategy is **FULL GAME FIRST**: connect every major Master Spec system into a campaign that can be completed, then deepen edge cases, balance, and presentation. The entries below report implementation status; they are not a queue of isolated feature slices. A checkpoint commit is a safety measure, so continue to the next missing campaign-critical system while the session permits. Defer saved Simulation Lab presets, report exports, cosmetic polish, secondary settings, and redundant tests until functional campaign coverage exists.
+Current strategy is **PLAYABLE ALPHA FIRST**: deliver an owner-runnable Windows build with the real current game loop and accessible implemented systems; stop spending the main work budget on repeated automatic boss retries. This does not relax Master Spec mechanics or claim 1.0. The broad functional-coverage goal remains for continuation after owner testing; preserve known campaign blockers for later resolution.
 
-### Current status override (2026-11-13; d8 BOSS_B gate reproduced)
+### Current status override (2026-11-13; Windows PLAYABLE ALPHA)
+
+The Windows x64 alpha package is `dist/CYDLE-Playable-Alpha.zip` (local, ignored by Git). The exported GUI smoke exercised fresh profile creation and reload, garage/build math, inventory filters, route, real combat/reward, autopilot stops, checkpoint cargo evacuation, and a real three-pair Simulation Lab comparison. Godot 4.7.2 editor import and Windows export returned exit 0; 22 scripts / 88,091 assertions passed; extracted EXE headless smoke exited 0. Exact flow and limitations are in the current `HANDOFF.md` section. Latest isolated level-11 d8 loss left BOSS_B at 981/4,951 HP at tick 148; campaign continuation past this gate, BOSS_CORE and endgame are unverified. The build is an early alpha, not a 1.0 release.
+
+### Historical status override (2026-11-13; d8 BOSS_B gate reproduced)
 
 Local/remote base before this WIP is `c1c8cd5d8df13e4cfdb0f4793ac618392c90b256`. A resumed campaign E2E cleared and extracted d5–d7 and reached d8 BOSS_B at level 11. The latest boss attempt was a real defeat at tick 159: 3,527 operator damage, one interrupt, 568 incoming HP damage / 575 shield absorbed, and BOSS_B remained at 1,364/4,951 HP. Earlier level-10 attempts also failed. No game balance was changed. Current WIP is only the harness: preserve top-ranked drones by role during test cleanup and restore EMP interrupt tactics on resume. The preserved isolated save is currently in a new d6 outing after that defeat. Full suite/export have not been rerun after this harness delta; see `HANDOFF.md` for profile paths, exact state, and next action. Do not claim d8, d12, campaign-ending, or endgame completion.
 

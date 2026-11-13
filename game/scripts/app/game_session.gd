@@ -119,7 +119,7 @@ func simulation_equipment_candidates(slot: String) -> Array[Dictionary]:
 		if not bool(build.get("valid", false)):
 			continue
 		var template: Dictionary = _item_catalog.get_template(str(item.get("templateId", "")))
-		var label: String = "%s · T%d · %s" % [str(template.get("name", item.get("templateId", "Предмет"))), int(item.get("techLevel", 1)), item_id]
+		var label: String = "%s · T%d" % [str(template.get("name", item.get("templateId", "Предмет"))), int(item.get("techLevel", 1))]
 		candidates.append({"itemId": item_id, "label": label})
 	return candidates
 

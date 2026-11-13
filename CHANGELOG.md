@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — Windows PLAYABLE ALPHA checkpoint
+
+- Prepared `dist/CYDLE-Playable-Alpha.zip` locally with the Godot 4.7.2 Windows x64 export and a short launch guide; binaries remain out of Git.
+- UI smoke followed new game/profile reload, garage and Build Lab, inventory filter/edit flow, real expedition combat/reward, autopilot pause, checkpoint cargo evacuation, and return to Garage. Simulation Lab completed three paired runs against E01 Raider using the shared combat simulator.
+- Wrapped the multi-control inventory filter row and compacted Simulation Lab candidate labels so the warehouse no longer requires horizontal scrolling for the filter controls.
+- Verification: editor import exit 0; 22 Godot test scripts / 88,091 assertions / zero failures; Windows Desktop export exit 0; extracted packaged EXE headless smoke exit 0.
+- d8 BOSS_B remains an unresolved campaign blocker (latest level-11 attempt lost at tick 148 with 981/4,951 boss HP). This alpha is not a 1.0 release and does not claim full campaign acceptance.
+
 ## Unreleased — campaign E2E d8 blocker and resume safety
 
 - The isolated campaign E2E now preserves the highest-ranked drone per role during test inventory cleanup and restores the boss interrupt tactic when resuming a saved profile. Runtime gameplay and balance are unchanged.
