@@ -484,6 +484,26 @@ func run(_tree: SceneTree) -> bool:
 			var signal_reload: GameSession = GameSession.new()
 			signal_reload.configure_save_directory("user://test-saves/signal-contract")
 			check(signal_reload.load_saved_game() and str(signal_reload.state.run.contract.get("status", "")) == "COMPLETE" and signal_reload.state.run.grant_ids.has(signal_completion_id) and signal_reload.state.run.unsecured_cargo.any(func(item: Dictionary) -> bool: return str(item.get("originGrantId", "")) == signal_completion_id + ":item"), "game_session: real SIGNAL reward did not persist exactly once through save reload")
+	var contract_death_session: GameSession = GameSession.new()
+	contract_death_session.configure_save_directory("user://test-saves/contract-death-failure")
+	if check(contract_death_session.start_new_game(1762900000142), "game_session: could not create a contract-death profile") and check(contract_death_session.start_expedition("contract-death-seed", false, "CT_HUNT"), "game_session: could not start the contract-death sortie: %s" % contract_death_session.last_error):
+		var death_item_catalog: ItemCatalog = ItemCatalog.new()
+		var death_catalog_result: Dictionary = death_item_catalog.load_catalog()
+		var death_item_rng: DeterministicRng = DeterministicRng.new()
+		death_item_rng.seed("contract-death-seed", "temporary-contract-cargo")
+		var death_item_result: Dictionary = ItemFactory.new().create_item(death_item_rng, death_item_catalog, {"templateId": "PISTOL_K1", "techLevel": 1, "rarity": "COMMON", "secured": false, "originGrantId": "contract-death:cargo", "origin": "test", "acquiredAt": 0})
+		if check(bool(death_catalog_result.get("ok", false)) and bool(death_item_result.get("ok", false)), "game_session: could not create the temporary cargo for contract-death settlement"):
+			var death_item: Dictionary = (death_item_result["item"] as ItemInstance).to_dictionary()
+			var death_payload: Dictionary = contract_death_session.state.to_payload()
+			death_payload["run"]["unsecuredCargo"] = [death_item]
+			death_payload["run"]["runWallet"] = {"CREDITS": 23.0, "SCRAP": 4.0, "DATA": 2.0}
+			check(contract_death_session._commit_payload(death_payload), "game_session: contract-death cargo fixture could not be saved: %s" % contract_death_session.last_error)
+			check(contract_death_session._resolve_combat_defeat(contract_death_session.state.run.to_dictionary(), "contract-death-fixture"), "game_session: defeat could not settle an active contract: %s" % contract_death_session.last_error)
+			check(str(contract_death_session.state.run.contract.get("status", "")) == "FAILED" and not bool(contract_death_session.state.run.contract.get("rewardClaimed", false)), "game_session: death left an undelivered active contract claimable")
+			check(contract_death_session.state.run.phase == "DEFEATED" and contract_death_session.state.run.unsecured_cargo.is_empty() and contract_death_session.state.run.wallet.credits == 0.0 and not contract_death_session.state.meta.inventory.any(func(item: Dictionary) -> bool: return str(item.get("itemId", "")) == str(death_item.get("itemId", ""))), "game_session: death did not discard unprotected cargo and sortie currency")
+			var death_reload: GameSession = GameSession.new()
+			death_reload.configure_save_directory("user://test-saves/contract-death-failure")
+			check(death_reload.load_saved_game() and str(death_reload.state.run.contract.get("status", "")) == "FAILED" and death_reload.state.run.unsecured_cargo.is_empty(), "game_session: failed contract/death cargo loss did not survive save reload")
 	var escalation_session: GameSession = GameSession.new()
 	escalation_session.configure_save_directory("user://test-saves/endgame-escalations")
 	if check(escalation_session.start_new_game(1762900000115), "game_session: could not create an endgame escalation profile"):

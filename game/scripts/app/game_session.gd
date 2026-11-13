@@ -3033,6 +3033,9 @@ func _grant_experience(operator: Dictionary, amount: int) -> void:
 func _resolve_combat_defeat(run_payload: Dictionary, node_id: String) -> bool:
 	var payload: Dictionary = state.to_payload()
 	var meta: Dictionary = payload["meta"]
+	var contract: Dictionary = run_payload.get("contract", {})
+	if str(contract.get("status", "")) == "ACTIVE":
+		contract["status"] = "FAILED"
 	var equipped_ids: Array = meta["equipment"].values()
 	for index: int in range(meta["inventory"].size()):
 		var item: Dictionary = meta["inventory"][index]
