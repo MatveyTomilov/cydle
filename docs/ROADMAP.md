@@ -6,7 +6,11 @@
 
 Current strategy is **FEATURE COMPLETE BETA**: audit against the normative Master Spec, close significant runtime/UI gaps, and validate real state transitions. Boss balancing and repeated automatic boss retries are deferred unless a concrete gameplay defect requires them. Preserve all profile/save data; use short deterministic integration scenarios.
 
-### Latest checkpoint — HUNT and TECH natural contract paths (2026-11-13)
+### Latest checkpoint — HUNT, TECH and ESCORT natural contract paths (2026-11-13)
+
+The latest contract integration also runs ESCORT from a fresh profile through two actual shared-simulator battles and onto the generated checkpoint, then verifies credits, faction reputation, exactly-once grant state and reload. Full native suite: 23 tests / 88,648 assertions / 0 failures; Godot import exit 0. No Windows export, GUI smoke or CI query. ESCORT failure-state behavior and SIGNAL unique-reward battle remain unverified.
+
+### Prior checkpoint — HUNT and TECH natural contract paths (2026-11-13)
 
 Commit `89eec3bc86747f4ec18d4b8742b9bba4d5cfaf92` tests TECH from route travel through the preceding real combat, marked CACHE, `OPEN_CACHE`, MODIFIED tagged contract item, DATA, blueprint, and save reload. HUNT's full ELITE battle/reward/reload scenario is in `418998d149c29aa1311e8f28c7b979fedc905a01`. Godot import exit 0; 23 tests / 88,642 assertions / 0 failures. Next contract gaps are SIGNAL target settlement and ESCORT success/failure at checkpoint; no Windows export or GUI smoke was run.
 

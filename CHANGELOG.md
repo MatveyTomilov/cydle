@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — natural ESCORT checkpoint settlement
+
+- Added a deterministic runtime flow that follows reachable route nodes, clears two real shared-simulator battles, reaches the generated checkpoint and verifies the ESCORT credit/faction rewards and completion grant after save reload.
+- Godot 4.7.2 headless import exit 0; 23 tests / 88,648 assertions passed. No Windows export, GUI smoke or CI query.
+
 ## Unreleased — natural TECH contract settlement
 
 - Added a deterministic GameSession flow that travels through the prerequisite ordinary COMBAT via the shared simulator, reaches the accepted TECH cache target and takes the real `OPEN_CACHE` action.

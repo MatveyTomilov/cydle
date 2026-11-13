@@ -1,10 +1,16 @@
 # CYDLE — Project handoff and development history
 
+## Latest game checkpoint (2026-11-13; HUNT, TECH and ESCORT contracts)
+
+- Adds an ESCORT runtime flow on seed `escort-runtime-fixed-seed`: starts a fresh contract sortie, follows reachable route nodes, clears two real battles with the shared simulator, reaches the authored checkpoint, verifies the exact credit/faction reward and completion grant, then reloads the save. No game runtime or balance code changed.
+- Godot 4.7.2 editor import exit 0; full native suite 23 tests / 88,648 assertions / 0 failures. Windows export, GUI smoke, campaign E2E and CI were not run/queried.
+- HUNT, TECH and the ESCORT success path now have real player-operation coverage. Remaining contract gaps: SIGNAL actual battle-to-unique reward, ESCORT failure conditions, death/cargo loss, full faction effects and offer/restart persistence. See `docs/FEATURE_AUDIT.md`.
+
 ## Latest game checkpoint (2026-11-13; HUNT and TECH contracts)
 
 - Commit `89eec3bc86747f4ec18d4b8742b9bba4d5cfaf92` adds a deterministic real TECH contract flow on seed `tech-contract-b01`: travel through the preceding ordinary COMBAT with the shared simulator, reach the marked CACHE, choose `OPEN_CACHE`, verify MODIFIED loot/tag, DATA award, first-success blueprint, and reload persistence. Combined with HUNT at `418998d149c29aa1311e8f28c7b979fedc905a01`, both basic contract types now have one real player-operation path through reward settlement.
 - Godot 4.7.2 editor import exit 0; full native suite 23 tests / 88,642 assertions / 0 failures; diff check exit 0. No Windows export, GUI smoke, or campaign E2E.
-- Still partial: SIGNAL actual battle-to-unique reward, ESCORT success/failure at a naturally reached checkpoint, contract death/cargo loss, faction shop/world effects, all-offer persistence. See `docs/FEATURE_AUDIT.md`.
+- At this checkpoint ESCORT was not yet run through a natural checkpoint; that success path is covered by the newer entry above. Failure conditions and other listed gaps remain.
 
 ## Latest game checkpoint (2026-11-13; HUNT contract through real combat)
 

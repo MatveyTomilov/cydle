@@ -321,6 +321,50 @@ func run(_tree: SceneTree) -> bool:
 		var expected_escort_faction: String = str(escort_session.available_contract_offers().filter(func(offer: Dictionary) -> bool: return str(offer.get("id", "")) == "CT_ESCORT")[0].get("factionId", ""))
 		if check(escort_session.start_expedition("escort-faction-contract", false, "CT_ESCORT"), "game_session: faction ESCORT contract did not start: %s" % escort_session.last_error):
 			check(str(escort_session.state.run.contract.get("factionId", "")) == expected_escort_faction and int(escort_session.state.run.contract.get("rewardReputation", {}).get(expected_escort_faction, 0)) == 8, "game_session: accepted ESCORT instance lost its themed faction reward")
+	var escort_runtime: GameSession = GameSession.new()
+	escort_runtime.configure_save_directory("user://test-saves/escort-contract-runtime")
+	if check(escort_runtime.start_new_game(1762900000141), "game_session: could not create an ESCORT runtime profile") and check(escort_runtime.start_expedition("escort-runtime-fixed-seed", false, "CT_ESCORT"), "game_session: ESCORT runtime outing failed to start: %s" % escort_runtime.last_error):
+		var escort_faction_id: String = str(escort_runtime.state.run.contract.get("factionId", ""))
+		var escort_credits_before: float = escort_runtime.state.run.wallet.credits
+		var escort_rep_before: int = int(escort_runtime.state.meta.reputation.get(escort_faction_id, 0))
+		var escort_reached_checkpoint: bool = false
+		var escort_runtime_steps: int = 0
+		while escort_runtime.state.run.phase == "ROUTE" and escort_runtime_steps < 12:
+			var escort_reachable: Array[Dictionary] = escort_runtime.reachable_nodes()
+			if escort_reachable.is_empty(): break
+			var escort_choice: Dictionary = escort_reachable[0]
+			var escort_combat_count: int = int(escort_runtime.state.run.contract.get("combatNodes", 0))
+			for candidate: Dictionary in escort_reachable:
+				if str(candidate.get("type", "")) == "CHECKPOINT":
+					escort_choice = candidate
+					break
+				if escort_combat_count < 2 and str(candidate.get("type", "")) in ["COMBAT", "ELITE", "BOUNTY"]:
+					escort_choice = candidate
+					break
+			if not escort_runtime.travel_to(str(escort_choice.get("id", ""))): break
+			escort_runtime_steps += 1
+			if escort_runtime.state.run.phase == "CHECKPOINT":
+				escort_reached_checkpoint = str(escort_runtime.current_node().get("type", "")) == "CHECKPOINT"
+				break
+			var escort_node_type: String = str(escort_runtime.current_node().get("type", ""))
+			if escort_node_type in ["COMBAT", "ELITE", "BOUNTY"]:
+				if not escort_runtime.begin_combat(): break
+				var escort_ticks: int = 0
+				while escort_runtime.combat_state() != null and escort_runtime.combat_state().outcome.is_empty() and escort_ticks < 1800:
+					if not escort_runtime.advance_combat_step(): break
+					escort_ticks += 1
+				if escort_runtime.combat_state() == null or escort_runtime.combat_state().outcome != "VICTORY" or not escort_runtime.resolve_active_combat(): break
+			elif not escort_runtime.resolve_service_node("LEAVE_NODE"):
+				break
+		check(escort_reached_checkpoint and escort_runtime.state.run.contract.get("combatNodes", 0) >= 2, "game_session: ESCORT route did not complete two real combats and reach its checkpoint; status=%s combats=%s depth=%d error=%s" % [escort_runtime.state.run.contract.get("status", ""), escort_runtime.state.run.contract.get("combatNodes", 0), escort_runtime.state.run.depth, escort_runtime.last_error])
+		var escort_completed: Dictionary = escort_runtime.state.run.contract
+		var escort_completion_id: String = "%s:reward" % str(escort_completed.get("instanceId", ""))
+		var expected_escort_credits: int = ceili(50.0 * CydleFormula.new().reward_scale(float(escort_runtime.state.run.depth)))
+		check(str(escort_completed.get("status", "")) == "COMPLETE" and bool(escort_completed.get("rewardClaimed", false)) and escort_runtime.state.run.grant_ids.has(escort_completion_id), "game_session: ESCORT checkpoint did not settle its idempotent completion grant")
+		check(escort_runtime.state.run.wallet.credits >= escort_credits_before + expected_escort_credits and int(escort_runtime.state.meta.reputation.get(escort_faction_id, 0)) == escort_rep_before + 8, "game_session: ESCORT checkpoint omitted its authored credit or faction reputation reward")
+		var escort_reload: GameSession = GameSession.new()
+		escort_reload.configure_save_directory("user://test-saves/escort-contract-runtime")
+		check(escort_reload.load_saved_game() and str(escort_reload.state.run.contract.get("status", "")) == "COMPLETE" and escort_reload.state.run.grant_ids.has(escort_completion_id) and int(escort_reload.state.meta.reputation.get(escort_faction_id, 0)) == escort_rep_before + 8, "game_session: ESCORT checkpoint completion or faction reward did not survive save reload")
 	var favored_session: GameSession = GameSession.new()
 	favored_session.configure_save_directory("user://test-saves/faction-threshold-contract")
 	if check(favored_session.start_new_game(1762900000108), "game_session: could not create a favored faction profile"):
