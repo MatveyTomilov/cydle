@@ -101,7 +101,9 @@ func advance_action(timeline: Dictionary, now_ms: int) -> Dictionary:
 		next["phase"] = "COOLDOWN"
 	else:
 		next["phase"] = "READY"
-	# The main channel is free after recovery even if this ability is cooling down.\n\treturn {"timeline": next, "didCommit": did_commit,\n\t\t"channelReady": bool(next.get("committed", false)) and now_ms >= int(next.get("recoveryUntilMs", 0))}
+	# The main channel is free after recovery even if this ability is cooling down.
+	return {"timeline": next, "didCommit": did_commit,
+		"channelReady": bool(next.get("committed", false)) and now_ms >= int(next.get("recoveryUntilMs", 0))}
 
 
 func interrupt_action(timeline: Dictionary, now_ms: int) -> Dictionary:
