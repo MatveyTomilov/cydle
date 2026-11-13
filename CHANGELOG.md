@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — retain exact offline diagnostics
+
+- Preserved an exact -1 ms wall-clock rollback via an explicit elapsed-delta-presence flag and exposed cap/rollback values in autopilot report history.
+- Added assertions for report and history values. Godot 4.7.2 import exit 0; 23 tests / 88,679 assertions passed. Independent regression and review pending.
+
 ## Unreleased — disclose unapplied offline time
 
 - Auto-pilot now reports wall-clock time beyond the 12-hour processing cap and backward system-clock movement; negative time applies no game progress.

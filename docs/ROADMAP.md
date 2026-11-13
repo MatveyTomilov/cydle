@@ -6,7 +6,11 @@
 
 Current strategy is **FEATURE COMPLETE BETA**: audit against the normative Master Spec, close significant runtime/UI gaps, and validate real state transitions. Boss balancing and repeated automatic boss retries are deferred unless a concrete gameplay defect requires them. Preserve all profile/save data; use short deterministic integration scenarios.
 
-### Latest checkpoint — offline time boundary reporting (2026-11-13)
+### Latest checkpoint — offline diagnostics precision and history (2026-11-13)
+
+`50e61651290083ddb75893757d723b334607faab` fixes exact -1 ms rollback disclosure, persists the new diagnostics in report history, and renders them in historical UI rows. Tests cover +1 ms above the 12-hour cap and -1 ms rollback without game-time advancement. Local Godot import exit 0; 23 tests / 88,679 assertions / 0 failures. Independent regression/review are pending. No long offline simulation. Continue with interruption/retry idempotency and bounded long-window performance measurement.
+
+### Prior checkpoint — offline time boundary reporting (2026-11-13)
 
 `a406db440179ed7fdf3f408125018846672e4dfd` exposes wall time above the 12-hour offline cap instead of silently discarding it and reports backward system-clock movement while applying zero game-time. A visible autopilot notice explains either boundary; regressions use 1 ms over-cap and -5 s inputs without long simulation. Local Godot import exit 0; 23 tests / 88,677 assertions / 0 failures. Independent regression/review are pending. No full 12-hour simulation. Next: verify save/reload interruption/retry idempotency and report history.
 

@@ -1,5 +1,12 @@
 # CYDLE — Project handoff and development history
 
+## Latest game checkpoint (2026-11-13; offline diagnostics precision and history)
+
+- Game-code checkpoint: `50e61651290083ddb75893757d723b334607faab`. An explicit boolean now distinguishes an observed wall-clock delta from the API's default sentinel, so an exact -1 ms rollback is preserved instead of being rounded to -2 ms. The offline report history rows now show excess time or clock rollback, matching the current report.
+- Regressions verify +1 ms beyond the 12-hour cap, -1 ms rollback with zero game-time progress, and both values persisted in report history. Reviewer findings from `a406db4` are addressed.
+- Local Godot 4.7.2 import exit 0; 23 tests / 88,679 assertions / 0 failures; `git diff --check` exit 0. Independent tester and follow-up reviewer checks are pending. No Windows export, GUI smoke, 12-hour simulation or CI query.
+- Long-duration CPU behavior, interruption/retry idempotency and route-wide offline parity remain unverified.
+
 ## Latest game checkpoint (2026-11-13; offline time boundary reporting)
 
 - Game-code checkpoint: `a406db440179ed7fdf3f408125018846672e4dfd`. Loading a profile with auto-pilot now passes the observed elapsed time through the 12-hour cap and records any unapplied remainder. Negative system-clock movement runs zero game-time and is exposed as `clockRollbackMs`.
