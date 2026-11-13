@@ -106,6 +106,11 @@ func run(_tree: SceneTree) -> bool:
 		check(int(clock_rollback_report.get("clockRollbackMs", 0)) == 1 and int(clock_rollback_report.get("elapsedWallClockMs", -1)) == 0 and int(clock_rollback_report.get("simulatedMs", -1)) == 0, "game_session: negative offline wall-clock delta was not disclosed accurately without applying time: %s" % clock_rollback_report)
 		check(offline_cap_session.state.meta.autopilot_report_history.back().get("clockRollbackMs", 0) == 1, "game_session: report history omitted the exact clock rollback diagnostic")
 		check(is_equal_approx(float(offline_cap_session.state.run.resources.get("gameTimeMs", 0.0)), time_before_clock_rollback), "game_session: negative offline wall-clock delta advanced game-time")
+		var boundary_history_reload: GameSession = GameSession.new()
+		boundary_history_reload.configure_save_directory("user://test-saves/autopilot-offline-cap")
+		var boundary_history_loaded: bool = boundary_history_reload.load_saved_game()
+		var boundary_history: Array[Dictionary] = boundary_history_reload.state.meta.autopilot_report_history if boundary_history_loaded else []
+		check(boundary_history.size() >= 2 and int(boundary_history[-2].get("unappliedTimeMs", 0)) == 1 and int(boundary_history.back().get("clockRollbackMs", 0)) == 1, "game_session: offline cap/rollback diagnostics were lost after saving and reloading report history")
 	if check(autopilot_session.start_new_game(1762900000050), "game_session: could not create an autopilot profile"):
 		check(autopilot_session.state.meta.autopilot_profiles.size() == 3 and autopilot_session.active_autopilot_profile_id() == "BALANCED", "game_session: new profiles do not include the three authored pilot presets")
 		var old_pilot_payload: Dictionary = autopilot_session.state.to_payload()
