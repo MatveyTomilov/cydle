@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — natural TECH contract settlement
+
+- Added a deterministic GameSession flow that travels through the prerequisite ordinary COMBAT via the shared simulator, reaches the accepted TECH cache target and takes the real `OPEN_CACHE` action.
+- Verifies the MODIFIED item has the contract's target tag, the authored DATA payout is received, the first-success blueprint unlocks, and the result survives save reload.
+- Godot 4.7.2 headless import exit 0; 23 tests / 88,642 assertions passed. No Windows export or GUI smoke.
+
 ## Unreleased — natural HUNT contract settlement
 
 - Added a deterministic GameSession integration flow from accepting HUNT through travel, actual shared-simulator ELITE victory, the authored contract credit/item reward, and save reload.

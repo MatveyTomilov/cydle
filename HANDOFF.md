@@ -1,5 +1,11 @@
 # CYDLE — Project handoff and development history
 
+## Latest game checkpoint (2026-11-13; HUNT and TECH contracts)
+
+- Commit `89eec3bc86747f4ec18d4b8742b9bba4d5cfaf92` adds a deterministic real TECH contract flow on seed `tech-contract-b01`: travel through the preceding ordinary COMBAT with the shared simulator, reach the marked CACHE, choose `OPEN_CACHE`, verify MODIFIED loot/tag, DATA award, first-success blueprint, and reload persistence. Combined with HUNT at `418998d149c29aa1311e8f28c7b979fedc905a01`, both basic contract types now have one real player-operation path through reward settlement.
+- Godot 4.7.2 editor import exit 0; full native suite 23 tests / 88,642 assertions / 0 failures; diff check exit 0. No Windows export, GUI smoke, or campaign E2E.
+- Still partial: SIGNAL actual battle-to-unique reward, ESCORT success/failure at a naturally reached checkpoint, contract death/cargo loss, faction shop/world effects, all-offer persistence. See `docs/FEATURE_AUDIT.md`.
+
 ## Latest game checkpoint (2026-11-13; HUNT contract through real combat)
 
 - Commit `418998d149c29aa1311e8f28c7b979fedc905a01` adds a deterministic HUNT integration flow: a fresh profile accepts the offer, follows the marked/reachable target, runs the shared 100 ms combat simulator to an outcome, settles combat, checks the exact contract grant and payout, then reloads the save. Fixed seed `hunt-runtime-fixed-seed` won the target ELITE and retained a COMPLETE, reward-claimed contract with the unsecured contract item after reload.
