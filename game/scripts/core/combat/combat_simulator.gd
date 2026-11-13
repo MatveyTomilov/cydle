@@ -192,7 +192,7 @@ func _supports_skill_trigger_effects(state: CombatState) -> bool:
 		var effect_id: String = str(effect.get("id", ""))
 		var skill_trigger: bool = source_id in ["SK_BLADE", "SK_NEURO", "SK_SEED", "SK_BREAK"]
 		var periodic_item_trigger: bool = str(effect.get("event", "")) == "PERIODIC" and str(trigger_value.get("sourceKind", "")) in ["item", "tree"] and _supports_periodic_trigger(effect)
-		var attack_counter_trigger: bool = str(effect.get("event", "")) == "ON_ATTACK_COUNTER" and str(trigger_value.get("sourceKind", "")) == "item" and _supports_attack_counter_trigger(effect)
+		var attack_counter_trigger: bool = str(effect.get("event", "")) == "ON_ATTACK_COUNTER" and str(trigger_value.get("sourceKind", "")) in ["item", "tree"] and _supports_attack_counter_trigger(effect)
 		var direct_hit_trigger: bool = str(effect.get("event", "")) == "ON_HIT" and str(trigger_value.get("sourceKind", "")) != "skill" and _supports_direct_hit_trigger(effect)
 		var kill_trigger: bool = str(effect.get("event", "")) == "ON_KILL" and _supports_kill_trigger(effect)
 		var before_hit_trigger: bool = str(effect.get("event", "")) == "ON_BEFORE_HIT" and _supports_before_hit_trigger(effect)
@@ -2028,16 +2028,27 @@ func _dispatch_attack_counter_triggers(state: CombatState, rng: DeterministicRng
 	for trigger_value: Dictionary in state.build.get("triggerEffects", []):
 		var effect: Dictionary = trigger_value.get("effect", {})
 		var effect_id: String = str(effect.get("id", ""))
-		if str(effect.get("event", "")) != "ON_ATTACK_COUNTER" or str(trigger_value.get("sourceKind", "")) != "item" or str(trigger_value.get("sourceId", "")) != source_item_id:
+		var source_kind: String = str(trigger_value.get("sourceKind", ""))
+		var trigger_source_id: String = str(trigger_value.get("sourceId", ""))
+		var is_item_trigger: bool = source_kind == "item" and trigger_source_id == source_item_id
+		var is_tree_trigger: bool = source_kind == "tree" and actor.kind == "operator"
+		if str(effect.get("event", "")) != "ON_ATTACK_COUNTER" or (not is_item_trigger and not is_tree_trigger):
 			continue
 		var every: int = int(effect.get("counterEvery", 0))
 		var attack_count: int = int(actor.counters.get("attacks", 0))
+		if is_tree_trigger:
+			var target_key: String = "attackCounterTarget:%s:%s" % [trigger_source_id, effect_id]
+			var count_key: String = "attackCounterCount:%s:%s" % [trigger_source_id, effect_id]
+			var previous_target_id: String = str(actor.flags.get(target_key, ""))
+			attack_count = int(actor.flags.get(count_key, 0)) + 1 if previous_target_id == target.id else 1
+			actor.flags[target_key] = target.id
+			actor.flags[count_key] = float(attack_count)
 		if every <= 0 or attack_count <= 0 or attack_count % every != 0:
 			continue
 		if bool(effect.get("requireDrone", false)) and actor.kind != "drone": continue
 		var action: Dictionary = effect.get("action", {})
-		var trigger_owner: CombatActorState = _trigger_owner(state, source_item_id)
-		var trigger_key: String = "%s:%s" % [source_item_id, effect_id]
+		var trigger_owner: CombatActorState = actor if is_tree_trigger else _trigger_owner(state, source_item_id)
+		var trigger_key: String = "%s:%s" % [trigger_source_id, effect_id]
 		if bool(effect.get("oncePerCombat", false)) and bool(trigger_owner.once_per_combat.get(trigger_key, false)): continue
 		if float(trigger_owner.icds.get(trigger_key, 0.0)) > float(state.time_ms): continue
 		if not _trigger_status_condition_passes(state, trigger_owner, target, effect.get("condition", {})): continue
@@ -2081,7 +2092,7 @@ func _dispatch_attack_counter_triggers(state: CombatState, rng: DeterministicRng
 				var raw: float = basis * float(action.get("coefficient", 0.0))
 				for damage_target: CombatActorState in damage_targets:
 					_resolve_basic_hit(state, rng, actor, damage_target, raw, str(action.get("damageType", "ENERGY")), trigger_action_id, false, "", 0.0, false, 0.0)
-			"buff": _apply_trigger_buff(state, trigger_owner, action, source_item_id, trigger_action_id)
+			"buff": _apply_trigger_buff(state, trigger_owner, action, trigger_source_id, trigger_action_id)
 
 func _counter_secondary_target(state: CombatState, excluded_id: String) -> CombatActorState:
 	var targets: Array[CombatActorState] = []

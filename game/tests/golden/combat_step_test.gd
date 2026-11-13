@@ -79,6 +79,8 @@ func run(_tree: SceneTree) -> bool:
 	_test_unsupported_trigger_is_rejected(config, build)
 	_test_event_turret_ally(config, build)
 	_test_enemy_summoner(config, build)
+	_test_catalog_trigger_support(config, state)
+	_test_same_target_tree_attack_counter(config, build)
 	return failure_count == 0
 
 func _test_unsupported_trigger_is_rejected(config: Dictionary, build: Dictionary) -> void:
@@ -280,6 +282,71 @@ func _test_enemy_summoner(config: Dictionary, build: Dictionary) -> void:
 	check(state.log.any(func(event: Dictionary) -> bool: return str(event.get("kind", "")) == "TELEGRAPH" and str(event.get("data", {}).get("abilityId", "")) == "E10_summon"), "combat_step: E10 summon cast did not expose its telegraph")
 	var restored: CombatState = CombatState.from_dictionary(state.to_dictionary(), build)
 	check(restored != null and restored.enemies.any(func(enemy: CombatActorState) -> bool: return enemy.summoned and enemy.template_id == "E20"), "combat_step: E10 summon did not survive a combat snapshot roundtrip")
+
+func _test_catalog_trigger_support(config: Dictionary, state: CombatState) -> void:
+	var build_definitions: Dictionary = _read_dictionary("res://data/catalog/build_definitions.json")
+	var item_definitions: Dictionary = _read_dictionary("res://data/catalog/item_templates.json")
+	if not check(not build_definitions.is_empty() and not item_definitions.is_empty(), "combat_step: authored trigger catalogs could not be loaded"):
+		return
+	var triggers: Array[Dictionary] = []
+	for skill: Dictionary in build_definitions.get("skills", []):
+		for effect: Dictionary in skill.get("extraEffects", []):
+			if str(effect.get("type", "")) == "trigger":
+				triggers.append({"sourceId": str(skill.get("id", "")), "sourceKind": "skill", "effect": effect})
+	for source_kind: String in ["passives", "treeNodes", "mutations"]:
+		for source: Dictionary in build_definitions.get(source_kind, []):
+			for effect: Dictionary in source.get("effects", []):
+				if str(effect.get("type", "")) == "trigger":
+					triggers.append({"sourceId": str(source.get("id", "")), "sourceKind": "tree" if source_kind == "treeNodes" else source_kind.trim_suffix("s"), "effect": effect})
+	for template: Dictionary in item_definitions.get("templates", []):
+		for effect: Dictionary in template.get("effects", []):
+			if str(effect.get("type", "")) == "trigger":
+				triggers.append({"sourceId": str(template.get("id", "")), "sourceKind": "item", "effect": effect})
+	var simulator: CombatSimulator = CombatSimulator.new()
+	for trigger: Dictionary in triggers:
+		state.build["triggerEffects"] = [trigger]
+		var effect: Dictionary = trigger.get("effect", {})
+		check(simulator._supports_skill_trigger_effects(state), "combat_step: authored trigger rejected by the step guard: %s / %s / %s" % [str(trigger.get("sourceId", "")), str(effect.get("event", "")), str(effect.get("action", {}).get("kind", ""))])
+	check(not triggers.is_empty(), "combat_step: no catalog triggers were included in the configuration audit")
+
+func _test_same_target_tree_attack_counter(config: Dictionary, build: Dictionary) -> void:
+	var trigger_build: Dictionary = build.duplicate(true)
+	trigger_build["triggerEffects"] = [{
+		"sourceId": "R3D", "sourceName": "Пристрелка", "sourceKind": "tree",
+		"effect": {"type": "trigger", "id": "R3D", "event": "ON_ATTACK_COUNTER", "chance": 1.0, "counterEvery": 4,
+			"action": {"kind": "buff", "mods": [{"stat": "accuracy", "op": "FLAT", "value": 8}], "durationMs": 4000}},
+	}]
+	var initialized: Dictionary = CombatSimulator.new().create_state({
+		"seed": "r3d-same-target-counter", "depth": int(config.get("depth", 1)), "biome": str(config.get("biome", "B01")),
+		"nodeType": "COMBAT", "build": trigger_build, "enemies": [config.get("enemy", {}), config.get("enemy", {})], "tactics": config.get("tactics", {}),
+	})
+	if not check(bool(initialized.get("ok", false)), "combat_step: R3D counter fixture failed to initialize"):
+		return
+	var simulator: CombatSimulator = CombatSimulator.new()
+	var state: CombatState = initialized["state"] as CombatState
+	var first_target: CombatActorState = state.enemies[0]
+	var second_target: CombatActorState = state.enemies[1]
+	var rng: DeterministicRng = DeterministicRng.new()
+	rng.seed("r3d-same-target-counter", "triggers")
+	for attack_number: int in range(1, 4):
+		state.operator.counters["attacks"] = attack_number
+		simulator._dispatch_attack_counter_triggers(state, rng, state.operator, first_target, "%s:atk:%d" % [state.operator.id, attack_number])
+	check(state.operator.buffs.is_empty(), "combat_step: R3D triggered before four attacks on one target")
+	state.operator.counters["attacks"] = 4
+	simulator._dispatch_attack_counter_triggers(state, rng, state.operator, first_target, "%s:atk:4" % state.operator.id)
+	check(state.operator.buffs.size() == 1 and str(state.operator.buffs[0].get("sourceId", "")) == "R3D", "combat_step: R3D did not grant its accuracy buff on the fourth attack to one target")
+	state.operator.counters["attacks"] = 5
+	simulator._dispatch_attack_counter_triggers(state, rng, state.operator, second_target, "%s:atk:5" % state.operator.id)
+	check(state.operator.buffs.size() == 1, "combat_step: R3D carried its same-target counter over to another target")
+	for attack_number: int in range(6, 8):
+		state.operator.counters["attacks"] = attack_number
+		simulator._dispatch_attack_counter_triggers(state, rng, state.operator, second_target, "%s:atk:%d" % [state.operator.id, attack_number])
+	check(state.operator.buffs.size() == 1, "combat_step: R3D triggered before the second target had four attacks")
+	state.operator.counters["attacks"] = 8
+	simulator._dispatch_attack_counter_triggers(state, rng, state.operator, second_target, "%s:atk:8" % state.operator.id)
+	check(state.operator.buffs.size() == 1 and float(state.operator.buffs[0].get("expiresAt", 0.0)) == float(state.time_ms) + 4000.0, "combat_step: R3D failed to refresh its four-second buff after four attacks on a new target")
+	var restored: CombatState = CombatState.from_dictionary(state.to_dictionary(), trigger_build)
+	check(restored != null and restored.operator.buffs.size() == 1 and int(restored.operator.flags.get("attackCounterCount:R3D:R3D", 0.0)) == 4, "combat_step: R3D counter and buff did not survive a combat snapshot roundtrip")
 
 func _test_direct_status_tree_trigger(config: Dictionary, build: Dictionary) -> void:
 	var trigger_build: Dictionary = build.duplicate(true)
