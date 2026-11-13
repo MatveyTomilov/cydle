@@ -237,6 +237,36 @@ func run(_tree: SceneTree) -> bool:
 			var repeat_payout: Dictionary = contract_session.state.to_payload()
 			contract_session._complete_contract(repeat_payout, {"CREDITS": 30}, {"rarity": "RARE", "tag": "weapon"})
 			check(contract_session._commit_payload(repeat_payout) and is_equal_approx(contract_session.state.run.wallet.credits, credits_before + 30.0) and contract_session.state.run.unsecured_cargo.size() == 1, "game_session: repeated contract payout duplicated its grant")
+	var hunt_runtime_session: GameSession = GameSession.new()
+	hunt_runtime_session.configure_save_directory("user://test-saves/hunt-contract-runtime")
+	if check(hunt_runtime_session.start_new_game(1762900000101), "game_session: could not create a HUNT runtime profile") and check(hunt_runtime_session.start_expedition("hunt-runtime-fixed-seed", false, "CT_HUNT"), "game_session: HUNT runtime outing failed to start: %s" % hunt_runtime_session.last_error):
+		var hunt_contract: Dictionary = hunt_runtime_session.state.run.contract
+		var hunt_target_id: String = str(hunt_contract.get("targetNodeId", ""))
+		check(hunt_session_target_reachable(hunt_runtime_session, hunt_target_id), "game_session: HUNT's revealed target was not reachable in the authored route")
+		var hunt_battle_started: bool = hunt_runtime_session.travel_to(hunt_target_id) and hunt_runtime_session.begin_combat()
+		check(hunt_battle_started, "game_session: HUNT target could not be entered for combat: %s" % hunt_runtime_session.last_error)
+		if hunt_battle_started:
+			var hunt_ticks: int = 0
+			while hunt_runtime_session.combat_state() != null and hunt_runtime_session.combat_state().outcome.is_empty() and hunt_ticks < 1800:
+				if not hunt_runtime_session.advance_combat_step(): break
+				hunt_ticks += 1
+			var hunt_combat: CombatState = hunt_runtime_session.combat_state()
+			check(hunt_combat != null and not hunt_combat.outcome.is_empty(), "game_session: HUNT target battle did not settle within the combat tick limit")
+			if hunt_combat != null and hunt_combat.outcome == "VICTORY":
+				var pre_reward_credits: float = hunt_runtime_session.state.run.wallet.credits
+				check(hunt_runtime_session.resolve_active_combat(), "game_session: HUNT target victory failed shared settlement: %s" % hunt_runtime_session.last_error)
+				var paid_hunt: Dictionary = hunt_runtime_session.state.run.contract
+				var hunt_completion_id: String = "%s:reward" % str(paid_hunt.get("instanceId", ""))
+				var expected_hunt_credits: int = ceili(30.0 * CydleFormula.new().reward_scale(float(hunt_runtime_session.state.run.depth)))
+				var hunt_item_present: bool = hunt_runtime_session.state.run.unsecured_cargo.any(func(item: Dictionary) -> bool: return str(item.get("originGrantId", "")) == hunt_completion_id + ":item")
+				check(str(paid_hunt.get("status", "")) == "COMPLETE" and bool(paid_hunt.get("rewardClaimed", false)) and hunt_runtime_session.state.run.grant_ids.has(hunt_completion_id) and hunt_runtime_session.state.run.wallet.credits >= pre_reward_credits + expected_hunt_credits, "game_session: real HUNT target settlement did not complete and pay the authored reward; contract=%s wallet=%s" % [paid_hunt, hunt_runtime_session.state.run.wallet.to_dictionary()])
+				check(hunt_item_present, "game_session: real HUNT target settlement did not grant the exact contract item")
+				var paid_hunt_reload: GameSession = GameSession.new()
+				paid_hunt_reload.configure_save_directory("user://test-saves/hunt-contract-runtime")
+				check(paid_hunt_reload.load_saved_game() and str(paid_hunt_reload.state.run.contract.get("status", "")) == "COMPLETE" and paid_hunt_reload.state.run.unsecured_cargo.size() == hunt_runtime_session.state.run.unsecured_cargo.size(), "game_session: real HUNT completion or unsecured reward did not persist on reload")
+			else:
+				var defeat_resolved: bool = hunt_combat != null and hunt_combat.outcome == "DEFEAT" and hunt_runtime_session.resolve_active_combat()
+				check(defeat_resolved and str(hunt_runtime_session.state.run.phase) == "DEFEATED" and hunt_runtime_session.state.run.unsecured_cargo.is_empty() and not bool(hunt_runtime_session.state.run.contract.get("rewardClaimed", false)), "game_session: HUNT defeat did not preserve the actual loss/contract state")
 	var tech_offer_session: GameSession = GameSession.new()
 	tech_offer_session.configure_save_directory("user://test-saves/contracts-tech-any-biome")
 	if check(tech_offer_session.start_new_game(1762900000105), "game_session: could not create a cross-biome TECH profile"):
@@ -1366,3 +1396,9 @@ func _test_all_quest_choice_transactions() -> void:
 					check(bool(saved_copy.get("ok", false)) and session.state.meta.quest_progress[quest_id].get("choiceHistory", []).size() == stage_number, "game_session: %s/S%d/%s did not retain its decision in a valid save" % [quest_id, stage_number, str(choice.get("id", ""))])
 					tested_choices += 1
 	check(tested_choices == 36, "game_session: expected 36 real quest choices, got %d" % tested_choices)
+
+func hunt_session_target_reachable(session: GameSession, target_id: String) -> bool:
+	for node: Dictionary in session.reachable_nodes():
+		if str(node.get("id", "")) == target_id:
+			return true
+	return false
