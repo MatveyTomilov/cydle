@@ -1,5 +1,13 @@
 # CYDLE — Project handoff and development history
 
+## Current checkpoint (2026-11-13; execute all authored quest choices)
+
+- Repository `https://github.com/MatveyTomilov/cydle`; workspace `E:\cydle\project`; branch `development/codex`.
+- HEAD and `origin/development/codex`: `67d83499a441d0625497bd85d9aac535336e592c`; clean after push.
+- Added a data-driven GameSession regression for all 36 choices across the six three-stage quests. It prepares the stage's authored biome/gate/target, runs the real `resolve_quest_choice()` transaction, and checks decision history plus save-schema roundtrip. All 36 choices currently resolve on supported fixtures; this does not verify exact narrative/reward balance or all route arrival sequences.
+- Latest full checks: Godot 4.7.2 headless editor import exit 0; 22 tests passed, 88,578 assertions, 0 failures; `git diff --check` exit 0. The all-event 48-choice smoke remains passing in the same suite. No Windows export, GUI smoke or campaign E2E was run.
+- Continue with contract lifecycle completion and remaining partial systems in `docs/FEATURE_AUDIT.md`. Keep boss campaign auto retries deferred.
+
 ## Current checkpoint (2026-11-13; event reward catalog loading and 48-choice audit)
 
 - Repository `https://github.com/MatveyTomilov/cydle`; workspace `E:\cydle\project`; branch `development/codex`.

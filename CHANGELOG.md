@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — exercise all authored quest choices
+
+- Added real GameSession transaction scenarios for all 36 authored choices across Q01–Q06, including stage gates/targets, quest progress, event completion and save-schema roundtrip.
+- Godot 4.7.2: editor import exit 0; 22 tests / 88,578 assertions / 0 failures; diff check exit 0.
+
 ## Unreleased — verify every event choice transaction
 
 - Added a data-driven smoke for all 48 choices across the 24 event definitions using actual `GameSession` route/event operations.

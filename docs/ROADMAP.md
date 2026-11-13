@@ -6,7 +6,11 @@
 
 Current strategy is **FEATURE COMPLETE BETA**: audit against the normative Master Spec, close significant runtime/UI gaps, and validate real state transitions. Boss balancing and repeated automatic boss retries are deferred unless a concrete gameplay defect requires them. Preserve all profile/save data; use short deterministic integration scenarios.
 
-### Current status override (2026-11-13; all event choices transact)
+### Current status override (2026-11-13; all quest choices transact)
+
+Added a data-driven GameSession scenario for all 36 choices in the six authored three-stage quest chains. Each choice is applied to a real QUEST route node with its authored biome and objective gate where applicable; the test verifies choice history and save-schema roundtrip. Godot editor import exit 0; 22 tests passed, 88,578 assertions / 0 failures; diff check exit 0. Pushed HEAD `67d83499a441d0625497bd85d9aac535336e592c`. This confirms transaction reachability under prepared conditions, not full narrative, progression pacing, exact consequence balance, or natural campaign routing.
+
+### Previous status override (2026-11-13; all event choices transact)
 
 A data-driven integration smoke now executes both authored choices for every one of the 24 event definitions (48 real `GameSession.resolve_event()` transactions), checking node consumption and event persistence. It exposed an unloaded item-catalog defect in event grant handling; `resolve_event()` now loads the catalog before generating any event reward. Godot editor import exit 0; 22 tests passed, 88,467 assertions / 0 failures; diff check exit 0. Pushed HEAD `7207119ad494fd6397410d10cc501c711b32a85c`. This checks that every choice can transact with an isolated funded fixture; exact balance/effect semantics and longer consequences remain separately audited.
 
