@@ -43,3 +43,11 @@ At export gates, also run:
 ```
 
 Report only checks actually run, including failures and exit codes. The npm app validates the frozen reference; Godot validates the native product.
+
+## Codex subagents
+
+- Use only `regression_tester`, `game_qa`, and (when a meaningful change needs a second opinion) `reviewer` from `.codex/agents/`.
+- For every test/review delegation, pin and report the full source SHA. Run from a detached temporary Git worktree; isolate Godot profiles with a per-run `%APPDATA%` directory. Never let a tester edit or push source.
+- Send `regression_tester` to each meaningful code checkpoint for focused fast checks; after dispatch, continue independent implementation without waiting unless its finding blocks that work.
+- Send `game_qa` only at significant playable checkpoints for longer user-flow/campaign scenarios. Do not duplicate fast checks or spend runs repeating boss attempts without a specific hypothesis.
+- Use `reviewer` only for substantial architecture, save, combat, or cross-system changes. The main agent owns fixes and integrates test findings.
