@@ -161,6 +161,30 @@ func _edge_cost(session: GameSession, node_id: String) -> int:
 			return int(edge.get("fuelCost", 1))
 	return 999
 
+func _minimum_fuel_to_checkpoint(session: GameSession) -> int:
+	var graph: Dictionary = session.state.run.graph
+	var distances: Dictionary = {str(session.state.run.current_node_id): 0}
+	for _iteration: int in range(6):
+		for edge_value: Variant in graph.get("edges", []):
+			if not edge_value is Dictionary:
+				continue
+			var edge: Dictionary = edge_value
+			var from_id: String = str(edge.get("from", ""))
+			var to_id: String = str(edge.get("to", ""))
+			if not distances.has(from_id):
+				continue
+			var proposed: int = int(distances[from_id]) + int(edge.get("fuelCost", 1))
+			if not distances.has(to_id) or proposed < int(distances[to_id]):
+				distances[to_id] = proposed
+	var layers: Array = graph.get("layers", [])
+	var final_layer: Array = layers.back() if not layers.is_empty() else []
+	var minimum: int = 999
+	for node: Dictionary in final_layer:
+		var node_id: String = str(node.get("id", ""))
+		if distances.has(node_id):
+			minimum = mini(minimum, int(distances[node_id]))
+	return minimum
+
 func _route_diagnostics(session: GameSession) -> String:
 	var values: Array[String] = []
 	var fuel: int = int(session.state.run.resources.get("fuel", 0))
@@ -212,7 +236,13 @@ func _resolve_node(session: GameSession) -> bool:
 		var prototype: String = "IMP_SHIELD" if options.has("IMP_SHIELD") else str(options[0]) if not options.is_empty() else ""
 		return session.resolve_service_node("OPEN_CACHE", prototype)
 	if kind == "FUEL":
-		return session.resolve_service_node("BUY_FUEL") or session.resolve_service_node("SCRAP_FUEL") or session.resolve_service_node("LEAVE_NODE")
+		var fuel: float = float(session.state.run.resources.get("fuel", 0.0))
+		var required_fuel: int = _minimum_fuel_to_checkpoint(session)
+		if fuel > float(required_fuel + 1):
+			return session.resolve_service_node("LEAVE_NODE")
+		if float(session.state.run.wallet.scrap) >= 5.0 and session.resolve_service_node("SCRAP_FUEL"):
+			return true
+		return session.resolve_service_node("BUY_FUEL") or session.resolve_service_node("LEAVE_NODE")
 	if kind == "REPAIR":
 		var resources: Dictionary = session.state.run.resources
 		var hp: float = float(resources.get("hp", 0.0))
@@ -389,6 +419,14 @@ func _lowest_safe_dismantle_candidate(session: GameSession) -> String:
 	for item: Dictionary in session.state.meta.inventory:
 		var item_id: String = str(item.get("itemId", ""))
 		if not bool(item.get("secured", false)) or equipped_ids.has(item_id):
+			continue
+		var run_equipped: bool = false
+		if session.state.run != null:
+			for run_item_value: Variant in session.state.run.equipment.values():
+				if str(run_item_value) == item_id:
+					run_equipped = true
+					break
+		if run_equipped:
 			continue
 		var template: Dictionary = catalog.get_template(str(item.get("templateId", "")))
 		var category: String = str(template.get("category", ""))
