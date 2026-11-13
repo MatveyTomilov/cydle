@@ -214,7 +214,12 @@ func _resolve_node(session: GameSession) -> bool:
 	if kind == "FUEL":
 		return session.resolve_service_node("BUY_FUEL") or session.resolve_service_node("SCRAP_FUEL") or session.resolve_service_node("LEAVE_NODE")
 	if kind == "REPAIR":
-		return session.resolve_service_node("REPAIR_HULL") or session.resolve_service_node("REPAIR_HP") or session.resolve_service_node("LEAVE_NODE")
+		var resources: Dictionary = session.state.run.resources
+		var hp: float = float(resources.get("hp", 0.0))
+		var max_hp: float = maxf(1.0, float(resources.get("maxHP", 1.0)))
+		var primary_action: String = "REPAIR_HP" if hp / max_hp < 0.8 else "REPAIR_HULL"
+		var fallback_action: String = "REPAIR_HULL" if primary_action == "REPAIR_HP" else "REPAIR_HP"
+		return session.resolve_service_node(primary_action) or session.resolve_service_node(fallback_action) or session.resolve_service_node("LEAVE_NODE")
 	if kind == "SHOP":
 		var catalog: ItemCatalog = ItemCatalog.new()
 		if bool(catalog.load_catalog().get("ok", false)):
