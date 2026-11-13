@@ -22,6 +22,7 @@ const TEST_PATHS: Array[String] = [
 	"res://tests/golden/autobattle_v2_contract_test.gd",
 	"res://tests/golden/autobattle_v2_channel_test.gd",
 	"res://tests/golden/autobattle_v2_runtime_test.gd",
+	"res://tests/golden/autobattle_v2_session_test.gd",
 	"res://tests/golden/autobattle_v2_targets_test.gd",
 	"res://tests/golden/autobattle_v2_skill_catalog_test.gd",
 	"res://tests/golden/autobattle_v2_duel_test.gd",

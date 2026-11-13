@@ -22,7 +22,9 @@ func run(_tree: SceneTree) -> bool:
 	for skill: Dictionary in build_catalog.skills.values():
 		if str(skill.get("channel", "main")) == "main": main_skill_ids.append(str(skill.get("id", "")))
 	main_skill_ids.sort()
-	check(main_skill_ids.size() == AutobattleV2Contract.SUPPORTED_MAIN_SKILLS.size(), "v2_skill_catalog: supported main skill list drifted from the authored catalog (%d vs %d)" % [main_skill_ids.size(), AutobattleV2Contract.SUPPORTED_MAIN_SKILLS.size()])
+	var supported_skill_ids: Array[String] = AutobattleV2Contract.SUPPORTED_MAIN_SKILLS.duplicate()
+	supported_skill_ids.sort()
+	check(main_skill_ids == supported_skill_ids, "v2_skill_catalog: supported main skill IDs drifted from the authored catalog (%s vs %s)" % [str(main_skill_ids), str(supported_skill_ids)])
 	var resolver: BuildResolver = BuildResolver.new()
 	var simulator: CombatSimulator = CombatSimulator.new()
 	for skill_id: String in main_skill_ids:

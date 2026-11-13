@@ -88,6 +88,10 @@ func run(_tree: SceneTree) -> bool:
 	var skill_build: Dictionary = _build_with_skill("SK_PIERCE")
 	if not check(bool(skill_build.get("valid", false)), "v2_runtime: BuildResolver rejected the real main skill fixture"):
 		return false
+	var forged_skill_build: Dictionary = skill_build.duplicate(true)
+	forged_skill_build["skills"][0]["coefficient"] = float(forged_skill_build["skills"][0].get("coefficient", 1.0)) + 100.0
+	var forged_skill_result: Dictionary = simulator.create_state({"combatRulesVersion": CombatState.V2_RULES_VERSION, "seed": "v2-runtime-forged-skill", "depth": 1, "build": forged_skill_build, "enemies": [{"templateId": "E01"}], "startEnergy": 100})
+	check(not bool(forged_skill_result.get("ok", true)) and str(forged_skill_result.get("error", "")).contains("NON_CANONICAL_V2_SKILL"), "v2_runtime: V2 accepted a mutated noncanonical skill definition")
 	var skill_config: Dictionary = {"combatRulesVersion": CombatState.V2_RULES_VERSION, "seed": "v2-runtime-real-skill", "depth": 1, "build": skill_build, "enemies": [{"templateId": "E01"}], "startEnergy": 100}
 	var skill_created: Dictionary = simulator.create_state(skill_config)
 	if not check(bool(skill_created.get("ok", false)), "v2_runtime: real main skill adapter failed: %s" % str(skill_created.get("error", ""))):
@@ -152,6 +156,26 @@ func run(_tree: SceneTree) -> bool:
 	check(skill_cooldown_rejected, "v2_runtime: skill cooldown did not gate the next channel selection")
 	if skill_restored != null:
 		check(StateHash.new().state_hash(skill_state.to_dictionary()) == StateHash.new().state_hash(skill_restored.to_dictionary()), "v2_runtime: resumed skill recovery diverged")
+	var cdr_config: Dictionary = skill_config.duplicate(true)
+	cdr_config["seed"] = "v2-runtime-cdr-expires-during-windup"
+	var cdr_created: Dictionary = simulator.create_state(cdr_config)
+	if check(bool(cdr_created.get("ok", false)), "v2_runtime: CDR expiry scenario failed to initialize"):
+		var cdr_state: CombatState = cdr_created["state"]
+		cdr_state.operator.buffs.append({"id": "test-cdr-window", "expiresAt": 150.0, "mods": [{"stat": "cooldownRecovery", "op": "INCREASED", "value": 50.0, "source": {"id": "test-cdr", "name": "test", "kind": "test"}}]})
+		var cdr_expected_ready: int = -1
+		var cdr_committed: bool = false
+		for _tick: int in range(8):
+			var cdr_step: Dictionary = simulator.step_combat(cdr_state)
+			if not check(bool(cdr_step.get("ok", false)), "v2_runtime: CDR expiry step failed"): break
+			cdr_state = cdr_step["state"]
+			for event: Dictionary in cdr_state.log:
+				if str(event.get("kind", "")) == "ACTION_PREPARE" and str(event.get("sourceId", "")) == "SK_PIERCE":
+					var cdr_prepared: Dictionary = event.get("data", {})
+					cdr_expected_ready = int(event.get("timestamp", 0)) + int(cdr_prepared.get("cooldownMs", 0))
+				if str(event.get("kind", "")) == "SKILL_USE" and str(event.get("skillId", "")) == "SK_PIERCE": cdr_committed = true
+			if cdr_committed: break
+		check(cdr_expected_ready > 0 and cdr_committed, "v2_runtime: CDR test did not prepare and commit SK_PIERCE")
+		check(int(cdr_state.action_channel.get("cooldowns", {}).get("skill:SK_PIERCE", 0)) == cdr_expected_ready and int(cdr_state.operator.cooldowns.get("SK_PIERCE", 0.0)) == cdr_expected_ready, "v2_runtime: cooldown was recalculated after its captured CDR expired during PREPARE")
 	var shocked: CombatState = created["state"].clone()
 	simulator._add_simple_status(shocked, shocked.enemies[0], shocked.operator, "SHOCK", 1000)
 	shocked = simulator.step_combat(shocked)["state"]

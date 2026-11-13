@@ -308,16 +308,15 @@ func _resolve_v2_action(state: CombatState, rng: DeterministicRng, actor: Combat
 	actor.energy = clampf(actor.energy - cost, 0.0, float(actor.base_sheet.get("maxEnergy", 0.0)))
 	state.metrics["energySpent"] = float(state.metrics.get("energySpent", 0.0)) + cost
 	_gain_basic_heat(state, actor, float(skill.get("heatDelta", 0.0)), rng)
-	var sheet: Dictionary = _effective_sheet(state, actor)
-	var cooldown: float = _formula.cooldown_ms(float(skill.get("cooldownMs", 0.0)), float(sheet.get("cooldownRecovery", 0.0)))
-	if skill.get("tags", []).has("D") and _has_status(actor, "JAM"):
-		cooldown *= 1.3
+	# The compiler captured cooldown at PREPARE, including the then-effective CDR
+	# and JAM modifiers. Do not recalculate it after windup/status expiry.
+	var cooldown: int = int(action.get("cooldownMs", 0))
 	var timeline: Dictionary = context.get("timeline", {})
 	var action_start_ms: int = int(timeline.get("commitAtMs", state.time_ms)) - int(action.get("prepareMs", 0))
-	actor.cooldowns[str(skill["id"])] = float(action_start_ms) + cooldown
+	actor.cooldowns[str(skill["id"])] = float(action_start_ms + cooldown)
 	var channel_cooldowns: Dictionary = state.action_channel.get("cooldowns", {})
 	var recovery_until: int = int(timeline.get("recoveryUntilMs", state.time_ms))
-	channel_cooldowns[str(action.get("actionId", ""))] = maxi(recovery_until, action_start_ms + int(ceili(cooldown / float(TICK_MS))) * TICK_MS)
+	channel_cooldowns[str(action.get("actionId", ""))] = maxi(recovery_until, action_start_ms + cooldown)
 	state.action_channel["cooldowns"] = channel_cooldowns
 	actor.counters["casts"] = int(actor.counters.get("casts", 0)) + 1
 	var cast: Dictionary = {

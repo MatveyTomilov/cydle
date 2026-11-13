@@ -43,13 +43,20 @@ static func target_name(doctrine: int) -> String:
 static func validate_build(build: Dictionary) -> String:
 	if not build.get("drones", []).is_empty():
 		return "UNSUPPORTED_V2_DRONES"
+	var catalog: BuildCatalog = BuildCatalog.new()
+	var loaded: Dictionary = catalog.load_catalog()
+	if not bool(loaded.get("ok", false)):
+		return "V2_BUILD_CATALOG_UNAVAILABLE:%s" % str(loaded.get("error", "unknown"))
 	var skills_by_id: Dictionary = {}
 	for skill_value: Variant in build.get("skills", []):
 		if not skill_value is Dictionary:
 			return "INVALID_V2_SKILL_DEFINITION"
 		var skill: Dictionary = skill_value
-		if str(skill.get("channel", "main")) != "main" or not SUPPORTED_MAIN_SKILLS.has(str(skill.get("id", ""))):
+		var skill_id: String = str(skill.get("id", ""))
+		if str(skill.get("channel", "main")) != "main" or not SUPPORTED_MAIN_SKILLS.has(skill_id):
 			return "UNSUPPORTED_V2_SKILL:%s" % str(skill.get("id", "unknown"))
+		if not catalog.skills.has(skill_id) or skill != catalog.skills.get(skill_id, {}):
+			return "NON_CANONICAL_V2_SKILL:%s" % skill_id
 		var target: Dictionary = compile_target(str(skill.get("targetMode", "HIGHEST_THREAT")))
 		if not bool(target.get("ok", false)):
 			return str(target.get("error", "UNSUPPORTED_TARGET_MODE"))
