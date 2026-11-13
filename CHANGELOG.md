@@ -1,3 +1,9 @@
+## Unreleased — Autobattle V2 migration branch (13 November 2026)
+
+- Adopted CYDLE_MASTER_SPEC.md v2.1 §8 as the normative item-authored combat model, superseding player-programmable tactics.
+- Added isolated AutobattleV2Contract deterministic action selector, action timeline, reaction budget, bounded proc ledger, target doctrines and Why-Not rejection codes, with a headless contract test registered in the native runner.
+- Status: contract-only, not connected to GameSession or the current CombatSimulator. V1 saves and playable combat remain unchanged. Godot CI and runtime parity must be verified before merge.
+
 # Changelog
 
 ## Unreleased — every equipment category is available to the active expedition build
