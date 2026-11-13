@@ -2,7 +2,7 @@
 
 - Adopted CYDLE_MASTER_SPEC.md v2.1 §8 as the normative item-authored combat model, superseding player-programmable tactics.
 - Added isolated AutobattleV2Contract deterministic action selector, action timeline, reaction budget, bounded proc ledger, target doctrines and Why-Not rejection codes, with a headless contract test registered in the native runner.
-- Status: contract-only, not connected to GameSession or the current CombatSimulator. V1 saves and playable combat remain unchanged. Godot CI and runtime parity must be verified before merge.
+- Added isolated AutobattleV2Duel: ARC-9 basic action with canonical DamageMath, Energy/Heat, HOT damage, authored Vent and Heat-to-Shield, enemy autoattack, causal event records and replay/snapshot tests. Fixed channel occupancy semantics so cooldown does not block further weapon actions. This is **headless prototype-only**, not connected to GameSession, Build Lab, consumables or campaign. V1 saves and live combat remain unchanged; new SHA's CI and rendered/headless parity remain to be verified before merge.
 
 # Changelog
 
