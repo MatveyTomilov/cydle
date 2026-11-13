@@ -24,6 +24,16 @@ var _loot_rng: DeterministicRng
 func configure_save_directory(path: String) -> void:
 	_repository.configure_directory(path)
 
+func save_snapshots() -> Array[Dictionary]:
+	return _repository.list_snapshots(SLOT_ID)
+
+func restore_save_snapshot(snapshot_index: int) -> bool:
+	var restored: Dictionary = _repository.restore_snapshot(SLOT_ID, snapshot_index)
+	if not bool(restored.get("ok", false)):
+		last_error = str(restored.get("error", "Не удалось восстановить копию."))
+		return false
+	return load_saved_game()
+
 func load_saved_game() -> bool:
 	var loaded: Dictionary = _repository.load_game(SLOT_ID)
 	if bool(loaded.get("ok", false)):

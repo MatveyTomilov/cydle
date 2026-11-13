@@ -6,6 +6,10 @@
 
 Current strategy is **FEATURE COMPLETE BETA**: audit against the normative Master Spec, close significant runtime/UI gaps, and validate real state transitions. Boss balancing and repeated automatic boss retries are deferred unless a concrete gameplay defect requires them. Preserve all profile/save data; use short deterministic integration scenarios.
 
+### Latest checkpoint — §25 animated battle screen shipped; QA save/UI defects fixed (2026-11-13)
+
+The static text battle report is replaced by the Master Spec §25 animated side-view autobattle (`battle_arena.gd` + `battle_view.gd`), driven by the same deterministic simulator and the bounded-cadence playback API. Rendering only reads the event log; pause/×1/×2/×4/skip and the settlement action are always on screen at 1280×720, verified with real windowed viewport captures. New `battle_view_test.gd` proves rendered playback is outcome/state-identical to skip. Independent `game_qa` on `4f7d19c` verified the act-1 loop, extraction, reloads, autopilot and save integrity as player-reachable, and reported two major UI/save defects now fixed (silent new-game overwrite → confirmation + backup restore; clipped checkpoint cargo actions → readable names + no horizontal overflow). Its remaining blocker is the d4 BOSS_A gate (5/5 defeats), which is the next investigation target. Local Godot 4.7.2 import exit 0; full native suite 25 tests / 88,898 assertions / 0 failures; asset validation exit 0.
+
 ### Latest checkpoint — CI restored, then combat playback unblocked (2026-11-13)
 
 GitHub Actions is green on `4f7d19c78af8a4ea505d001eaaca200342143a87` (run `43409888278`, all 17 steps). Every earlier red run was a false positive in the other direction: the Godot steps never executed because only the GUI-subsystem editor executable was installed. CI now installs the console wrapper, gates on the real runner summary, asserts the exported EXE size, boots it headless with an isolated `APPDATA`, and publishes `cydle-windows-<sha>`. That artifact was downloaded and launched independently (116,396,408 bytes, exit 0, `CYDLE shell ready: menu`).

@@ -95,6 +95,47 @@ func load_game(slot_id: String) -> Dictionary:
 		return _failure("Снимок найден, но данные игры повреждены; исходный файл сохранён: %s" % str(state_result.get("error", "неизвестная ошибка")))
 	return {"ok": true, "empty": false, "recovered": bool(loaded.get("recovered", false)), "state": state_result["state"], "save": loaded["save"], "error": ""}
 
+func list_snapshots(slot_id: String) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	if not _valid_slot_id(slot_id):
+		return result
+	for index: int in [0, 1, 2]:
+		var path: String = snapshot_path(slot_id, index)
+		if not FileAccess.file_exists(path):
+			continue
+		var parsed: Dictionary = _read_snapshot(path)
+		if not bool(parsed.get("ok", false)):
+			continue
+		var save: Dictionary = parsed["save"]
+		result.append({
+			"index": index,
+			"path": path,
+			"revision": int(save["revision"]),
+			"save_id": str(save["saveId"]),
+			"updated_at": int(save["updatedAt"]),
+		})
+	return result
+
+func restore_snapshot(slot_id: String, snapshot_index: int) -> Dictionary:
+	if not _valid_slot_id(slot_id):
+		return _failure("Недопустимый идентификатор слота сохранения.")
+	if not [1, 2].has(snapshot_index):
+		return _failure("Восстановить можно только резервную копию (.bak1/.bak2).")
+	var source: Dictionary = _read_snapshot(snapshot_path(slot_id, snapshot_index))
+	if not bool(source.get("ok", false)):
+		return _failure("Резервная копия повреждена: %s" % str(source.get("error", "неизвестная ошибка")))
+	var current: Dictionary = self.load(slot_id)
+	if not bool(current.get("ok", false)) and not bool(current.get("empty", false)):
+		return _failure("Текущий слот повреждён; восстановление не выполнено: %s" % str(current.get("error", "")))
+	var document: Dictionary = source["save"]
+	var revision: int = int(document["revision"]) + 1
+	var save_id: String = str(document["saveId"])
+	if bool(current.get("ok", false)):
+		revision = maxi(revision, int(current["save"]["revision"]) + 1)
+		save_id = str(current["save"]["saveId"])
+	var replacement: Dictionary = _validator.create_document(document["payload"], save_id, revision, maxi(0, int(document["updatedAt"])), str(document["balanceVersion"]), str(document["gameVersion"]))
+	return _commit(slot_id, replacement, current.get("save", {}))
+
 func export_text(slot_id: String) -> Dictionary:
 	var loaded: Dictionary = self.load(slot_id)
 	if not bool(loaded.get("ok", false)):

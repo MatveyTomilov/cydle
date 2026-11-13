@@ -52,10 +52,36 @@ func run(tree: SceneTree) -> bool:
 		app.call("_show_inventory")
 		check(_has_label(app, "ФИЛЬТР ДОБЫЧИ · РЕШЕНИЕ О ПОДБОРЕ ПРИМЕНЯЕТСЯ К БОЕВЫМ, КВЕСТОВЫМ И СОБЫТИЙНЫМ НАГРАДАМ"), "test_app_boot: inventory omitted the persistent loot filter controls")
 		check(_has_button(body, "СОХРАНИТЬ ФИЛЬТР"), "test_app_boot: inventory did not expose the loot filter save action")
+		var live_save_id: String = pilot_session.state.save_id
+		var live_revision: int = pilot_session.state.revision
+		app.call("_show_menu")
+		var new_game_button: Button = _find_button(app, "НОВАЯ ИГРА")
+		if check(new_game_button != null, "test_app_boot: menu lost the new game action"):
+			new_game_button.pressed.emit()
+			await tree.process_frame
+			check(str(app.get("_screen")) == "new_game_confirm", "test_app_boot: new game overwrote a live profile without confirmation")
+			check(pilot_session.state.save_id == live_save_id and pilot_session.state.revision == live_revision, "test_app_boot: opening the confirmation already mutated the live save")
+			var cancel_button: Button = _find_button(app, "ОТМЕНА")
+			if check(cancel_button != null, "test_app_boot: confirmation offered no cancel"):
+				cancel_button.pressed.emit()
+				await tree.process_frame
+				check(pilot_session.state.save_id == live_save_id, "test_app_boot: cancelling the confirmation changed the save")
+		app.call("_show_settings")
+		check(_has_label(app, "Резервные копии сейва"), "test_app_boot: settings omitted the backup restore panel")
+		check(_has_button(body, "ВОССТАНОВИТЬ"), "test_app_boot: settings offered no way to restore a backup")
 
 	app.queue_free()
 	await tree.process_frame
 	return failure_count == 0
+
+func _find_button(node: Node, text: String) -> Button:
+	if node is Button and (node as Button).text == text:
+		return node as Button
+	for child: Node in node.get_children():
+		var found: Button = _find_button(child, text)
+		if found != null:
+			return found
+	return null
 
 func _has_label(node: Node, text: String) -> bool:
 	if node is Label and (node as Label).text == text:

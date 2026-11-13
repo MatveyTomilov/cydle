@@ -80,7 +80,7 @@ jobs:
           $assertions = [int]$groups[3].Value
           $assertionFailures = [int]$groups[4].Value
           if ($failed -ne 0 -or $assertionFailures -ne 0) { throw "Native tests reported $failed failed tests and $assertionFailures failed assertions" }
-          if ($passed -lt 24 -or $assertions -lt 80000) { throw "Native suite ran only $passed tests / $assertions assertions; expected at least 24 / 80000" }
+          if ($passed -lt 25 -or $assertions -lt 80000) { throw "Native suite ran only $passed tests / $assertions assertions; expected at least 25 / 80000" }
           Write-Host "Verified native suite: $passed tests, $assertions assertions, 0 failures"
 
       - name: Validate asset manifest

@@ -15,7 +15,6 @@ var _body: VBoxContainer
 var _footer: Label
 var _saved_badge: Label
 var _screen: String = "menu"
-var _combat_timer: Timer
 var _settings: ConfigFile = ConfigFile.new()
 var _muted: bool = false
 var _reduced_motion: bool = false
@@ -42,6 +41,14 @@ func _ready() -> void:
 	_build_shell()
 	_show_menu()
 	print("CYDLE shell ready: %s" % _screen)
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		_session.flush_combat_snapshot()
+
+func _on_quit() -> void:
+	_session.flush_combat_snapshot()
+	get_tree().quit()
 
 func _build_shell() -> void:
 	for child: Node in get_children():
@@ -113,7 +120,7 @@ func _build_shell() -> void:
 	sidebar_spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	sidebar.add_child(sidebar_spacer)
 	var quit: Button = _button("ЗАВЕРШИТЬ СМЕНУ", true)
-	quit.pressed.connect(func() -> void: get_tree().quit())
+	quit.pressed.connect(_on_quit)
 	sidebar.add_child(quit)
 	var frame: PanelContainer = PanelContainer.new()
 	frame.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -128,6 +135,7 @@ func _build_shell() -> void:
 	frame.add_child(inner)
 	var scroll: ScrollContainer = ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	inner.add_child(scroll)
 	_body = VBoxContainer.new()
 	_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1552,10 +1560,17 @@ func _add_checkpoint_shipping_control() -> void:
 	if cargo.is_empty():
 		_body.add_child(_label("Незакреплённого груза нет.", 11, COLOR_MUTED))
 	else:
+		var catalog: ItemCatalog = ItemCatalog.new()
+		catalog.load_catalog()
 		for item: Dictionary in cargo:
 			var item_id: String = str(item.get("itemId", ""))
+			var template: Dictionary = catalog.get_template(str(item.get("templateId", "")))
 			var choice: CheckButton = CheckButton.new()
-			choice.text = "%s · %s" % [str(item.get("templateId", "Предмет")), item_id]
+			choice.text = "%s · %s · T%d" % [str(template.get("name", item.get("templateId", "Предмет"))), str(item.get("rarity", "COMMON")), int(item.get("techLevel", 1))]
+			choice.tooltip_text = item_id
+			choice.clip_text = true
+			choice.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+			choice.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			choice.button_pressed = _checkpoint_shipping_ids.has(item_id)
 			choice.toggled.connect(_on_checkpoint_shipping_item_toggled.bind(item_id))
 			_body.add_child(choice)
@@ -1676,49 +1691,55 @@ func _show_settings() -> void:
 		_settings.save("user://settings.cfg"))
 	_body.add_child(motion)
 	_body.add_child(_label("Настройки сохраняются отдельно от игрового слота. Звук пока не интегрирован; отключение действует заранее для следующих аудиосистем.", 12, COLOR_MUTED))
+	_body.add_child(_label("Резервные копии сейва", 16, COLOR_TEXT))
+	var snapshots: Array[Dictionary] = _session.save_snapshots()
+	if snapshots.is_empty():
+		_body.add_child(_label("Сохранений пока нет.", 11, COLOR_MUTED))
+	for snapshot: Dictionary in snapshots:
+		var index: int = int(snapshot["index"])
+		var row: HBoxContainer = HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		_body.add_child(row)
+		var kind: String = "ОСНОВНОЙ" if index == 0 else ("КОПИЯ 1" if index == 1 else "КОПИЯ 2")
+		var info: Label = _label("%s · ревизия %d · %s" % [kind, int(snapshot["revision"]), str(snapshot["save_id"])], 11, COLOR_TEXT if index == 0 else COLOR_MUTED)
+		info.autowrap_mode = TextServer.AUTOWRAP_OFF
+		info.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(info)
+		if index != 0:
+			var restore: Button = _button("ВОССТАНОВИТЬ", false)
+			restore.tooltip_text = "Заменит основной слот этой копией; текущая версия уйдёт в .bak1."
+			restore.pressed.connect(_on_restore_snapshot.bind(index))
+			row.add_child(restore)
 	var back: Button = _button("В ГАРАЖ", false)
 	back.pressed.connect(_navigate.bind("garage"))
 	_body.add_child(back)
 
+func _on_restore_snapshot(snapshot_index: int) -> void:
+	if _session.restore_save_snapshot(snapshot_index):
+		_saved_badge.text = "СЕЙВ · ВОССТАНОВЛЕН"
+		_footer.text = "Резервная копия восстановлена в основной слот."
+		_show_settings()
+	else:
+		_footer.text = _session.last_error
+
 func _show_battle() -> void:
 	_screen = "battle"
 	_clear_body()
-	var combat: CombatState = _session.combat_state()
-	if combat == null:
+	if _session.combat_state() == null:
 		_show_road()
 		return
-	_body.add_child(_label("АВТОБОЙ   /   СИМУЛЯЦИЯ 100 МС", 12, COLOR_CYAN))
+	_body.add_child(_label("АВТОБОЙ   /   ОДИН ДЕТЕРМИНИРОВАННЫЙ СИМУЛЯТОР · ШАГ 100 МС", 12, COLOR_CYAN))
 	if not _session.combat_notice.is_empty():
 		var notice: Label = _label(_session.combat_notice, 12, COLOR_AMBER)
 		notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_body.add_child(notice)
-	_body.add_child(_label("Оператор vs %s" % ", ".join(_enemy_names(combat.enemies)), 24, COLOR_TEXT))
-	var operator_bar: ProgressBar = _bar(combat.operator.hp / maxf(1.0, float(combat.operator.base_sheet.get("maxHP", 1.0))), Color("4cc99b"))
-	_body.add_child(_label("ОПЕРАТОР · HP %d / %d · ЩИТ %d · ЭНЕРГИЯ %d · НАГРЕВ %d" % [int(combat.operator.hp), int(combat.operator.base_sheet.get("maxHP", 0)), int(combat.operator.shield), int(combat.operator.energy), int(combat.operator.heat)], 12, COLOR_TEXT))
-	_body.add_child(operator_bar)
-	for enemy: CombatActorState in combat.enemies:
-		_body.add_child(_label("%s · HP %d / %d" % [enemy.display_name, int(enemy.hp), int(enemy.base_sheet.get("maxHP", 0))], 13, COLOR_RED))
-		_body.add_child(_bar(enemy.hp / maxf(1.0, float(enemy.base_sheet.get("maxHP", 1.0))), COLOR_RED))
-	_body.add_child(_label("ВРЕМЯ БОЯ %d:%02d" % [int(combat.time_ms / 60000.0), int(combat.time_ms / 1000.0) % 60], 13, COLOR_AMBER))
-	var events: Array[Dictionary] = combat.log.slice(maxi(0, combat.log.size() - 8))
-	for event: Dictionary in events:
-		_body.add_child(_label("[%d.%d] %s" % [int(float(event.get("timestamp", 0.0)) / 1000.0), int(float(event.get("timestamp", 0.0)) / 100.0) % 10, str(event.get("text", event.get("kind", "")))], 11, COLOR_MUTED))
-	if not combat.outcome.is_empty():
-		_body.add_child(_label("ИСХОД: %s" % combat.outcome, 18, COLOR_CYAN if combat.outcome == "VICTORY" else COLOR_RED))
-		var settle: Button = _button("ЗАФИКСИРОВАТЬ РЕЗУЛЬТАТ", true)
-		settle.pressed.connect(_on_resolve_combat)
-		_body.add_child(settle)
-	else:
-		var step: Button = _button("СЛЕДУЮЩИЙ ТИК · 100 МС", true)
-		step.pressed.connect(_on_combat_tick)
-		_body.add_child(step)
-		var skip: Button = _button("ПРОСЧИТАТЬ ДО ИСХОДА", false)
-		skip.pressed.connect(_on_combat_skip)
-		_body.add_child(skip)
-	var status: Label = _label(_session.last_error, 12, COLOR_RED)
+	var view: BattleView = BattleView.new(_session, _reduced_motion)
+	view.settlement_requested.connect(_on_resolve_combat)
+	_body.add_child(view)
 	if not _session.last_error.is_empty():
-		_body.add_child(status)
-	_footer.text = "ОДИН ДЕТЕРМИНИРОВАННЫЙ COMBATSIMULATOR · %d МС" % combat.time_ms
+		_body.add_child(_label(_session.last_error, 12, COLOR_RED))
+	_footer.text = "ПАУЗА И СКОРОСТЬ НЕ ВЛИЯЮТ НА ИСХОД · РЕНДЕР ТОЛЬКО ЧИТАЕТ СОБЫТИЯ"
 
 func _trace_text(node_value: Variant, depth: int) -> String:
 	if not node_value is Dictionary:
@@ -1746,6 +1767,33 @@ func _navigate(destination: String) -> void:
 		"settings": _show_settings()
 
 func _on_new_game() -> void:
+	if _session.state != null:
+		_show_new_game_confirm()
+		return
+	_start_new_game_now()
+
+func _show_new_game_confirm() -> void:
+	_screen = "new_game_confirm"
+	_clear_body()
+	_body.add_child(_label("НОВАЯ ИГРА ЗАМЕНИТ ТЕКУЩИЙ ПРОФИЛЬ", 20, COLOR_AMBER))
+	var run: GameSaveState.RunState = _session.state.run
+	var summary: String = "Сейв %s · ревизия %d" % [_session.state.save_id, _session.state.revision]
+	if run != null:
+		summary += " · сектор %d · фаза %s" % [int(run.depth), str(run.phase)]
+	_body.add_child(_label(summary, 12, COLOR_TEXT))
+	_body.add_child(_label("Текущий прогресс будет перезаписан. Две предыдущие версии останутся в резервных копиях .bak1/.bak2 и их можно вернуть в настройках.", 12, COLOR_MUTED))
+	var actions: HBoxContainer = HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 10)
+	_body.add_child(actions)
+	var confirm: Button = _button("ДА, НАЧАТЬ ЗАНОВО", true)
+	confirm.pressed.connect(_start_new_game_now)
+	actions.add_child(confirm)
+	var cancel: Button = _button("ОТМЕНА", false)
+	cancel.pressed.connect(_show_menu)
+	actions.add_child(cancel)
+	_footer.text = "ПОДТВЕРДИТЕ ПЕРЕЗАПИСЬ ИЛИ ВЕРНИТЕСЬ В МЕНЮ"
+
+func _start_new_game_now() -> void:
 	_selected_escalations.clear()
 	if _session.start_new_game():
 		_saved_badge.text = "СЕЙВ · СОЗДАН"
@@ -1777,17 +1825,6 @@ func _on_begin_combat() -> void:
 		_show_battle()
 	else:
 		_footer.text = _session.last_error
-
-func _on_combat_tick() -> void:
-	if _session.advance_combat_step():
-		_show_battle()
-	else:
-		_footer.text = _session.last_error
-
-func _on_combat_skip() -> void:
-	if not _session.skip_combat_to_outcome():
-		_footer.text = _session.last_error
-	_show_battle()
 
 func _on_resolve_combat() -> void:
 	if _session.resolve_active_combat():
@@ -2224,12 +2261,6 @@ func _item_by_id(item_id: String) -> Dictionary:
 			return item
 	return {}
 
-func _enemy_names(enemies: Array[CombatActorState]) -> PackedStringArray:
-	var result: PackedStringArray = PackedStringArray()
-	for enemy: CombatActorState in enemies:
-		result.append(enemy.display_name)
-	return result
-
 func _bar(fraction: float, color: Color) -> ProgressBar:
 	var bar: ProgressBar = ProgressBar.new()
 	bar.min_value = 0.0
@@ -2244,6 +2275,7 @@ func _bar(fraction: float, color: Color) -> ProgressBar:
 func _clear_body() -> void:
 	if _body == null:
 		return
+	_session.flush_combat_snapshot()
 	for child: Node in _body.get_children():
 		child.queue_free()
 

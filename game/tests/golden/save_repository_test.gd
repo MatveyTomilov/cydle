@@ -98,6 +98,23 @@ func run(_tree: SceneTree) -> bool:
 	check(bool(recovered_interrupted_commit.get("ok", false)) and bool(recovered_interrupted_commit.get("recovered", false)), "save_repository: interrupted promotion did not report a recoverable snapshot")
 	check(recovered_interrupted_commit.get("save", {}).get("payload") == stable_save.get("save", {}).get("payload"), "save_repository: interrupted promotion lost the last committed payload")
 
+	var restore_repository: Object = repository_script.new()
+	restore_repository.call("configure_directory", test_directory)
+	check(bool(restore_repository.call("save", "restore_slot", {"value": "one"}, 10).get("ok", false)), "save_repository: restore fixture v1 failed")
+	check(bool(restore_repository.call("save", "restore_slot", {"value": "two"}, 20).get("ok", false)), "save_repository: restore fixture v2 failed")
+	check(bool(restore_repository.call("save", "restore_slot", {"value": "three"}, 30).get("ok", false)), "save_repository: restore fixture v3 failed")
+	var snapshots: Array = restore_repository.call("list_snapshots", "restore_slot")
+	check(snapshots.size() == 3, "save_repository: expected main plus two backups, got %d" % snapshots.size())
+	var restored: Dictionary = restore_repository.call("restore_snapshot", "restore_slot", 2)
+	check(bool(restored.get("ok", false)), "save_repository: restoring .bak2 failed: %s" % str(restored.get("error", "")))
+	var restored_load: Dictionary = restore_repository.call("load", "restore_slot")
+	check(bool(restored_load.get("ok", false)) and restored_load.get("save", {}).get("payload", {}).get("value") == "one", "save_repository: restore did not bring back the .bak2 payload")
+	check(int(restored_load.get("save", {}).get("revision", 0)) == 4, "save_repository: restored revision must outrank every backup so load() selects it")
+	check(not bool(restore_repository.call("restore_snapshot", "restore_slot", 0).get("ok", false)), "save_repository: restoring the main snapshot must be rejected")
+	check(not bool(restore_repository.call("restore_snapshot", "restore_slot", 9).get("ok", false)), "save_repository: restoring an out-of-range index must be rejected")
+	var post_restore: Array = restore_repository.call("list_snapshots", "restore_slot")
+	check(post_restore.size() == 3 and int(post_restore[0]["revision"]) == 4, "save_repository: pre-restore state was not rotated into a backup")
+
 	_cleanup_directory(test_directory)
 	return failure_count == 0
 
