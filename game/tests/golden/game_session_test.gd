@@ -444,14 +444,46 @@ func run(_tree: SceneTree) -> bool:
 			check(str(signal_contract.get("kind", "")) == "SIGNAL" and str(signal_contract.get("targetUniqueId", "")) == "U09" and not str(signal_contract.get("targetNodeId", "")).is_empty() and str(signal_contract.get("eventId", "")) == "contract-offer:5:SIGNAL_U09", "game_session: signal contract did not create a targeted elite encounter tied to its world event")
 			var signal_round_trip: Dictionary = GameSaveState.new().parse_payload(signal_session.state.to_payload())
 			check(bool(signal_round_trip.get("ok", false)) and str(signal_round_trip["state"].run.contract.get("kind", "")) == "SIGNAL", "game_session: active signal contract did not survive save validation")
-			var signal_payout: Dictionary = signal_session.state.to_payload()
-			check(signal_session._complete_contract(signal_payout, {}, {"rarity": "UNIQUE", "templateId": "U09"}), "game_session: unique signal contract reward failed: %s" % signal_session.last_error)
-			check(signal_session._commit_payload(signal_payout), "game_session: unique signal contract reward could not be saved: %s" % signal_session.last_error)
-			var signal_cargo: Array = signal_session.state.run.unsecured_cargo
-			check(str(signal_session.state.run.contract.get("status", "")) == "COMPLETE" and signal_cargo.size() == 1 and str(signal_cargo[0].get("templateId", "")) == "U09", "game_session: signal contract did not grant its exact unique item")
-			var signal_repeat: Dictionary = signal_session.state.to_payload()
-			signal_session._complete_contract(signal_repeat, {}, {"rarity": "UNIQUE", "templateId": "U09"})
-			check(signal_session._commit_payload(signal_repeat) and signal_session.state.run.unsecured_cargo.size() == 1, "game_session: repeated signal payout duplicated the unique item")
+			var signal_target_id: String = str(signal_contract.get("targetNodeId", ""))
+			var signal_route: Array[String] = route_path_to_node(signal_session.state.run.graph, "START", signal_target_id)
+			var signal_route_valid: bool = not signal_route.is_empty()
+			for signal_route_node_id: String in signal_route:
+				if not signal_session.travel_to(signal_route_node_id):
+					signal_route_valid = false
+					break
+				var signal_node: Dictionary = signal_session.current_node()
+				if str(signal_node.get("id", "")) == signal_target_id:
+					if str(signal_node.get("type", "")) != "ELITE" or not signal_session.begin_combat():
+						signal_route_valid = false
+						break
+					var signal_ticks: int = 0
+					while signal_session.combat_state() != null and signal_session.combat_state().outcome.is_empty() and signal_ticks < 1800:
+						if not signal_session.advance_combat_step(): break
+						signal_ticks += 1
+					if signal_session.combat_state() == null or signal_session.combat_state().outcome != "VICTORY" or not signal_session.resolve_active_combat():
+						signal_route_valid = false
+						break
+				elif str(signal_node.get("type", "")) in ["COMBAT", "ELITE", "BOUNTY"]:
+					if not signal_session.begin_combat():
+						signal_route_valid = false
+						break
+					var signal_route_ticks: int = 0
+					while signal_session.combat_state() != null and signal_session.combat_state().outcome.is_empty() and signal_route_ticks < 1800:
+						if not signal_session.advance_combat_step(): break
+						signal_route_ticks += 1
+					if signal_session.combat_state() == null or signal_session.combat_state().outcome != "VICTORY" or not signal_session.resolve_active_combat():
+						signal_route_valid = false
+						break
+				elif not signal_session.resolve_service_node("LEAVE_NODE"):
+					signal_route_valid = false
+					break
+			var signal_completion_id: String = "%s:reward" % str(signal_contract.get("instanceId", ""))
+			var signal_cargo: Array[Dictionary] = signal_session.state.run.unsecured_cargo.filter(func(item: Dictionary) -> bool: return str(item.get("originGrantId", "")) == signal_completion_id + ":item")
+			check(signal_route_valid and str(signal_session.state.run.contract.get("status", "")) == "COMPLETE" and bool(signal_session.state.run.contract.get("rewardClaimed", false)) and signal_session.state.run.grant_ids.has(signal_completion_id), "game_session: natural SIGNAL target battle did not settle the unique contract reward: %s" % signal_session.last_error)
+			check(signal_cargo.size() == 1 and str(signal_cargo[0].get("templateId", "")) == "U09" and str(signal_cargo[0].get("rarity", "")) == "UNIQUE", "game_session: real SIGNAL ELITE victory did not grant exactly its authored U09 item")
+			var signal_reload: GameSession = GameSession.new()
+			signal_reload.configure_save_directory("user://test-saves/signal-contract")
+			check(signal_reload.load_saved_game() and str(signal_reload.state.run.contract.get("status", "")) == "COMPLETE" and signal_reload.state.run.grant_ids.has(signal_completion_id) and signal_reload.state.run.unsecured_cargo.any(func(item: Dictionary) -> bool: return str(item.get("originGrantId", "")) == signal_completion_id + ":item"), "game_session: real SIGNAL reward did not persist exactly once through save reload")
 	var escalation_session: GameSession = GameSession.new()
 	escalation_session.configure_save_directory("user://test-saves/endgame-escalations")
 	if check(escalation_session.start_new_game(1762900000115), "game_session: could not create an endgame escalation profile"):
@@ -1485,3 +1517,29 @@ func hunt_session_target_reachable(session: GameSession, target_id: String) -> b
 		if str(node.get("id", "")) == target_id:
 			return true
 	return false
+
+func route_path_to_node(graph: Dictionary, start_id: String, target_id: String) -> Array[String]:
+	var adjacency: Dictionary = {}
+	for edge: Dictionary in graph.get("edges", []):
+		var source: String = str(edge.get("from", ""))
+		if not adjacency.has(source): adjacency[source] = []
+		(adjacency[source] as Array).append(str(edge.get("to", "")))
+	var previous: Dictionary = {start_id: ""}
+	var queue: Array[String] = [start_id]
+	var cursor: int = 0
+	while cursor < queue.size() and not previous.has(target_id):
+		var current_id: String = queue[cursor]
+		cursor += 1
+		for next_id: String in adjacency.get(current_id, []):
+			if previous.has(next_id): continue
+			previous[next_id] = current_id
+			queue.append(next_id)
+	if not previous.has(target_id): return []
+	var reversed: Array[String] = []
+	var cursor_id: String = target_id
+	while cursor_id != start_id:
+		reversed.append(cursor_id)
+		cursor_id = str(previous.get(cursor_id, ""))
+		if cursor_id.is_empty(): return []
+	reversed.reverse()
+	return reversed
