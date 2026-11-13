@@ -14,7 +14,8 @@ const VENT_THRESHOLD: float = 85.0
 const VENT_COOLDOWN_MS: int = 8000
 
 var _actions: AutobattleV2Contract = AutobattleV2Contract.new()
-var _damage: DamageMath = DamageMath.new()
+# DamageMath's CalcTrace uses an instance-local counter; construct it per
+# resolved packet so replay hashes never inherit history from another run.
 var _hash: StateHash = StateHash.new()
 
 func new_duel(seed_value: String, enemy_hp: float = 900.0, enemy_armor: float = 4.0) -> Dictionary:
@@ -159,6 +160,7 @@ func _begin_next_action(state: Dictionary) -> void:
 
 
 func _commit_arc(state: Dictionary, rng: DeterministicRng) -> void:
+	var damage: DamageMath = DamageMath.new()
 	var op: Dictionary = state["operator"]
 	var enemy: Dictionary = state["enemy"]
 	if float(op["energy"]) < ARC_ENERGY_COST:
@@ -171,16 +173,16 @@ func _commit_arc(state: Dictionary, rng: DeterministicRng) -> void:
 	op["lastHeatGainAtMs"] = int(state["timeMs"])
 	if float(op["heat"]) >= HOT_THRESHOLD and not was_hot:
 		_emit(state, "HOT_START", {"sourceId": "weapon:ARC-9", "heat": op["heat"]})
-	var chance: float = _damage.hit_probability(100.0, float(enemy.get("evasion", 0.0)))
+	var chance: float = damage.hit_probability(100.0, float(enemy.get("evasion", 0.0)))
 	var hit: bool = rng.chance(chance)
 	var applied: float = 0.0
 	var mitigation_trace: Dictionary = {}
 	var partition_trace: Dictionary = {}
 	if hit:
 		var base_damage: float = ARC_DAMAGE * (1.3 if float(op["heat"]) >= HOT_THRESHOLD else 1.0)
-		var mitigation: Dictionary = _damage.mitigate_packet(base_damage, "KINETIC",
+		var mitigation: Dictionary = damage.mitigate_packet(base_damage, "KINETIC",
 			{"armor": enemy["armor"]}, DamageMath.ZERO_PENETRATION)
-		var partition: Dictionary = _damage.partition_damage(float(mitigation["afterDefense"]),
+		var partition: Dictionary = damage.partition_damage(float(mitigation["afterDefense"]),
 			{"hp": enemy["hp"], "shield": enemy["shield"], "temp": []}, 0.0)
 		enemy["shield"] = maxf(0.0, float(enemy["shield"]) - float(partition["shieldConsumed"]))
 		enemy["hp"] = maxf(0.0, float(enemy["hp"]) - float(partition["hpLost"]))
@@ -224,15 +226,16 @@ func _commit_vent(state: Dictionary) -> void:
 
 
 func _commit_enemy_attack(state: Dictionary, rng: DeterministicRng) -> void:
+	var damage: DamageMath = DamageMath.new()
 	var op: Dictionary = state["operator"]
 	var enemy: Dictionary = state["enemy"]
-	var hit: bool = rng.chance(_damage.hit_probability(float(enemy["accuracy"]), 0.0))
+	var hit: bool = rng.chance(damage.hit_probability(float(enemy["accuracy"]), 0.0))
 	var applied: float = 0.0
 	var mitigation_trace: Dictionary = {}
 	if hit:
-		var packet: Dictionary = _damage.mitigate_packet(float(enemy["damage"]), "KINETIC",
+		var packet: Dictionary = damage.mitigate_packet(float(enemy["damage"]), "KINETIC",
 			{"armor": 0.0}, DamageMath.ZERO_PENETRATION)
-		var partition: Dictionary = _damage.partition_damage(float(packet["afterDefense"]),
+		var partition: Dictionary = damage.partition_damage(float(packet["afterDefense"]),
 			{"hp": op["hp"], "shield": op["shield"], "temp": []}, 0.0)
 		op["shield"] = maxf(0.0, float(op["shield"]) - float(partition["shieldConsumed"]))
 		op["hp"] = maxf(0.0, float(op["hp"]) - float(partition["hpLost"]))
