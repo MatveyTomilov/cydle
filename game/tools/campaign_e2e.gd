@@ -140,13 +140,24 @@ func _choose_node(session: GameSession) -> Dictionary:
 		var node_type: String = str(known.get("type", "UNKNOWN"))
 		var score: float = 0.0
 		if node_type == "CHECKPOINT": score = 100.0
-		elif node_type == "FUEL": score = 70.0
+		elif node_type == "FUEL":
+			var fuel_after_travel: float = float(resources.get("fuel", 0.0)) - float(edge_cost)
+			var needed_for_boss: int = _fuel_to_next_boss(session, node_id)
+			var credit_cost: int = ceili(3.0 * CydleFormula.new().reward_scale(float(session.state.run.depth)))
+			var can_refuel: bool = float(session.state.run.wallet.scrap) >= 5.0 or float(session.state.run.wallet.credits) >= float(credit_cost)
+			var refuel_needed: bool = fuel_after_travel <= float(needed_for_boss + 2)
+			score = 70.0 if refuel_needed and can_refuel else 3.0
 		elif node_type == "REPAIR":
 			var hp_fraction: float = float(resources.get("hp", 0.0)) / maxf(1.0, float(resources.get("maxHP", 1.0)))
 			var repair_needed: bool = float(resources.get("hull", 0.0)) <= 70.0 or hp_fraction <= 0.9
 			score = (82.0 if int(session.state.run.depth) % 4 == 0 else 62.0) if repair_needed else 4.0
-		elif node_type == "CACHE": score = 22.0
-		elif node_type == "EVENT": score = 16.0
+		elif node_type == "CACHE":
+			var short_for_boss: bool = float(resources.get("fuel", 0.0)) <= float(_fuel_to_next_boss(session, node_id) + 2)
+			var has_refuel_funds: bool = float(session.state.run.wallet.scrap) >= 5.0 or float(session.state.run.wallet.credits) >= float(ceili(3.0 * CydleFormula.new().reward_scale(float(session.state.run.depth))))
+			score = 44.0 if short_for_boss and not has_refuel_funds else 22.0
+		elif node_type == "EVENT":
+			var short_for_boss: bool = float(resources.get("fuel", 0.0)) <= float(_fuel_to_next_boss(session, node_id) + 2)
+			score = 34.0 if short_for_boss else 16.0
 		elif node_type == "COMBAT": score = 10.0
 		elif node_type == "SHOP": score = 32.0 if int(session.state.run.depth) <= 3 and float(session.state.run.wallet.credits) >= 40.0 else 2.0
 		elif node_type in ["ELITE", "BOUNTY"]: score = -6.0
@@ -161,9 +172,10 @@ func _edge_cost(session: GameSession, node_id: String) -> int:
 			return int(edge.get("fuelCost", 1))
 	return 999
 
-func _minimum_fuel_to_checkpoint(session: GameSession) -> int:
+func _minimum_fuel_to_checkpoint(session: GameSession, start_node_id: String = "") -> int:
 	var graph: Dictionary = session.state.run.graph
-	var distances: Dictionary = {str(session.state.run.current_node_id): 0}
+	var origin_id: String = str(session.state.run.current_node_id) if start_node_id.is_empty() else start_node_id
+	var distances: Dictionary = {origin_id: 0}
 	for _iteration: int in range(6):
 		for edge_value: Variant in graph.get("edges", []):
 			if not edge_value is Dictionary:
@@ -184,6 +196,16 @@ func _minimum_fuel_to_checkpoint(session: GameSession) -> int:
 		if distances.has(node_id):
 			minimum = mini(minimum, int(distances[node_id]))
 	return minimum
+
+func _fuel_to_next_boss(session: GameSession, start_node_id: String = "") -> int:
+	var depth: int = int(session.state.run.depth)
+	var sectors_to_boss: int = 4 - depth % 4
+	if depth == 12:
+		# The campaign E2E continues into d13 after the final boss checkpoint.
+		sectors_to_boss = 1
+	elif depth > 12:
+		sectors_to_boss = 0
+	return _minimum_fuel_to_checkpoint(session, start_node_id) + sectors_to_boss * 6
 
 func _route_diagnostics(session: GameSession) -> String:
 	var values: Array[String] = []
@@ -237,8 +259,8 @@ func _resolve_node(session: GameSession) -> bool:
 		return session.resolve_service_node("OPEN_CACHE", prototype)
 	if kind == "FUEL":
 		var fuel: float = float(session.state.run.resources.get("fuel", 0.0))
-		var required_fuel: int = _minimum_fuel_to_checkpoint(session)
-		if fuel > float(required_fuel + 1):
+		var required_fuel: int = _fuel_to_next_boss(session)
+		if fuel > float(required_fuel + 2):
 			return session.resolve_service_node("LEAVE_NODE")
 		if float(session.state.run.wallet.scrap) >= 5.0 and session.resolve_service_node("SCRAP_FUEL"):
 			return true
