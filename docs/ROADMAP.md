@@ -6,7 +6,11 @@
 
 Current strategy is **FEATURE COMPLETE BETA**: audit against the normative Master Spec, close significant runtime/UI gaps, and validate real state transitions. Boss balancing and repeated automatic boss retries are deferred unless a concrete gameplay defect requires them. Preserve all profile/save data; use short deterministic integration scenarios.
 
-### Current status override (2026-11-13; affordability-aware choices)
+### Current status override (2026-11-13; all event choices transact)
+
+A data-driven integration smoke now executes both authored choices for every one of the 24 event definitions (48 real `GameSession.resolve_event()` transactions), checking node consumption and event persistence. It exposed an unloaded item-catalog defect in event grant handling; `resolve_event()` now loads the catalog before generating any event reward. Godot editor import exit 0; 22 tests passed, 88,467 assertions / 0 failures; diff check exit 0. Pushed HEAD `7207119ad494fd6397410d10cc501c711b32a85c`. This checks that every choice can transact with an isolated funded fixture; exact balance/effect semantics and longer consequences remain separately audited.
+
+### Previous status override (2026-11-13; affordability-aware choices)
 
 Event and quest choice UI now calls shared GameSession cost quotes also used by the actual transaction. Unaffordable paid choices are disabled and show the missing currency/amount; special scaled event and Q03 engine prices share calculation logic with settlement. EV02 and Q03 regressions confirm rejected paid choices leave event/quest state unchanged while the valid alternative resolves. Godot editor import exit 0; 22 tests passed, 88,319 assertions / 0 failures; diff check exit 0. Pushed HEAD `24668e57b181db526a3e4068e098a8c1fe501726`. This is an interface correctness fix, not systematic verification of all 48 event choices or all quest branches.
 

@@ -1,5 +1,13 @@
 # CYDLE — Project handoff and development history
 
+## Current checkpoint (2026-11-13; event reward catalog loading and 48-choice audit)
+
+- Repository `https://github.com/MatveyTomilov/cydle`; workspace `E:\cydle\project`; branch `development/codex`.
+- HEAD and `origin/development/codex`: `7207119ad494fd6397410d10cc501c711b32a85c`; clean after push.
+- The new data-driven event transaction regression executed both choices of all 24 authored events against `GameSession.resolve_event()`, verifying that each resolves the route node and records event usage. It caught a runtime defect: event item rewards used the session's uninitialized item catalog, so EV01/A and other item-grant choices could fail if the catalog had not been loaded by a previous UI action. `resolve_event()` now ensures the catalog is loaded before item generation.
+- Checks: Godot 4.7.2 editor import exit 0; 22 tests passed, 88,467 assertions, 0 failures; `git diff --check` exit 0. The 48-choice event transaction smoke ran as part of `event_catalog_test`. This does not verify every event reward's exact numeric balance or multi-node consequences. No export, GUI smoke, campaign E2E or beta archive was run.
+- Continue with contract/faction and quest consequence coverage from `docs/FEATURE_AUDIT.md`, then attack other partial systems. Keep tests deterministic and isolated; no boss-targeted campaign retries.
+
 ## Current checkpoint (2026-11-13; event and quest affordability regressions)
 
 - Repository `https://github.com/MatveyTomilov/cydle`; workspace `E:\cydle\project`; branch `development/codex`.

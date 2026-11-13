@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — verify every event choice transaction
+
+- Added a data-driven smoke for all 48 choices across the 24 event definitions using actual `GameSession` route/event operations.
+- Fixed event item rewards failing when `resolve_event()` was the first operation to need the item catalog; the transaction now loads it before generation.
+- Godot 4.7.2: editor import exit 0; 22 tests / 88,467 assertions / 0 failures; diff check exit 0.
+
 ## Unreleased — disable unaffordable event and quest options
 
 - Shared `GameSession` cost quotes now drive both actual event/quest transactions and road UI availability. Paid options are disabled with currency and required amount when the unsecured sortie wallet cannot cover them.
