@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — field loot powers the active expedition build
+
+- Added between-fight installation of compatible unsecured cargo into unlocked field slots. The field Build Lab, combat initialization/resume, event energy refills, and sector continuation now use the same `run.equipment` through the existing `BuildResolver` and combat simulator.
+- The field item remains unsecured. Extraction secures cargo and promotes the active field kit to permanent equipment; defeat, tow, and abandon reconcile references against surviving owned gear and preserve existing cargo/durability consequences.
+- Wired cargo rows to real equip/restore actions and made Build Lab show the field build during an expedition.
+- Regression covers slot validation, actual combat actor stats, ownership, save/load, continuation, extraction, and dismantle protection. Local checks: Godot 4.7.2 import exit 0, **26 tests / 88,941 assertions / 0 failures**; TypeScript typecheck, 207 tests, catalog validation, and production build pass. CI pending.
+
 ## Unreleased — Master Spec §25 animated battle screen, and two player-facing save/UI fixes
 
 - Replaced the static text battle report with the §25 animated side-view autobattle. `game/scripts/app/battle_arena.gd` renders the shared simulator's event log only (tracers, impacts, damage numbers, miss/dodge arcs, shield/heal rings, status pops, death fades, cast telegraphs, heat lockout, rain and idle bob disabled under reduced motion) using the repo's existing original placeholder SVGs via `data/presentation/alpha_visual_fallbacks.json`. It never writes combat state, so rendering cannot change an outcome.

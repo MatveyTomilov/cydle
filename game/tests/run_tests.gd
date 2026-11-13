@@ -9,6 +9,7 @@ const TEST_PATHS: Array[String] = [
 	"res://tests/golden/sector_generator_test.gd",
 	"res://tests/golden/event_catalog_test.gd",
 	"res://tests/golden/game_session_test.gd",
+	"res://tests/golden/run_equipment_test.gd",
 	"res://tests/golden/offline_budget_test.gd",
 	"res://tests/golden/combat_playback_test.gd",
 	"res://tests/golden/battle_view_test.gd",

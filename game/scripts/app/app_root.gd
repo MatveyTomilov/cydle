@@ -351,12 +351,15 @@ func _show_garage() -> void:
 func _show_build() -> void:
 	_screen = "build"
 	_clear_body()
-	_body.add_child(_label("BUILD LAB   /   ТЕКУЩАЯ СБОРКА", 12, COLOR_CYAN))
+	var field_loadout: bool = _session.state.run != null and not ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(_session.state.run.phase)
+	_body.add_child(_label("ПОЛЕВАЯ СБОРКА" if field_loadout else "BUILD LAB   /   ТЕКУЩАЯ СБОРКА", 12, COLOR_CYAN))
 	_body.add_child(_label("Билдинг", 28, COLOR_TEXT))
-	var build: Dictionary = _session.build_preview()
+	var build: Dictionary = _session.run_build_preview() if field_loadout else _session.build_preview()
 	if not bool(build.get("valid", false)):
 		_body.add_child(_label("Сборка невалидна: %s" % str(build.get("issues", [])), 14, COLOR_RED))
 		return
+	if field_loadout:
+		_body.add_child(_label("Расчёты используют текущие полевые слоты. Незакреплённые предметы в них будут потеряны при поражении.", 12, COLOR_AMBER))
 	var stat_ids: Array[String] = StatMath.new().stat_ids()
 	var selector: OptionButton = OptionButton.new()
 	selector.custom_minimum_size.x = 340
@@ -1352,9 +1355,9 @@ func _show_road() -> void:
 	_footer.text = "ПЕРЕХОДЫ РАСХОДУЮТ ТОПЛИВО И 25 СЕКУНД ИГРОВОГО ВРЕМЕНИ"
 
 func _add_run_cargo_control(run: GameSaveState.RunState) -> void:
-	if not ["ROUTE", "CHECKPOINT"].has(run.phase):
+	if not ["ROUTE", "NODE", "CHECKPOINT"].has(run.phase):
 		return
-	_body.add_child(_label("НЕЗАКРЕПЛЁННЫЙ ГРУЗ · SCR %d · DATA %d" % [int(run.wallet.scrap), int(run.wallet.data)], 12, COLOR_CYAN))
+	_body.add_child(_label("ПОЛЕВОЕ СНАРЯЖЕНИЕ И НЕЗАКРЕПЛЁННЫЙ ГРУЗ · SCR %d · DATA %d" % [int(run.wallet.scrap), int(run.wallet.data)], 12, COLOR_CYAN))
 	if run.unsecured_cargo.is_empty():
 		_body.add_child(_label("Грузовой отсек пуст.", 10, COLOR_MUTED))
 	else:
@@ -1363,17 +1366,39 @@ func _add_run_cargo_control(run: GameSaveState.RunState) -> void:
 		for item: Dictionary in run.unsecured_cargo:
 			var item_id: String = str(item.get("itemId", ""))
 			var template: Dictionary = catalog.get_template(str(item.get("templateId", "")))
-			var item_row: HBoxContainer = HBoxContainer.new()
+			var item_row: VBoxContainer = VBoxContainer.new()
+			item_row.add_theme_constant_override("separation", 4)
 			_body.add_child(item_row)
 			var item_label: Label = _label("%s · %s · T%d" % [str(template.get("name", item.get("templateId", "Предмет"))), str(item.get("rarity", "COMMON")), int(item.get("techLevel", 1))], 11, COLOR_TEXT)
-			item_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			item_row.add_child(item_label)
+			var actions: HBoxContainer = HBoxContainer.new()
+			actions.add_theme_constant_override("separation", 6)
+			item_row.add_child(actions)
+			var equipped_slot: String = _session.run_equipped_slot(item_id)
+			if not equipped_slot.is_empty():
+				var equipped_label: Label = _label("УСТАНОВЛЕН · %s" % _run_slot_label(equipped_slot), 10, COLOR_CYAN)
+				equipped_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				actions.add_child(equipped_label)
+				var restore_field: Button = _button("ВЕРНУТЬ ШТАТНЫЙ СЛОТ", true)
+				restore_field.pressed.connect(_on_unequip_run_item.bind(equipped_slot))
+				actions.add_child(restore_field)
+			else:
+				var available_slots: Array[String] = _session.valid_run_equipment_slots(item_id)
+				if not available_slots.is_empty():
+					var slot_selector: OptionButton = OptionButton.new()
+					for slot: String in available_slots:
+						slot_selector.add_item(_run_slot_label(slot))
+						slot_selector.set_item_metadata(slot_selector.item_count - 1, slot)
+					actions.add_child(slot_selector)
+					var equip: Button = _button("ЭКИПИРОВАТЬ", true)
+					equip.pressed.connect(_on_equip_run_item.bind(str(slot_selector.get_item_metadata(slot_selector.selected)), item_id, slot_selector))
+					actions.add_child(equip)
 			var quote: Dictionary = _session.run_item_dismantle_quote(item_id)
 			var dismantle: Button = _button("РАЗОБРАТЬ · %d SCR / %d DATA" % [int(quote.get("scrap", 0)), int(quote.get("data", 0))], false)
 			dismantle.disabled = not bool(quote.get("valid", false))
-			dismantle.tooltip_text = str(quote.get("error", "Получится незакреплённый ресурс; можно отменить до следующего узла."))
+			dismantle.tooltip_text = str(quote.get("error", "Груз останется незакреплённым до эвакуации."))
 			dismantle.pressed.connect(_on_dismantle_run_item.bind(item_id))
-			item_row.add_child(dismantle)
+			actions.add_child(dismantle)
 	if _session.can_undo_last_dismantle() and str(_session.state.meta.disassembly_undo.get("source", "")) == "RUN":
 		var undo_run: Button = _button("ОТМЕНИТЬ ПОСЛЕДНИЙ РАЗБОР", true)
 		undo_run.tooltip_text = "Вернёт предмет в этот груз и спишет полученный SCRAP/DATA. Недоступно после входа в следующий узел."
@@ -1384,6 +1409,24 @@ func _on_dismantle_run_item(item_id: String) -> void:
 	var dismantled: bool = _session.dismantle_run_item(item_id)
 	_show_road()
 	_footer.text = "ГРУЗ РАЗОБРАН · РЕСУРСЫ ОСТАЮТСЯ НЕЗАКРЕПЛЁННЫМИ" if dismantled else _session.last_error
+
+func _run_slot_label(slot: String) -> String:
+	var labels: Dictionary = {"MAIN": "ОСНОВНОЕ ОРУЖИЕ", "OFFHAND": "ВТОРОЙ МОДУЛЬ", "ARMOR": "БРОНЯ"}
+	if slot.begins_with("IMP_"): return "ИМПЛАНТ %s" % slot.trim_prefix("IMP_")
+	if slot.begins_with("DRONE_"): return "ДРОН %s" % slot.trim_prefix("DRONE_")
+	return str(labels.get(slot, slot))
+
+func _on_equip_run_item(slot: String, item_id: String, selector: OptionButton) -> void:
+	if selector.selected >= 0:
+		slot = str(selector.get_item_metadata(selector.selected))
+	var equipped: bool = _session.equip_run_item(slot, item_id)
+	_show_road()
+	_footer.text = "ПОЛЕВОЙ СЛОТ ОБНОВЛЁН · ГРУЗ ОСТАЛСЯ НЕЗАКРЕПЛЁННЫМ" if equipped else _session.last_error
+
+func _on_unequip_run_item(slot: String) -> void:
+	var restored: bool = _session.unequip_run_item(slot)
+	_show_road()
+	_footer.text = "ВОССТАНОВЛЕН ШТАТНЫЙ ПОЛЕВОЙ СЛОТ" if restored else _session.last_error
 
 func _show_current_node(run: GameSaveState.RunState) -> void:
 	var node: Dictionary = _session.current_node()

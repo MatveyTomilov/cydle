@@ -108,6 +108,164 @@ func build_preview() -> Dictionary:
 		"unlockedDroneSlots": state.meta.unlocked_drone_slots,
 	})
 
+func run_build_preview() -> Dictionary:
+	if state == null or state.run == null or ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(state.run.phase):
+		return build_preview()
+	return BuildResolver.new().resolve_build(_run_build_input(state))
+
+func _run_build_input(save_state: GameSaveState) -> Dictionary:
+	var input: Dictionary = _build_input(save_state)
+	if save_state.run == null:
+		return input
+	var items_by_id: Dictionary = {}
+	for item: Dictionary in save_state.meta.inventory:
+		items_by_id[str(item.get("itemId", ""))] = item
+	for item: Dictionary in save_state.run.unsecured_cargo:
+		items_by_id[str(item.get("itemId", ""))] = item
+	var equipment: Dictionary = {}
+	for slot_value: Variant in save_state.run.equipment.keys():
+		var item: ItemInstance = ItemInstance.new()
+		var raw: Dictionary = items_by_id.get(str(save_state.run.equipment[slot_value]), {})
+		if not raw.is_empty() and item.instantiate_from_dictionary(raw):
+			equipment[str(slot_value)] = item
+	input["equipment"] = equipment
+	return input
+
+func run_equipped_slot(item_id: String) -> String:
+	if state == null or state.run == null:
+		return ""
+	for slot_value: Variant in state.run.equipment.keys():
+		if str(state.run.equipment[slot_value]) == item_id:
+			return str(slot_value)
+	return ""
+
+func valid_run_equipment_slots(item_id: String) -> Array[String]:
+	var result: Array[String] = []
+	if not _run_equipment_change_allowed():
+		return result
+	var item: Dictionary = {}
+	for candidate: Dictionary in state.run.unsecured_cargo:
+		if str(candidate.get("itemId", "")) == item_id:
+			item = candidate
+			break
+	if item.is_empty():
+		last_error = "Предмет отсутствует в незакреплённом грузе."
+		return result
+	if not _item_catalog_loaded():
+		return result
+	var template: Dictionary = _item_catalog.get_template(str(item.get("templateId", "")))
+	if template.is_empty():
+		last_error = "Шаблон предмета отсутствует в каталоге."
+		return result
+	var candidates: Array[String] = []
+	match str(template.get("category", "")):
+		"MAIN": candidates = ["MAIN"]
+		"OFFHAND": candidates = ["OFFHAND"]
+		"ARMOR": candidates = ["ARMOR"]
+		"IMPLANT": candidates = ["IMP_1", "IMP_2", "IMP_3", "IMP_4", "IMP_5", "IMP_6"]
+		"DRONE": candidates = ["DRONE_1", "DRONE_2"]
+	for slot: String in candidates:
+		if not _run_slot_unlocked(slot):
+			continue
+		var payload: Dictionary = state.to_payload()
+		var run_equipment: Dictionary = payload["run"]["equipment"]
+		for equipped_slot: Variant in run_equipment.keys().duplicate():
+			if str(run_equipment[equipped_slot]) == item_id:
+				run_equipment.erase(equipped_slot)
+		run_equipment[slot] = item_id
+		var parsed: Dictionary = GameSaveState.new().parse_payload(payload)
+		if bool(parsed.get("ok", false)):
+			result.append(slot)
+	return result
+
+func equip_run_item(slot: String, item_id: String) -> bool:
+	if not _run_equipment_change_allowed():
+		return false
+	if not valid_run_equipment_slots(item_id).has(slot):
+		last_error = "Предмет нельзя установить в выбранный полевой слот или сборка станет невалидной."
+		return false
+	var payload: Dictionary = state.to_payload()
+	var run_payload: Dictionary = payload["run"]
+	var run_equipment: Dictionary = run_payload["equipment"]
+	for equipped_slot: Variant in run_equipment.keys().duplicate():
+		if str(run_equipment[equipped_slot]) == item_id:
+			run_equipment.erase(equipped_slot)
+	run_equipment[slot] = item_id
+	var parsed: Dictionary = GameSaveState.new().parse_payload(payload)
+	if not bool(parsed.get("ok", false)):
+		last_error = str(parsed.get("error", "Полевая сборка не прошла проверку."))
+		return false
+	var candidate: GameSaveState = parsed["state"] as GameSaveState
+	var build: Dictionary = BuildResolver.new().resolve_build(_run_build_input(candidate))
+	if not bool(build.get("valid", false)):
+		last_error = "Полевая сборка невалидна: %s" % str(build.get("issues", []))
+		return false
+	var resources: Dictionary = run_payload["resources"]
+	var stats: Dictionary = build.get("stats", {})
+	for key_pair: Array in [["maxHP", "maxHP"], ["maxShield", "maxShield"], ["maxEnergy", "maxEnergy"]]:
+		var resource_key: String = str(key_pair[0])
+		resources[resource_key] = float(stats.get(str(key_pair[1]), resources.get(resource_key, 0.0)))
+	resources["hp"] = minf(float(resources.get("hp", 0.0)), float(resources["maxHP"]))
+	resources["shield"] = minf(float(resources.get("shield", 0.0)), float(resources["maxShield"]))
+	resources["energy"] = minf(float(resources.get("energy", 0.0)), float(resources["maxEnergy"]))
+	run_payload["lastCommandId"] = "run:equipment:%s:%s:%d" % [slot, item_id, state.revision]
+	return _commit_payload(payload)
+
+func unequip_run_item(slot: String) -> bool:
+	if not _run_equipment_change_allowed():
+		return false
+	if not state.run.equipment.has(slot):
+		last_error = "В выбранном полевом слоте нет предмета."
+		return false
+	var equipped_id: String = str(state.run.equipment[slot])
+	var cargo_item: bool = false
+	for item: Dictionary in state.run.unsecured_cargo:
+		if str(item.get("itemId", "")) == equipped_id:
+			cargo_item = true
+			break
+	if not cargo_item:
+		last_error = "Снять этим действием можно только предмет из незакреплённого груза."
+		return false
+	var payload: Dictionary = state.to_payload()
+	var run_payload: Dictionary = payload["run"]
+	var fallback_id: String = str(payload["meta"]["equipment"].get(slot, ""))
+	if fallback_id.is_empty():
+		run_payload["equipment"].erase(slot)
+	else:
+		run_payload["equipment"][slot] = fallback_id
+	var parsed: Dictionary = GameSaveState.new().parse_payload(payload)
+	if not bool(parsed.get("ok", false)):
+		last_error = str(parsed.get("error", "Возврат полевого слота не прошёл проверку."))
+		return false
+	var candidate: GameSaveState = parsed["state"] as GameSaveState
+	var build: Dictionary = BuildResolver.new().resolve_build(_run_build_input(candidate))
+	if not bool(build.get("valid", false)):
+		last_error = "Полевая сборка невалидна: %s" % str(build.get("issues", []))
+		return false
+	var resources: Dictionary = run_payload["resources"]
+	var stats: Dictionary = build.get("stats", {})
+	for key_pair: Array in [["maxHP", "maxHP"], ["maxShield", "maxShield"], ["maxEnergy", "maxEnergy"]]:
+		var resource_key: String = str(key_pair[0])
+		resources[resource_key] = float(stats.get(str(key_pair[1]), resources.get(resource_key, 0.0)))
+	resources["hp"] = minf(float(resources.get("hp", 0.0)), float(resources["maxHP"]))
+	resources["shield"] = minf(float(resources.get("shield", 0.0)), float(resources["maxShield"]))
+	resources["energy"] = minf(float(resources.get("energy", 0.0)), float(resources["maxEnergy"]))
+	run_payload["lastCommandId"] = "run:equipment:restore:%s:%d" % [slot, state.revision]
+	return _commit_payload(payload)
+
+func _run_equipment_change_allowed() -> bool:
+	if state == null or state.run == null or not ["ROUTE", "NODE", "CHECKPOINT"].has(state.run.phase) or _combat != null:
+		last_error = "Полевое снаряжение меняется только между боями."
+		return false
+	return true
+
+func _run_slot_unlocked(slot: String) -> bool:
+	if slot.begins_with("IMP_"):
+		return int(slot.trim_prefix("IMP_")) <= state.meta.unlocked_implant_slots
+	if slot.begins_with("DRONE_"):
+		return int(slot.trim_prefix("DRONE_")) <= state.meta.unlocked_drone_slots
+	return ["MAIN", "OFFHAND", "ARMOR"].has(slot)
+
 func simulation_equipment_candidates(slot: String) -> Array[Dictionary]:
 	var candidates: Array[Dictionary] = []
 	if state == null or not _garage_action_allowed() or not state.meta.equipment.has(slot):
@@ -1757,7 +1915,7 @@ func resolve_event(choice_id: String, cargo_item_id: String = "") -> bool:
 		var hp: float = float(resources["hp"])
 		resources["hp"] = minf(float(resources["maxHP"]), hp + (float(resources["maxHP"]) - hp) * float(choice["healMissingFraction"]))
 	if bool(choice.get("refillEnergy", false)):
-		var build: Dictionary = build_preview()
+		var build: Dictionary = run_build_preview()
 		if not bool(build.get("valid", false)):
 			last_error = "Невозможно рассчитать энергию текущей сборки."
 			return false
@@ -2463,7 +2621,7 @@ func continue_campaign(escalation_ids: Array[String] = []) -> bool:
 		return false
 	var next_depth: int = state.run.depth + 1
 	if not _validate_escalation_selection(escalation_ids, next_depth): return false
-	var build: Dictionary = build_preview()
+	var build: Dictionary = run_build_preview()
 	var seed: String = "%s:sector:%d" % [state.run.seed, next_depth]
 	var biome: String = _generator.campaign_biome(next_depth, seed, _campaign_biome_history(state.meta.campaign_flags))
 	var generated: Dictionary = _generator.generate(seed, next_depth, biome, false, state.run.wanted, state.run.events_seen, escalation_ids, _last_boss_history(state.meta.campaign_flags))
@@ -2492,7 +2650,6 @@ func continue_campaign(escalation_ids: Array[String] = []) -> bool:
 	run_payload["combatResult"] = null
 	run_payload["pendingTravelDeltaMs"] = 0
 	run_payload["escalationIds"] = escalation_ids.duplicate()
-	run_payload["equipment"] = state.meta.equipment.duplicate(true)
 	if not build.is_empty():
 		var stats: Dictionary = build.get("stats", {})
 		var resources: Dictionary = run_payload["resources"]
@@ -2730,7 +2887,7 @@ func begin_combat() -> bool:
 	if state.run.cleared_node_ids.has(str(node.get("id", ""))):
 		last_error = "Этот боевой узел уже пройден."
 		return false
-	var build: Dictionary = build_preview()
+	var build: Dictionary = run_build_preview()
 	if not bool(build.get("valid", false)):
 		last_error = "Сборка не прошла проверку BuildResolver."
 		return false
@@ -3116,23 +3273,18 @@ func _resolve_combat_defeat(run_payload: Dictionary, node_id: String) -> bool:
 	var contract: Dictionary = run_payload.get("contract", {})
 	if str(contract.get("status", "")) == "ACTIVE":
 		contract["status"] = "FAILED"
-	var equipped_ids: Array = meta["equipment"].values()
+	var field_equipment: Dictionary = run_payload.get("equipment", {})
+	var field_item_ids: Array[String] = _field_secured_equipped_ids(field_equipment, meta["inventory"])
+	meta["equipment"] = _settled_field_equipment(field_equipment, meta["inventory"], meta.get("equipment", {}))
 	for index: int in range(meta["inventory"].size()):
 		var item: Dictionary = meta["inventory"][index]
-		if equipped_ids.has(str(item.get("itemId", ""))):
+		if field_item_ids.has(str(item.get("itemId", ""))):
 			item["durability"] = maxf(0.0, float(item.get("durability", 100.0)) - 20.0)
 		meta["inventory"][index] = item
 	var revive_cost: int = 5 if int(meta.get("garage", {}).get("GARAGE_MED", 1)) >= 2 else 10
 	var paid: bool = float(meta["protectedBank"].get("CREDITS", 0.0)) >= float(revive_cost)
 	if paid:
 		meta["protectedBank"]["CREDITS"] = float(meta["protectedBank"]["CREDITS"]) - float(revive_cost)
-	var build: Dictionary = build_preview()
-	var stats: Dictionary = build.get("stats", {})
-	var resources: Dictionary = run_payload["resources"]
-	resources["hp"] = float(stats.get("maxHP", 1.0)) * (1.0 if paid else 0.5)
-	resources["maxHP"] = float(stats.get("maxHP", 1.0))
-	resources["shield"] = float(stats.get("maxShield", 0.0)) if paid else 0.0
-	resources["maxShield"] = float(stats.get("maxShield", 0.0))
 	run_payload["phase"] = "DEFEATED"
 	run_payload["combatResult"] = null
 	run_payload["combatSnapshot"] = null
@@ -3146,6 +3298,17 @@ func _resolve_combat_defeat(run_payload: Dictionary, node_id: String) -> bool:
 	run_payload["lastCommandId"] = "combat:defeat:%s" % node_id
 	payload["meta"] = meta
 	payload["run"] = run_payload
+	var parsed: Dictionary = GameSaveState.new().parse_payload(payload)
+	if not bool(parsed.get("ok", false)):
+		last_error = str(parsed.get("error", "Профиль восстановления после поражения повреждён."))
+		return false
+	var build: Dictionary = BuildResolver.new().resolve_build(_build_input(parsed["state"] as GameSaveState))
+	var stats: Dictionary = build.get("stats", {})
+	var resources: Dictionary = run_payload["resources"]
+	resources["hp"] = float(stats.get("maxHP", 1.0)) * (1.0 if paid else 0.5)
+	resources["maxHP"] = float(stats.get("maxHP", 1.0))
+	resources["shield"] = float(stats.get("maxShield", 0.0)) if paid else 0.0
+	resources["maxShield"] = float(stats.get("maxShield", 0.0))
 	if not _commit_payload(payload):
 		return false
 	_combat = null
@@ -4384,6 +4547,7 @@ func extract_run() -> bool:
 		if not _inventory_has(meta["inventory"], str(secured.get("itemId", ""))):
 			meta["inventory"].append(secured)
 	run_payload["unsecuredCargo"] = []
+	meta["equipment"] = run_payload["equipment"].duplicate(true)
 	run_payload["runWallet"] = {"CREDITS": 0.0, "SCRAP": 0.0, "DATA": 0.0}
 	run_payload["temporaryMutationIds"] = []
 	var resources: Dictionary = run_payload["resources"]
@@ -4399,6 +4563,38 @@ func extract_run() -> bool:
 	run_payload["phase"] = "EXTRACTED"
 	run_payload["lastCommandId"] = "extract:%s" % str(run_payload["seed"])
 	return _commit_payload(payload)
+
+func _field_secured_equipped_ids(field_equipment: Dictionary, inventory: Array) -> Array[String]:
+	var secured_ids: Dictionary = {}
+	for item: Dictionary in inventory:
+		if bool(item.get("secured", false)):
+			secured_ids[str(item.get("itemId", ""))] = true
+	var result: Array[String] = []
+	for value: Variant in field_equipment.values():
+		var item_id: String = str(value)
+		if secured_ids.has(item_id) and not result.has(item_id):
+			result.append(item_id)
+	return result
+
+func _settled_field_equipment(field_equipment: Dictionary, inventory: Array, fallback_equipment: Dictionary) -> Dictionary:
+	var owned_ids: Dictionary = {}
+	for item: Dictionary in inventory:
+		owned_ids[str(item.get("itemId", ""))] = true
+	var result: Dictionary = {}
+	var used_ids: Dictionary = {}
+	for slot_value: Variant in field_equipment.keys():
+		var slot: String = str(slot_value)
+		var item_id: String = str(field_equipment[slot_value])
+		if owned_ids.has(item_id) and not used_ids.has(item_id):
+			result[slot] = item_id
+			used_ids[item_id] = true
+	for slot_value: Variant in fallback_equipment.keys():
+		var slot: String = str(slot_value)
+		var item_id: String = str(fallback_equipment[slot_value])
+		if not result.has(slot) and owned_ids.has(item_id) and not used_ids.has(item_id):
+			result[slot] = item_id
+			used_ids[item_id] = true
+	return result
 
 func emergency_exit_quote() -> Dictionary:
 	if not _emergency_exit_allowed():
@@ -4459,6 +4655,7 @@ func call_evacuation_tow() -> bool:
 		lost_wallet[currency] = amount - retained
 		banked_wallet[currency] = retained
 		bank[currency] = float(bank.get(currency, 0.0)) + retained
+	meta["equipment"] = _settled_field_equipment(run_payload.get("equipment", {}), inventory, meta.get("equipment", {}))
 	run_payload["runWallet"] = {"CREDITS": 0.0, "SCRAP": 0.0, "DATA": 0.0}
 	run_payload["lootRng"] = rng.serialize()
 	run_payload["unsecuredCargo"] = []
@@ -4485,7 +4682,8 @@ func abandon_run() -> bool:
 	var payload: Dictionary = state.to_payload()
 	var run_payload: Dictionary = payload["run"]
 	var meta: Dictionary = payload["meta"]
-	var equipped_ids: Array = meta["equipment"].values()
+	meta["equipment"] = _settled_field_equipment(run_payload.get("equipment", {}), meta["inventory"], meta.get("equipment", {}))
+	var equipped_ids: Array[String] = _field_secured_equipped_ids(run_payload.get("equipment", {}), meta["inventory"])
 	for index: int in range(meta["inventory"].size()):
 		var item: Dictionary = meta["inventory"][index]
 		if bool(item.get("secured", false)) and equipped_ids.has(str(item.get("itemId", ""))):
@@ -4571,7 +4769,7 @@ func _restore_combat_snapshot() -> bool:
 	if not serialized is Dictionary:
 		last_error = "В снимке отсутствует сериализованное состояние симулятора."
 		return false
-	var build: Dictionary = build_preview()
+	var build: Dictionary = run_build_preview()
 	if not bool(build.get("valid", false)):
 		last_error = "Нельзя восстановить бой: сохранённая сборка недействительна."
 		return false
