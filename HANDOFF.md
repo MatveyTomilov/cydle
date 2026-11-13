@@ -63,6 +63,12 @@
 
 ## Current live continuation (2026-11-13; Q06 objective gating regression)
 
+### Current status override (2026-11-13; save checksum JSON-roundtrip fix)
+
+- Local WIP is based on pushed `7f8c321a6e7f9b9face78e922335e021923925ea` on `development/codex`. A resumed isolated campaign had failed to commit a save because a float crossed the checksum bucket during JSON serialization. New checksums now hash the same twice-JSON-normalized number representation used by on-disk validation; validation still accepts old in-memory 1e-5, previous 1e-8, and legacy checksum formats. The stored gameplay values are not rounded or changed.
+- Checks actually run: Godot 4.7.2 editor import exit 0; full headless suite exit 0 (22 scripts, 88,085 assertions); `git diff --check` exit 0. Windows export/EXE smoke not run. A resumed isolated `campaign_e2e.gd -- --resume` is in progress; it has restored an active d1 combat and progressed to d4, with repeated save/reload and settlement cycles not reproducing the checksum rejection so far. No campaign completion is confirmed by this run.
+- Exact continuation: let the active campaign E2E reach a result, then commit/push this fix if it remains green. Preserve `%APPDATA%\Godot\app_userdata\CYDLE\campaign-e2e-repro` and its safety copy `%TEMP%\CYDLE-campaign-e2e-repro-before-7f8c321`. Then continue with the next campaign-critical systems; do not divert to Simulation Lab presets, report exports, or polish.
+
 - Latest pushed base: `154e70d3fa3c3a5ce6a75d350c8032287336657d` on `development/codex`; current WIP adds further verification of the Q06 objective gate.
 - Q05's “survive three B05 combat nodes” alternative counts ANOMALY nodes alongside COMBAT/ELITE/BOUNTY. Regression confirms three cleared B05 nodes including one ANOMALY unlock the Q05_S2 choice.
 - Additional Q06 regression distinguishes the ordinary B06 anomaly from the quest's extra tagged anomaly: clearing only the ordinary one leaves Q06_S2 unavailable; clearing the extra objective enables it.

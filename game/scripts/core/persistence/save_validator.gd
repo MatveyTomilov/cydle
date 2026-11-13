@@ -53,11 +53,14 @@ func validate(value: Variant) -> Dictionary:
 		if not ["format", "schemaVersion", "balanceVersion", "gameVersion", "saveId", "revision", "updatedAt", "payload", "checksum"].has(field_name):
 			return _failure("Неизвестное поле сохранения: %s." % str(field_name))
 	var saved_checksum: String = str(document["checksum"])
-	if checksum(document) != saved_checksum and _previous_float_checksum(document) != saved_checksum and _legacy_checksum(document) != saved_checksum:
+	if checksum(document) != saved_checksum and _in_memory_float_checksum(document) != saved_checksum and _previous_float_checksum(document) != saved_checksum and _legacy_checksum(document) != saved_checksum:
 		return _failure("Контрольная сумма не совпадает: файл повреждён.")
 	return {"ok": true, "save": document.duplicate(true), "error": ""}
 
 func checksum(document: Dictionary) -> String:
+	return _serialized_checksum_with_float_scale(document, FLOAT_CHECKSUM_SCALE)
+
+func _in_memory_float_checksum(document: Dictionary) -> String:
 	return _checksum_with_float_scale(document, FLOAT_CHECKSUM_SCALE)
 
 func _previous_float_checksum(document: Dictionary) -> String:
@@ -71,6 +74,23 @@ func _checksum_with_float_scale(document: Dictionary, scale: float) -> String:
 	if not _is_json_value(payload):
 		return _state_hash.state_hash(payload)
 	return _state_hash.state_hash(_canonicalize_checksum_numbers(payload, scale))
+
+func _serialized_checksum_with_float_scale(document: Dictionary, scale: float) -> String:
+	var payload: Dictionary = document.duplicate(true)
+	payload.erase("checksum")
+	if not _is_json_value(payload):
+		return _state_hash.state_hash(payload)
+	# Hash exactly the numeric representation that will be written to disk so that
+	# validation after JSON parsing sees the same float values and checksum buckets.
+	var serialized: String = JSON.stringify(payload, "", true, true)
+	var normalized: Variant = JSON.parse_string(serialized)
+	if normalized == null:
+		return _state_hash.state_hash(payload)
+	serialized = JSON.stringify(normalized, "", true, true)
+	normalized = JSON.parse_string(serialized)
+	if normalized == null:
+		return _state_hash.state_hash(payload)
+	return _state_hash.state_hash(_canonicalize_checksum_numbers(normalized, scale))
 
 func _legacy_checksum(document: Dictionary) -> String:
 	# Accept saves created before the stable-number checksum was introduced.

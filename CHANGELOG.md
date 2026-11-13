@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — save checksum JSON-roundtrip stability
+
+- New snapshots calculate integrity hashes from the repeated JSON-normalized representation used after disk reads, preventing ordinary float serialization from invalidating a just-written temp save. Validation continues to accept older in-memory 1e-5, 1e-8 and legacy checksums; gameplay values are unchanged.
+- Godot 4.7.2 editor import exit 0; 22 headless scripts / 88,085 assertions / 0 failures; `git diff --check` passed. An isolated resumed campaign E2E is in progress; Windows export/EXE smoke was not run.
+
 ## Unreleased — catalog-driven periodic and attack-counter triggers
 
 - Periodic trigger support now dispatches authored item/tree actions for flags, shield recovery, interruption, TechLevel-scaled support damage and repeated D skills. ON_ATTACK_COUNTER actions now apply statuses, secondary damage or buffs through the shared deterministic combat pipeline instead of a list of effect IDs.
