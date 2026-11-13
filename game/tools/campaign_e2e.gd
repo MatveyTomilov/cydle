@@ -176,6 +176,9 @@ func _resolve_node(session: GameSession) -> bool:
 	if kind in ["COMBAT", "ELITE", "BOUNTY", "BOSS", "ANOMALY"]:
 		if not session.has_active_combat() and not session.begin_combat():
 			return false
+		if session.combat_state() == null and session.state.run.cleared_node_ids.has(str(node.get("id", ""))):
+			print("E2E combat d%d node=%s skipped by an authored one-time effect; no loot or XP awarded." % [session.state.run.depth, str(node.get("id", ""))])
+			return true
 		var ticks: int = 0
 		while session.combat_state() != null and session.combat_state().outcome.is_empty() and ticks < MAX_COMBAT_TICKS:
 			if not session.advance_combat_step():

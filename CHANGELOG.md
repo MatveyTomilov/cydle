@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — campaign E2E authored-combat skip handling
+
+- The campaign driver now treats an ordinary combat node cleared by a catalogued one-time skip effect as resolved when no `CombatState` is created. It reports the skip and awards no combat XP or loot, matching runtime behavior. A resumed campaign run observed the EV16 skip and proceeded to later route nodes.
+- The campaign E2E run is still retrying d4 BOSS_A; this harness fix does not establish a boss win or full campaign pass.
+
 ## Unreleased — quest journal requirements and decision history
 
 - Active/paused quest cards now show the authored stage gate, remaining Q02 sector deadline, both choice consequences, and past player decisions. The UI reads the persisted quest state and does not duplicate progression logic.
