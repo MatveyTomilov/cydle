@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — catalog-driven periodic and attack-counter triggers
+
+- Periodic trigger support now dispatches authored item/tree actions for flags, shield recovery, interruption, TechLevel-scaled support damage and repeated D skills. ON_ATTACK_COUNTER actions now apply statuses, secondary damage or buffs through the shared deterministic combat pipeline instead of a list of effect IDs.
+- Trigger cadence, source ownership, conditions, proc chance, ICD/once guards and proc counters are retained; the existing simulator remains the only combat engine. Godot import and 22 headless scripts / 88,085 assertions passed; diff check passed. Windows export/EXE smoke was not run.
+
 ## Unreleased — authored event trigger coverage
 
 - The shared deterministic combat simulator now dispatches authored cast, dodge, incoming-damage/HP-threshold, status-expiry, interrupt, enemy-telegraph, drone-death, combat-start, heat-full and heat-release trigger actions. It reuses existing actor state, status definitions, combat RNG, damage pipeline and StatMath path.

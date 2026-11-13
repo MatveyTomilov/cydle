@@ -1,5 +1,12 @@
 # CYDLE — Project handoff and development history
 
+## Live continuation (2026-11-13; periodic and attack-counter combat triggers)
+
+- Branch `development/codex`; pushed base: `7356115485761f884e26eb120d2e45cfa73f9008`. Current WIP is in `game/scripts/core/combat/combat_simulator.gd` and has not been committed yet.
+- Replaced the periodic and ON_ATTACK_COUNTER allowlists by catalogued action handling. Supported periodic effects include tree/item flags, shield recovery, interrupt, TechLevel-scaled support damage, and U09 repeat of the last tagged D skill through the same damage pipeline with zero proc weight. ON_ATTACK_COUNTER now resolves catalogued applyStatus, secondaryDamage, and buff actions with counter cadence, source identity, conditions, chance, ICD, once guards, and proc metrics. Existing catalog examples ARC_E2, FOCUS_D1, DR_ARC, DR_MED, DR_EMP, TR_SUPPORT, U09 and U18 use the shared deterministic combat state.
+- Added serialized last D-skill/target provenance to the existing actor flags; this preserves current save/replay snapshot shape without changing actor schema.
+- Godot 4.7.2 editor import exit 0; `res://tests/run_tests.gd` exit 0 (22 scripts / 88,085 assertions / 0 failures); `git diff --check` exit 0. Windows export/EXE smoke not run. Next commit and push `development/codex`, then continue on the next uncovered campaign requirement. Do not treat this catalog-trigger coverage as full combat parity.
+
 ## Live continuation (2026-11-13; authored event trigger expansion)
 
 - Branch `development/codex`; base HEAD and remote HEAD are `10e0467837131d8a73dea9b56dd72947958191e8`. Current WIP extends the same deterministic `CombatSimulator` in `game/scripts/core/combat/combat_simulator.gd`; no parallel engine was added.

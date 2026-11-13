@@ -6,6 +6,10 @@
 
 The active strategy is **FULL GAME FIRST**: connect every major Master Spec system into a campaign that can be completed, then deepen edge cases, balance, and presentation. The entries below report implementation status; they are not a queue of isolated feature slices. A checkpoint commit is a safety measure, so continue to the next missing campaign-critical system while the session permits. Defer saved Simulation Lab presets, report exports, cosmetic polish, secondary settings, and redundant tests until functional campaign coverage exists.
 
+### Current status override (2026-11-13; periodic and attack-counter triggers)
+
+Periodic and every-N-attacks item/tree effects now dispatch by authored action data in the shared combat simulator, including support relay damage, drone shield/interrupt actions, U09 digital-skill repeat, U18 pulse flags, and ARC/FOCUS/DR_ARC counter effects. Chance, cooldown, once guards, and proc accounting use the same state/RNG path. Godot editor import passed; 22 headless scripts / 88,085 assertions and diff check passed. Windows export/EXE smoke not run.
+
 ### Current status override (2026-11-13; authored event trigger expansion)
 
 The shared 100 ms simulator now connects authored combat triggers for cast, dodge, incoming damage/HP threshold, status expiry, interrupt, enemy telegraph, drone death, combat start and heat full/release. Triggered statuses use catalogued stack caps, duration scaling and snapshots; extra reaction windows bypass one reaction cooldown, and consume-on-hit buffs are consumed after the operator's next direct attack/cast. Negative heat and SK_VENT share lockout-release dispatch. Godot 4.7.2 headless suite: 22 scripts, 88,085 assertions, 0 failures; diff check passes. The latest authored-status helper still needs an editor import and Windows export/smoke was not rerun. This improves trigger breadth, not complete combat/campaign coverage.
