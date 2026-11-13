@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — campaign E2E d8 blocker and resume safety
+
+- The isolated campaign E2E now preserves the highest-ranked drone per role during test inventory cleanup and restores the boss interrupt tactic when resuming a saved profile. Runtime gameplay and balance are unchanged.
+- d5–d7 routes/checkpoints and d8 ordinary combat were exercised through persisted transitions. BOSS_B at d8 remains a blocker for this pilot: level 11 lost at tick 159 with BOSS_B at 1,364/4,951 HP. The isolated profile is preserved mid d6 retry.
+- Harness launched and ran under Godot 4.7.2; the full suite and export have not been rerun after this harness delta.
+
 ## Unreleased — campaign E2E authored-combat skip handling
 
 - The campaign driver now treats an ordinary combat node cleared by a catalogued one-time skip effect as resolved when no `CombatState` is created. It reports the skip and awards no combat XP or loot, matching runtime behavior. A resumed campaign run observed the EV16 skip and proceeded to later route nodes.
