@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — disclose unapplied offline time
+
+- Auto-pilot now reports wall-clock time beyond the 12-hour processing cap and backward system-clock movement; negative time applies no game progress.
+- The autopilot summary displays either condition. Boundary regressions use short requests and do not run a long simulation.
+- Godot 4.7.2 import exit 0; 23 tests / 88,677 assertions passed. Independent regression and review pending.
+
 ## Unreleased — active/offline battle parity smoke
 
 - Compared identical seeded battles in manual and offline/autopilot sessions, including outcome, metrics, run economy, grants, operator progression and post-settlement reload.

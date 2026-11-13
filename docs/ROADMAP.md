@@ -6,7 +6,11 @@
 
 Current strategy is **FEATURE COMPLETE BETA**: audit against the normative Master Spec, close significant runtime/UI gaps, and validate real state transitions. Boss balancing and repeated automatic boss retries are deferred unless a concrete gameplay defect requires them. Preserve all profile/save data; use short deterministic integration scenarios.
 
-### Latest checkpoint — active/offline combat parity smoke (2026-11-13)
+### Latest checkpoint — offline time boundary reporting (2026-11-13)
+
+`a406db440179ed7fdf3f408125018846672e4dfd` exposes wall time above the 12-hour offline cap instead of silently discarding it and reports backward system-clock movement while applying zero game-time. A visible autopilot notice explains either boundary; regressions use 1 ms over-cap and -5 s inputs without long simulation. Local Godot import exit 0; 23 tests / 88,677 assertions / 0 failures. Independent regression/review are pending. No full 12-hour simulation. Next: verify save/reload interruption/retry idempotency and report history.
+
+### Prior checkpoint — active/offline combat parity smoke (2026-11-13)
 
 `99d944b576e382b642aba573cd120b5b623acde7` creates two matching profiles, runs the same fixed combat by manual 100 ms stepping and `simulate_autopilot()` with an exact-duration budget, compares outcome/metrics/economy/progression and reloads the offline result. Local Godot import exit 0; 23 tests / 88,675 assertions / 0 failures. Independent regression check is pending. This is one battle, not validation of 12-hour limits, repeated interruption or full route parity. Next: cover bounded long-window behavior and save/reload idempotency without running an actual 12-hour simulation.
 

@@ -1,5 +1,12 @@
 # CYDLE — Project handoff and development history
 
+## Latest game checkpoint (2026-11-13; offline time boundary reporting)
+
+- Game-code checkpoint: `a406db440179ed7fdf3f408125018846672e4dfd`. Loading a profile with auto-pilot now passes the observed elapsed time through the 12-hour cap and records any unapplied remainder. Negative system-clock movement runs zero game-time and is exposed as `clockRollbackMs`.
+- The autopilot screen displays excess offline time that the 12-hour cap did not apply, or a backward-clock notice. Regressions cover a 1 ms over-cap request and a -5 s clock delta without simulating long duration or advancing game-time.
+- Local Godot 4.7.2 import exit 0; 23 tests / 88,677 assertions / 0 failures; `git diff --check` exit 0. Independent regression and reviewer checks are pending. No Windows export, GUI smoke, 12-hour simulation or CI query.
+- This adds observability and boundary behavior; it does not prove full elapsed-time parity, report accuracy across a full route or bounded CPU for 12 hours. Continue with pause/resume and repeated offline-processing idempotency.
+
 ## Latest game checkpoint (2026-11-13; active/offline combat parity smoke)
 
 - Game-code checkpoint: `99d944b576e382b642aba573cd120b5b623acde7`. Added a deterministic single-battle parity regression using two identical profiles and the same route/combat seed. One combat advances manually through the shared 100 ms step API; the other settles through `simulate_autopilot()` with an exact combat-time budget.
