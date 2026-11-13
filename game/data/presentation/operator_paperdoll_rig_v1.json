@@ -1,0 +1,247 @@
+{
+  "schema_version": 1,
+  "contract": "operator_paperdoll_front_v1",
+  "status": "draft_reference_coordinates_unvalidated",
+  "view": "front",
+  "projection": "orthographic_straight_on",
+  "unit": "art_unit",
+  "canvas": [
+    1024,
+    1536
+  ],
+  "origin": "top_left",
+  "anatomical_sides": "r=operator_right_screen_left;l=operator_left_screen_right",
+  "background": "transparent",
+  "root_anchor": "feet_center",
+  "anchors": {
+    "feet_center": [
+      512,
+      1456
+    ],
+    "head_center": [
+      512,
+      212
+    ],
+    "neck": [
+      512,
+      365
+    ],
+    "chest_center": [
+      512,
+      560
+    ],
+    "hips_center": [
+      512,
+      885
+    ],
+    "shoulder_r": [
+      355,
+      435
+    ],
+    "shoulder_l": [
+      667,
+      435
+    ],
+    "elbow_r": [
+      299,
+      594
+    ],
+    "elbow_l": [
+      721,
+      594
+    ],
+    "wrist_r": [
+      276,
+      780
+    ],
+    "wrist_l": [
+      748,
+      780
+    ],
+    "grip_r_neutral": [
+      253,
+      832
+    ],
+    "grip_l_neutral": [
+      767,
+      832
+    ],
+    "knee_r": [
+      421,
+      1160
+    ],
+    "knee_l": [
+      603,
+      1160
+    ]
+  },
+  "joint_art_overlap_units": 24,
+  "visual_layers": [
+    {
+      "id": "cape_back",
+      "z": 0
+    },
+    {
+      "id": "base_undersuit",
+      "z": 10
+    },
+    {
+      "id": "armor_legs",
+      "z": 20
+    },
+    {
+      "id": "chest_implant_under",
+      "z": 30
+    },
+    {
+      "id": "armor_torso_shoulders",
+      "z": 40
+    },
+    {
+      "id": "scarf_collar_front",
+      "z": 50
+    },
+    {
+      "id": "pose_arms_hand_back",
+      "z": 60
+    },
+    {
+      "id": "offhand_device",
+      "z": 65
+    },
+    {
+      "id": "main_weapon",
+      "z": 70
+    },
+    {
+      "id": "fingers_front",
+      "z": 80
+    },
+    {
+      "id": "head_visor_overlay",
+      "z": 90
+    }
+  ],
+  "pose_profiles": {
+    "neutral": {
+      "primary_hand": [
+        253,
+        832
+      ],
+      "support_hand": [
+        767,
+        832
+      ],
+      "weapon_family": "none"
+    },
+    "pistol_onehand": {
+      "primary_hand": [
+        485,
+        670
+      ],
+      "support_hand": [
+        767,
+        832
+      ],
+      "weapon_family": "sidearm"
+    },
+    "longgun_twohand": {
+      "primary_hand": [
+        448,
+        686
+      ],
+      "support_hand": [
+        605,
+        674
+      ],
+      "weapon_family": "rifle_shotgun_rail_laser"
+    },
+    "blade_onehand": {
+      "primary_hand": [
+        315,
+        733
+      ],
+      "support_hand": [
+        767,
+        832
+      ],
+      "weapon_family": "blade"
+    },
+    "dual_sidearm": {
+      "primary_hand": [
+        457,
+        684
+      ],
+      "support_hand": [
+        572,
+        684
+      ],
+      "weapon_family": "dual"
+    },
+    "digital_focus": {
+      "primary_hand": [
+        315,
+        733
+      ],
+      "support_hand": [
+        767,
+        832
+      ],
+      "weapon_family": "focus"
+    }
+  },
+  "gameplay_slot_to_visual": {
+    "MAIN_WEAPON": "main_weapon",
+    "OFFHAND": "offhand_device_or_left_hand",
+    "ARMOR": "armor_visual_bundle",
+    "IMPLANT_HEAD": "head_visor_overlay",
+    "IMPLANT_ARMS": "arm_gauntlets",
+    "IMPLANT_CHEST": "chest_implant_under_or_exposed",
+    "IMPLANT_NEURAL": "optional_nonvisible",
+    "IMPLANT_UNIVERSAL": "follow_item_display_profile"
+  },
+  "weapon_visual_metadata_required": [
+    "visual_id",
+    "template_id",
+    "pose_profile",
+    "view",
+    "source_canvas",
+    "grip_main",
+    "muzzle",
+    "runtime_png",
+    "crop_rect",
+    "offset"
+  ],
+  "weapon_visual_metadata_optional": [
+    "grip_support",
+    "forefinger_overlay",
+    "backplate_layer"
+  ],
+  "acceptance": {
+    "grip_tolerance_art_units": 8,
+    "authoring_preview_ui_px": [
+      320,
+      480
+    ],
+    "requires_white_gray_dark_comparison": true,
+    "verify_in_godot": true,
+    "simulation_hash_unchanged": true
+  },
+  "notes": "Numeric attachment points are provisional and require calibration to approved original PNG operator. No vector/SVG generation in new asset production. Deterministic gameplay must not read this config.",
+  "asset_format": "PNG",
+  "asset_pipeline": "generated_raster_to_aligned_master_png_to_cropped_runtime_png_with_json",
+  "crop_policy": {
+    "alpha_threshold_gt": 8,
+    "padding_pixels": 8,
+    "preserve_source_scale": true,
+    "offset_equals_crop_xy": true,
+    "transparent_rgba_required": true
+  },
+  "production_outputs": [
+    "original_source_image",
+    "full_canvas_transparent_png_master",
+    "cropped_transparent_png_runtime",
+    "json_metadata"
+  ],
+  "legacy_svg_policy": "read_only_transitional_fallback_until_png_integrated_no_new_svg"
+}
