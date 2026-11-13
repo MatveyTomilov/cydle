@@ -164,6 +164,12 @@ func valid_run_equipment_slots(item_id: String) -> Array[String]:
 		"ARMOR": candidates = ["ARMOR"]
 		"IMPLANT": candidates = ["IMP_1", "IMP_2", "IMP_3", "IMP_4", "IMP_5", "IMP_6"]
 		"DRONE": candidates = ["DRONE_1", "DRONE_2"]
+		"ENGINE": candidates = ["ENGINE"]
+		"CHASSIS": candidates = ["CHASSIS"]
+		"SCANNER": candidates = ["SCANNER"]
+		"SERVICE": candidates = ["SERVICE"]
+		"CARGO": candidates = ["CARGO"]
+		"SUPPORT": candidates = ["SUPPORT"]
 	for slot: String in candidates:
 		if not _run_slot_unlocked(slot):
 			continue
@@ -264,7 +270,7 @@ func _run_slot_unlocked(slot: String) -> bool:
 		return int(slot.trim_prefix("IMP_")) <= state.meta.unlocked_implant_slots
 	if slot.begins_with("DRONE_"):
 		return int(slot.trim_prefix("DRONE_")) <= state.meta.unlocked_drone_slots
-	return ["MAIN", "OFFHAND", "ARMOR"].has(slot)
+	return BuildResolver.EQUIPMENT_SLOTS.has(slot)
 
 func simulation_equipment_candidates(slot: String) -> Array[Dictionary]:
 	var candidates: Array[Dictionary] = []

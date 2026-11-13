@@ -1411,7 +1411,11 @@ func _on_dismantle_run_item(item_id: String) -> void:
 	_footer.text = "ГРУЗ РАЗОБРАН · РЕСУРСЫ ОСТАЮТСЯ НЕЗАКРЕПЛЁННЫМИ" if dismantled else _session.last_error
 
 func _run_slot_label(slot: String) -> String:
-	var labels: Dictionary = {"MAIN": "ОСНОВНОЕ ОРУЖИЕ", "OFFHAND": "ВТОРОЙ МОДУЛЬ", "ARMOR": "БРОНЯ"}
+	var labels: Dictionary = {
+		"MAIN": "ОСНОВНОЕ ОРУЖИЕ", "OFFHAND": "ВТОРОЙ МОДУЛЬ", "ARMOR": "БРОНЯ",
+		"ENGINE": "ДВИГАТЕЛЬ", "CHASSIS": "КОРПУС", "SCANNER": "СКАНЕР",
+		"SERVICE": "СЕРВИСНЫЙ МОДУЛЬ", "CARGO": "ГРУЗОВОЙ МОДУЛЬ", "SUPPORT": "МОДУЛЬ ПОДДЕРЖКИ",
+	}
 	if slot.begins_with("IMP_"): return "ИМПЛАНТ %s" % slot.trim_prefix("IMP_")
 	if slot.begins_with("DRONE_"): return "ДРОН %s" % slot.trim_prefix("DRONE_")
 	return str(labels.get(slot, slot))

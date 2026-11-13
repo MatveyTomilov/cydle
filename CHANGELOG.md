@@ -1,11 +1,11 @@
 # Changelog
 
-## Unreleased — field loot powers the active expedition build
+## Unreleased — every equipment category is available to the active expedition build
 
-- Added between-fight installation of compatible unsecured cargo into unlocked field slots. The field Build Lab, combat initialization/resume, event energy refills, and sector continuation now use the same `run.equipment` through the existing `BuildResolver` and combat simulator.
+- Added between-fight installation of compatible unsecured cargo into all unlocked weapon, armor, implant, drone, engine, chassis, scanner, service, cargo, and support slots. The field Build Lab, combat initialization/resume, event energy refills, and sector continuation use the same `run.equipment` through the existing `BuildResolver` and combat simulator.
 - The field item remains unsecured. Extraction secures cargo and promotes the active field kit to permanent equipment; defeat, tow, and abandon reconcile references against surviving owned gear and preserve existing cargo/durability consequences.
 - Wired cargo rows to real equip/restore actions and made Build Lab show the field build during an expedition.
-- Regression covers slot validation, actual combat actor stats, ownership, save/load, continuation, extraction, and dismantle protection. Local checks: Godot 4.7.2 import exit 0, **26 tests / 88,941 assertions / 0 failures**; TypeScript typecheck, 207 tests, catalog validation, and production build pass. CI pending.
+- Regression covers all six transport/service slot types, actual combat actor stats, ownership, save/load, continuation, extraction, and dismantle protection. Local checks: Godot 4.7.2 import exit 0, **26 tests / 88,967 assertions / 0 failures**; TypeScript typecheck, 207 tests, catalog validation, and production build pass on the previous checkpoint. CI pending.
 
 ## Unreleased — Master Spec §25 animated battle screen, and two player-facing save/UI fixes
 

@@ -81,4 +81,38 @@ func run(_tree: SceneTree) -> bool:
 		if combat_session.combat_state() != null:
 			var combat_max_shield: float = float(combat_session.combat_state().operator.base_sheet.get("maxShield", 0.0))
 			check(is_equal_approx(combat_max_shield, float(combat_session.run_build_preview().get("stats", {}).get("maxShield", -1.0))), "run_equipment: real combat did not use the field BuildResolver result")
+	var transport_session: GameSession = GameSession.new()
+	transport_session.configure_save_directory("user://test-saves/run-equipment-transport")
+	if check(transport_session.start_new_game(1762900000303) and transport_session.start_expedition("run-equipment-transport"), "run_equipment: could not prepare transport-slot profile"):
+		var transport_specs: Array[Dictionary] = [
+			{"templateId": "TR_ENGINE_1", "slot": "ENGINE"},
+			{"templateId": "TR_CHASSIS_1", "slot": "CHASSIS"},
+			{"templateId": "TR_SCANNER_1", "slot": "SCANNER"},
+			{"templateId": "TR_SERVICE_1", "slot": "SERVICE"},
+			{"templateId": "TR_CARGO_1", "slot": "CARGO"},
+			{"templateId": "TR_SUPPORT_1", "slot": "SUPPORT"},
+		]
+		var transport_payload: Dictionary = transport_session.state.to_payload()
+		var transport_ids: Array[String] = []
+		for index: int in range(transport_specs.size()):
+			var spec: Dictionary = transport_specs[index]
+			var transport_rng: DeterministicRng = DeterministicRng.new()
+			transport_rng.seed("run-equipment-transport", str(spec["templateId"]))
+			var transport_created: Dictionary = ItemFactory.new().create_item(transport_rng, catalog, {
+				"templateId": str(spec["templateId"]), "techLevel": 1, "rarity": "COMMON", "secured": false,
+				"originGrantId": "run-equipment:transport:%d" % index, "origin": "test", "acquiredAt": 0,
+			})
+			if not check(bool(transport_created.get("ok", false)), "run_equipment: transport item fixture failed for %s" % str(spec["templateId"])):
+				continue
+			var transport_item: Dictionary = (transport_created["item"] as ItemInstance).to_dictionary()
+			transport_ids.append(str(transport_item.get("itemId", "")))
+			transport_payload["run"]["unsecuredCargo"].append(transport_item)
+		check(transport_session._commit_payload(transport_payload), "run_equipment: transport items were rejected from unsecured cargo: %s" % transport_session.last_error)
+		for index: int in range(mini(transport_specs.size(), transport_ids.size())):
+			var spec: Dictionary = transport_specs[index]
+			var transport_id: String = transport_ids[index]
+			var expected_slot: String = str(spec["slot"])
+			check(transport_session.valid_run_equipment_slots(transport_id).has(expected_slot), "run_equipment: %s cargo was not offered its %s slot" % [str(spec["templateId"]), expected_slot])
+			check(transport_session.equip_run_item(expected_slot, transport_id), "run_equipment: %s could not be equipped: %s" % [expected_slot, transport_session.last_error])
+			check(transport_session.unequip_run_item(expected_slot), "run_equipment: %s could not restore the stock slot: %s" % [expected_slot, transport_session.last_error])
 	return failure_count == 0
