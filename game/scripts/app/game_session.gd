@@ -2882,7 +2882,7 @@ func buy_shop_item(index: int) -> bool:
 	payload["run"] = run_payload
 	return _commit_payload(payload)
 
-func begin_combat() -> bool:
+func begin_combat(use_v2: bool = false) -> bool:
 	if state == null or state.run == null or state.run.phase != "NODE":
 		last_error = "Для боя нужно находиться на боевом узле."
 		return false
@@ -2897,33 +2897,37 @@ func begin_combat() -> bool:
 	if not bool(build.get("valid", false)):
 		last_error = "Сборка не прошла проверку BuildResolver."
 		return false
-	var tactic: Dictionary = {}
-	for profile: Dictionary in state.meta.tactics:
-		if str(profile.get("id", "")) == state.meta.active_tactic_id:
-			tactic = profile
-			break
-	if tactic.is_empty():
-		last_error = "Активный профиль тактики не найден."
-		return false
 	combat_notice = ""
-	var compatible_rules: Array[Dictionary] = []
-	var omitted_rules: Array[String] = []
-	for rule_value: Variant in tactic.get("rules", []):
-		if not rule_value is Dictionary or not bool(rule_value.get("enabled", false)):
-			continue
-		var skill_id: String = str(rule_value.get("skillId", "AUTO"))
-		if skill_id in ["AUTO", "SK_BURST", "SK_PIERCE", "SK_EXEC", "SK_BLADE", "SK_PLASMA", "SK_ARC", "SK_OVR", "SK_NEURO", "SK_SEED", "SK_DETONATE", "SK_BREAK", "SK_SCAN", "SK_LEECH", "SK_CHAIN", "SK_KINETIC", "SK_SIDE_FIRE", "SK_SHIELD", "SK_EMP", "SK_GUARD", "SK_VENT", "SK_HEAL", "SK_DRONE_MARK"]:
-			var compatible_rule: Dictionary = rule_value.duplicate(true)
-			if skill_id == "SK_BURST" and str(compatible_rule.get("target", "")) == "allEnemies":
-				compatible_rule["target"] = "nearest"
-			compatible_rules.append(compatible_rule)
-		else:
-			omitted_rules.append(skill_id)
-	if compatible_rules.is_empty():
-		compatible_rules.append({"id": "basic-auto", "priority": -999, "enabled": true, "skillId": "AUTO", "target": "nearest", "conditions": []})
-	var effective_tactic: Dictionary = {"id": str(tactic.get("id", "DEFAULT")), "name": str(tactic.get("name", "Тактика")), "rules": compatible_rules}
-	if not omitted_rules.is_empty():
-		combat_notice = "Пока не поддерживаются умения: %s. Остальные правила и условия работают; исходный профиль сохранён." % ", ".join(omitted_rules)
+	var effective_tactic: Dictionary = {}
+	if use_v2:
+		combat_notice = "Автобой V2 · автоматические способности из BuildResolver; профиль тактики V1 для этого боя не применяется."
+	else:
+		var tactic: Dictionary = {}
+		for profile: Dictionary in state.meta.tactics:
+			if str(profile.get("id", "")) == state.meta.active_tactic_id:
+				tactic = profile
+				break
+		if tactic.is_empty():
+			last_error = "Активный профиль тактики не найден."
+			return false
+		var compatible_rules: Array[Dictionary] = []
+		var omitted_rules: Array[String] = []
+		for rule_value: Variant in tactic.get("rules", []):
+			if not rule_value is Dictionary or not bool(rule_value.get("enabled", false)):
+				continue
+			var skill_id: String = str(rule_value.get("skillId", "AUTO"))
+			if skill_id in ["AUTO", "SK_BURST", "SK_PIERCE", "SK_EXEC", "SK_BLADE", "SK_PLASMA", "SK_ARC", "SK_OVR", "SK_NEURO", "SK_SEED", "SK_DETONATE", "SK_BREAK", "SK_SCAN", "SK_LEECH", "SK_CHAIN", "SK_KINETIC", "SK_SIDE_FIRE", "SK_SHIELD", "SK_EMP", "SK_GUARD", "SK_VENT", "SK_HEAL", "SK_DRONE_MARK"]:
+				var compatible_rule: Dictionary = rule_value.duplicate(true)
+				if skill_id == "SK_BURST" and str(compatible_rule.get("target", "")) == "allEnemies":
+					compatible_rule["target"] = "nearest"
+				compatible_rules.append(compatible_rule)
+			else:
+				omitted_rules.append(skill_id)
+		if compatible_rules.is_empty():
+			compatible_rules.append({"id": "basic-auto", "priority": -999, "enabled": true, "skillId": "AUTO", "target": "nearest", "conditions": []})
+		effective_tactic = {"id": str(tactic.get("id", "DEFAULT")), "name": str(tactic.get("name", "Тактика")), "rules": compatible_rules}
+		if not omitted_rules.is_empty():
+			combat_notice = "Пока не поддерживаются умения: %s. Остальные правила и условия работают; исходный профиль сохранён." % ", ".join(omitted_rules)
 	var resources: Dictionary = state.run.resources
 	var pending_next: Dictionary = state.run.pending_next_combat
 	var effective_type: String = str(node.get("type", "COMBAT"))
@@ -2959,6 +2963,8 @@ func begin_combat() -> bool:
 		"elitePen": 10.0 if state.run.escalation_ids.has("SHIELD_BREAK") and effective_type in ["ELITE", "ANOMALY", "BOUNTY"] else 0.0,
 		"droneWar": state.run.escalation_ids.has("DRONE_WAR"),
 	}
+	if use_v2:
+		config["combatRulesVersion"] = CombatState.V2_RULES_VERSION
 	if bool(pending_next.get("alliedTurret", false)):
 		config["alliedEnemies"] = [{"templateId": "E08", "strength": 0.5}]
 	var initialized: Dictionary = _simulator.create_state(config)
@@ -4753,6 +4759,7 @@ func _persist_combat_snapshot() -> bool:
 	var snapshot: GameSaveState.CombatSnapshotState = GameSaveState.CombatSnapshotState.new()
 	snapshot.sim_time_ms = _combat.time_ms
 	snapshot.actors = [{
+		"combatRulesVersion": _combat.combat_rules_version,
 		"combatState": _combat.to_dictionary(), "nodeType": _active_node_type,
 		"rewardModifiers": _active_reward_modifiers.duplicate(true),
 	}]
@@ -4771,9 +4778,16 @@ func _restore_combat_snapshot() -> bool:
 		last_error = "Снимок активного боя пуст или повреждён."
 		return false
 	var saved: Dictionary = snapshot.actors[0]
+	var saved_version: String = str(saved.get("combatRulesVersion", CombatState.LEGACY_RULES_VERSION))
+	if saved_version not in [CombatSimulator.COMBAT_RULES_VERSION, CombatState.V2_RULES_VERSION]:
+		last_error = "Версия сохранённого боя не поддерживается. Профиль сохранён; требуется совместимый движок."
+		return false
 	var serialized: Variant = saved.get("combatState")
 	if not serialized is Dictionary:
 		last_error = "В снимке отсутствует сериализованное состояние симулятора."
+		return false
+	if str(serialized.get("combatRulesVersion", CombatState.LEGACY_RULES_VERSION)) != saved_version:
+		last_error = "Версия состояния боя не совпадает с оболочкой сохранения. Профиль сохранён."
 		return false
 	var build: Dictionary = run_build_preview()
 	if not bool(build.get("valid", false)):

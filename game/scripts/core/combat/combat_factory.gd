@@ -10,6 +10,59 @@ var _formula: CydleFormula = CydleFormula.new()
 var _catalog_loaded: bool = false
 var _catalog_error: String = ""
 
+func v2_build_rules_hash(build: Dictionary) -> String:
+	var equipment_sources: Dictionary = {}
+	for slot_value: Variant in build.get("equipment", {}).keys():
+		var item: Variant = build["equipment"][slot_value]
+		if item is ItemInstance:
+			equipment_sources[str(slot_value)] = item.item_id
+		elif item is Dictionary:
+			equipment_sources[str(slot_value)] = str(item.get("itemId", ""))
+	return StateHash.new().state_hash({
+		"version": CombatState.V2_RULES_VERSION,
+		"weapon": build.get("mainWeapon", {}), "sidearm": build.get("sidearm", {}),
+		"equipmentSources": equipment_sources, "skills": build.get("skills", []),
+		"stats": build.get("stats", {}), "modifiers": build.get("modifiers", []),
+		"triggerEffects": build.get("triggerEffects", []), "drones": build.get("drones", []),
+	})
+
+# Compile from the canonical resolved weapon. This adapter owns timing only;
+# damage packets, hit/crit, statuses and procs stay in CombatSimulator.
+func compile_v2_weapon_action(build: Dictionary, effective_stats: Dictionary = {}, timing_multiplier: float = 1.0) -> Dictionary:
+	if not bool(build.get("valid", false)) or not build.get("mainWeapon") is Dictionary:
+		return {}
+	var weapon: Dictionary = build["mainWeapon"]
+	if str(weapon.get("itemId", "")).is_empty():
+		return {}
+	var stats: Dictionary = effective_stats if not effective_stats.is_empty() else build.get("stats", {})
+	var interval: float = _formula.attack_interval_ms(float(weapon.get("intervalMs", 1000)), float(stats.get("attackSpeed", 0)), float(stats.get("moreAttackSpeed", 1)))
+	var duration: int = maxi(100, int(ceili(interval * timing_multiplier / 100.0)) * 100)
+	var prepare: int = maxi(100, int(floorf(float(duration) * 0.75 / 100.0)) * 100)
+	return {"sourceId": str(weapon["itemId"]), "actionId": "weapon:basic", "classId": "BASIC_ATTACK", "targetDoctrine": AutobattleV2Contract.Doctrine.HIGHEST_THREAT, "targetMode": "HIGHEST_THREAT", "prepareMs": prepare, "recoveryMs": duration - prepare, "cooldownMs": 0, "energyCost": float(weapon.get("energyPerAttack", 0)), "heatDelta": float(weapon.get("heatPerAttack", 0))}
+
+func compile_v2_main_actions(build: Dictionary, effective_stats: Dictionary, timing_multiplier: float = 1.0) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	var basic: Dictionary = compile_v2_weapon_action(build, effective_stats, timing_multiplier)
+	if not basic.is_empty():
+		result.append(basic)
+	for skill: Dictionary in build.get("skills", []):
+		if str(skill.get("channel", "main")) != "main":
+			continue
+		var target: Dictionary = AutobattleV2Contract.compile_target(str(skill.get("targetMode", "HIGHEST_THREAT")))
+		var prepare: int = maxi(0, int(ceili(float(skill.get("windupMs", 0)) / 100.0)) * 100)
+		var recovery: int = maxi(0, int(ceili(float(skill.get("recoveryMs", 0)) / 100.0)) * 100)
+		var energy_cost: float = main_skill_energy_cost(skill, effective_stats)
+		var cooldown: float = _formula.cooldown_ms(float(skill.get("cooldownMs", 0)), float(effective_stats.get("cooldownRecovery", 0)))
+		result.append({"sourceId": str(skill.get("id", "")), "actionId": "skill:%s" % str(skill.get("id", "")), "skillId": str(skill.get("id", "")), "classId": "SPECIAL_ATTACK", "targetDoctrine": int(target.get("doctrine", -1)), "targetMode": str(target.get("name", "")), "targetError": str(target.get("error", "")), "prepareMs": prepare, "recoveryMs": recovery, "cooldownMs": maxi(0, int(ceili(cooldown / 100.0)) * 100), "energyCost": maxf(0, energy_cost), "heatDelta": float(skill.get("heatDelta", 0)), "requires": skill.get("requires", []).duplicate(true)})
+	return result
+
+func main_skill_energy_cost(skill: Dictionary, effective_stats: Dictionary) -> float:
+	var cost: float = float(skill.get("energyCost", 0.0))
+	if cost <= 0.0: return 0.0
+	if str(skill.get("basis", "")) == "TECH_E": cost = maxf(1.0, cost - float(effective_stats.get("energySkillCostFlat", 0.0)))
+	cost *= 1.0 - clampf(float(effective_stats.get("skillEnergyCostLess", 0.0)), 0.0, 60.0) / 100.0
+	return maxf(0.0, cost)
+
 func create_roster(build: Dictionary, enemy_specs: Array[Dictionary], depth: int, options: Dictionary = {}) -> Dictionary:
 	if not bool(build.get("valid", false)) or not build.get("mainWeapon") is Dictionary or build.get("mainWeapon", {}).is_empty():
 		return _failure("Для боя требуется валидная сборка с основным оружием.")

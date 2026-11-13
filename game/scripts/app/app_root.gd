@@ -1466,6 +1466,10 @@ func _show_current_node(run: GameSaveState.RunState) -> void:
 			var begin: Button = _button("НАЧАТЬ АВТОБОЙ", true)
 			begin.pressed.connect(_on_begin_combat)
 			_body.add_child(begin)
+			var begin_v2: Button = _button("НАЧАТЬ АВТОБОЙ V2 · BETA", false)
+			begin_v2.pressed.connect(_on_begin_v2_combat)
+			_body.add_child(begin_v2)
+			_body.add_child(_label("V2 использует автоматический канал и навыки экипировки. Предметные proc-эффекты и дроны пока не поддерживаются; несовместимая сборка будет отклонена с причиной. Обычный автобой V1 остаётся доступен.", 11, COLOR_MUTED))
 	elif str(node.get("type", "")) == "FUEL":
 		var buy: Button = _button("КУПИТЬ 1 ТОПЛИВО · КРЕДИТЫ", true)
 		buy.pressed.connect(_on_service_action.bind("BUY_FUEL"))
@@ -1869,6 +1873,12 @@ func _on_travel(node_id: String) -> void:
 
 func _on_begin_combat() -> void:
 	if _session.begin_combat():
+		_show_battle()
+	else:
+		_footer.text = _session.last_error
+
+func _on_begin_v2_combat() -> void:
+	if _session.begin_combat(true):
 		_show_battle()
 	else:
 		_footer.text = _session.last_error

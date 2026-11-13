@@ -22,6 +22,17 @@ var _status_catalog_loaded: bool = false
 var _status_catalog_error: String = ""
 
 func create_state(config: Dictionary) -> Dictionary:
+	var requested_version: String = str(config.get("combatRulesVersion", COMBAT_RULES_VERSION))
+	if requested_version not in [COMBAT_RULES_VERSION, CombatState.V2_RULES_VERSION]:
+		return _failure("Неподдерживаемая версия боевых правил; требуется явная миграция.")
+	# Incremental adapter: never silently drop unported authored abilities.
+	if requested_version == CombatState.V2_RULES_VERSION:
+		var v2_build: Dictionary = config.get("build", {})
+		if not config.get("tactics", {}).is_empty():
+			return _failure("V2 adapter: пользовательские тактики V1 ещё не поддерживаются.")
+		var build_error: String = AutobattleV2Contract.validate_build(v2_build)
+		if not build_error.is_empty():
+			return _failure("V2 adapter: %s." % build_error)
 	var seed_value: Variant = config.get("seed", "")
 	var depth_value: Variant = config.get("depth", 0)
 	var enemy_value: Variant = config.get("enemies", [])
@@ -44,6 +55,11 @@ func create_state(config: Dictionary) -> Dictionary:
 	if not bool(roster.get("ok", false)):
 		return roster
 	var state: CombatState = CombatState.new()
+	state.combat_rules_version = requested_version
+	if requested_version == CombatState.V2_RULES_VERSION:
+		if _factory.compile_v2_weapon_action(build_value).is_empty():
+			return _failure("V2 adapter: не удалось скомпилировать реальное оружие.")
+		state.action_channel = AutobattleV2Channel.new().new_state()
 	state.seed = str(seed_value)
 	state.depth = int(depth_value)
 	state.biome = str(config.get("biome", "B01"))
@@ -65,7 +81,9 @@ func create_state(config: Dictionary) -> Dictionary:
 	state.extra_enemy_digital_bonus = float(config.get("extraEnemyDigitalBonus", 0.0))
 	state.metrics = _empty_metrics()
 	state.rng = _new_rng(state.seed).serialize()
-	state.rules_hash = _hash.hash_string(_hash.stable_stringify({"version": COMBAT_RULES_VERSION, "tactics": state.tactics}))
+	state.rules_hash = _hash.hash_string(_hash.stable_stringify({"version": requested_version, "tactics": state.tactics}))
+	if requested_version == CombatState.V2_RULES_VERSION:
+		state.rules_hash = _factory.v2_build_rules_hash(state.build)
 	state.next_event_id = 1
 	for trigger_value: Dictionary in state.build.get("triggerEffects", []):
 		var effect: Dictionary = trigger_value.get("effect", {})
@@ -88,6 +106,8 @@ func create_state(config: Dictionary) -> Dictionary:
 func step_combat(state: CombatState) -> Dictionary:
 	if state == null:
 		return _failure("Нельзя продвинуть пустое состояние боя.")
+	if state.combat_rules_version not in [COMBAT_RULES_VERSION, CombatState.V2_RULES_VERSION]:
+		return _failure("Версия снимка не соответствует боевому движку.")
 	if not state.outcome.is_empty():
 		return {"ok": true, "state": state, "error": ""}
 	if not _supports_basic_auto_step(state):
@@ -103,13 +123,20 @@ func step_combat(state: CombatState) -> Dictionary:
 	_run_periodic_drone_triggers(next, rng)
 	_advance_reaction_cast(next, rng)
 	_advance_drone_skill_casts(next, rng)
-	_advance_main_skill_cast(next, rng)
+	if next.combat_rules_version == COMBAT_RULES_VERSION:
+		_advance_main_skill_cast(next, rng)
 	_advance_enemy_ability_casts(next, rng)
-	_choose_reaction_skill(next, rng)
+	if next.combat_rules_version == COMBAT_RULES_VERSION:
+		_choose_reaction_skill(next, rng)
 	var ready: Array[CombatActorState] = next.all_actors()
 	ready.sort_custom(func(left: CombatActorState, right: CombatActorState) -> bool: return left.id < right.id)
 	for actor: CombatActorState in ready:
 		if not actor.alive:
+			continue
+		if actor.kind == "operator" and next.combat_rules_version == CombatState.V2_RULES_VERSION:
+			var v2_result: Dictionary = _step_v2_weapon_channel(next, rng)
+			if not bool(v2_result.get("ok", false)):
+				return v2_result
 			continue
 		if actor.side == "enemy" and actor.cast == null:
 			var scheduled_ability: Dictionary = _ready_enemy_ability(next, actor)
@@ -143,6 +170,176 @@ func step_combat(state: CombatState) -> Dictionary:
 	_check_terminal(next)
 	next.rng = rng.serialize()
 	return {"ok": true, "state": next, "error": ""}
+
+func _step_v2_weapon_channel(state: CombatState, rng: DeterministicRng) -> Dictionary:
+	var channel: AutobattleV2Channel = AutobattleV2Channel.new()
+	var actor: CombatActorState = state.operator
+	if _has_status(actor, "STUN") and not state.action_channel.get("active", {}).is_empty():
+		var interrupted: Dictionary = channel.interrupt(state.action_channel, state.time_ms)
+		if not bool(interrupted.get("ok", false)):
+			return _failure(str(interrupted.get("error", "INVALID_ACTION_CHANNEL")))
+		state.action_channel = interrupted["state"]
+		if bool(interrupted.get("interrupted", false)):
+			_emit(state, "ACTION_INTERRUPTED", actor.id, {"data": {"reason": "STUN", "phase": "PREPARE"}})
+	var context: Dictionary = state.action_channel.get("active", {}).duplicate(true)
+	var advanced: Dictionary = channel.advance(state.action_channel, state.time_ms)
+	if not bool(advanced.get("ok", false)):
+		return _failure(str(advanced.get("error", "INVALID_ACTION_CHANNEL")))
+	state.action_channel = advanced["state"]
+	var captured_targets: Array = context.get("targetIds", context.get("action", {}).get("targetIds", []))
+	var target_ids: Array[String] = []
+	for captured_id: Variant in captured_targets:
+		var captured_actor: CombatActorState = _actor_by_id(state, str(captured_id))
+		if captured_actor != null and captured_actor.alive: target_ids.append(captured_actor.id)
+	var target: CombatActorState = _actor_by_id(state, target_ids[0]) if not target_ids.is_empty() else null
+	if not advanced["commit"].is_empty() and target == null:
+		var doctrine: int = int(advanced["commit"].get("targetDoctrine", AutobattleV2Contract.Doctrine.HIGHEST_THREAT))
+		var retargeted: Dictionary = _v2_resolve_targets(state, doctrine, actor.last_target_id, str(context.get("action", {}).get("actionId", "weapon:basic")))
+		if bool(retargeted.get("ok", false)):
+			for target_id: Variant in retargeted.get("targets", []): target_ids.append(str(target_id))
+		target = _actor_by_id(state, target_ids[0]) if not target_ids.is_empty() else null
+		if target != null:
+			context["targetIds"] = target_ids.duplicate()
+			context["action"]["targetIds"] = target_ids.duplicate()
+			_emit(state, "TARGET_REACQUIRED", actor.id, {"actionId": context.get("instanceId", ""), "targetId": target.id, "targetIds": target_ids.duplicate(), "reason": "PREPARED_TARGET_UNAVAILABLE"})
+	elif not advanced["commit"].is_empty() and not target_ids.is_empty():
+		context["targetIds"] = target_ids.duplicate()
+		context["action"]["targetIds"] = target_ids.duplicate()
+	if not state.action_channel.get("active", {}).is_empty():
+		state.action_channel["active"]["targetIds"] = context.get("targetIds", []).duplicate()
+		state.action_channel["active"]["action"]["targetIds"] = context.get("targetIds", []).duplicate()
+	if not advanced["commit"].is_empty():
+		var committed: Dictionary = advanced["commit"]
+		var reason: String = ""
+		if target == null:
+			reason = "NO_TARGET"
+		elif _has_status(actor, "STUN"):
+			reason = "STUN"
+		elif actor.energy < float(committed.get("energyCost", 0)):
+			reason = "ENERGY_AT_COMMIT"
+		elif actor.heat_lockout and float(committed.get("heatDelta", 0)) > 0:
+			reason = "THERMAL_LOCK"
+		elif str(committed.get("classId", "")) == "SPECIAL_ATTACK" and not _v2_requirements_pass(state, committed, target):
+			reason = "REQUIREMENT_AT_COMMIT"
+		if reason.is_empty():
+			var applied: Dictionary = _resolve_v2_action(state, rng, actor, target, context)
+			if not bool(applied.get("ok", false)):
+				return applied
+		else:
+			state.action_channel.get("cooldowns", {}).erase(str(committed.get("actionId", "")))
+			_emit(state, "ACTION_UNAVAILABLE", actor.id, {"data": {"reason": reason, "phase": "COMMIT", "sourceId": committed.get("sourceId", "")}})
+	if state.action_channel["active"].is_empty():
+		var actions: Array[Dictionary] = _factory.compile_v2_main_actions(state.build, _effective_sheet(state, actor), 1.0 / 0.7 if _has_status(actor, "SHOCK") else 1.0)
+		var available: Array[Dictionary] = []
+		for action: Dictionary in actions:
+			if not str(action.get("targetError", "")).is_empty():
+				return _failure(str(action["targetError"]))
+			var action_skill: Dictionary = _v2_skill(state, str(action.get("skillId", "")))
+			if action_skill.get("tags", []).has("D") and _has_status(actor, "JAM"):
+				action["cooldownMs"] = int(ceili(float(action.get("cooldownMs", 0)) * 1.3 / 100.0)) * 100
+			var resolved_targets: Dictionary = _v2_resolve_targets(state, int(action.get("targetDoctrine", -1)), actor.last_target_id, str(action.get("actionId", "")))
+			if not bool(resolved_targets.get("ok", false)):
+				return _failure(str(resolved_targets.get("error", "TARGET_RESOLUTION_FAILED")))
+			var candidate_target_ids: Array[String] = []
+			candidate_target_ids.assign(resolved_targets["targets"])
+			var action_target: CombatActorState = _actor_by_id(state, candidate_target_ids[0]) if not candidate_target_ids.is_empty() else null
+			action["hasValidTarget"] = not candidate_target_ids.is_empty()
+			action["targetIds"] = candidate_target_ids.duplicate()
+			if str(action.get("classId", "")) == "SPECIAL_ATTACK" and not _v2_requirements_pass(state, action, action_target):
+				action["hasValidTarget"] = false
+			if not action["hasValidTarget"]:
+				_emit(state, "ACTION_UNAVAILABLE", actor.id, {"data": {"actionId": action["actionId"], "reason": "NO_TARGET"}})
+				continue
+			available.append(action)
+		if _has_status(actor, "STUN"):
+			return {"ok": true}
+		var chosen: Dictionary = channel.start(state.action_channel, available, state.time_ms, actor.energy, actor.heat, float(actor.base_sheet.get("maxHeat", 100)), actor.heat_lockout)
+		if not bool(chosen.get("ok", false)):
+			return _failure(str(chosen.get("error", "INVALID_ACTION_CHANNEL")))
+		state.action_channel = chosen["state"]
+		for rejected: Dictionary in chosen["rejected"]:
+			_emit(state, "ACTION_UNAVAILABLE", actor.id, {"data": rejected})
+		if not chosen["action"].is_empty():
+			var instance_id: String = "%s:v2:%d" % [actor.id, state.time_ms]
+			var chosen_action: Dictionary = chosen["action"]
+			var chosen_targets: Array = chosen_action.get("targetIds", [])
+			var prepare_event: Dictionary = _emit(state, "ACTION_PREPARE", actor.id, {"actionId": instance_id, "sourceId": str(chosen_action["sourceId"]), "targetId": str(chosen_targets[0]) if not chosen_targets.is_empty() else "", "targetIds": chosen_targets.duplicate(), "data": chosen_action})
+			state.action_channel["active"]["instanceId"] = instance_id
+			state.action_channel["active"]["prepareEventId"] = int(prepare_event["eventId"])
+			state.action_channel["active"]["targetIds"] = chosen_targets.duplicate()
+	return {"ok": true}
+
+func _v2_resolve_targets(state: CombatState, doctrine: int, focus_id: String, action_id: String) -> Dictionary:
+	var seeded_roll: int = 0
+	if doctrine == AutobattleV2Contract.Doctrine.RANDOM_SEEDED:
+		var targeting_rng: DeterministicRng = _new_rng("v2-target:%s:%d:%s" % [state.seed, state.time_ms, action_id])
+		seeded_roll = targeting_rng.int_range(0, 0x7FFFFFFF)
+	return AutobattleV2Targets.new().resolve(state, doctrine, focus_id, seeded_roll)
+
+func _v2_requirements_pass(state: CombatState, action: Dictionary, target: CombatActorState) -> bool:
+	for requirement_value: Variant in action.get("requires", []):
+		if not requirement_value is String:
+			return false
+		match str(requirement_value):
+			"VIRUS":
+				if target == null or not _has_status(target, "VIRUS"): return false
+			"SIDEARM":
+				if state.build.get("sidearm", {}).is_empty(): return false
+			"MAIN_K":
+				if str(state.build.get("mainWeapon", {}).get("type", "")) != "KINETIC": return false
+			"DR_MED", "DR_EMP":
+				return false
+			_:
+				return false
+	return true
+
+func _resolve_v2_action(state: CombatState, rng: DeterministicRng, actor: CombatActorState, target: CombatActorState, context: Dictionary) -> Dictionary:
+	var action: Dictionary = context.get("action", {})
+	if str(action.get("classId", "")) == "BASIC_ATTACK":
+		return _resolve_basic_attack(state, rng, actor, target, context)
+	if str(action.get("classId", "")) != "SPECIAL_ATTACK":
+		return _failure("V2 adapter: неизвестный класс действия %s." % str(action.get("classId", "")))
+	var skill: Dictionary = _v2_skill(state, str(action.get("skillId", "")))
+	if skill.is_empty():
+		return _failure("V2 adapter: скомпилированная способность отсутствует в BuildResolver (%s)." % str(action.get("skillId", "")))
+	var cost: float = float(action.get("energyCost", _main_skill_energy_cost(skill, _effective_sheet(state, actor))))
+	if actor.energy < cost:
+		return _failure("V2 adapter: энергия изменилась до атомарной фиксации способности.")
+	actor.energy = clampf(actor.energy - cost, 0.0, float(actor.base_sheet.get("maxEnergy", 0.0)))
+	state.metrics["energySpent"] = float(state.metrics.get("energySpent", 0.0)) + cost
+	_gain_basic_heat(state, actor, float(skill.get("heatDelta", 0.0)), rng)
+	# The compiler captured cooldown at PREPARE, including the then-effective CDR
+	# and JAM modifiers. Do not recalculate it after windup/status expiry.
+	var cooldown: int = int(action.get("cooldownMs", 0))
+	var timeline: Dictionary = context.get("timeline", {})
+	var action_start_ms: int = int(timeline.get("commitAtMs", state.time_ms)) - int(action.get("prepareMs", 0))
+	actor.cooldowns[str(skill["id"])] = float(action_start_ms + cooldown)
+	var channel_cooldowns: Dictionary = state.action_channel.get("cooldowns", {})
+	var recovery_until: int = int(timeline.get("recoveryUntilMs", state.time_ms))
+	channel_cooldowns[str(action.get("actionId", ""))] = maxi(recovery_until, action_start_ms + cooldown)
+	state.action_channel["cooldowns"] = channel_cooldowns
+	actor.counters["casts"] = int(actor.counters.get("casts", 0)) + 1
+	var cast: Dictionary = {
+		"actionId": str(context.get("instanceId", "%s:v2:%d" % [actor.id, state.time_ms])),
+		"skillId": str(skill["id"]), "targetId": target.id if target != null else "",
+		"targetIds": context.get("targetIds", []), "startedAt": int(context.get("timeline", {}).get("commitAtMs", state.time_ms)),
+		"resolveAt": state.time_ms, "endAt": int(context.get("timeline", {}).get("recoveryUntilMs", state.time_ms)),
+		"interruptible": false, "resolved": true, "channel": "main", "causeId": int(context.get("prepareEventId", 0)),
+	}
+	actor.last_skill_id = str(skill["id"])
+	actor.last_target_id = target.id if target != null else ""
+	actor.last_main_attack_at = state.time_ms
+	actor.next_attack_at = float(cast["endAt"])
+	_record_enemy_judge_program(state, str(skill["id"]))
+	_resolve_main_skill(state, rng, actor, cast)
+	_consume_hit_buffs(actor)
+	return {"ok": true, "error": ""}
+
+func _v2_skill(state: CombatState, skill_id: String) -> Dictionary:
+	for skill: Dictionary in state.build.get("skills", []):
+		if str(skill.get("id", "")) == skill_id:
+			return skill
+	return {}
 
 func _supports_basic_auto_step(state: CombatState) -> bool:
 	if not _supports_skill_trigger_effects(state):
@@ -791,13 +988,7 @@ func _choose_main_skill(state: CombatState, _rng: DeterministicRng, actor: Comba
 	return {"started": false}
 
 func _main_skill_energy_cost(skill: Dictionary, sheet: Dictionary) -> float:
-	var cost: float = float(skill.get("energyCost", 0.0))
-	if cost <= 0.0:
-		return 0.0
-	if str(skill.get("basis", "")) == "TECH_E":
-		cost = maxf(1.0, cost - float(sheet.get("energySkillCostFlat", 0.0)))
-	cost *= 1.0 - clampf(float(sheet.get("skillEnergyCostLess", 0.0)), 0.0, 60.0) / 100.0
-	return maxf(0.0, cost)
+	return _factory.main_skill_energy_cost(skill, sheet)
 
 func _choose_reaction_skill(state: CombatState, rng: DeterministicRng) -> void:
 	var actor: CombatActorState = state.operator
@@ -1467,11 +1658,16 @@ func _resolve_main_skill(state: CombatState, rng: DeterministicRng, actor: Comba
 	var target: CombatActorState = _actor_by_id(state, str(cast.get("targetId", "")))
 	state.metrics["skillUses"][skill_id] = int(state.metrics["skillUses"].get(skill_id, 0)) + 1
 	var action_id: String = str(cast.get("actionId", ""))
-	var cast_event: Dictionary = _emit(state, "SKILL_USE", actor.id, {
+	var skill_use_fields: Dictionary = {
 		"skillId": skill_id, "targetId": target.id if target != null else "", "actionId": action_id,
 		"originActionId": action_id, "text": "%s: %s." % [actor.display_name, str(skill.get("name", skill_id))],
 		"data": {"channel": "main"},
-	})
+	}
+	if state.combat_rules_version == CombatState.V2_RULES_VERSION:
+		skill_use_fields["sourceId"] = skill_id
+		skill_use_fields["causeId"] = int(cast.get("causeId", 0))
+		skill_use_fields["targetIds"] = cast.get("targetIds", [target.id] if target != null else []).duplicate()
+	var cast_event: Dictionary = _emit(state, "SKILL_USE", actor.id, skill_use_fields)
 	if skill.get("tags", []).has("D") and target != null and target.side == "enemy":
 		actor.flags["lastDigitalSkillId"] = skill_id
 		actor.flags["lastDigitalTargetId"] = target.id
@@ -1511,10 +1707,14 @@ func _resolve_main_skill(state: CombatState, rng: DeterministicRng, actor: Comba
 		return
 	if skill_id == "SK_KINETIC" or str(skill.get("targetMode", "")) == "allEnemies":
 		var targets: Array[CombatActorState] = []
-		for enemy: CombatActorState in state.enemies:
-			if enemy.alive:
-				targets.append(enemy)
-		targets.sort_custom(func(left: CombatActorState, right: CombatActorState) -> bool: return left.id < right.id)
+		if state.combat_rules_version == CombatState.V2_RULES_VERSION and cast.get("targetIds", []) is Array:
+			for target_id: Variant in cast.get("targetIds", []):
+				var captured: CombatActorState = _actor_by_id(state, str(target_id))
+				if captured != null and captured.alive: targets.append(captured)
+		else:
+			for enemy: CombatActorState in state.enemies:
+				if enemy.alive: targets.append(enemy)
+			targets.sort_custom(func(left: CombatActorState, right: CombatActorState) -> bool: return left.id < right.id)
 		var limit: int = int(skill.get("maxTargets", targets.size()))
 		for current_target: CombatActorState in targets.slice(0, limit):
 			var raw_base: float = _skill_raw_damage(skill, base_damage, effective, current_target)
@@ -1928,6 +2128,8 @@ func _apply_basic_continuous(state: CombatState, rng: DeterministicRng) -> void:
 				ambient += float(_factory._enemy_catalog.get_template(enemy.template_id).get("ambientHeatPerSec", 0.0))
 		var cooling: float = maxf(0.0, float(sheet.get("heatCooling", 0.0)) - state.cooling_penalty)
 		var heat_before: float = operator.heat
+		if state.combat_rules_version == CombatState.V2_RULES_VERSION and (operator.heat_lockout or state.time_ms - int(operator.flags.get("v2LastHeatGainAt", -100000)) < 500):
+			cooling = 0.0
 		operator.heat = clampf(operator.heat + (ambient - cooling) * 0.1, 0.0, float(sheet.get("maxHeat", 0.0)))
 		_handle_heat_transition(state, rng, operator, heat_before, float(sheet.get("maxHeat", 0.0)))
 		if operator.heat <= 25.0:
@@ -1963,13 +2165,15 @@ func _pick_auto_target(state: CombatState, actor: CombatActorState) -> CombatAct
 		if enemy.alive:
 			enemies.append(enemy)
 	enemies.sort_custom(func(left: CombatActorState, right: CombatActorState) -> bool: return left.id < right.id)
+	if state.combat_rules_version == CombatState.V2_RULES_VERSION and actor.kind == "operator":
+		enemies.sort_custom(func(left: CombatActorState, right: CombatActorState) -> bool: return left.threat_units > right.threat_units if left.threat_units != right.threat_units else left.id < right.id)
 	if actor.kind == "drone" and actor.drone_role == "mark":
 		for enemy: CombatActorState in enemies:
 			if _has_status(enemy, "DRONE_MARK"):
 				return enemy
 	return enemies[0] if not enemies.is_empty() else null
 
-func _resolve_basic_attack(state: CombatState, rng: DeterministicRng, actor: CombatActorState, target: CombatActorState) -> Dictionary:
+func _resolve_basic_attack(state: CombatState, rng: DeterministicRng, actor: CombatActorState, target: CombatActorState, context: Dictionary = {}) -> Dictionary:
 	if actor.kind == "operator":
 		_record_enemy_judge_program(state, "")
 	var weapon: Dictionary = state.build.get("mainWeapon", {}) if actor.kind == "operator" else {}
@@ -1987,13 +2191,20 @@ func _resolve_basic_attack(state: CombatState, rng: DeterministicRng, actor: Com
 		_gain_basic_heat(state, actor, heat_gain, rng)
 	actor.counters["attacks"] = int(actor.counters.get("attacks", 0)) + 1
 	var action_id: String = "%s:atk:%d" % [actor.id, int(actor.counters["attacks"])]
+	if not context.is_empty():
+		action_id = str(context.get("instanceId", action_id))
 	actor.last_main_attack_at = state.time_ms
-	_emit(state, "ATTACK", actor.id, {"targetId": target.id, "actionId": action_id, "text": "%s атакует %s." % [actor.display_name, target.display_name]})
+	var attack_fields: Dictionary = {"targetId": target.id, "actionId": action_id, "text": "%s атакует %s." % [actor.display_name, target.display_name]}
+	if not context.is_empty():
+		attack_fields["sourceId"] = str(context.get("action", {}).get("sourceId", ""))
+		attack_fields["causeId"] = int(context.get("prepareEventId", 0))
+	_emit(state, "ATTACK", actor.id, attack_fields)
 	actor.last_target_id = target.id
 	var packets: Array[Dictionary] = _attack_packets(actor, weapon)
+	var locked_target: CombatActorState = target
 	var landed: bool = false
 	for packet: Dictionary in packets:
-		var current_target: CombatActorState = _pick_auto_target(state, actor)
+		var current_target: CombatActorState = locked_target if state.combat_rules_version == CombatState.V2_RULES_VERSION else _pick_auto_target(state, actor)
 		if current_target == null:
 			break
 		var hit_result: Dictionary = _resolve_basic_hit(state, rng, actor, current_target, float(packet["amount"]), str(packet["type"]), action_id, actor.kind == "operator")
@@ -2473,9 +2684,22 @@ func _gain_basic_heat(state: CombatState, actor: CombatActorState, amount: float
 	var max_heat: float = float(actor.base_sheet.get("maxHeat", 0.0))
 	var before: float = actor.heat
 	actor.heat = clampf(actor.heat + amount, 0.0, max_heat)
+	if state.combat_rules_version == CombatState.V2_RULES_VERSION:
+		actor.flags["v2LastHeatGainAt"] = state.time_ms
 	_handle_heat_transition(state, rng, actor, before, max_heat)
 
 func _handle_heat_transition(state: CombatState, rng: DeterministicRng, actor: CombatActorState, heat_before: float, max_heat: float) -> void:
+	if state.combat_rules_version == CombatState.V2_RULES_VERSION:
+		if actor.heat_lockout and state.time_ms >= actor.lockout_until:
+			actor.heat_lockout = false
+			actor.heat = minf(max_heat, 65.0)
+			_emit(state, "HEAT_LOCKOUT_END", actor.id, {"data": {"heat": actor.heat, "reason": "LOCK_DURATION_ELAPSED"}})
+		elif not actor.heat_lockout and actor.heat >= max_heat:
+			actor.heat_lockout = true
+			actor.lockout_until = state.time_ms + 1500
+			state.metrics["heatLockouts"] = int(state.metrics.get("heatLockouts", 0)) + 1
+			_emit(state, "HEAT_LOCKOUT", actor.id, {"data": {"heat": actor.heat, "untilMs": actor.lockout_until}})
+		return
 	if not actor.heat_lockout and heat_before < max_heat and actor.heat >= max_heat:
 		actor.heat_lockout = true
 		_emit(state, "HEAT", actor.id, {"text": "Нагрев достиг максимума.", "data": {"heat": actor.heat, "threshold": max_heat}})

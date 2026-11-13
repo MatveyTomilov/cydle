@@ -1,5 +1,15 @@
 # CYDLE agent instructions
 
+## Combat V2 migration — approved 13 November 2026
+
+- The owner approved replacing programmable tactics with item-authored deterministic autobattle. CYDLE_MASTER_SPEC.md v2.1 §8 overrides incompatible legacy combat clauses; this is a design change, not a claim of completed runtime migration.
+- game/scripts/core/combat/combat_simulator.gd is currently the V1 runtime. Do not delete it or mass-port V1 tactic selection until V2 has a duel, replay parity and migration checks. TypeScript remains a formula/status oracle, never the new V2 action-selection oracle.
+- Develop V2 in feature/autobattle-v2, with a reviewed PR into development/codex. Keep the ongoing development/codex branch and historical branches untouched while this parallel migration is being proven.
+- AutobattleV2Contract and its tests are isolated, NOT connected to the live GameSession. Never claim playable V2 until actual dispatch and encounters pass.
+- Implement one Heat/Shield/Energy/Drone synergy before adding a second archetype. Preserve the existing 85-stat resolver, RNG/state hashing, damage math, CalcTrace and old replay fixtures.
+- V2 must not accept editable priorities, condition DSL or queued reactions from saves, loot affixes or UI. Use explicit combat versioning and preserve META/RUN/reward integrity.
+- Required gates: Godot import, V1 regression suite, V2 headless replay, seed/rendered/offline parity, proc bounds, scenario matrix, live Build Lab trace, consumables-disabled campaign and manual gameplay QA.
+
 ## Product and authority
 
 - `CYDLE_MASTER_SPEC.md` is the normative source for game rules, balance, and release acceptance. Do not change its design decisions without explicit approval.
@@ -9,7 +19,7 @@
 
 ## Git and preservation
 
-- Work on `development/codex`. Keep `main`, `development/luna`, `development/qwen`, and `recovery/qwen-snapshot` unchanged.
+- For the approved V2 migration work on `feature/autobattle-v2`; keep its PR draft until Gate A. Outside this migration the working branch is `development/codex`. Keep `main`, `development/luna`, `development/qwen`, and `recovery/qwen-snapshot` unchanged.
 - Preserve existing Qwen/Luna code and commits. Avoid destructive Git commands and broad rewrites. Keep changes focused, tested, committed, and pushed to `origin/development/codex` at completed checkpoints.
 - Do not commit generated build output, `.godot` cache, local save data, credentials, or unlicensed/undocumented assets.
 
