@@ -513,6 +513,16 @@ func run(_tree: SceneTree) -> bool:
 			q03_reward_payload["run"]["currentNodeId"] = q03_quest_node_id
 			q03_reward_payload["run"]["clearedNodeIds"] = [q03_elite_node_id]
 			q03_reward_payload["run"]["visitedNodeIds"] = [q03_elite_node_id, q03_quest_node_id]
+			q03_reward_payload["run"]["runWallet"]["CREDITS"] = 0.0
+			if check(not q03_elite_node_id.is_empty() and rust_quest_target._commit_payload(q03_reward_payload), "game_session: Q03 choice affordability fixture failed to save: %s" % rust_quest_target.last_error):
+				var ready_q03_stages: Array[Dictionary] = rust_quest_target.available_quest_stages()
+				var q03_stage_two: Dictionary = ready_q03_stages[0].get("stage", {}) if not ready_q03_stages.is_empty() else {}
+				var q03_buy_engine: Dictionary = {}
+				for q03_choice: Dictionary in q03_stage_two.get("choices", []):
+					if str(q03_choice.get("id", "")) == "B": q03_buy_engine = q03_choice
+				var q03_engine_quote: Dictionary = rust_quest_target.quest_choice_affordability(q03_buy_engine)
+				check(not bool(q03_engine_quote.get("affordable", true)) and str(q03_engine_quote.get("reason", "")).contains("CREDITS"), "game_session: Q03 engine purchase did not expose its scaled credit requirement")
+				check(not rust_quest_target.resolve_quest_choice("Q03", "B") and rust_quest_target.state.meta.quest_progress["Q03"].get("choiceHistory", []).size() == 1, "game_session: unaffordable Q03 engine choice changed quest progress")
 			check(not q03_elite_node_id.is_empty() and rust_quest_target._commit_payload(q03_reward_payload) and rust_quest_target.resolve_quest_choice("Q03", "A"), "game_session: Q03 reward choice failed after the required E09 objective: %s" % rust_quest_target.last_error)
 			if not rust_quest_target.state.run.unsecured_cargo.is_empty():
 				var q03_reward_item: Dictionary = rust_quest_target.state.run.unsecured_cargo.back()
