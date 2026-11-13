@@ -14,6 +14,10 @@ Save checksums now normalize numeric values through the same repeated JSON seria
 
 The existing shared autopilot now records actual travel, node, combat, checkpoint, and terminal-run actions in a bounded per-return event log. Offline/interactive reports derive gross currency gains, net currency/faction changes, items found/lost/secured, strongest drop, run/battle outcomes, elapsed wall-clock and game-time, and route endpoints from those transactions and snapshots. The road UI renders the return summary; the save schema validates new optional report fields while retaining old report compatibility. Godot editor import and 22 scripts / 88,089 assertions passed; Windows Desktop export and EXE headless smoke passed; diff check passed. The 12-hour elapsed-time clamp has a regression; a real 12-hour process, idempotency and active/offline state-hash parity are not yet verified.
 
+### Current status override (2026-11-13; Q03 authored reward audit)
+
+Q03_S2 now grants only its three specified RARE drone templates (DR_GUN, DR_ARC, DR_MED) at exact current sector TechLevel; prior generic category loot could violate both type and tier guarantees. The deterministic selection and transaction are exercised after the route's E09 elite objective. Godot editor import, 22 scripts / 88,091 assertions, Windows export/EXE smoke and diff check passed. This fixes one exact quest reward contract and does not complete all six quest chains.
+
 ### Previous status override (2026-11-13; periodic and attack-counter triggers)
 
 Periodic and every-N-attacks item/tree effects now dispatch by authored action data in the shared combat simulator, including support relay damage, drone shield/interrupt actions, U09 digital-skill repeat, U18 pulse flags, and ARC/FOCUS/DR_ARC counter effects. Chance, cooldown, once guards, and proc accounting use the same state/RNG path. Godot editor import passed; 22 headless scripts / 88,085 assertions and diff check passed. Windows export/EXE smoke not run.

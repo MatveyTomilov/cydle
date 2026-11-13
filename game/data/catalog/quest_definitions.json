@@ -274,7 +274,11 @@
                 "F_RUST": 6
               },
               "grantItem": {
-                "category": "DRONE",
+                "templateIds": [
+                  "DR_GUN",
+                  "DR_ARC",
+                  "DR_MED"
+                ],
                 "rarity": "RARE"
               },
               "questAdvance": true

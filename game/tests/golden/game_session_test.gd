@@ -503,6 +503,22 @@ func run(_tree: SceneTree) -> bool:
 			for edge: Dictionary in rust_quest_target.state.run.graph.get("edges", []):
 				if str(edge.get("to", "")) == q03_quest_node_id and int(edge.get("fromLayer", -1)) == 2: q03_has_route_edges = true
 			check(not q03_quest_node_id.is_empty() and q03_has_route_edges, "game_session: Q03 stage node was not connected to the playable route")
+			var q03_elite_node_id: String = ""
+			for layer: Array in rust_quest_target.state.run.graph.get("layers", []):
+				for node: Dictionary in layer:
+					if str(node.get("type", "")) == "ELITE" and node.get("questTargets", []).has("Q03") and node.get("enemies", []).any(func(enemy: Dictionary) -> bool: return str(enemy.get("templateId", "")) == "E09"):
+						q03_elite_node_id = str(node.get("id", ""))
+			var q03_reward_payload: Dictionary = rust_quest_target.state.to_payload()
+			q03_reward_payload["run"]["phase"] = "NODE"
+			q03_reward_payload["run"]["currentNodeId"] = q03_quest_node_id
+			q03_reward_payload["run"]["clearedNodeIds"] = [q03_elite_node_id]
+			q03_reward_payload["run"]["visitedNodeIds"] = [q03_elite_node_id, q03_quest_node_id]
+			check(not q03_elite_node_id.is_empty() and rust_quest_target._commit_payload(q03_reward_payload) and rust_quest_target.resolve_quest_choice("Q03", "A"), "game_session: Q03 reward choice failed after the required E09 objective: %s" % rust_quest_target.last_error)
+			if not rust_quest_target.state.run.unsecured_cargo.is_empty():
+				var q03_reward_item: Dictionary = rust_quest_target.state.run.unsecured_cargo.back()
+				check(["DR_GUN", "DR_ARC", "DR_MED"].has(str(q03_reward_item.get("templateId", ""))) and str(q03_reward_item.get("rarity", "")) == "RARE" and int(q03_reward_item.get("techLevel", 0)) == rust_quest_target.state.run.depth, "game_session: Q03 promised a guaranteed current-TechLevel RARE DR_GUN/DR_ARC/DR_MED but granted %s" % q03_reward_item)
+			else:
+				check(false, "game_session: Q03 successful stage did not put its promised drone into unsecured cargo")
 	var continued_quest_session: GameSession = GameSession.new()
 	continued_quest_session.configure_save_directory("user://test-saves/quest-target-continue")
 	if check(continued_quest_session.start_new_game(1762900000135), "game_session: could not create a continued-quest profile") and check(continued_quest_session.start_expedition("quest-target-continue"), "game_session: could not create the pre-checkpoint outing"):

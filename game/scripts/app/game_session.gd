@@ -2011,8 +2011,14 @@ func resolve_quest_choice(quest_id: String, choice_id: String) -> bool:
 		loot.restore(run_payload["lootRng"])
 		for grant_index: int in range(maxi(1, int(grant.get("count", 1)))):
 			var grant_id: String = "quest:%s:%s:%d" % [str(run_payload["seed"]), history_key, grant_index]
-			var options: Dictionary = {"depth": state.run.depth, "biome": state.run.biome, "table": "ORDINARY", "secured": false, "grantId": grant_id, "origin": "quest", "acquiredAt": state.updated_at}
+			var options: Dictionary = {"depth": state.run.depth, "biome": state.run.biome, "table": "ORDINARY", "secured": false, "grantId": grant_id, "origin": "quest", "acquiredAt": state.updated_at, "techOffsetOverride": 0}
 			if grant.has("templateId"): options["forceTemplateId"] = grant["templateId"]
+			if grant.has("templateIds"):
+				var template_ids: Array = grant.get("templateIds", [])
+				if template_ids.is_empty():
+					last_error = "Квестовая награда содержит пустой список совместимых предметов."
+					return false
+				options["forceTemplateId"] = str(loot.pick(template_ids))
 			if grant.has("category"): options["forceCategory"] = grant["category"]
 			if grant.has("tag"): options["forceTag"] = grant["tag"]
 			if grant.has("rarity"): options["forceRarity"] = grant["rarity"]

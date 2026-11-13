@@ -64,6 +64,17 @@ func _valid_quest(value: Variant) -> bool:
 		for choice: Variant in stage["choices"]:
 			if not choice is Dictionary or not _text(choice.get("id")) or not _text(choice.get("label")) or not _text(choice.get("desc")):
 				return false
+			var grant_item: Variant = choice.get("grantItem", {})
+			if not grant_item is Dictionary:
+				return false
+			if grant_item.has("templateIds"):
+				if not grant_item["templateIds"] is Array or grant_item["templateIds"].is_empty():
+					return false
+				var template_ids: Dictionary = {}
+				for template_id: Variant in grant_item["templateIds"]:
+					if not _text(template_id) or template_ids.has(str(template_id)):
+						return false
+					template_ids[str(template_id)] = true
 	return true
 
 func _valid_contract(value: Variant) -> bool:
