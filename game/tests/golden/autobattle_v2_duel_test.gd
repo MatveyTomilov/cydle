@@ -12,7 +12,7 @@ func run(_tree: SceneTree) -> bool:
 	if not check(bool(one_tick.get("ok", false)), "v2_duel: first step failed"):
 		return false
 	check(int(one_tick["state"].get("timeMs", 0)) == 100, "v2_duel: fixed tick did not advance 100ms")
-	check(str(one_tick["state"].get("activeAction", {}).get("actionId", "")) == "ARC-9:basic", "v2_duel: ARC-9 was not started automatically")
+	check(str(one_tick["state"]["actionChannel"]["active"]["action"].get("actionId", "")) == "ARC-9:basic", "v2_duel: ARC-9 was not started automatically")
 	check(duel.state_hash(initial) == initial_hash, "v2_duel: step mutated its input snapshot")
 	var first: Dictionary = duel.run_until(initial, 350)
 	var second: Dictionary = duel.run_until(initial, 350)
@@ -53,4 +53,27 @@ func run(_tree: SceneTree) -> bool:
 	var normal: Dictionary = duel.run_until(initial, 100)
 	check(float(tank.get("state", {}).get("metrics", {}).get("operatorDamage", 0.0)) < float(normal.get("state", {}).get("metrics", {}).get("operatorDamage", 0.0)),
 		"v2_duel: canonical armor mitigation is not effective")
+	# Vent is on cooldown: the weapon must reach real overheat rather than idle
+	# forever below the cap. Snapshot the lock and verify its exact deadline.
+	var hot: Dictionary = duel.new_duel("v2-overheat", 10000.0)
+	hot["operator"]["heat"] = 99.0
+	hot["operator"]["lastHeatGainAtMs"] = 0
+	hot["actionChannel"]["cooldowns"]["thermal-vent"] = 10000
+	var locked: Dictionary = duel.run_until(hot, 7)["state"]
+	check(bool(locked["operator"]["thermalLocked"]) and float(locked["operator"]["heat"]) == 100.0, "v2_duel: heat-cap crossing did not lock")
+	var lock_end: int = int(locked["operator"]["thermalLockUntilMs"])
+	var before_end: Dictionary = duel.run_until(locked, 14)["state"]
+	check(bool(before_end["operator"]["thermalLocked"]) and int(before_end["timeMs"]) == lock_end - 100, "v2_duel: lock ended too early")
+	var unlocked: Dictionary = duel.step(before_end)["state"]
+	check(not bool(unlocked["operator"]["thermalLocked"]) and float(unlocked["operator"]["heat"]) == 65.0, "v2_duel: lock failed to reset heat at deadline")
+	var continued: Dictionary = duel.run_until(unlocked, 10)["state"]
+	check(int(continued["metrics"]["operatorHits"]) + int(continued["metrics"]["operatorMisses"]) > int(locked["metrics"]["operatorHits"]) + int(locked["metrics"]["operatorMisses"]), "v2_duel: attacks did not resume after lock")
+	var simultaneous: Dictionary = one_tick["state"].duplicate(true)
+	simultaneous["enemy"]["nextAttackAtMs"] = 700
+	var both: Dictionary = duel.run_until(simultaneous, 6)["state"]
+	var commits: Array[String] = []
+	for event: Dictionary in both["log"]:
+		if int(event.get("timestamp", 0)) == 700 and str(event.get("kind", "")) in ["ENEMY_ATTACK", "ATTACK_COMMIT"]:
+			commits.append(str(event["kind"]))
+	check(commits == ["ENEMY_ATTACK", "ATTACK_COMMIT"], "v2_duel: equal-time prepared actions did not use stable actor order")
 	return failure_count == 0

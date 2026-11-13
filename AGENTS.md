@@ -19,7 +19,7 @@
 
 ## Git and preservation
 
-- Work on `development/codex`. Keep `main`, `development/luna`, `development/qwen`, and `recovery/qwen-snapshot` unchanged.
+- For the approved V2 migration work on `feature/autobattle-v2`; keep its PR draft until Gate A. Outside this migration the working branch is `development/codex`. Keep `main`, `development/luna`, `development/qwen`, and `recovery/qwen-snapshot` unchanged.
 - Preserve existing Qwen/Luna code and commits. Avoid destructive Git commands and broad rewrites. Keep changes focused, tested, committed, and pushed to `origin/development/codex` at completed checkpoints.
 - Do not commit generated build output, `.godot` cache, local save data, credentials, or unlicensed/undocumented assets.
 

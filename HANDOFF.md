@@ -1,5 +1,14 @@
 # CYDLE — Project handoff and development history
 
+## Current V2 work — action channel and compatibility boundary (2026-11-13)
+
+- Branch `feature/autobattle-v2`, draft PR #3, based on `d6dc32786acbc0fa4303a7e8e4164b6092668f46`. PR base is current `development/codex` (`6d2a8fe`). Research report was not found among tracked files; the owner's AUTOBATTLE V2 attachment is the governing assignment.
+- `AutobattleV2Channel` owns serializable PREPARE/COMMIT/RECOVERY, cooldowns, interruption and bounded support scheduling. The duel now uses it; it is not a new damage implementation. Post-commit JSON restore does not replay the effect; preparation interruption charges no cooldown. Support cannot indefinitely displace an eligible attack.
+- Fixed prototype Heat cap starvation: attacks cross the cap at commit, enter a 1500 ms thermal lock and reset to 65 at expiry. Equal-time enemy/operator intents are gathered before effects, applied in stable actor order and then settled. Prototype format is now `cydle-combat-2.0-prototype.2`; older prototype dictionaries are rejected.
+- New GameSession snapshots explicitly mark V1 in the wrapper. Untagged historical snapshots still load as V1; V2/future snapshots are rejected by the V1 loader and engine, preserving the profile. V1 golden state representation/hashes remain unchanged. This is a compatibility boundary, not implemented V2 save migration.
+- Targeted fresh-process tests: combat_step (483 assertions), V2 contract (54), channel (19), duel (26), all 0 failures, exit 0. Editor import exit 0. An earlier full run overlapped edits and used the previously loaded CombatState with the new test: 1 failure; its output is not a valid verification of the final sources. The committed checkpoint must receive a fresh full regression/CI run.
+- A1 remains open: compile canonical equipment into V2, connect the existing factory/simulator/session, then real save/replay parity. A2–A6, real Heat items, progression, UI, consumables and V2 campaign acceptance remain open. See `docs/AUTOBATTLE_V2_GATE_A.md` for the single current gate ledger. Do not merge PR #3 yet. User save folders and prior QA profiles were untouched.
+
 ## Experimental feature checkpoint — Autobattle V2 (2026-11-13)
 
 - User-approved new combat model codified in CYDLE_MASTER_SPEC.md v2.1 §8 on isolated feature/autobattle-v2 branch, based on Codex checkpoint 6d2a8fe. It replaces V1 programmable tactics with equipment-authored automatic behavior.

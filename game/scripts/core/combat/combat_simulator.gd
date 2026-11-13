@@ -22,6 +22,8 @@ var _status_catalog_loaded: bool = false
 var _status_catalog_error: String = ""
 
 func create_state(config: Dictionary) -> Dictionary:
+	if str(config.get("combatRulesVersion", COMBAT_RULES_VERSION)) != COMBAT_RULES_VERSION:
+		return _failure("Неподдерживаемая версия боевых правил; требуется явная миграция.")
 	var seed_value: Variant = config.get("seed", "")
 	var depth_value: Variant = config.get("depth", 0)
 	var enemy_value: Variant = config.get("enemies", [])
@@ -88,6 +90,8 @@ func create_state(config: Dictionary) -> Dictionary:
 func step_combat(state: CombatState) -> Dictionary:
 	if state == null:
 		return _failure("Нельзя продвинуть пустое состояние боя.")
+	if state.combat_rules_version != COMBAT_RULES_VERSION:
+		return _failure("Версия снимка не соответствует боевому движку.")
 	if not state.outcome.is_empty():
 		return {"ok": true, "state": state, "error": ""}
 	if not _supports_basic_auto_step(state):

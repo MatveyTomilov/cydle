@@ -4,7 +4,7 @@ extends RefCounted
 # Executable, deterministic first V2 duel: ARC-9 vs a single enemy.
 # This is a headless proving slice, not the GameSession runtime.
 # Future phases replace these fixed authored prototypes with BuildResolver data.
-const VERSION: String = "cydle-combat-2.0-prototype"
+const VERSION: String = "cydle-combat-2.0-prototype.2"
 const TICK_MS: int = 100
 const ARC_DAMAGE: float = 22.0
 const ARC_ENERGY_COST: float = 4.0
@@ -14,6 +14,7 @@ const VENT_THRESHOLD: float = 85.0
 const VENT_COOLDOWN_MS: int = 8000
 
 var _actions: AutobattleV2Contract = AutobattleV2Contract.new()
+var _channel: AutobattleV2Channel = AutobattleV2Channel.new()
 # DamageMath's CalcTrace uses an instance-local counter; construct it per
 # resolved packet so replay hashes never inherit history from another run.
 var _hash: StateHash = StateHash.new()
@@ -28,12 +29,12 @@ func new_duel(seed_value: String, enemy_hp: float = 900.0, enemy_armor: float = 
 		"operator": {"hp": 320.0, "maxHp": 320.0, "shield": 120.0, "maxShield": 120.0,
 			"energy": 100.0, "maxEnergy": 100.0, "heat": 0.0, "maxHeat": 100.0,
 			"lastHeatGainAtMs": -100000, "lastDamagedAtMs": -100000,
-			"lastTargetId": "enemy:0", "thermalLocked": false},
+			"lastTargetId": "enemy:0", "thermalLocked": false, "thermalLockUntilMs": 0},
 		"enemy": {"id": "enemy:0", "hp": enemy_hp, "maxHp": enemy_hp,
 			"armor": enemy_armor, "shield": 0.0, "maxShield": 0.0,
 			"accuracy": 100.0, "evasion": 0.0, "threat": 10.0,
 			"damage": 6.0, "nextAttackAtMs": 2500, "attackIntervalMs": 2500},
-		"activeAction": {}, "ventReadyAtMs": 0, "nextEventId": 1, "log": [],
+		"actionChannel": _channel.new_state(), "nextEventId": 1, "log": [],
 		"metrics": {"operatorDamage": 0.0, "operatorHits": 0, "operatorMisses": 0,
 			"ventUses": 0, "shieldFromVent": 0.0, "enemyHits": 0},
 		"outcome": "",
@@ -53,31 +54,32 @@ func step(current: Dictionary) -> Dictionary:
 	_regenerate(state)
 	var operator: Dictionary = state["operator"]
 	var enemy: Dictionary = state["enemy"]
-	var active: Dictionary = state["activeAction"]
-	if not active.is_empty():
-		var advanced: Dictionary = _actions.advance_action(active["timeline"], int(state["timeMs"]))
-		active["timeline"] = advanced["timeline"]
-		if bool(advanced["didCommit"]):
-			if str(active.get("actionId", "")) == "ARC-9:basic":
-				_commit_arc(state, rng)
-			elif str(active.get("actionId", "")) == "thermal-vent":
-				_commit_vent(state)
-			else:
-				return {"ok": false, "error": "UNKNOWN_ACTION"}
-		if bool(advanced.get("channelReady", false)):
-			state["activeAction"] = {}
-		else:
-			state["activeAction"] = active
-	# This prototype enemy has a direct basic attack; telegraphs and its own
-	# five-phase action channel are intentionally separate future work.
-	if float(enemy.get("hp", 0.0)) > 0.0 and float(operator.get("hp", 0.0)) > 0.0 and int(state["timeMs"]) >= int(enemy["nextAttackAtMs"]):
+	# Gather both due intents before applying either lethal effect. Equal-time
+	# basic commits use stable actor ids (enemy:0 precedes operator); deaths
+	# settle only after all intents prepared for this timestamp are applied.
+	var enemy_due: bool = float(enemy["hp"]) > 0.0 and float(operator["hp"]) > 0.0 and int(state["timeMs"]) >= int(enemy["nextAttackAtMs"])
+	var advanced: Dictionary = _channel.advance(state.get("actionChannel", {}), int(state["timeMs"]))
+	if not bool(advanced.get("ok", false)):
+		return advanced
+	state["actionChannel"] = advanced["state"]
+	var committed: Dictionary = advanced["commit"]
+	if enemy_due:
 		_commit_enemy_attack(state, rng)
 		enemy["nextAttackAtMs"] = int(enemy["nextAttackAtMs"]) + int(enemy["attackIntervalMs"])
+	if not committed.is_empty():
+		if str(committed.get("actionId", "")) == "ARC-9:basic":
+			_commit_arc(state, rng)
+		elif str(committed.get("actionId", "")) == "thermal-vent":
+			_commit_vent(state)
+		else:
+			return {"ok": false, "error": "UNKNOWN_ACTION"}
+	# This prototype enemy has a direct basic attack; telegraphs and its own
+	# five-phase action channel are intentionally separate future work.
 	if float(operator.get("hp", 0.0)) <= 0.0:
 		state["outcome"] = "DEFEAT"
 	elif float(enemy.get("hp", 0.0)) <= 0.0:
 		state["outcome"] = "VICTORY"
-	elif state["activeAction"].is_empty():
+	elif state["actionChannel"]["active"].is_empty():
 		_begin_next_action(state)
 	state["rng"] = rng.serialize()
 	return {"ok": true, "state": state}
@@ -103,7 +105,11 @@ func _regenerate(state: Dictionary) -> void:
 	var op: Dictionary = state["operator"]
 	var now: int = int(state["timeMs"])
 	op["energy"] = minf(float(op["maxEnergy"]), float(op["energy"]) + 0.8)
-	if now - int(op["lastHeatGainAtMs"]) >= 500:
+	if bool(op["thermalLocked"]) and now >= int(op["thermalLockUntilMs"]):
+		op["thermalLocked"] = false
+		op["heat"] = 65.0
+		_emit(state, "THERMAL_LOCK_END", {"sourceId": "resource:heat", "targetId": "operator", "reason": "LOCK_DURATION_ELAPSED", "heat": op["heat"]})
+	elif not bool(op["thermalLocked"]) and now - int(op["lastHeatGainAtMs"]) >= 500:
 		op["heat"] = maxf(0.0, float(op["heat"]) - 0.6)
 	if now - int(op["lastDamagedAtMs"]) >= 4000:
 		op["shield"] = minf(float(op["maxShield"]), float(op["shield"]) + float(op["maxShield"]) * 0.008)
@@ -125,14 +131,15 @@ func _begin_next_action(state: Dictionary) -> void:
 		candidates.append({
 			"sourceId": "ability:thermal-vent", "actionId": "thermal-vent",
 			"classId": "DEFENSE", "targetMode": "SELF",
-			"readyAtMs": 0, "cooldownUntilMs": int(state["ventReadyAtMs"]),
+			"readyAtMs": 0,
 			"energyCost": 0.0, "heatDelta": -45.0,
 			"prepareMs": 400, "recoveryMs": 0, "cooldownMs": VENT_COOLDOWN_MS,
 		})
-	var selected: Dictionary = _actions.select_action(
-		candidates, now, float(op["energy"]), float(op["heat"]), float(op["maxHeat"]),
+	var selected: Dictionary = _channel.start(
+		state["actionChannel"], candidates, now, float(op["energy"]), float(op["heat"]), float(op["maxHeat"]),
 		bool(op["thermalLocked"])
 	)
+	state["actionChannel"] = selected["state"]
 	for denied: Dictionary in selected.get("rejected", []):
 		_emit(state, "ACTION_UNAVAILABLE", {
 			"actionId": denied.get("actionId", ""), "reason": denied.get("reason", ""),
@@ -149,11 +156,9 @@ func _begin_next_action(state: Dictionary) -> void:
 		if selected_ids.is_empty():
 			return
 		op["lastTargetId"] = selected_ids[0]
-	state["activeAction"] = {"actionId": str(authored["actionId"]), "sourceId": str(authored["sourceId"]),
-		"timeline": _actions.begin_action(authored, now)}
 	_emit(state, "ACTION_PREPARE", {
 		"sourceId": str(authored["sourceId"]), "actionId": str(authored["actionId"]),
-		"commitAtMs": state["activeAction"]["timeline"]["commitAtMs"],
+		"commitAtMs": state["actionChannel"]["active"]["timeline"]["commitAtMs"],
 		"targetId": str(op.get("lastTargetId", "")) if str(authored["targetMode"]) != "SELF" else "operator",
 		"reason": "ITEM_AUTHORED_ACTION",
 	})
@@ -171,6 +176,10 @@ func _commit_arc(state: Dictionary, rng: DeterministicRng) -> void:
 	var was_hot: bool = float(op["heat"]) >= HOT_THRESHOLD
 	op["heat"] = minf(float(op["maxHeat"]), float(op["heat"]) + ARC_HEAT_GAIN)
 	op["lastHeatGainAtMs"] = int(state["timeMs"])
+	if float(op["heat"]) >= float(op["maxHeat"]):
+		op["thermalLocked"] = true
+		op["thermalLockUntilMs"] = int(state["timeMs"]) + 1500
+		_emit(state, "THERMAL_LOCK_START", {"sourceId": "weapon:ARC-9", "targetId": "operator", "reason": "HEAT_CAP_COMMITTED", "untilMs": op["thermalLockUntilMs"]})
 	if float(op["heat"]) >= HOT_THRESHOLD and not was_hot:
 		_emit(state, "HOT_START", {"sourceId": "weapon:ARC-9", "heat": op["heat"]})
 	var chance: float = damage.hit_probability(100.0, float(enemy.get("evasion", 0.0)))
@@ -212,7 +221,6 @@ func _commit_vent(state: Dictionary) -> void:
 	op["energy"] = minf(float(op["maxEnergy"]), float(op["energy"]) + 15.0)
 	var gained: float = minf(float(op["maxShield"]) - float(op["shield"]), 0.6 * removed)
 	op["shield"] = float(op["shield"]) + gained
-	state["ventReadyAtMs"] = int(state["timeMs"]) + VENT_COOLDOWN_MS
 	state["metrics"]["ventUses"] = int(state["metrics"]["ventUses"]) + 1
 	state["metrics"]["shieldFromVent"] = float(state["metrics"]["shieldFromVent"]) + gained
 	_emit(state, "HEAT_VENT", {

@@ -4753,6 +4753,7 @@ func _persist_combat_snapshot() -> bool:
 	var snapshot: GameSaveState.CombatSnapshotState = GameSaveState.CombatSnapshotState.new()
 	snapshot.sim_time_ms = _combat.time_ms
 	snapshot.actors = [{
+		"combatRulesVersion": _combat.combat_rules_version,
 		"combatState": _combat.to_dictionary(), "nodeType": _active_node_type,
 		"rewardModifiers": _active_reward_modifiers.duplicate(true),
 	}]
@@ -4771,6 +4772,9 @@ func _restore_combat_snapshot() -> bool:
 		last_error = "Снимок активного боя пуст или повреждён."
 		return false
 	var saved: Dictionary = snapshot.actors[0]
+	if str(saved.get("combatRulesVersion", CombatState.LEGACY_RULES_VERSION)) != CombatSimulator.COMBAT_RULES_VERSION:
+		last_error = "Версия сохранённого боя не поддерживается. Профиль сохранён; требуется совместимый движок."
+		return false
 	var serialized: Variant = saved.get("combatState")
 	if not serialized is Dictionary:
 		last_error = "В снимке отсутствует сериализованное состояние симулятора."

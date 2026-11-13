@@ -1,6 +1,8 @@
 class_name CombatState
 extends RefCounted
 
+const LEGACY_RULES_VERSION: String = "cydle-combat-1.0"
+var combat_rules_version: String = LEGACY_RULES_VERSION
 var seed: String = ""
 var depth: int = 1
 var biome: String = "B01"
@@ -49,7 +51,7 @@ func to_dictionary() -> Dictionary:
 	var ally_values: Array[Dictionary] = []
 	for actor: CombatActorState in allies:
 		ally_values.append(actor.to_dictionary())
-	return {
+	var result: Dictionary = {
 		"seed": seed, "depth": depth, "biome": biome, "nodeType": node_type, "timeMs": time_ms,
 		"maxDurationMs": max_duration_ms, "operator": operator.to_dictionary(), "drones": drone_values,
 		"enemies": enemy_values, "allies": ally_values, "rng": rng.duplicate(true), "nextEventId": next_event_id,
@@ -61,8 +63,16 @@ func to_dictionary() -> Dictionary:
 		"minimumEnemyTelegraphMs": minimum_enemy_telegraph_ms, "droneWar": drone_war,
 		"extraEnemyDigitalBonus": extra_enemy_digital_bonus, "triggerChains": trigger_chains.duplicate(true),
 	}
+	# Preserve the historical V1 hash representation used by golden fixtures.
+	if combat_rules_version != LEGACY_RULES_VERSION:
+		result["combatRulesVersion"] = combat_rules_version
+	return result
 
 static func from_dictionary(value: Dictionary, resolved_build: Dictionary) -> CombatState:
+	# Untagged historical snapshots are V1. Never reinterpret a V2/future
+	# snapshot through legacy casts, tactics and cooldown semantics.
+	if str(value.get("combatRulesVersion", LEGACY_RULES_VERSION)) != LEGACY_RULES_VERSION:
+		return null
 	if not value.get("operator") is Dictionary or resolved_build.is_empty():
 		return null
 	var state: CombatState = CombatState.new()

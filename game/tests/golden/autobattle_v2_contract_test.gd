@@ -28,7 +28,7 @@ func run(_tree: SceneTree) -> bool:
 	picked = contract.select_action([weapon], 0, 2.0, 10.0, 100.0)
 	check(str(picked.get("rejected", [])[0].get("reason", "")) == "ENERGY", "autobattle_v2: missing energy reason")
 	picked = contract.select_action([weapon], 0, 100.0, 96.0, 100.0)
-	check(str(picked.get("rejected", [])[0].get("reason", "")) == "HEAT_CAP", "autobattle_v2: heat limit ignored")
+	check(not picked.get("action", {}).is_empty(), "autobattle_v2: crossing heat cap must cause overheat at commit")
 	picked = contract.select_action([weapon], 0, 100.0, 20.0, 100.0, true)
 	check(str(picked.get("rejected", [])[0].get("reason", "")) == "THERMAL_LOCK", "autobattle_v2: thermal lock ignored")
 	var injected: Dictionary = special.duplicate(true)

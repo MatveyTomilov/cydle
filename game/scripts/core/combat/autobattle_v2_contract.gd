@@ -66,8 +66,10 @@ func _candidate_rejection(action: Dictionary, now_ms: int, energy: float, heat: 
 	if float(action.get("heatDelta", 0.0)) > 0.0:
 		if thermal_locked:
 			return "THERMAL_LOCK"
-		if heat + float(action.get("heatDelta", 0.0)) > heat_max:
-			return "HEAT_CAP"
+		# Crossing the cap commits and causes THERMAL_LOCK in the resource
+		# transition. Rejecting projected heat here makes overheat unreachable.
+		if heat >= heat_max:
+			return "THERMAL_LOCK"
 	return ""
 
 

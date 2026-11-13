@@ -1,5 +1,9 @@
 # CYDLE 1.0 delivery roadmap — Godot
 
+## Active priority: Autobattle V2 Gate A (13 November 2026)
+
+Owner's V2 assignment supersedes FULL GAME FIRST for this migration: first one complete Thermocircuit synergy through 12 sectors and early endgame. Work in `feature/autobattle-v2`, PR #3 stays draft. A1 now has a reusable serialized action channel, bounded support scheduling, real prototype overheat and a V1 snapshot-version guard. Live GameSession still uses V1. Next: canonical build/action compiler and shared runtime dispatch, not additional archetypes or boss tuning on V1. Track evidence in [Gate A](AUTOBATTLE_V2_GATE_A.md).
+
 `CYDLE_MASTER_SPEC.md` is the normative source for game design and release requirements. `docs/godot/` records the current engine, architecture, visual direction, and asset production rules. This roadmap records what actually exists; a plan or catalog entry is not working gameplay.
 
 ## Development strategy (2026-11-13)
