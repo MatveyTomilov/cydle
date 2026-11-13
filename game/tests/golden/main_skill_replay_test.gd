@@ -34,9 +34,30 @@ func _run_default_solo_burst() -> void:
 			break
 	if not check(str(burst_rule.get("target", "")) == "nearest" and str(burst_rule.get("conditions", [{}])[0].get("kind", "")) == "always", "default_solo_burst: starter tactic excludes a valid single target"):
 		return
+	var items_by_id: Dictionary = {}
+	for item_value: Dictionary in payload["meta"].get("inventory", []):
+		items_by_id[str(item_value["itemId"])] = item_value
+	var equipment: Dictionary = {}
+	for slot_value: Variant in payload["meta"].get("equipment", {}).keys():
+		var item_id: String = str(payload["meta"]["equipment"][slot_value])
+		if not items_by_id.has(item_id):
+			continue
+		var item: ItemInstance = ItemInstance.new()
+		if not check(item.instantiate_from_dictionary(items_by_id[item_id]), "default_solo_burst: starter item did not parse for %s" % str(slot_value)):
+			return
+		equipment[str(slot_value)] = item
+	var build: Dictionary = BuildResolver.new().resolve_build({
+		"equipment": equipment, "attributes": payload["meta"]["operator"]["attributes"],
+		"skillIds": payload["meta"]["skillIds"], "passiveIds": payload["meta"]["passiveIds"],
+		"treeNodeIds": payload["meta"]["treeNodeIds"], "attributePointsEarned": payload["meta"]["operator"]["attributePoints"],
+		"treePointsEarned": payload["meta"]["operator"]["treePoints"],
+		"unlockedImplantSlots": payload["meta"]["unlockedImplantSlots"], "unlockedDroneSlots": payload["meta"]["unlockedDroneSlots"],
+	})
+	if not check(bool(build.get("valid", false)), "default_solo_burst: BuildResolver rejected starter build: %s" % str(build.get("error", ""))):
+		return
 	var initialized: Dictionary = CombatSimulator.new().create_state({
 		"seed": "default-solo-boss-burst", "depth": 4, "biome": "B01", "nodeType": "BOSS",
-		"build": fixture["build"], "enemies": [{"templateId": "BOSS_A"}], "tactics": tactics,
+		"build": build, "enemies": [{"templateId": "BOSS_A"}], "tactics": tactics,
 		"maxDurationMs": 6000, "startEnergy": 100,
 	})
 	if not check(bool(initialized.get("ok", false)), "default_solo_burst: BOSS_A state initialization failed: %s" % initialized.get("error", "")):
