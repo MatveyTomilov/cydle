@@ -1,5 +1,14 @@
 # CYDLE — Project handoff and development history
 
+## Current checkpoint (2026-11-13; R3D same-target tree trigger)
+
+- Repository `https://github.com/MatveyTomilov/cydle`; workspace `E:\cydle\project`; branch `development/codex`.
+- HEAD and `origin/development/codex`: `13989af407cdf598db9fbe5a5a0add97b421bb01`; working tree was clean after push. Latest commits: `13989af` R3D same-target tree attack triggers; `2e3f1dc` execute authored enemy summon abilities; `c14cf5e` preserve sector graph invariants for active quests.
+- This checkpoint continues FEATURE COMPLETE BETA work. `docs/FEATURE_AUDIT.md` is the current requirements-to-code matrix; it distinguishes real player-facing systems from catalog-only or unverified functionality. The game is not feature complete, the campaign has not been accepted end to end, and no beta package has been produced.
+- New defect found by catalog-trigger support regression: R3D (`ON_ATTACK_COUNTER`) was rejected by the shared simulator guard and had no per-target counter. The guard now accepts item/tree sources; tree triggers count successful operator attacks per target, reset after switching targets, apply the authored buff and preserve counter/buff in combat snapshots. Regression exercises the same-target threshold, target switch, refresh and roundtrip.
+- Checks: Godot 4.7.2 headless editor import exit 0; `res://tests/run_tests.gd`: 22 tests passed, 88,314 assertions, 0 failures; `git diff --check` exit 0. The three runtime checkpoints in this section have been pushed. No export, GUI smoke, long campaign E2E or Windows beta archive was run for this checkpoint.
+- Continue from the matrix; do not repeat the long boss-balance E2E. Next, audit and test actual execution of catalogued trigger families and legal combat configurations, then move across the highest-impact uncovered campaign/economy/offline systems. For each block verify UI/state/save behavior, add a focused regression, update this file and `docs/ROADMAP.md`, and commit/push to this branch.
+
 ## Current checkpoint (2026-11-13; E10 summon action)
 
 - Base commit is `c14cf5e502daa10b384b3021d38a4b49ec35343c` on `development/codex`; no balance or save-schema changes in this block.

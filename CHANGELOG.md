@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — execute R3D's same-target attack trigger
+
+- Tree `ON_ATTACK_COUNTER` effects are accepted by the shared combat guard and now track successful operator attacks per target, resetting when the target changes. R3D grants and refreshes its authored accuracy buff on the fourth hit to a target.
+- Added catalog trigger acceptance coverage plus targeted checks for threshold, target switch, refresh, and combat snapshot roundtrip.
+- Added `docs/FEATURE_AUDIT.md`, an implementation-vs-player-access matrix with known gaps and the current checkpoint.
+- Godot 4.7.2: editor import exit 0; 22 tests / 88,314 assertions / 0 failures; diff check exit 0.
+
 ## Unreleased — enable the authored E10 summon
 
 - Added scheduled enemy `summon` ability resolution, using the existing summon cap and no-loot handling. E10 now executes its catalogued E20 spawn after its telegraph instead of silently skipping the unsupported action kind.

@@ -6,11 +6,15 @@
 
 Current strategy is **FEATURE COMPLETE BETA**: audit against the normative Master Spec, close significant runtime/UI gaps, and validate real state transitions. Boss balancing and repeated automatic boss retries are deferred unless a concrete gameplay defect requires them. Preserve all profile/save data; use short deterministic integration scenarios.
 
-### Current status override (2026-11-13; E10 authored summon)
+### Current status override (2026-11-13; R3D same-target tree trigger)
+
+Catalog trigger coverage found R3D (`ON_ATTACK_COUNTER`) rejected at the shared simulator guard and missing target-specific counting. It now counts successful operator attacks on the same target, resets on target change, applies the authored accuracy buff and survives a combat snapshot roundtrip. Added a catalog trigger guard audit and targeted regression. Godot 4.7.2 editor import exit 0; 22 tests passed, 88,314 assertions / 0 failures; `git diff --check` exit 0. HEAD `13989af407cdf598db9fbe5a5a0add97b421bb01` is pushed. This is a narrow combat fix, not full trigger-context or beta acceptance; see `docs/FEATURE_AUDIT.md`.
+
+### Previous status override (2026-11-13; E10 authored summon)
 
 Enemy-catalog combat audit found `summon` in the legal E10 ability data but absent from the runtime enemy-ability scheduler/resolver; E10 therefore never deployed its authored E20. Added the legal scheduler kind and resolved through the existing two-summon cap/no-loot path. A deterministic regression observes the cast telegraph, summon owner/template and combat snapshot roundtrip. Editor import exit 0; 22 scripts / 88,243 assertions / 0 failures. Remaining ability/config coverage audit is in progress; no boss E2E was run.
 
-### Previous status override (2026-11-13; QUEST route invariant)
+### Historical status override (2026-11-13; QUEST route invariant)
 
 Confirmed/fixed the multi-quest branch expansion defect in `GameSession`: quest events now reuse existing layer-3 nodes without adding outgoing edges, preserving the map's optional-node count and max-three exits. `SectorGenerator.validate_graph()` now checks graph shape, layer progression, unique nodes/edges, fuel cost, max out-degree, reachability from START, and a route to an endpoint. `start_expedition()` validates the finalized graph after all quest/contract/faction changes. Regression covers two active B03 stages, GameSession expedition save, and reload. Godot 4.7.2 editor import exit 0; 22 scripts / 88,179 assertions / 0 failures. Current code/docs WIP is not yet pushed; record the next commit SHA here after pushing. Combat config guard inventory remains in progress; see current HANDOFF.
 
