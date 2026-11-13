@@ -377,3 +377,10 @@
 - Added catalog cross-reference validation at app startup and through `npm run validate`.
 - Added four save-boundary tests, including IndexedDB integration through `fake-indexeddb`.
 - Multi-sector campaign, general inventory transfer, item generation recipes, other road-node systems, later save migrations, CI, browser E2E, and final art/animation remain incomplete.
+# Unreleased — resumed combat budget and quest choice gating
+
+- Fixed offline/autopilot accounting when continuing a partially simulated combat snapshot: previous ticks remain in cumulative run time but no longer consume the new simulation budget twice. Added save/reload and exactly-once settlement regression.
+- Q03/Q04 stage-2 paid alternatives can be used without winning the elite fight, while elite reward options remain locked until their objective is satisfied. UI quotes and transaction checks share readiness logic.
+- Q02 stage-3 delivery choice now binds to B03 rather than inheriting the initial B01 biome.
+- Hardened the Godot test runner to skip scripts that fail parsing instead of attempting to instantiate them.
+- Verification: Godot 4.7.2 headless import exit 0; native suite 23 tests / 88,624 assertions passed; npm tests 207 passed; npm build exit 0. Windows export and campaign E2E were not run.

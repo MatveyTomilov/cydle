@@ -6,9 +6,13 @@
 
 Current strategy is **FEATURE COMPLETE BETA**: audit against the normative Master Spec, close significant runtime/UI gaps, and validate real state transitions. Boss balancing and repeated automatic boss retries are deferred unless a concrete gameplay defect requires them. Preserve all profile/save data; use short deterministic integration scenarios.
 
-### SAFE PAUSE — owner requested development stopped (2026-11-13)
+### Current checkpoint — resumed offline and quest transaction fixes (2026-11-13)
 
-Implementation checkpoint `67d83499a441d0625497bd85d9aac535336e592c` completes transaction reachability regressions for all 36 quest choices; all 48 event choices also transact in the catalog smoke. Latest full Godot suite on this game code: 22 tests passed, 88,578 assertions / 0 failures; editor import exit 0. No export, GUI smoke, CI query, or campaign E2E was run. CYDLE remains incomplete; use `docs/FEATURE_AUDIT.md` as the current gap list. Development is paused; do not start the next feature until the owner resumes. The suggested first atomic task is natural HUNT contract battle-to-reward lifecycle, then TECH/ESCORT lifecycle.
+Implementation checkpoint `10119bd1fe1a87d09e1504598bbd60535207d9b6`, resumed from pause `bf2c8c1c767159b2a454b95b868c28bb09c5374c`. Fixed resumed-combat offline budget double charging, Q03/Q04 stage-2 paid alternative objective gating (combat reward branches remain gated), and Q02 stage-3 B03 routing. Added offline save/reload and quest readiness regressions and hardened the test runner's parse-error handling. Godot import exit 0; 23 tests / 88,624 assertions / 0 failures; npm unit tests 207 passed; npm production build exit 0. No Windows export, GUI smoke, CI query, or campaign E2E was run. CYDLE remains incomplete; see `docs/FEATURE_AUDIT.md`. Next: natural HUNT contract target-battle-reward lifecycle, then TECH/ESCORT success and failure. Keep boss retries deferred.
+
+### Prior SAFE PAUSE — owner requested development stopped (2026-11-13; later resumed)
+
+Implementation checkpoint `67d83499a441d0625497bd85d9aac535336e592c` completed transaction reachability regressions for all 36 quest choices; all 48 event choices also transact in the catalog smoke. Pause checkpoint: `bf2c8c1c767159b2a454b95b868c28bb09c5374c`. The owner later resumed development. CYDLE remains incomplete; see `docs/FEATURE_AUDIT.md`.
 
 ### Current status override (2026-11-13; all quest choices transact)
 
