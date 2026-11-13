@@ -1,5 +1,13 @@
 # CYDLE — Project handoff and development history
 
+## Current checkpoint (2026-11-13; persisted campaign E2E repair choice)
+
+- Repository `https://github.com/MatveyTomilov/cydle`, working directory `E:\cydle\project`, branch `development/codex`; HEAD and `origin/development/codex` are both `18b568fd5083ea40c3d9f2550be6c608e6fe34c7`. Working tree was clean after this commit.
+- `game/tools/campaign_e2e.gd` now chooses HP repair below 80% operator health and otherwise prefers hull repair, with fallback to the other valid service. This corrects the E2E pilot's earlier unconditional hull-first choice; the game rules and repair prices/effects are unchanged.
+- A resumed campaign E2E is active in the isolated profile `%APPDATA%\Godot\app_userdata\CYDLE\campaign-e2e-repro`; preserved safety copy: `%TEMP%\CYDLE-campaign-e2e-repro-before-7f8c321`. It resumed from d1 with a saved combat, has continued through d3, and is now replaying the d1–d4 gate. Previous boss attempts were genuine defeats; no campaign completion is claimed. Do not reset or delete either profile.
+- Checks on the new harness: Godot 4.7.2 launched/parsed the updated E2E script and resumed its saved fight; `git diff --check` passed before commit. The full suite's last confirmed result remains 22 scripts / 88,091 assertions / 0 failures at the preceding game-code checkpoint; rerun it after the active E2E if needed. Windows export was last confirmed at the preceding gameplay checkpoint, not rerun for this test-only change.
+- Exact continuation: poll the active E2E session, record the actual d4 boss outcome and then continue full-game work. The broader campaign, endgame and release checklist remain incomplete; the E2E's 20-attempt cap is not proof of completion.
+
 ## Live continuation (2026-11-13; periodic and attack-counter combat triggers)
 
 - Branch `development/codex`; pushed base: `7356115485761f884e26eb120d2e45cfa73f9008`. Current WIP is in `game/scripts/core/combat/combat_simulator.gd` and has not been committed yet.

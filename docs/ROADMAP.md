@@ -6,6 +6,10 @@
 
 The active strategy is **FULL GAME FIRST**: connect every major Master Spec system into a campaign that can be completed, then deepen edge cases, balance, and presentation. The entries below report implementation status; they are not a queue of isolated feature slices. A checkpoint commit is a safety measure, so continue to the next missing campaign-critical system while the session permits. Defer saved Simulation Lab presets, report exports, cosmetic polish, secondary settings, and redundant tests until functional campaign coverage exists.
 
+### Current status override (2026-11-13; campaign E2E survival decision)
+
+Pushed HEAD `18b568fd5083ea40c3d9f2550be6c608e6fe34c7` improves the campaign E2E pilot's REPAIR choice: below 80% operator HP it attempts the authored HP service first; otherwise it attempts hull repair, with fallback. This changes only the scripted pilot, not repair rules or game balance. Godot 4.7.2 successfully launched and resumed the saved E2E combat; the campaign is still in progress in an isolated profile. Earlier d4 attempts ended in actual defeat; no full-campaign pass is claimed. Last confirmed full suite: 22 scripts / 88,091 assertions / 0 failures at the prior gameplay checkpoint. Export was not rerun for this harness-only change. See the current checkpoint block in `HANDOFF.md` for profile paths and continuation point.
+
 ### Current status override (2026-11-13; save checksum JSON-roundtrip fix)
 
 Save checksums now normalize numeric values through the same repeated JSON serialization/parsing path used by disk snapshots before hashing. This fixes a reproduced false-corruption failure when a float crossed a checksum bucket at commit time. Validation retains backward compatibility with in-memory 1e-5, prior 1e-8 and legacy checksums; gameplay values remain untouched. Godot editor import passed, 22 headless scripts / 88,085 assertions passed, and diff check passed. An isolated resumed campaign E2E is still running through repeated persisted transitions; no result or campaign completion is claimed yet. Windows export/EXE smoke was not run.
