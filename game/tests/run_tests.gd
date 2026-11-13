@@ -9,6 +9,7 @@ const TEST_PATHS: Array[String] = [
 	"res://tests/golden/sector_generator_test.gd",
 	"res://tests/golden/event_catalog_test.gd",
 	"res://tests/golden/game_session_test.gd",
+	"res://tests/golden/offline_budget_test.gd",
 	"res://tests/golden/item_catalog_test.gd",
 	"res://tests/golden/item_factory_test.gd",
 	"res://tests/golden/build_resolver_test.gd",
@@ -35,7 +36,7 @@ func _run() -> void:
 	var assertion_failures: int = 0
 	for test_path: String in TEST_PATHS:
 		var test_script: Script = load(test_path) as Script
-		if test_script == null:
+		if test_script == null or not test_script.can_instantiate():
 			push_error("Cannot load test script: %s" % test_path)
 			failed += 1
 			continue

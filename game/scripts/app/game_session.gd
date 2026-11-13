@@ -1124,6 +1124,10 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000, elapsed_wall_clock
 	var pilot_profile: Dictionary = active_autopilot_profile()
 	report["policy"] = {"id": pilot_profile_id, "name": str(pilot_profile.get("name", pilot_profile_id))}
 	var starting_time: float = float(state.run.resources.get("gameTimeMs", 0.0))
+	# Settlement adds the whole combat duration to run time, including ticks already
+	# simulated before this return. Count only newly advanced ticks in this budget.
+	if _combat != null:
+		starting_time += float(_combat.time_ms)
 	var starting_items: int = state.run.unsecured_cargo.size()
 	var starting_inventory: int = state.meta.inventory.size()
 	report["_startingSnapshot"] = _capture_autopilot_economy_snapshot()
@@ -1928,7 +1932,16 @@ func quest_choice_costs(choice: Dictionary) -> Dictionary:
 func event_choice_affordability(choice: Dictionary) -> Dictionary:
 	return _run_wallet_affordability(event_choice_costs(choice))
 
-func quest_choice_affordability(choice: Dictionary) -> Dictionary:
+func quest_choice_affordability(choice: Dictionary, quest_id: String = "") -> Dictionary:
+	if not quest_id.is_empty() and state != null and state.run != null:
+		var catalog: QuestCatalog = QuestCatalog.new()
+		if bool(catalog.load_catalog().get("ok", false)):
+			var quest: Dictionary = catalog.get_quest(quest_id)
+			var progress: Dictionary = state.meta.quest_progress.get(quest_id, {})
+			var stage_index: int = int(progress.get("stage", 1)) - 1
+			if stage_index >= 0 and stage_index < quest.get("stages", []).size():
+				if not _quest_stage_ready(quest, quest["stages"][stage_index], progress, bool(choice.get("bypassObjective", false))):
+					return {"affordable": false, "reason": "Для этого решения сначала выполните цель этапа.", "costs": quest_choice_costs(choice)}
 	return _run_wallet_affordability(quest_choice_costs(choice))
 
 func _run_wallet_affordability(costs: Dictionary) -> Dictionary:
@@ -1991,7 +2004,7 @@ func available_quest_stages() -> Array[Dictionary]:
 		if definition.is_empty() or stage_index < 0 or stage_index >= definition.get("stages", []).size():
 			continue
 		var stage: Dictionary = definition["stages"][stage_index]
-		if _quest_stage_ready(definition, stage, progress):
+		if (stage.get("choices", []) as Array).any(func(choice: Dictionary) -> bool: return _quest_stage_ready(definition, stage, progress, bool(choice.get("bypassObjective", false)))):
 			result.append({"quest": definition, "stage": stage, "progress": progress.duplicate(true)})
 	return result
 
@@ -2018,6 +2031,9 @@ func resolve_quest_choice(quest_id: String, choice_id: String) -> bool:
 			break
 	if choice.is_empty():
 		last_error = "Выбор отсутствует в текущем этапе задания."
+		return false
+	if not _quest_stage_ready(quest, stage, progress, bool(choice.get("bypassObjective", false))):
+		last_error = "Для этого решения сначала выполните цель этапа."
 		return false
 	var history_key: String = "%s:%d:%s" % [quest_id, int(progress.get("stage", 1)), choice_id]
 	if progress.get("choiceHistory", []).any(func(entry: Dictionary) -> bool: return "%s:%d:%s" % [quest_id, int(entry.get("stage", 0)), str(entry.get("choiceId", ""))] == history_key):
@@ -2132,7 +2148,7 @@ func resolve_quest_choice(quest_id: String, choice_id: String) -> bool:
 		run_payload["phase"] = "ROUTE"
 	return _commit_payload(payload)
 
-func _quest_stage_ready(quest: Dictionary, stage: Dictionary, progress: Dictionary) -> bool:
+func _quest_stage_ready(quest: Dictionary, stage: Dictionary, progress: Dictionary, bypass_objective: bool = false) -> bool:
 	var event_node: Dictionary = current_node()
 	if str(event_node.get("type", "")) not in ["EVENT", "QUEST"]:
 		return false
@@ -2156,6 +2172,8 @@ func _quest_stage_ready(quest: Dictionary, stage: Dictionary, progress: Dictiona
 		return false
 	if str(quest.get("id", "")) == "Q04" and int(stage.get("stage", 0)) == 2 and state.run.depth <= stage_started_depth:
 		return false
+	if bypass_objective:
+		return true
 	match requirement_kind:
 		"none": return true
 		"visitBiome": return state.run.biome == str(requirement.get("biome", ""))

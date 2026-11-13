@@ -1103,6 +1103,21 @@ func run(_tree: SceneTree) -> bool:
 		check(not quest_reload._quest_stage_ready(q02_definition, q02_definition["stages"][1], q02_progress), "game_session: Q02 delivery stage was offered in the same sector as the courier pickup")
 		quest_reload.state.run.depth += 1
 		check(quest_reload._quest_stage_ready(q02_definition, q02_definition["stages"][1], q02_progress), "game_session: Q02 delivery stage did not activate in the next matching sector")
+		var q02_final_progress: Dictionary = {"status": "ACTIVE", "stage": 3, "stageStartedDepth": 2, "startedDepth": 1, "completedStages": ["S1", "S2"], "choiceHistory": [], "flags": []}
+		quest_reload.state.meta.quest_progress = {"Q02": q02_final_progress}
+		var final_graph: Dictionary = SectorGenerator.new().generate("q02-final-biome-regression", 6, "B03")["graph"]
+		quest_reload._apply_active_quest_event_ids(final_graph, "B03")
+		var final_node_id: String = ""
+		for final_layer: Array in final_graph.get("layers", []):
+			for final_node: Dictionary in final_layer:
+				if str(final_node.get("eventId", "")) == "Q02_S3": final_node_id = str(final_node.get("id", ""))
+		check(not final_node_id.is_empty(), "game_session: Q02 finale was not generated in the delivery biome B03")
+		quest_reload.state.run.graph = final_graph
+		quest_reload.state.run.current_node_id = final_node_id
+		quest_reload.state.run.depth = 6
+		check(quest_reload._quest_stage_ready(q02_definition, q02_definition["stages"][2], q02_final_progress), "game_session: Q02 finale was unavailable in its generated B03 story node")
+		quest_reload.state.run.biome = "B01"
+		check(not quest_reload._quest_stage_ready(q02_definition, q02_definition["stages"][2], q02_final_progress), "game_session: Q02 finale incorrectly remained bound to pickup biome B01")
 		var q04_definition: Dictionary = quest_catalog.get_quest("Q04")
 		var q04_progress: Dictionary = {"stage": 2, "stageStartedDepth": quest_reload.state.run.depth, "startedDepth": quest_reload.state.run.depth, "choiceHistory": []}
 		quest_reload.state.run.biome = "B02"
@@ -1333,8 +1348,15 @@ func _test_all_quest_choice_transactions() -> void:
 				payload["run"]["unsecuredCargo"] = []
 				payload["run"]["grantIds"] = []
 				payload["run"]["runWallet"] = {"CREDITS": 100000.0, "SCRAP": 100000.0, "DATA": 100000.0}
+				var is_paid_bypass: bool = quest_id in ["Q03", "Q04"] and stage_number == 2 and str(choice.get("id", "")) == "B"
+				if is_paid_bypass:
+					payload["run"]["clearedNodeIds"] = []
 				if not check(session._commit_payload(payload), "game_session: could not prepare %s/S%d/%s: %s" % [quest_id, stage_number, str(choice.get("id", "")), session.last_error]):
 					continue
+				if is_paid_bypass:
+					check(session.available_quest_stages().size() == 1, "game_session: paid alternative remained hidden behind the combat objective")
+					check(not session.resolve_quest_choice(quest_id, "A"), "game_session: unfinished combat objective granted its combat reward")
+					check(not bool(session.quest_choice_affordability(stage["choices"][0], quest_id).get("affordable", true)) and bool(session.quest_choice_affordability(choice, quest_id).get("affordable", false)), "game_session: UI availability disagreed with combat vs paid alternative readiness")
 				var resolved: bool = session.resolve_quest_choice(quest_id, str(choice.get("id", "")))
 				check(resolved, "game_session: actual quest transaction rejected %s/S%d/%s: %s" % [quest_id, stage_number, str(choice.get("id", "")), session.last_error])
 				if resolved:

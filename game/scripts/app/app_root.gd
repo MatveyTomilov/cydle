@@ -1459,7 +1459,7 @@ func _show_current_node(run: GameSaveState.RunState) -> void:
 				else:
 					var choose: Button = _button("%s · %s" % [str(choice.get("id", "")), str(choice.get("label", "Выбрать"))], str(choice.get("id", "")) == "A")
 					choose.custom_minimum_size.x = 370
-					var choice_affordability: Dictionary = _session.quest_choice_affordability(choice) if node_type == "QUEST" else _session.event_choice_affordability(choice)
+					var choice_affordability: Dictionary = _session.quest_choice_affordability(choice, str(event.get("questId", ""))) if node_type == "QUEST" else _session.event_choice_affordability(choice)
 					choose.disabled = not bool(choice_affordability.get("affordable", false))
 					choose.tooltip_text = str(choice_affordability.get("reason", ""))
 					if node_type == "QUEST":
@@ -1482,7 +1482,7 @@ func _show_current_node(run: GameSaveState.RunState) -> void:
 		for choice: Dictionary in stage.get("choices", []):
 			var quest_choice: Button = _button("%s · %s" % [str(choice.get("id", "")), str(choice.get("label", "Решить"))], false)
 			quest_choice.custom_minimum_size.x = 370
-			var quest_affordability: Dictionary = _session.quest_choice_affordability(choice)
+			var quest_affordability: Dictionary = _session.quest_choice_affordability(choice, str(quest.get("id", "")))
 			quest_choice.disabled = not bool(quest_affordability.get("affordable", false))
 			quest_choice.tooltip_text = str(quest_affordability.get("reason", ""))
 			quest_choice.pressed.connect(_on_resolve_quest_choice.bind(str(quest.get("id", "")), str(choice.get("id", ""))))
