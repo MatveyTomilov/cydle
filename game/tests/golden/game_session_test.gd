@@ -219,6 +219,8 @@ func run(_tree: SceneTree) -> bool:
 		if contract_session.state.run != null:
 			var contract: Dictionary = contract_session.state.run.contract
 			check(str(contract.get("status", "")) == "ACTIVE" and not str(contract.get("targetNodeId", "")).is_empty() and str(contract.get("eventId", "")) == "contract-offer:1:CT_HUNT", "game_session: HUNT contract did not retain its active objective and world event")
+			var target_intel: Dictionary = contract_session.route_intel().get("nodes", {}).get(str(contract.get("targetNodeId", "")), {})
+			check(bool(target_intel.get("contractTarget", false)) and bool(target_intel.get("revealed", false)) and str(target_intel.get("type", "")) == "ELITE", "game_session: accepted contract objective was not revealed on the route map")
 			var found_target: bool = false
 			for layer: Array in contract_session.state.run.graph.get("layers", []):
 				for node: Dictionary in layer:

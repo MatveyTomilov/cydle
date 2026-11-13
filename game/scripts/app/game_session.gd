@@ -1084,8 +1084,10 @@ func route_intel() -> Dictionary:
 			var scouted: bool = state.run.scouted_node_ids.has(node_id)
 			var distance: int = int(distances.get(node_id, 999))
 			var is_preview: bool = preview_available and not state.meta.campaign_flags.has(preview_used_flag) and str(node.get("type", "")) == "ANOMALY"
-			var revealed: bool = visited or scouted or is_preview or (distance > 0 and distance <= scan_distance and effective_intel >= 1)
-			var info: Dictionary = {"revealed": revealed, "visited": visited, "scouted": scouted}
+			var active_contract: Dictionary = state.run.contract
+			var is_contract_target: bool = str(active_contract.get("status", "")) == "ACTIVE" and str(active_contract.get("targetNodeId", "")) == node_id
+			var revealed: bool = visited or scouted or is_preview or is_contract_target or (distance > 0 and distance <= scan_distance and effective_intel >= 1)
+			var info: Dictionary = {"revealed": revealed, "visited": visited, "scouted": scouted, "contractTarget": is_contract_target}
 			if revealed:
 				info["type"] = str(node.get("type", "UNKNOWN"))
 				info["questTarget"] = str(node.get("type", "")) == "QUEST" or not (node.get("questTargets", []) as Array).is_empty()

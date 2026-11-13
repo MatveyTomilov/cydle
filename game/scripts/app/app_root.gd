@@ -1260,7 +1260,15 @@ func _show_road() -> void:
 	_add_run_cargo_control(run)
 	var active_contract: Dictionary = run.contract
 	if not active_contract.is_empty():
-		_body.add_child(_label("КОНТРАКТ %s · %s · БОЕВЫХ УЗЛОВ %d" % [str(active_contract.get("id", "")), str(active_contract.get("status", "")), int(active_contract.get("combatNodes", 0))], 12, COLOR_CYAN))
+		var contract_kind: String = str(active_contract.get("kind", ""))
+		var contract_objective: String = ""
+		match contract_kind:
+			"HUNT": contract_objective = "ЦЕЛЬ ELITE · %s" % str(active_contract.get("targetEnemyId", "неизвестный враг"))
+			"SIGNAL": contract_objective = "ЦЕЛЬ ELITE · уникальная технология %s" % str(active_contract.get("targetUniqueId", ""))
+			"TECH": contract_objective = "ЦЕЛЬ · завершить %s" % ("аномалию" if str(active_contract.get("targetBiome", "")) == "B06" else "кэш")
+			"ESCORT": contract_objective = "Бои %d/2 · розыск %.0f/40 · топливо %.0f/3" % [int(active_contract.get("combatNodes", 0)), run.wanted, float(run.resources.get("fuel", 0.0))]
+		var contract_result: String = "" if str(active_contract.get("status", "")) == "ACTIVE" else " · НАГРАДА В НЕЗАКРЕПЛЁННОМ ГРУЗЕ" if str(active_contract.get("status", "")) == "COMPLETE" else " · НЕ ВЫПОЛНЕН"
+		_body.add_child(_label("КОНТРАКТ %s · %s%s" % [str(active_contract.get("id", "")), contract_objective, contract_result], 12, COLOR_CYAN if str(active_contract.get("status", "")) == "ACTIVE" else COLOR_AMBER))
 	if not run.escalation_ids.is_empty():
 		_body.add_child(_label("ЭСКАЛАЦИЯ · %s" % " · ".join(run.escalation_ids), 11, COLOR_AMBER))
 	if run.phase == "NODE":
@@ -1292,6 +1300,8 @@ func _show_road() -> void:
 							break
 				if bool(intel.get("questTarget", false)):
 					secondary = "ЦЕЛЬ ЗАДАНИЯ · " + secondary
+				if bool(intel.get("contractTarget", false)):
+					secondary = "ЦЕЛЬ КОНТРАКТА · " + secondary
 				if bool(intel.get("preview", false)):
 					secondary = "ПРЕДВАРИТЕЛЬНЫЙ СКАН · %s" % str(intel.get("anomalyProtocol", ""))
 				elif bool(intel.get("scouted", false)) and not visited:
