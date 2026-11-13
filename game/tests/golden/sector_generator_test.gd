@@ -40,6 +40,36 @@ func run(_tree: SceneTree) -> bool:
 		for node: Dictionary in layer_value:
 			if str(node.get("type", "")) == "ANOMALY": ordinary_anomaly_count += 1
 	check(ordinary_anomaly_count == 0, "sector_generator: a Zero Zone anomaly appeared outside B06")
+	var quest_session: GameSession = GameSession.new()
+	quest_session.configure_save_directory("user://test-saves/multi-active-quest-graph")
+	if check(quest_session.start_new_game(1762900000210), "sector_generator: could not create a multi-quest graph profile"):
+		quest_session.state.meta.quest_progress = {
+			"Q02": {"status": "ACTIVE", "stage": 2, "startedDepth": 2, "stageStartedDepth": 2, "completedStages": [], "choiceHistory": [], "flags": []},
+			"Q03": {"status": "ACTIVE", "stage": 1, "startedDepth": 2, "stageStartedDepth": 2, "completedStages": [], "choiceHistory": [], "flags": []},
+		}
+		var multi_quest_graph: Dictionary = generator.generate("multi-active-quest-graph", 6, "B03", false)["graph"]
+		var original_quest_layer_size: int = (multi_quest_graph["layers"][3] as Array).size()
+		quest_session._apply_active_quest_event_ids(multi_quest_graph, "B03")
+		_check_graph(multi_quest_graph)
+		var graph_validation: Dictionary = generator.validate_graph(multi_quest_graph)
+		check(bool(graph_validation.get("ok", false)), "sector_generator: quest-augmented graph failed runtime validation: %s" % str(graph_validation.get("errors", [])))
+		check((multi_quest_graph["layers"][3] as Array).size() == original_quest_layer_size, "sector_generator: active quest events expanded the map beyond its authored optional-node count")
+		var quest_node_count: int = 0
+		for quest_node: Dictionary in multi_quest_graph["layers"][3]:
+			if str(quest_node.get("type", "")) == "QUEST": quest_node_count += 1
+		check(quest_node_count == 2, "sector_generator: both eligible active quest stages were not placed on the map")
+		quest_session.state.meta.max_sector_cleared = 1
+		quest_session.state.meta.unlocked_forpost = 1
+		check(quest_session.start_expedition("multi-active-quest-graph"), "sector_generator: integrated multi-quest sortie did not start: %s" % quest_session.last_error)
+		if quest_session.state.run != null:
+			var saved_map_validation: Dictionary = generator.validate_graph(quest_session.state.run.graph)
+			check(bool(saved_map_validation.get("ok", false)), "sector_generator: GameSession saved an invalid quest graph: %s" % str(saved_map_validation.get("errors", [])))
+			var reloaded_quest_session: GameSession = GameSession.new()
+			reloaded_quest_session.configure_save_directory("user://test-saves/multi-active-quest-graph")
+			check(reloaded_quest_session.load_saved_game(), "sector_generator: quest-augmented sortie did not reload: %s" % reloaded_quest_session.last_error)
+			if reloaded_quest_session.state != null and reloaded_quest_session.state.run != null:
+				var reloaded_map_validation: Dictionary = generator.validate_graph(reloaded_quest_session.state.run.graph)
+				check(bool(reloaded_map_validation.get("ok", false)), "sector_generator: reloaded quest graph violated route invariants")
 	_check_combat_rosters(generator)
 	var invalid: Dictionary = generator.generate("bad-biome", 1, "B99")
 	check(not bool(invalid.get("ok", true)), "sector_generator: invalid biome was accepted")

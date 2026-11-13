@@ -1,6 +1,14 @@
 # CYDLE — Project handoff and development history
 
-## Current checkpoint (2026-11-13; Windows PLAYABLE ALPHA)
+## Current checkpoint (2026-11-13; QUEST graph invariant fix)
+
+- Continuation starts from the PLAYABLE ALPHA commit `05f8bba73d36afc92ac0832927c4a51c5b350068` on `development/codex`. The alpha ZIP remains local at `dist/CYDLE-Playable-Alpha.zip`; this block changes runtime route generation, not stored profile schemas.
+- Confirmed defect: `_apply_active_quest_event_ids` added each eligible stage as a new layer-3 node and connected it from every layer-2 source. With two active stages matching B03 (Q02/S2 and Q03/S1), all three sources exceeded the Master Spec max-three outgoing transition invariant; the test reproduced three violations.
+- Fix in progress: eligible quest events now reuse existing layer-3 nodes, prioritizing CACHE/REPAIR/FUEL/COMBAT before EVENT/SHOP, and retain existing node IDs/edges. No extra map nodes or edges are created. `SectorGenerator.validate_graph()` checks six-layer structure, unique IDs/edges, adjacent layers, fuel costs, ≤3 exits, incoming edges, start reachability, and a path from every node to an endpoint. `GameSession.start_expedition()` rejects a generated graph that fails this validator after quest, contract, and faction changes.
+- Regression: two concurrent B03 quest stages; assert graph size does not grow, both quest choices are present, route invariant validation succeeds, actual GameSession expedition commits, and the active quest graph reloads intact. Verification: editor import exit 0; 22 scripts / 88,179 assertions / 0 failures. This WIP has not yet been committed/pushed at the time of this entry.
+- Next: examine remaining CombatSimulator guards against actual legal catalog combinations; distinguish deliberately invalid fixtures from supported spec configurations. Continue the feature inventory afterward. Do not resume long boss E2E.
+
+## Previous checkpoint (2026-11-13; Windows PLAYABLE ALPHA)
 
 - Repository `https://github.com/MatveyTomilov/cydle`, working directory `E:\cydle\project`, branch `development/codex`. This checkpoint supersedes the older campaign-focused status notes below. The last pushed base before this alpha work was `fc77f7a398f0dacad4a06f8be5f194cf8e7d0672`; see the Git log for the final alpha checkpoint SHA.
 - Windows x64 build: `dist/CYDLE-Playable-Alpha.zip` (contains `CYDLE.exe` and `README.txt`); unpacked folder `dist/CYDLE-Playable-Alpha/`. The export is local and intentionally excluded from Git. It was produced with Godot 4.7.2 Stable, Desktop Windows preset, embedded PCK. Run `CYDLE.exe`; Godot is not required on the player's machine. Saves are under `%APPDATA%\Godot\app_userdata\CYDLE\saves\`.

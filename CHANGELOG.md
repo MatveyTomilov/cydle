@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — validate quest-augmented sector routes
+
+- Fixed active multi-stage quest routing: quest events reuse existing layer-three map nodes and preserve their edges instead of expanding every source's outgoing degree.
+- Added a final graph validator after quest, contract, and faction modifications; malformed route generation now fails before it is committed as a sortie.
+- Added a regression with simultaneous Q02/S2 and Q03/S1 in B03, including graph invariant checks, a real GameSession sortie save, and reload.
+- Godot 4.7.2: editor import exit 0; 22 scripts / 88,179 assertions / 0 failures. Campaign boss balancing was not attempted.
+
 ## Unreleased — Windows PLAYABLE ALPHA checkpoint
 
 - Prepared `dist/CYDLE-Playable-Alpha.zip` locally with the Godot 4.7.2 Windows x64 export and a short launch guide; binaries remain out of Git.

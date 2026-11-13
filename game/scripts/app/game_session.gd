@@ -662,25 +662,36 @@ func _apply_active_quest_event_ids(graph: Dictionary, biome: String) -> void:
 		if target_biome != biome:
 			continue
 		var event_id: String = str(stage.get("eventId", ""))
-		var node_id: String = "d%d-quest-%s" % [int(graph.get("depth", 1)), event_id.to_lower()]
 		quest_nodes.append({
-			"id": node_id, "layer": 3, "type": "QUEST", "eventId": event_id,
+			"eventId": event_id,
 			"questId": quest_id, "questStage": int(stage.get("stage", stage_index + 1)),
-			"threat": "medium", "enemies": [], "revealLevel": 1, "lootHint": "задание",
 		})
 	if quest_nodes.is_empty():
 		return
-	for quest_node: Dictionary in quest_nodes:
-		(layers[3] as Array).append(quest_node)
-	var edges: Array = graph.get("edges", [])
-	for source: Dictionary in layers[2]:
-		for quest_node: Dictionary in quest_nodes:
-			edges.append({"from": str(source.get("id", "")), "to": str(quest_node.get("id", "")), "fromLayer": 2, "toLayer": 3, "fuelCost": 1})
-	for quest_node: Dictionary in quest_nodes:
-		for destination: Dictionary in layers[4]:
-			edges.append({"from": str(quest_node.get("id", "")), "to": str(destination.get("id", "")), "fromLayer": 3, "toLayer": 4, "fuelCost": 1})
-	graph["layers"] = layers
-	graph["edges"] = edges
+	var layer_nodes: Array = layers[3]
+	var replacement_nodes: Array[Dictionary] = []
+	for node_value: Variant in layer_nodes:
+		if node_value is Dictionary and str(node_value.get("type", "")) != "QUEST":
+			replacement_nodes.append(node_value)
+	var replacement_priority: Dictionary = {"CACHE": 0, "REPAIR": 1, "FUEL": 1, "COMBAT": 2, "EVENT": 3, "SHOP": 4}
+	replacement_nodes.sort_custom(func(left: Dictionary, right: Dictionary) -> bool:
+		var left_priority: int = int(replacement_priority.get(str(left.get("type", "")), 99))
+		var right_priority: int = int(replacement_priority.get(str(right.get("type", "")), 99))
+		if left_priority != right_priority:
+			return left_priority < right_priority
+		return str(left.get("id", "")) < str(right.get("id", ""))
+	)
+	for quest_index: int in range(mini(quest_nodes.size(), replacement_nodes.size())):
+		var quest: Dictionary = quest_nodes[quest_index]
+		var target: Dictionary = replacement_nodes[quest_index]
+		target["type"] = "QUEST"
+		target["eventId"] = str(quest.get("eventId", ""))
+		target["questId"] = str(quest.get("questId", ""))
+		target["questStage"] = int(quest.get("questStage", 1))
+		target["threat"] = "medium"
+		target["enemies"] = []
+		target["lootHint"] = "задание"
+		target.erase("prototypeChoices")
 
 func _force_quest_target_node(layers: Array, enemy_id: String, reserved: Dictionary) -> Dictionary:
 	if enemy_id.is_empty():
@@ -814,6 +825,11 @@ func start_expedition(seed_value: String = "", use_medical_restore: bool = false
 		contract["targetTechTag"] = str(contract.get("rewardItem", {}).get("tag", biome_tags.get(biome, "tech")))
 	_apply_active_quest_targets(generated["graph"], biome, str(contract.get("targetNodeId", "")))
 	_apply_faction_world_effects(generated["graph"], seed)
+	var graph_validation: Dictionary = _generator.validate_graph(generated["graph"])
+	if not bool(graph_validation.get("ok", false)):
+		var graph_errors: Array = graph_validation.get("errors", [])
+		last_error = "Сгенерированная карта нарушает правила маршрута: %s" % str(graph_errors[0] if not graph_errors.is_empty() else "неизвестная ошибка")
+		return false
 	var world_rng: DeterministicRng = DeterministicRng.new()
 	world_rng.seed("world", seed)
 	var loot_rng: DeterministicRng = DeterministicRng.new()

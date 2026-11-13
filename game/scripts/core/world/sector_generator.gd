@@ -121,6 +121,112 @@ func reachable_nodes(graph: Dictionary, current_node_id: String) -> Array[Dictio
 			result.append(by_id[node_id])
 	return result
 
+func validate_graph(graph: Dictionary) -> Dictionary:
+	var errors: Array[String] = []
+	var layers: Array = graph.get("layers", [])
+	if layers.size() != 6:
+		errors.append("Маршрут должен содержать ровно шесть слоёв.")
+		return {"ok": false, "errors": errors}
+	var node_layers: Dictionary = {}
+	var nodes: Dictionary = {}
+	for layer_index: int in range(layers.size()):
+		if not layers[layer_index] is Array:
+			errors.append("Слой %d не является массивом узлов." % layer_index)
+			continue
+		for node_value: Variant in layers[layer_index]:
+			if not node_value is Dictionary:
+				errors.append("Слой %d содержит узел неверного формата." % layer_index)
+				continue
+			var node: Dictionary = node_value
+			var node_id: String = str(node.get("id", ""))
+			if node_id.is_empty():
+				errors.append("Узел слоя %d не имеет ID." % layer_index)
+				continue
+			if nodes.has(node_id):
+				errors.append("Повторный ID узла %s." % node_id)
+				continue
+			nodes[node_id] = node
+			node_layers[node_id] = layer_index
+			if int(node.get("layer", -99)) != layer_index:
+				errors.append("Узел %s заявляет слой, отличный от слоя массива." % node_id)
+		var layer: Array = layers[layer_index]
+		if layer.is_empty():
+			errors.append("Слой %d не содержит узлов." % layer_index)
+	var outgoing: Dictionary = {}
+	var incoming: Dictionary = {}
+	var adjacency: Dictionary = {"START": []}
+	var reverse_adjacency: Dictionary = {}
+	var seen_edges: Dictionary = {}
+	var edges: Array = graph.get("edges", [])
+	for edge_value: Variant in edges:
+		if not edge_value is Dictionary:
+			errors.append("Маршрут содержит ребро неверного формата.")
+			continue
+		var edge: Dictionary = edge_value
+		var from_id: String = str(edge.get("from", ""))
+		var to_id: String = str(edge.get("to", ""))
+		var pair_id: String = "%s>%s" % [from_id, to_id]
+		if seen_edges.has(pair_id):
+			errors.append("Маршрут содержит повторное ребро %s." % pair_id)
+			continue
+		seen_edges[pair_id] = true
+		var from_layer: int = -1 if from_id == "START" else int(node_layers.get(from_id, -99))
+		var to_layer: int = int(node_layers.get(to_id, -99))
+		if from_layer < -1 or to_layer < 0:
+			errors.append("Ребро %s ссылается на отсутствующий узел." % pair_id)
+			continue
+		if to_layer != from_layer + 1 or int(edge.get("fromLayer", -99)) != from_layer or int(edge.get("toLayer", -99)) != to_layer:
+			errors.append("Ребро %s не ведёт ровно в следующий слой." % pair_id)
+		if int(edge.get("fuelCost", 0)) not in [1, 2]:
+			errors.append("Ребро %s имеет недопустимую стоимость топлива." % pair_id)
+		outgoing[from_id] = int(outgoing.get(from_id, 0)) + 1
+		incoming[to_id] = int(incoming.get(to_id, 0)) + 1
+		if not adjacency.has(from_id): adjacency[from_id] = []
+		(adjacency[from_id] as Array).append(to_id)
+		if not reverse_adjacency.has(to_id): reverse_adjacency[to_id] = []
+		(reverse_adjacency[to_id] as Array).append(from_id)
+	if int(outgoing.get("START", 0)) != 1:
+		errors.append("Старт должен вести в единственный узел первого слоя.")
+	for node_id: Variant in nodes.keys():
+		var id: String = str(node_id)
+		var layer_index: int = int(node_layers[id])
+		if not incoming.has(id): errors.append("Узел %s недостижим по входящим рёбрам." % id)
+		if layer_index < 5 and not outgoing.has(id): errors.append("Узел %s не продолжает путь к финишу." % id)
+		if int(outgoing.get(id, 0)) > 3: errors.append("Узел %s имеет больше трёх исходящих переходов." % id)
+		if layer_index == 5 and outgoing.has(id): errors.append("Финишный узел %s имеет исходящий переход." % id)
+	var reachable: Dictionary = _walk_graph(adjacency, "START")
+	for node_id: Variant in nodes.keys():
+		if not reachable.has(str(node_id)):
+			errors.append("Узел %s не достижим из START." % str(node_id))
+	var reverse_reachable: Dictionary = {}
+	for final_node: Dictionary in layers[5]:
+		reverse_reachable[str(final_node.get("id", ""))] = true
+	var reverse_queue: Array[String] = []
+	for final_id: Variant in reverse_reachable.keys(): reverse_queue.append(str(final_id))
+	while not reverse_queue.is_empty():
+		var current: String = reverse_queue.pop_front()
+		for previous_value: Variant in reverse_adjacency.get(current, []):
+			var previous: String = str(previous_value)
+			if not reverse_reachable.has(previous):
+				reverse_reachable[previous] = true
+				reverse_queue.append(previous)
+	for node_id: Variant in nodes.keys():
+		if not reverse_reachable.has(str(node_id)):
+			errors.append("Узел %s не имеет пути к финалу." % str(node_id))
+	return {"ok": errors.is_empty(), "errors": errors}
+
+func _walk_graph(adjacency: Dictionary, start_id: String) -> Dictionary:
+	var seen: Dictionary = {start_id: true}
+	var queue: Array[String] = [start_id]
+	while not queue.is_empty():
+		var current: String = queue.pop_front()
+		for next_value: Variant in adjacency.get(current, []):
+			var next_id: String = str(next_value)
+			if not seen.has(next_id):
+				seen[next_id] = true
+				queue.append(next_id)
+	return seen
+
 func _create_node(seed_value: String, depth: int, biome: String, layer: int, index: int, node_type: String, fixed_enemies: Array[String], rng: DeterministicRng, extras: Dictionary, previous_boss_ids: Array[String] = []) -> Dictionary:
 	var enemies: Array[Dictionary] = []
 	for template_id: String in fixed_enemies:

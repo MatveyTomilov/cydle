@@ -4,9 +4,13 @@
 
 ## Development strategy (2026-11-13)
 
-Current strategy is **PLAYABLE ALPHA FIRST**: deliver an owner-runnable Windows build with the real current game loop and accessible implemented systems; stop spending the main work budget on repeated automatic boss retries. This does not relax Master Spec mechanics or claim 1.0. The broad functional-coverage goal remains for continuation after owner testing; preserve known campaign blockers for later resolution.
+Current strategy is **FEATURE COMPLETE BETA**: audit against the normative Master Spec, close significant runtime/UI gaps, and validate real state transitions. Boss balancing and repeated automatic boss retries are deferred unless a concrete gameplay defect requires them. Preserve all profile/save data; use short deterministic integration scenarios.
 
-### Current status override (2026-11-13; Windows PLAYABLE ALPHA)
+### Current status override (2026-11-13; QUEST route invariant)
+
+Confirmed/fixed the multi-quest branch expansion defect in `GameSession`: quest events now reuse existing layer-3 nodes without adding outgoing edges, preserving the map's optional-node count and max-three exits. `SectorGenerator.validate_graph()` now checks graph shape, layer progression, unique nodes/edges, fuel cost, max out-degree, reachability from START, and a route to an endpoint. `start_expedition()` validates the finalized graph after all quest/contract/faction changes. Regression covers two active B03 stages, GameSession expedition save, and reload. Godot 4.7.2 editor import exit 0; 22 scripts / 88,179 assertions / 0 failures. Current code/docs WIP is not yet pushed; record the next commit SHA here after pushing. Combat config guard inventory remains in progress; see current HANDOFF.
+
+### Historical status override (2026-11-13; Windows PLAYABLE ALPHA)
 
 The Windows x64 alpha package is `dist/CYDLE-Playable-Alpha.zip` (local, ignored by Git). The exported GUI smoke exercised fresh profile creation and reload, garage/build math, inventory filters, route, real combat/reward, autopilot stops, checkpoint cargo evacuation, and a real three-pair Simulation Lab comparison. Godot 4.7.2 editor import and Windows export returned exit 0; 22 scripts / 88,091 assertions passed; extracted EXE headless smoke exited 0. Exact flow and limitations are in the current `HANDOFF.md` section. Latest isolated level-11 d8 loss left BOSS_B at 981/4,951 HP at tick 148; campaign continuation past this gate, BOSS_CORE and endgame are unverified. The build is an early alpha, not a 1.0 release.
 
