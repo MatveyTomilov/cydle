@@ -54,6 +54,16 @@ func run(_tree: SceneTree) -> bool:
 	check(str(progressed.get("timeline", {}).get("phase", "")) == "RECOVERY", "autobattle_v2: recovery phase lost")
 	progressed = contract.advance_action(progressed["timeline"], 800)
 	check(str(progressed.get("timeline", {}).get("phase", "")) == "READY", "autobattle_v2: zero cooldown still blocked")
+	var vent_action: Dictionary = special.duplicate(true)
+	vent_action["prepareMs"] = 400
+	vent_action["recoveryMs"] = 0
+	vent_action["cooldownMs"] = 8000
+	var vent_timeline: Dictionary = contract.begin_action(vent_action, 0)
+	var vent_commit: Dictionary = contract.advance_action(vent_timeline, 400)
+	check(bool(vent_commit.get("didCommit", false)), "autobattle_v2: Vent did not commit at t400")
+	var vent_released: Dictionary = contract.advance_action(vent_commit["timeline"], 500)
+	check(str(vent_released.get("timeline", {}).get("phase", "")) == "COOLDOWN", "autobattle_v2: Vent ability lost cooldown")
+	check(bool(vent_released.get("channelReady", false)), "autobattle_v2: ability cooldown must not occupy operator's main channel")
 	var interruption: Dictionary = contract.interrupt_action(contract.begin_action(weapon, 0), 500)
 	check(bool(interruption.get("interrupted", false)), "autobattle_v2: PREPARE should be interruptible")
 	interruption = contract.interrupt_action(timeline, 700)
