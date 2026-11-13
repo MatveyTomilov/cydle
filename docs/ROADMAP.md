@@ -10,6 +10,8 @@ Current strategy is **FEATURE COMPLETE BETA**: audit against the normative Maste
 
 EV13 now charges `ceil(60% × ceil(rare shop price))`, matching §20.1. The d12 regression proves the previously-undercharged price was 266 and is now 267 credits. Godot 4.7.2 import exit 0; full native suite: 23 tests / 88,682 assertions / 0 failures. No TypeScript or Windows export was run for this Godot-only fix.
 
+EV07's scrap option also now removes 10% of maximum hull instead of 10 flat hull. Local event-transaction regression confirms the percentage result. Godot import exit 0; full suite 23 / 88,683. Independent regression is pending.
+
 ### Latest checkpoint — offline diagnostics precision and history (2026-11-13)
 
 `50e61651290083ddb75893757d723b334607faab` fixes exact -1 ms rollback disclosure, persists the new diagnostics in report history, and renders them in historical UI rows. Tests cover +1 ms above the 12-hour cap and -1 ms rollback without game-time advancement. Local Godot import exit 0; 23 tests / 88,679 assertions / 0 failures. Independent regression/review are pending. No long offline simulation. Continue with interruption/retry idempotency and bounded long-window performance measurement.

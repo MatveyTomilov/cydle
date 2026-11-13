@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — EV07 percentage hull damage
+
+- EV07's scrap option now removes 10% of maximum hull instead of a flat 10 hull, matching Master Spec §20.1. The data-driven event transaction regression checks the actual before/after hull values.
+- Godot 4.7.2 import exit 0; full native suite: 23 tests / 88,683 assertions / 0 failures. Independent regression verification is pending.
+
 ## Unreleased — EV13 rare price rounding
 
 - Grey Dealer now charges `ceil(60% × rounded rare shop price)` as specified. The d12 boundary was 266 before and is correctly 267 credits after the change.

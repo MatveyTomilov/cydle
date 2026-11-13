@@ -1740,6 +1740,8 @@ func resolve_event(choice_id: String, cargo_item_id: String = "") -> bool:
 		resources["fuel"] = clampf(float(resources["fuel"]) + float(choice["fuel"]), 0.0, float(resources["maxFuel"]))
 	if choice.has("hull"):
 		resources["hull"] = clampf(float(resources["hull"]) + float(choice["hull"]), 0.0, float(resources["maxHull"]))
+	if choice.has("hullFraction"):
+		resources["hull"] = clampf(float(resources["hull"]) + float(resources["maxHull"]) * float(choice["hullFraction"]), 0.0, float(resources["maxHull"]))
 	if choice.has("healMissingFraction"):
 		var hp: float = float(resources["hp"])
 		resources["hp"] = minf(float(resources["maxHP"]), hp + (float(resources["maxHP"]) - hp) * float(choice["healMissingFraction"]))

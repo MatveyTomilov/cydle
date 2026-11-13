@@ -176,7 +176,7 @@
             "SCRAP": 12
           },
           "scaled": true,
-          "hull": -10
+          "hullFraction": -0.1
         },
         {
           "id": "B",

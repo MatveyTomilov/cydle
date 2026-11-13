@@ -74,5 +74,8 @@ func _test_all_event_choice_transactions(catalog: EventCatalog) -> void:
 			check(resolved, "event_catalog: actual event transaction rejected %s/%s: %s" % [event_id, str(choice.get("id", "")), session.last_error])
 			if resolved:
 				check(session.state.run.phase == "ROUTE" and session.state.run.cleared_node_ids.has(node_id) and session.state.run.events_seen == [event_id], "event_catalog: %s/%s did not consume its route node and record the event" % [event_id, str(choice.get("id", ""))])
+				if event_id == "EV07" and str(choice.get("id", "")) == "A":
+					var expected_hull: float = maxf(0.0, float(run["resources"].get("hull", 0.0)) - float(run["resources"].get("maxHull", 0.0)) * 0.1)
+					check(is_equal_approx(session.state.run.resources.get("hull", -1.0), expected_hull), "event_catalog: EV07 must remove 10%% of maximum hull, expected=%s actual=%s" % [str(expected_hull), str(session.state.run.resources.get("hull", -1.0))])
 				tested_choices += 1
 	check(tested_choices == 48, "event_catalog: expected 48 successful real event choices, got %d" % tested_choices)
