@@ -6,11 +6,9 @@
 
 Current strategy is **FEATURE COMPLETE BETA**: audit against the normative Master Spec, close significant runtime/UI gaps, and validate real state transitions. Boss balancing and repeated automatic boss retries are deferred unless a concrete gameplay defect requires them. Preserve all profile/save data; use short deterministic integration scenarios.
 
-### Latest game-code checkpoint — EV13 rare price rounding
+### Latest game-code checkpoint — event rounding and hull consequence fixes
 
-EV13 now charges `ceil(60% × ceil(rare shop price))`, matching §20.1. The d12 regression proves the previously-undercharged price was 266 and is now 267 credits. Godot 4.7.2 import exit 0; full native suite: 23 tests / 88,682 assertions / 0 failures. No TypeScript or Windows export was run for this Godot-only fix.
-
-EV07's scrap option also now removes 10% of maximum hull instead of 10 flat hull. Local event-transaction regression confirms the percentage result. Godot import exit 0; full suite 23 / 88,683. Independent regression is pending.
+Pushed game-code checkpoint `40a662322610b12b1c38a35c5b72ad4c4d3ca107`: EV13 charges `ceil(60% × ceil(rare shop price))`, so its d12 price is 267 credits, and EV07 now removes 10% of maximum hull instead of 10 flat hull. Local event-transaction regressions confirm both consequences. Godot 4.7.2 import exit 0; full suite 23 tests / 88,683 assertions / 0 failures. Independent EV07 regression is pending. No TypeScript or Windows export was run for these Godot changes.
 
 ### Latest checkpoint — offline diagnostics precision and history (2026-11-13)
 

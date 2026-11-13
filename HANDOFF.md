@@ -15,10 +15,10 @@
 - Regression added to `game/tests/golden/event_catalog_test.gd`. Godot 4.7.2 headless editor import exit 0; full native suite exit 0: 23 tests, 88,682 assertions, 0 failures. TypeScript suite/typecheck were already green at prior code-equivalent HEAD and are unaffected by this Godot-only change.
 - Commit `24e5fcc6b51c4e5b7ab2c3207a3b0454a856729d` was pushed to `development/codex`; local and remote HEAD matched and the worktree was clean at the push checkpoint. Independent regression verified this SHA: import exit 0, 23 tests / 88,682 assertions / 0 failures, EV13 price assertion 267, detached worktree clean, `git diff --check` clean. Logs: `C:\Users\Matve\AppData\Local\Temp\cydle-regression-logs-24e5fcc6b51c4e5b\`.
 
-## Current uncommitted game-code block — EV07 percentage hull loss
+## Latest game-code checkpoint — EV07 percentage hull loss
 
 - EV07 scrap choice previously subtracted 10 flat hull while §20.1 specifies a 10% hull loss. Event data now expresses `hullFraction: -0.1`; `GameSession.resolve_event()` subtracts that fraction of max hull. The all-event real transaction matrix checks EV07's resulting hull value.
-- Local Godot 4.7.2 import exit 0; full native suite 23 tests / 88,683 assertions / 0 failures. Pending commit and independent regression; do not call this checkpoint saved yet.
+- Commit `40a662322610b12b1c38a35c5b72ad4c4d3ca107` is pushed to `development/codex`; local and remote SHA matched and worktree is clean. Local Godot 4.7.2 import exit 0; full native suite 23 tests / 88,683 assertions / 0 failures. Independent regression is pending.
 
 ## Latest game checkpoint (2026-11-13; offline diagnostics precision and history)
 

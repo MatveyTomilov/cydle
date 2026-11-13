@@ -30,8 +30,8 @@ This is an implementation audit, not a release checklist. “Complete” means t
 ## Current checkpoint
 
 - Branch: `development/codex`.
-- Latest pushed game-code checkpoint: `24e5fcc6b51c4e5b7ab2c3207a3b0454a856729d`; the EV07 change is a new local block pending commit.
-- Godot 4.7.2 editor import exit 0; full native suite after EV13/EV07 changes: 23 tests, 88,683 assertions, 0 failures. Independent tester reproduced the EV13 result on `24e5fcc6b51c4e5b7ab2c3207a3b0454a856729d` (23 / 88,682, EV13 d12=267, clean detached worktree/diff). The EV07 change awaits independent verification. Legacy TypeScript on prior code-equivalent `62c76fcbf5c2bb08af88cfcabd2839c49c12c393`: 22 files / 207 tests and typecheck pass.
+- Latest pushed game-code checkpoint: `40a662322610b12b1c38a35c5b72ad4c4d3ca107`.
+- Godot 4.7.2 editor import exit 0; full native suite after EV13/EV07 changes: 23 tests, 88,683 assertions, 0 failures. Independent tester reproduced EV13 on `24e5fcc6b51c4e5b7ab2c3207a3b0454a856729d` (23 / 88,682, d12=267, clean detached worktree/diff). EV07 independent check for `40a662322610b12b1c38a35c5b72ad4c4d3ca107` is pending. Legacy TypeScript on prior code-equivalent `62c76fcbf5c2bb08af88cfcabd2839c49c12c393`: 22 files / 207 tests and typecheck pass.
 - First bounded BOSS_B study used six full fights on config checkpoint `928afba`: Kinetic and Tech/Energy lose reproducibly; Drone/Hybrid wins twice at 20.3s with 16.998 HP. This flags a balance risk for those tested configurations only; one seed and three builds do not establish overall viability. No simulator rejection or confirmed mechanic defect. See `HANDOFF.md` for exact scenario and artifact paths.
 - CI status was not queried. The complete test suite was not rerun after docs-only updates.
 - This is not a FEATURE COMPLETE BETA claim. Full spec coverage, campaign completion, and beta export are still outstanding.
