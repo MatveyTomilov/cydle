@@ -2,11 +2,11 @@
 
 ## Active priority: Autobattle V2 Gate A (13 November 2026)
 
-Independent full regression of the shared real-weapon adapter `5d9e059`: 30 tests / 89,232 assertions / zero failures. Follow-up preserves runtime SHOCK/attack-speed timing and preparation-to-damage causal identity. Remaining A1 work is authored abilities/procs/drones, explicit live migration and full save/replay parity.
+Latest pushed checkpoint `6a04983bb42ea6284c8651afaec6ea8f6a364124` adds one typed target-doctrine contract and routes 16 BuildResolver main skills through the existing V2 channel and shared CombatSimulator damage/status path. Targets stay locked across PREPARE→COMMIT, with explicit dead-target reacquisition and versioned snapshots. Local full suite: 31 tests / 89,365 assertions / 0 failures; npm's 207 tests and Godot import/assets/Windows export/smoke passed. Independent review and GitHub CI for this checkpoint are pending.
 
-The first real-weapon V2 adapter now uses CombatFactory/BuildResolver and the existing CombatSimulator damage path under an explicit development version. It accepts weapon-only builds and rejects unported skills/procs/drones; no GameSession activation yet. Extend canonical action coverage and validate integrated saves before enabling V2 gameplay. Independent regression at `23194c2`: 29 tests / 89,072 assertions / zero failures.
+Remaining immediate A1 work: integrate the tested main-skill adapter with GameSession, preserve V1 saves/load behavior, and add session-level save/resume/replay coverage. Reactions, equipment-authored procs/triggers, and drones are still explicitly rejected; no GameSession activation yet. The EXE export is a local ignored artifact at `game/build/CYDLE.exe`, not a published V2 build.
 
-Owner's V2 assignment supersedes FULL GAME FIRST for this migration: first one complete Thermocircuit synergy through 12 sectors and early endgame. Work in `feature/autobattle-v2`, PR #3 stays draft. A1 now has a reusable serialized action channel, bounded support scheduling, real prototype overheat and a V1 snapshot-version guard. Live GameSession still uses V1. Next: canonical build/action compiler and shared runtime dispatch, not additional archetypes or boss tuning on V1. Track evidence in [Gate A](AUTOBATTLE_V2_GATE_A.md).
+Owner's V2 assignment supersedes FULL GAME FIRST for this migration: first one complete Thermocircuit synergy through 12 sectors and early endgame. Work in `feature/autobattle-v2`, PR #3 stays draft. No GameSession migration until skill execution, V1 save compatibility, and V2 snapshot restore are proven at the session boundary. Track evidence in [Gate A](AUTOBATTLE_V2_GATE_A.md).
 
 `CYDLE_MASTER_SPEC.md` is the normative source for game design and release requirements. `docs/godot/` records the current engine, architecture, visual direction, and asset production rules. This roadmap records what actually exists; a plan or catalog entry is not working gameplay.
 
