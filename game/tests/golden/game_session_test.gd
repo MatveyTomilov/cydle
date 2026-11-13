@@ -1277,4 +1277,68 @@ func run(_tree: SceneTree) -> bool:
 		check(abandon_session.state.run.phase == "ABANDONED" and abandon_session.state.run.wallet.credits == 0.0 and abandon_session.state.run.unsecured_cargo.is_empty(), "game_session: abandoned cargo/currency were not lost")
 		check(float(abandoned_main.get("durability", 100.0)) == 90.0, "game_session: abandonment did not damage permanent equipped gear by 10 durability")
 		check(not abandon_session.abandon_run(), "game_session: abandonment could be settled more than once")
+	_test_all_quest_choice_transactions()
 	return failure_count == 0
+
+func _test_all_quest_choice_transactions() -> void:
+	var session: GameSession = GameSession.new()
+	session.configure_save_directory("user://test-saves/quest-choice-matrix")
+	if not check(session.start_new_game(1762900000992) and session.start_expedition("quest-choice-matrix"), "game_session: could not create the quest choice transaction profile"):
+		return
+	var catalog: QuestCatalog = QuestCatalog.new()
+	if not check(bool(catalog.load_catalog().get("ok", false)), "game_session: quest catalog failed in the transaction matrix"):
+		return
+	var tested_choices: int = 0
+	for quest_id: String in catalog.quests.keys():
+		var quest: Dictionary = catalog.get_quest(quest_id)
+		for stage: Dictionary in quest.get("stages", []):
+			for choice: Dictionary in stage.get("choices", []):
+				var stage_number: int = int(stage.get("stage", 1))
+				var depth: int = maxi(int(quest.get("minDepth", 1)), 2 if quest_id == "Q06" else 1)
+				var biome: String = str(stage.get("biome", quest.get("biome", "B01")))
+				var node_id: String = "quest-matrix-%s-S%d-%s" % [quest_id, stage_number, str(choice.get("id", ""))]
+				var quest_node: Dictionary = {"id": node_id, "layer": 0, "type": "QUEST", "questId": quest_id, "questStage": stage_number, "eventId": str(stage.get("eventId", "")), "threat": "medium", "enemies": [], "revealLevel": 1, "lootHint": "quest"}
+				var graph_layers: Array = [[quest_node]]
+				var graph_edges: Array[Dictionary] = [{"from": "START", "to": node_id, "fromLayer": -1, "toLayer": 0, "fuelCost": 1}]
+				var cleared: Array[String] = []
+				var requirement: Dictionary = stage.get("requirement", {"kind": "none"})
+				var objective_kind: String = str(requirement.get("kind", "none"))
+				if objective_kind in ["killElite", "anomaly"]:
+					var objective_id: String = "%s-objective" % node_id
+					var enemy_id: String = str(requirement.get("enemyId", "E01"))
+					var objective_type: String = "ANOMALY" if objective_kind == "anomaly" else "ELITE"
+					quest_node["layer"] = 1
+					graph_layers = [[{"id": objective_id, "layer": 0, "type": objective_type, "questTargets": [quest_id], "enemies": [{"templateId": enemy_id, "elite": "EL_TANK"}], "threat": "high", "revealLevel": 1, "lootHint": "quest"}], [quest_node]]
+					graph_edges = [{"from": "START", "to": objective_id, "fromLayer": -1, "toLayer": 0, "fuelCost": 1}, {"from": objective_id, "to": node_id, "fromLayer": 0, "toLayer": 1, "fuelCost": 1}]
+					cleared.append(objective_id)
+				elif quest_id == "Q05" and stage_number == 2:
+					for objective_index: int in range(3):
+						var combat_id: String = "%s-combat-%d" % [node_id, objective_index]
+						graph_layers[0].append({"id": combat_id, "layer": 0, "type": "COMBAT", "enemies": [{"templateId": "E01"}], "threat": "medium", "revealLevel": 1, "lootHint": "combat"})
+						cleared.append(combat_id)
+				var progress: Dictionary = {"status": "ACTIVE", "stage": stage_number, "startedDepth": depth - 1, "stageStartedDepth": depth - 1, "completedStages": [], "choiceHistory": [], "flags": []}
+				for prior_stage: int in range(1, stage_number):
+					progress["completedStages"].append("S%d" % prior_stage)
+					progress["choiceHistory"].append({"stage": prior_stage, "choiceId": "A", "nodeId": "prior-%s-S%d" % [quest_id, prior_stage]})
+				var payload: Dictionary = session.state.to_payload()
+				payload["meta"]["questProgress"] = {quest_id: progress}
+				payload["meta"]["maxSectorCleared"] = maxi(0, depth - 1)
+				payload["run"]["depth"] = depth
+				payload["run"]["biome"] = biome
+				payload["run"]["phase"] = "NODE"
+				payload["run"]["currentNodeId"] = node_id
+				payload["run"]["graph"] = {"layers": graph_layers, "edges": graph_edges}
+				payload["run"]["clearedNodeIds"] = cleared
+				payload["run"]["visitedNodeIds"] = cleared + [node_id]
+				payload["run"]["unsecuredCargo"] = []
+				payload["run"]["grantIds"] = []
+				payload["run"]["runWallet"] = {"CREDITS": 100000.0, "SCRAP": 100000.0, "DATA": 100000.0}
+				if not check(session._commit_payload(payload), "game_session: could not prepare %s/S%d/%s: %s" % [quest_id, stage_number, str(choice.get("id", "")), session.last_error]):
+					continue
+				var resolved: bool = session.resolve_quest_choice(quest_id, str(choice.get("id", "")))
+				check(resolved, "game_session: actual quest transaction rejected %s/S%d/%s: %s" % [quest_id, stage_number, str(choice.get("id", "")), session.last_error])
+				if resolved:
+					var saved_copy: Dictionary = GameSaveState.new().parse_payload(session.state.to_payload())
+					check(bool(saved_copy.get("ok", false)) and session.state.meta.quest_progress[quest_id].get("choiceHistory", []).size() == stage_number, "game_session: %s/S%d/%s did not retain its decision in a valid save" % [quest_id, stage_number, str(choice.get("id", ""))])
+					tested_choices += 1
+	check(tested_choices == 36, "game_session: expected 36 real quest choices, got %d" % tested_choices)
