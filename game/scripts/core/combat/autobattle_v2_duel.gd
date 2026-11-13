@@ -63,7 +63,7 @@ func step(current: Dictionary) -> Dictionary:
 				_commit_vent(state)
 			else:
 				return {"ok": false, "error": "UNKNOWN_ACTION"}
-		if str(active["timeline"].get("phase", "")) == "READY":
+		if bool(advanced.get("channelReady", false)):
 			state["activeAction"] = {}
 		else:
 			state["activeAction"] = active
