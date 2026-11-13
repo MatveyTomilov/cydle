@@ -100,9 +100,11 @@ func run(_tree: SceneTree) -> bool:
 	if check(offline_cap_session.start_new_game(1762900000049) and offline_cap_session.start_expedition("autopilot-offline-cap"), "game_session: could not prepare an isolated offline time-cap profile"):
 		var capped_offline_report: Dictionary = offline_cap_session.simulate_autopilot(1, 43200001)
 		check(int(capped_offline_report.get("elapsedWallClockMs", 0)) == 43200000 and int(capped_offline_report.get("unappliedTimeMs", 0)) == 1 and int(capped_offline_report.get("simulatedMs", 0)) <= 1, "game_session: offline return exceeded the 12-hour wall-clock cap, hid unapplied time or ignored its simulation budget: %s" % capped_offline_report)
+		check(offline_cap_session.state.meta.autopilot_report_history.back().get("unappliedTimeMs", 0) == 1, "game_session: report history omitted the unapplied offline time diagnostic")
 		var time_before_clock_rollback: float = offline_cap_session.state.run.resources.get("gameTimeMs", 0.0)
-		var clock_rollback_report: Dictionary = offline_cap_session.simulate_autopilot(0, -5000)
-		check(int(clock_rollback_report.get("clockRollbackMs", 0)) == 5000 and int(clock_rollback_report.get("elapsedWallClockMs", -1)) == 0 and int(clock_rollback_report.get("simulatedMs", -1)) == 0, "game_session: negative offline wall-clock delta was not disclosed without applying time: %s" % clock_rollback_report)
+		var clock_rollback_report: Dictionary = offline_cap_session.simulate_autopilot(0, -1, true)
+		check(int(clock_rollback_report.get("clockRollbackMs", 0)) == 1 and int(clock_rollback_report.get("elapsedWallClockMs", -1)) == 0 and int(clock_rollback_report.get("simulatedMs", -1)) == 0, "game_session: negative offline wall-clock delta was not disclosed accurately without applying time: %s" % clock_rollback_report)
+		check(offline_cap_session.state.meta.autopilot_report_history.back().get("clockRollbackMs", 0) == 1, "game_session: report history omitted the exact clock rollback diagnostic")
 		check(is_equal_approx(float(offline_cap_session.state.run.resources.get("gameTimeMs", 0.0)), time_before_clock_rollback), "game_session: negative offline wall-clock delta advanced game-time")
 	if check(autopilot_session.start_new_game(1762900000050), "game_session: could not create an autopilot profile"):
 		check(autopilot_session.state.meta.autopilot_profiles.size() == 3 and autopilot_session.active_autopilot_profile_id() == "BALANCED", "game_session: new profiles do not include the three authored pilot presets")

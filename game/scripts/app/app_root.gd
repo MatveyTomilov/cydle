@@ -1259,7 +1259,12 @@ func _show_road() -> void:
 		_body.add_child(_label("ЖУРНАЛ АВТОПИЛОТА · последние %d из 20" % report_history.size(), 11, COLOR_MUTED))
 		for history_index: int in range(maxi(0, report_history.size() - 5), report_history.size()):
 			var saved_report: Dictionary = report_history[history_index]
-			var history_label: Label = _label("%02d · %s · %s · узлов %d · боёв %d" % [history_index + 1, str(saved_report.get("status", "")), str(saved_report.get("reasonCode", "")), int(saved_report.get("nodesVisited", 0)), int(saved_report.get("battles", 0))], 10, COLOR_MUTED)
+			var history_time_notice: String = ""
+			if int(saved_report.get("unappliedTimeMs", 0)) > 0:
+				history_time_notice = " · не применено %s с" % _fmt(float(saved_report.get("unappliedTimeMs", 0)) / 1000.0)
+			elif int(saved_report.get("clockRollbackMs", 0)) > 0:
+				history_time_notice = " · откат часов %s с" % _fmt(float(saved_report.get("clockRollbackMs", 0)) / 1000.0)
+			var history_label: Label = _label("%02d · %s · %s · узлов %d · боёв %d%s" % [history_index + 1, str(saved_report.get("status", "")), str(saved_report.get("reasonCode", "")), int(saved_report.get("nodesVisited", 0)), int(saved_report.get("battles", 0)), history_time_notice], 10, COLOR_MUTED)
 			history_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			_body.add_child(history_label)
 	_add_run_cargo_control(run)

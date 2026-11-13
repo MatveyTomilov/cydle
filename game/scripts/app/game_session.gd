@@ -35,9 +35,9 @@ func load_saved_game() -> bool:
 			var now_ms: int = int(Time.get_unix_time_from_system() * 1000.0)
 			var observed_offline_elapsed_ms: int = now_ms - offline_since_ms
 			if observed_offline_elapsed_ms < 0:
-				last_autopilot_report = simulate_autopilot(0, observed_offline_elapsed_ms if observed_offline_elapsed_ms < -1 else -2)
+				last_autopilot_report = simulate_autopilot(0, observed_offline_elapsed_ms, true)
 			elif observed_offline_elapsed_ms >= 1000:
-				last_autopilot_report = simulate_autopilot(observed_offline_elapsed_ms, observed_offline_elapsed_ms)
+				last_autopilot_report = simulate_autopilot(observed_offline_elapsed_ms, observed_offline_elapsed_ms, true)
 		last_error = ""
 		return true
 	if bool(loaded.get("empty", false)):
@@ -1112,15 +1112,16 @@ func _anomaly_preview_available() -> bool:
 	var progress: Dictionary = state.meta.quest_progress.get("Q06", {})
 	return (progress.get("flags", []) as Array).has("earlyAnomaly") and not state.meta.campaign_flags.has("ANOMALY_PREVIEW_USED:EARLY")
 
-func simulate_autopilot(simulation_budget_ms: int = 43200000, elapsed_wall_clock_ms: int = -1) -> Dictionary:
+func simulate_autopilot(simulation_budget_ms: int = 43200000, elapsed_wall_clock_ms: int = -1, wall_clock_delta_provided: bool = false) -> Dictionary:
 	const MAX_OFFLINE_MS: int = 43200000
 	const MAX_COMMANDS: int = 2048
 	var budget: int = clampi(simulation_budget_ms, 0, MAX_OFFLINE_MS)
 	var report: Dictionary = {"ok": true, "status": "RUNNING", "reasonCode": "BUDGET", "reason": "Достигнут лимит симуляции.", "simulatedMs": 0, "elapsedWallClockMs": 0, "unappliedTimeMs": 0, "clockRollbackMs": 0, "nodesVisited": 0, "battles": 0, "battlesWon": 0, "battlesLost": 0, "itemsFound": 0, "itemsSecured": 0, "itemsLost": 0, "runsStarted": 1, "runsFinished": 0, "eventLog": [], "seed": "", "error": ""}
-	report["_elapsedWallClockMs"] = clampi(elapsed_wall_clock_ms, 0, MAX_OFFLINE_MS) if elapsed_wall_clock_ms >= 0 else -1
-	if elapsed_wall_clock_ms > MAX_OFFLINE_MS:
+	var has_wall_clock_delta: bool = wall_clock_delta_provided or elapsed_wall_clock_ms != -1
+	report["_elapsedWallClockMs"] = clampi(elapsed_wall_clock_ms, 0, MAX_OFFLINE_MS) if has_wall_clock_delta else -1
+	if has_wall_clock_delta and elapsed_wall_clock_ms > MAX_OFFLINE_MS:
 		report["unappliedTimeMs"] = elapsed_wall_clock_ms - MAX_OFFLINE_MS
-	elif elapsed_wall_clock_ms < -1:
+	elif has_wall_clock_delta and elapsed_wall_clock_ms < 0:
 		report["clockRollbackMs"] = absi(elapsed_wall_clock_ms)
 	report["_wallClockStartedAtMs"] = int(Time.get_unix_time_from_system() * 1000.0)
 	if state == null or state.run == null or ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(state.run.phase):
