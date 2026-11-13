@@ -72,6 +72,7 @@ func run(_tree: SceneTree) -> bool:
 	_test_attack_counter_items(config, operator)
 	_test_direct_status_tree_trigger(config, build)
 	_test_direct_hit_trigger_actions(config, build)
+	_test_on_kill_triggers(config, build)
 	_test_unsupported_trigger_is_rejected(config, build)
 	_test_event_turret_ally(config, build)
 	return failure_count == 0
@@ -121,6 +122,58 @@ func _test_direct_hit_trigger_actions(config: Dictionary, build: Dictionary) -> 
 	check(is_equal_approx(state.operator.energy, energy_before + 4.0), "combat_step: U12 ON_HIT did not restore energy against VIRUS")
 	check(float(target.statuses["VIRUS"][0].get("expiresAt", 0.0)) == 3000.0, "combat_step: X2 ON_HIT did not extend VIRUS duration")
 	check(target.hp < enemy_hp_before, "combat_step: X4 ON_HIT did not deal secondary damage")
+
+func _test_on_kill_triggers(config: Dictionary, build: Dictionary) -> void:
+	var trigger_build: Dictionary = build.duplicate(true)
+	trigger_build["triggerEffects"] = [
+		{"sourceId": "K3D", "sourceKind": "tree", "effect": {"type": "trigger", "id": "K3D", "event": "ON_KILL", "chance": 1.0, "icdMs": 2000, "requireKillType": "KINETIC", "action": {"kind": "restoreEnergy", "amount": 4}}},
+		{"sourceId": "H3C", "sourceKind": "tree", "effect": {"type": "trigger", "id": "H3C", "event": "ON_KILL", "requireKillType": "ENERGY", "action": {"kind": "changeHeat", "amount": -15}}},
+		{"sourceId": "U02", "sourceKind": "item", "effect": {"type": "trigger", "id": "U02_echo", "event": "ON_KILL", "requireDirect": true, "requireKillType": "DIGITAL", "action": {"kind": "secondaryDamage", "basis": "techPower", "coefficient": 0.6, "damageType": "DIGITAL", "targeting": "otherEnemy", "canProc": false}}},
+		{"sourceId": "N4C", "sourceKind": "tree", "effect": {"type": "trigger", "id": "N4C", "event": "ON_KILL", "condition": {"kind": "targetStatus", "status": "VIRUS"}, "action": {"kind": "transferVirus", "stacks": 2}}},
+	]
+	var enemy_specs: Array[Dictionary] = [config.get("enemy", {}), config.get("enemy", {}), config.get("enemy", {}), config.get("enemy", {})]
+	var initialized: Dictionary = CombatSimulator.new().create_state({
+		"seed": "on-kill-trigger-fixture", "depth": int(config.get("depth", 1)), "biome": str(config.get("biome", "B01")),
+		"nodeType": "COMBAT", "build": trigger_build, "enemies": enemy_specs, "tactics": config.get("tactics", {}),
+	})
+	if not check(bool(initialized.get("ok", false)), "combat_step: ON_KILL fixture failed to initialize"):
+		return
+	var simulator: CombatSimulator = CombatSimulator.new()
+	var state: CombatState = initialized["state"] as CombatState
+	var max_energy: float = float(state.operator.base_sheet.get("maxEnergy", 0.0))
+	state.operator.energy = maxf(0.0, max_energy - 20.0)
+	var energy_before: float = state.operator.energy
+	state.operator.heat = 50.0
+	var targets: Array[CombatActorState] = state.enemies
+	for index: int in range(3):
+		var killed: CombatActorState = targets[index]
+		killed.hp = 0.0
+		killed.last_hit_by_id = state.operator.id
+		killed.last_hit_can_proc = true
+		killed.last_hit_proc_weight = 1.0
+		killed.last_hit_direct = true
+		killed.last_hit_event_source = "DIRECT"
+		killed.last_hit_action_id = "on-kill:%d" % index
+		killed.last_hit_origin_action_id = "on-kill:%d" % index
+		killed.last_hit_cause_id = index + 1
+	targets[0].last_hit_damage_type = "KINETIC"
+	targets[1].last_hit_damage_type = "ENERGY"
+	targets[2].last_hit_damage_type = "DIGITAL"
+	targets[2].statuses["VIRUS"] = [
+		{"sourceId": "test:VIRUS", "sourceActorId": state.operator.id, "expiresAt": 6000.0, "nextTickAt": 1000.0, "snapshot": 0.0, "stacks": 1},
+		{"sourceId": "test:VIRUS", "sourceActorId": state.operator.id, "expiresAt": 6000.0, "nextTickAt": 1000.0, "snapshot": 0.0, "stacks": 1},
+	]
+	var living_target: CombatActorState = targets[3]
+	living_target.base_sheet["evasion"] = 0.0
+	var hp_before: float = living_target.hp
+	var rng: DeterministicRng = DeterministicRng.new()
+	rng.seed("on-kill-trigger-fixture", "kills")
+	simulator._resolve_basic_deaths(state, rng)
+	check(is_equal_approx(state.operator.energy, energy_before + 4.0), "combat_step: K3D kinetic kill did not restore energy")
+	check(is_equal_approx(state.operator.heat, 35.0), "combat_step: H3C energy kill did not reduce heat")
+	check(living_target.statuses.get("VIRUS", []).size() == 2, "combat_step: N4C did not transfer two VIRUS stacks from a killed target")
+	check(living_target.hp < hp_before, "combat_step: U02 did not echo digital kill damage onto another enemy")
+	check(int(state.metrics.get("procsTriggered", 0)) == 4, "combat_step: ON_KILL actions were not each counted once")
 
 func _test_event_turret_ally(config: Dictionary, build: Dictionary) -> void:
 	var initialized: Dictionary = CombatSimulator.new().create_state({

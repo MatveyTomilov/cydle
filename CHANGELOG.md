@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — ON_KILL combat triggers
+
+- The shared simulator now preserves last-hit provenance in typed, serialized combat actor state and dispatches catalogued kill triggers for energy recovery, heat change, VIRUS transfer, and secondary damage. Direct, secondary, and status-tick origins are distinguished for filters; unsupported event/action pairs still fail closed.
+- Regressions cover K3D, H3C, U02, and N4C interacting on actual enemy death resolution. Godot editor import passed; 22 headless scripts passed (88,077 assertions); `git diff --check` passed. Windows export/smoke not run for this delta.
+
 ## Unreleased — executable direct-hit build triggers
 
 - Direct player-hit triggers now execute catalogued `restoreShield`, `restoreEnergy`, `extendStatus`, and `secondaryDamage` actions alongside `applyStatus`. Filters, proc chance, owner ICDs, and once-per-combat/drone guards are honored; unsupported event/action pairs remain rejected instead of being silently accepted.

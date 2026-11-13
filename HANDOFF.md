@@ -1,5 +1,12 @@
 # CYDLE — Project handoff and development history
 
+## Live continuation (2026-11-13; ON_KILL trigger integration)
+
+- Base checkpoint: `58dedab1c8ae398f3e6afcc6d0cfa16ee5c1f895` on `development/codex` (pushed). This WIP stores last-hit source, type, event origin, proc weight, and cause ID as backward-compatible serialized `CombatActorState` fields, not public gameplay flags.
+- Enemy death resolution now dispatches authored ON_KILL effects through the existing combat RNG and simulator. Implemented actions: restore energy, change heat, transfer VIRUS stacks, and secondary damage. Direct/secondary/status-tick filters, damage type, status conditions, chance, ICD, and once guards are considered. Regression covers K3D energy on kinetic kill, H3C cooling on energy kill, U02 digital echo, and N4C VIRUS transfer.
+- Verification: Godot 4.7.2 editor import exit 0; 22 headless scripts exit 0 (88,077 assertions); `git diff --check` exit 0. Windows export/smoke not run for this WIP. TypeScript oracle not rerun (legacy source unchanged).
+- Worktree includes this ON_KILL WIP plus the preceding pushed direct-hit trigger checkpoint. Next: inspect exact diff, commit/push on `development/codex`, then implement the next campaign-critical trigger family (prefer ON_BEFORE_HIT/packet mods, preserving the same engine for active play/offline/autopilot/labs). Many event families, enemy behavior breadth, campaign acceptance, and release export acceptance are still outstanding.
+
 ## Live continuation (2026-11-13; direct-hit trigger actions)
 
 - Repository root: `E:\cydle\project`; branch `development/codex`; base HEAD/origin before this WIP: `0555a2326e1e29d270308ac25bc6b795d42554a7`. The current WIP is limited to `game/scripts/core/combat/combat_simulator.gd`, `game/tests/golden/combat_step_test.gd`, `CHANGELOG.md`, `docs/ROADMAP.md`, and this handoff.

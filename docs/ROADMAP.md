@@ -6,6 +6,10 @@
 
 The active strategy is **FULL GAME FIRST**: connect every major Master Spec system into a campaign that can be completed, then deepen edge cases, balance, and presentation. The entries below report implementation status; they are not a queue of isolated feature slices. A checkpoint commit is a safety measure, so continue to the next missing campaign-critical system while the session permits. Defer saved Simulation Lab presets, report exports, cosmetic polish, secondary settings, and redundant tests until functional campaign coverage exists.
 
+### Current status override (2026-11-13; ON_KILL triggers)
+
+The shared simulator now tracks last-hit provenance in backward-compatible typed actor snapshot fields and runs authored ON_KILL actions for K3D/H3C/U02/N4C patterns: energy recovery, heat adjustment, VIRUS transfer, and non-proccing secondary damage. Direct/secondary/status-tick sources are filtered; other trigger event families remain incomplete. Godot import and 22 headless scripts pass at 88,077 assertions; Windows export/smoke not rerun.
+
 ### Current status override (2026-11-13; direct-hit trigger actions)
 
 The native 100 ms simulator now executes active `ON_HIT` tree/item actions for status application, energy/shield recovery, status extension, and secondary damage. Proc filters, chance, ICD and one-time guards are enforced. A targeted regression passes for K4B, U12, X2, and X4; an unsupported ON_HEAT_FULL effect is still rejected. This closes only part of combat-trigger coverage: ON_KILL, ON_BEFORE_HIT, ON_SHIELD_ABSORB, ON_DODGE, ON_CAST, boss/elite interactions, and other authored trigger/event families remain incomplete. Godot editor import and 22 headless scripts pass (88,071 assertions); export is not run for this delta.

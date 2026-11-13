@@ -135,7 +135,7 @@ func step_combat(state: CombatState) -> Dictionary:
 		if not bool(attack.get("ok", false)):
 			return _failure(str(attack.get("error", "Автоатака не разрешилась.")))
 		_schedule_next_attack(next, actor)
-	_resolve_basic_deaths(next)
+	_resolve_basic_deaths(next, rng)
 	_resolve_boss_phases(next)
 	_check_terminal(next)
 	next.rng = rng.serialize()
@@ -191,9 +191,22 @@ func _supports_skill_trigger_effects(state: CombatState) -> bool:
 		var periodic_item_trigger: bool = effect_id in ["DR_MED_heal", "DR_EMP_interrupt", "TR_SUPPORT_blast"] and str(effect.get("event", "")) == "PERIODIC" and str(trigger_value.get("sourceKind", "")) == "item"
 		var attack_counter_trigger: bool = effect_id in ["ARC_E2_splash", "FOCUS_D1_virus", "DR_ARC_shock"] and str(effect.get("event", "")) == "ON_ATTACK_COUNTER" and str(trigger_value.get("sourceKind", "")) == "item"
 		var direct_hit_trigger: bool = str(effect.get("event", "")) == "ON_HIT" and str(trigger_value.get("sourceKind", "")) != "skill" and _supports_direct_hit_trigger(effect)
-		if not skill_trigger and not periodic_item_trigger and not attack_counter_trigger and not direct_hit_trigger:
+		var kill_trigger: bool = str(effect.get("event", "")) == "ON_KILL" and _supports_kill_trigger(effect)
+		if not skill_trigger and not periodic_item_trigger and not attack_counter_trigger and not direct_hit_trigger and not kill_trigger:
 			return false
 	return true
+
+func _supports_kill_trigger(effect: Dictionary) -> bool:
+	var action: Dictionary = effect.get("action", {})
+	var condition: Dictionary = effect.get("condition", {})
+	if not condition.is_empty() and str(condition.get("kind", "")) not in ["targetStatus", "targetNoStatus", "heatAtLeast", "hpBelow"]:
+		return false
+	match str(action.get("kind", "")):
+		"restoreEnergy": return float(action.get("amount", 0.0)) > 0.0
+		"changeHeat": return true
+		"transferVirus": return int(action.get("stacks", 0)) > 0
+		"secondaryDamage": return float(action.get("coefficient", 0.0)) > 0.0 and str(action.get("targeting", "")) in ["target", "otherEnemy", "allEnemies"] and str(action.get("damageType", "ENERGY")) in ["KINETIC", "ENERGY", "DIGITAL"]
+		_: return false
 
 func _supports_direct_hit_trigger(effect: Dictionary) -> bool:
 	var action: Dictionary = effect.get("action", {})
@@ -1244,13 +1257,23 @@ func _apply_dot_damage(state: CombatState, target: CombatActorState, source_id: 
 		by_source[source_id] = float(by_source.get(source_id, 0.0)) + dealt
 		if target.kind == "operator":
 			state.metrics["hpLost"] = float(state.metrics.get("hpLost", 0.0)) + float(partition["hpLost"])
-	_emit(state, "DOT_TICK", source_id, {
+	var tick_event: Dictionary = _emit(state, "DOT_TICK", source_id, {
 		"targetId": target.id, "actionId": "dot:%s:%s:%d" % [status_id, target.id, state.time_ms],
 		"statusId": status_id, "damageType": damage_type,
 		"amountBeforeDefense": raw, "amountAfterDefense": incoming,
 		"shieldConsumed": partition["shieldConsumed"], "hpLost": partition["hpLost"],
 		"text": "%s → %s: %s %s." % [status_name, target.display_name, _one_decimal(incoming), damage_type],
 	})
+	target.last_hit_by_id = source_id
+	target.last_hit_target_id = target.id
+	target.last_hit_action_id = str(tick_event.get("actionId", ""))
+	target.last_hit_origin_action_id = str(tick_event.get("actionId", ""))
+	target.last_hit_cause_id = int(tick_event.get("eventId", 0))
+	target.last_hit_damage_type = damage_type
+	target.last_hit_direct = false
+	target.last_hit_can_proc = true
+	target.last_hit_proc_weight = 1.0
+	target.last_hit_event_source = "STATUS_TICK"
 
 func _expire_dot_statuses(state: CombatState) -> void:
 	if not _status_catalog_loaded:
@@ -1615,7 +1638,17 @@ func _resolve_basic_hit(state: CombatState, rng: DeterministicRng, actor: Combat
 	}
 	if not skill_id.is_empty():
 		damage_event["skillId"] = skill_id
-	_emit(state, "DAMAGE", actor.id, damage_event)
+	var emitted_damage: Dictionary = _emit(state, "DAMAGE", actor.id, damage_event)
+	target.last_hit_by_id = actor.id
+	target.last_hit_target_id = target.id
+	target.last_hit_action_id = action_id
+	target.last_hit_origin_action_id = action_id
+	target.last_hit_cause_id = int(emitted_damage.get("eventId", 0))
+	target.last_hit_damage_type = damage_type
+	target.last_hit_direct = direct
+	target.last_hit_can_proc = true
+	target.last_hit_proc_weight = proc_weight
+	target.last_hit_event_source = "DIRECT" if direct else "SECONDARY"
 	_dispatch_direct_status_triggers(state, rng, actor, target, damage_type, action_id, skill_id, direct, proc_weight)
 	if actor.side == "enemy" and target.side == "player":
 		_resolve_enemy_direct_hit_effects(state, actor, target, action_id, raw)
@@ -1852,16 +1885,19 @@ func _gain_basic_heat(state: CombatState, actor: CombatActorState, amount: float
 		state.metrics["heatLockouts"] = int(state.metrics.get("heatLockouts", 0)) + 1
 		_emit(state, "HEAT_LOCKOUT", actor.id, {"text": "Перегрев: main-канал заблокирован до охлаждения ≤ 80."})
 
-func _resolve_basic_deaths(state: CombatState) -> void:
+func _resolve_basic_deaths(state: CombatState, rng: DeterministicRng) -> void:
 	for actor: CombatActorState in state.all_actors():
 		if not actor.alive or actor.hp > 0.0:
 			continue
 		actor.alive = false
-		_emit(state, "DEATH", actor.id, {"text": "%s уничтожен." % actor.display_name})
+		var death_event: Dictionary = _emit(state, "DEATH", actor.id, {"text": "%s уничтожен." % actor.display_name})
 		if actor.side == "enemy":
 			state.metrics["kills"] = int(state.metrics.get("kills", 0)) + 1
 			var ttk: Array = state.metrics["ttk"]
 			ttk.append({"enemyId": actor.id, "name": actor.display_name, "ms": state.time_ms})
+			var killer: CombatActorState = _actor_by_id(state, actor.last_hit_by_id)
+			if killer != null and actor.last_hit_can_proc:
+				_dispatch_kill_triggers(state, rng, killer, actor, death_event)
 			if actor.elite_mod == "EL_SPLIT":
 				_spawn_summoned_enemy(state, actor, "E20", 0.5)
 				_spawn_summoned_enemy(state, actor, "E20", 0.5)
@@ -1880,6 +1916,148 @@ func _resolve_basic_deaths(state: CombatState) -> void:
 					_add_simple_status(state, ally, ally, "BERSERK", 999000.0)
 		elif actor.kind == "drone":
 			state.metrics["droneDeaths"] = int(state.metrics.get("droneDeaths", 0)) + 1
+
+func _dispatch_kill_triggers(state: CombatState, rng: DeterministicRng, killer: CombatActorState, dead_target: CombatActorState, death_event: Dictionary) -> void:
+	if killer.side != "player":
+		return
+	var damage_type: String = dead_target.last_hit_damage_type
+	var direct: bool = dead_target.last_hit_direct
+	var event_source: String = dead_target.last_hit_event_source
+	var origin_action_id: String = dead_target.last_hit_origin_action_id
+	var action_id: String = dead_target.last_hit_action_id if not dead_target.last_hit_action_id.is_empty() else origin_action_id
+	var cause_id: int = dead_target.last_hit_cause_id if dead_target.last_hit_cause_id > 0 else int(death_event.get("eventId", 0))
+	var proc_weight: float = 1.0 if event_source == "STATUS_TICK" else dead_target.last_hit_proc_weight
+	for trigger_value: Variant in state.build.get("triggerEffects", []):
+		if not trigger_value is Dictionary:
+			continue
+		var effect: Dictionary = trigger_value.get("effect", {})
+		if str(effect.get("event", "")) != "ON_KILL" or not _supports_kill_trigger(effect):
+			continue
+		var source_id: String = str(trigger_value.get("sourceId", ""))
+		var owner: CombatActorState = _trigger_owner(state, source_id)
+		if not owner.alive or (owner.kind != "operator" and owner.id != killer.id):
+			continue
+		if bool(effect.get("requireDirect", false)) and not direct:
+			continue
+		if not str(effect.get("requireKillType", "")).is_empty() and str(effect.get("requireKillType", "")) != damage_type:
+			continue
+		if event_source == "STATUS_TICK" and not bool(effect.get("allowStatusTick", false)):
+			continue
+		if event_source == "SECONDARY" and not bool(effect.get("allowSecondary", false)):
+			continue
+		var damage_type_filter: Array = effect.get("damageTypeFilter", [])
+		if not damage_type_filter.is_empty() and not damage_type_filter.has(damage_type):
+			continue
+		if not _trigger_status_condition_passes(state, killer, dead_target, effect.get("condition", {})):
+			continue
+		var trigger_id: String = str(effect.get("id", ""))
+		var trigger_key: String = "%s:%s" % [source_id, trigger_id]
+		var instance_key: String = "%s:%s" % [trigger_key, killer.id] if bool(effect.get("oncePerDrone", false)) else trigger_key
+		if bool(effect.get("oncePerCombat", false)) and bool(owner.once_per_combat.get(trigger_key, false)):
+			continue
+		if bool(effect.get("oncePerDrone", false)) and bool(owner.once_per_combat.get(instance_key, false)):
+			continue
+		if float(owner.icds.get(instance_key, 0.0)) > float(state.time_ms):
+			continue
+		var chance: float = clampf(float(effect.get("chance", 1.0)) * proc_weight * float(_effective_sheet(state, owner, dead_target).get("procMultiplier", 1.0)), 0.0, 1.0)
+		if not rng.chance(chance):
+			continue
+		if bool(effect.get("oncePerCombat", false)):
+			owner.once_per_combat[trigger_key] = true
+		if bool(effect.get("oncePerDrone", false)):
+			owner.once_per_combat[instance_key] = true
+		var icd_ms: float = float(effect.get("icdMs", 0.0))
+		if icd_ms > 0.0:
+			owner.icds[instance_key] = float(state.time_ms) + icd_ms
+		state.metrics["procsTriggered"] = int(state.metrics.get("procsTriggered", 0)) + 1
+		var trigger_action_id: String = "%s:trigger:%s" % [action_id, trigger_id]
+		var trigger_event: Dictionary = _emit(state, "TRIGGER", owner.id, {"targetId": dead_target.id, "actionId": trigger_action_id, "text": "%s: сработал эффект «%s» при убийстве." % [owner.display_name, trigger_id], "data": {"sourceId": source_id, "chance": chance, "damageType": damage_type, "eventSource": event_source}})
+		var action: Dictionary = effect.get("action", {})
+		match str(action.get("kind", "")):
+			"restoreEnergy":
+				_restore_trigger_energy(state, owner, action, trigger_action_id, int(trigger_event.get("eventId", 0)))
+			"changeHeat":
+				var amount: float = float(action.get("amount", 0.0))
+				if amount >= 0.0:
+					_gain_basic_heat(state, owner, amount)
+				else:
+					owner.heat = maxf(0.0, owner.heat + amount)
+					if bool(action.get("removeLockout", false)) and owner.heat <= 80.0:
+						owner.heat_lockout = false
+			"transferVirus":
+				_transfer_kill_virus(state, owner, dead_target, int(action.get("stacks", 1)), trigger_action_id, int(trigger_event.get("eventId", 0)))
+			"secondaryDamage":
+				_apply_kill_secondary_damage(state, rng, owner, killer, dead_target, action, trigger_action_id)
+
+func _restore_trigger_energy(state: CombatState, owner: CombatActorState, action: Dictionary, action_id: String, cause_id: int = 0) -> void:
+	var bucket: int = floori(float(state.time_ms) / 1000.0)
+	if int(owner.flags.get("energyGainSecond", -1)) != bucket:
+		owner.flags["energyGainSecond"] = bucket
+		owner.flags["energyGainInSecond"] = 0.0
+	var cap: float = float(action.get("perSecondCap", 1.0e30))
+	var gain: float = minf(float(action.get("amount", 0.0)), maxf(0.0, cap - float(owner.flags.get("energyGainInSecond", 0.0))))
+	var before: float = owner.energy
+	owner.energy = minf(float(_effective_sheet(state, owner).get("maxEnergy", 0.0)), owner.energy + gain)
+	var restored: float = owner.energy - before
+	owner.flags["energyGainInSecond"] = float(owner.flags.get("energyGainInSecond", 0.0)) + restored
+	if restored > 0.0:
+		_emit(state, "ENERGY", owner.id, {"actionId": action_id, "causeId": cause_id, "text": "%s: +%s энергии." % [owner.display_name, _one_decimal(restored)], "data": {"amount": restored}})
+
+func _transfer_kill_virus(state: CombatState, owner: CombatActorState, dead_target: CombatActorState, requested: int, action_id: String, cause_id: int) -> void:
+	if not _status_catalog_loaded:
+		var loaded: Dictionary = _status_catalog.load_catalog()
+		_status_catalog_loaded = true
+		_status_catalog_error = str(loaded.get("error", "")) if not bool(loaded.get("ok", false)) else ""
+	if not _status_catalog_error.is_empty():
+		return
+	var entries: Array = dead_target.statuses.get("VIRUS", [])
+	var destination: CombatActorState = null
+	for enemy: CombatActorState in state.enemies:
+		if enemy.alive and enemy.id != dead_target.id:
+			destination = enemy
+			break
+	if entries.is_empty() or destination == null or requested <= 0:
+		return
+	var max_stacks: int = int(_status_catalog.get_definition("VIRUS").get("maxStacks", 6)) + floori(float(_effective_sheet(state, owner).get("virusStackCap", 0.0)))
+	var capacity: int = maxi(0, max_stacks - _status_stacks(destination, "VIRUS"))
+	var count: int = mini(mini(requested, entries.size()), capacity)
+	if count <= 0:
+		return
+	var moved: Array = entries.slice(0, count)
+	dead_target.statuses["VIRUS"] = entries.slice(count)
+	var destination_entries: Array = destination.statuses.get("VIRUS", [])
+	for entry: Dictionary in moved:
+		var transferred: Dictionary = entry.duplicate(true)
+		transferred["sourceId"] = "%s:VIRUS" % owner.id
+		transferred["sourceActorId"] = owner.id
+		destination_entries.append(transferred)
+	destination.statuses["VIRUS"] = destination_entries
+	_emit(state, "STATUS_APPLY", owner.id, {"targetId": destination.id, "actionId": action_id, "causeId": cause_id, "statusId": "VIRUS", "text": "%s: VIRUS перенесён на %s." % [owner.display_name, destination.display_name], "data": {"stacks": _status_stacks(destination, "VIRUS"), "moved": count}})
+
+func _apply_kill_secondary_damage(state: CombatState, rng: DeterministicRng, owner: CombatActorState, killer: CombatActorState, dead_target: CombatActorState, action: Dictionary, action_id: String) -> void:
+	var basis: float = float(_effective_sheet(state, owner).get("techPower", 0.0))
+	match str(action.get("basis", "techPower")):
+		"mainWeapon": basis = float(state.build.get("mainWeapon", {}).get("damage", 0.0))
+		"droneTech": basis = killer.attack_damage if killer.kind == "drone" else float(state.drones[0].attack_damage) if not state.drones.is_empty() else 0.0
+		"flat": basis = 1.0
+		"virusRemaining": basis = float(_status_stacks(dead_target, "VIRUS"))
+	var raw: float = basis * float(action.get("coefficient", 0.0))
+	var targets: Array[CombatActorState] = []
+	match str(action.get("targeting", "otherEnemy")):
+		"target":
+			var primary: CombatActorState = _pick_auto_target(state, owner)
+			if primary != null: targets.append(primary)
+		"otherEnemy":
+			for enemy: CombatActorState in state.enemies:
+				if enemy.alive and enemy.id != dead_target.id:
+					targets.append(enemy)
+					break
+		"allEnemies":
+			for enemy: CombatActorState in state.enemies:
+				if enemy.alive: targets.append(enemy)
+	var max_targets: int = int(action.get("maxTargets", targets.size()))
+	for index: int in range(mini(targets.size(), maxi(0, max_targets))):
+		_resolve_basic_hit(state, rng, owner, targets[index], raw, str(action.get("damageType", "DIGITAL")), "%s:child:%d" % [action_id, index + 1], false, "", 0.0, false, 0.0)
 
 func _resolve_boss_phases(state: CombatState) -> void:
 	for boss: CombatActorState in state.enemies:

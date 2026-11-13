@@ -53,6 +53,16 @@ var last_skill_id: String = ""
 var same_skill_count: int = 0
 var damage_dealt: float = 0.0
 var damage_taken: float = 0.0
+var last_hit_by_id: String = ""
+var last_hit_target_id: String = ""
+var last_hit_action_id: String = ""
+var last_hit_origin_action_id: String = ""
+var last_hit_cause_id: int = 0
+var last_hit_damage_type: String = ""
+var last_hit_direct: bool = false
+var last_hit_can_proc: bool = false
+var last_hit_proc_weight: float = 0.0
+var last_hit_event_source: String = ""
 
 func to_dictionary() -> Dictionary:
 	return {
@@ -70,6 +80,10 @@ func to_dictionary() -> Dictionary:
 		"droneRole": drone_role, "droneItemId": drone_item_id, "dronePellets": drone_pellets,
 		"lastMainAttackAt": last_main_attack_at, "lastTargetId": last_target_id, "sameTargetHits": same_target_hits,
 		"lastSkillId": last_skill_id, "sameSkillCount": same_skill_count, "damageDealt": damage_dealt, "damageTaken": damage_taken,
+		"lastHitById": last_hit_by_id, "lastHitTargetId": last_hit_target_id, "lastHitActionId": last_hit_action_id,
+		"lastHitOriginActionId": last_hit_origin_action_id, "lastHitCauseId": last_hit_cause_id,
+		"lastHitDamageType": last_hit_damage_type, "lastHitDirect": last_hit_direct,
+		"lastHitCanProc": last_hit_can_proc, "lastHitProcWeight": last_hit_proc_weight, "lastHitEventSource": last_hit_event_source,
 	}
 
 func clone() -> CombatActorState:
@@ -139,4 +153,14 @@ static func from_dictionary(value: Dictionary) -> CombatActorState:
 	actor.same_skill_count = int(value.get("sameSkillCount", 0))
 	actor.damage_dealt = float(value.get("damageDealt", 0.0))
 	actor.damage_taken = float(value.get("damageTaken", 0.0))
+	actor.last_hit_by_id = str(value.get("lastHitById", ""))
+	actor.last_hit_target_id = str(value.get("lastHitTargetId", ""))
+	actor.last_hit_action_id = str(value.get("lastHitActionId", ""))
+	actor.last_hit_origin_action_id = str(value.get("lastHitOriginActionId", ""))
+	actor.last_hit_cause_id = int(value.get("lastHitCauseId", 0))
+	actor.last_hit_damage_type = str(value.get("lastHitDamageType", ""))
+	actor.last_hit_direct = bool(value.get("lastHitDirect", false))
+	actor.last_hit_can_proc = bool(value.get("lastHitCanProc", false))
+	actor.last_hit_proc_weight = float(value.get("lastHitProcWeight", 0.0))
+	actor.last_hit_event_source = str(value.get("lastHitEventSource", ""))
 	return actor
