@@ -3,7 +3,7 @@
 ## Unreleased — EV16 real encounter skip verification
 
 - Added a generated-route integration scenario: EV16's paid choice then consumes the next ordinary COMBAT node, clears its skip flag, and grants no XP, cargo, or item grants.
-- Godot 4.7.2 full native suite: 23 tests / 88,689 assertions / 0 failures. The first attempt surfaced a test-only wrong field name (`experience` instead of `xp`); corrected before the passing run. Independent verification is pending.
+- Local and independent Godot 4.7.2 full native suite: 23 tests / 88,689 assertions / 0 failures on exact SHA `a5b0bc4`. EV16 skip integration verified with no XP/loot/grants and flag consumption; detached tree and diff check clean. The first local attempt surfaced a test-only wrong field name (`experience` instead of `xp`), corrected before the passing run.
 
 ## Unreleased — EV07 percentage hull damage
 

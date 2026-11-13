@@ -25,7 +25,7 @@
 ## Latest game-code checkpoint — EV16 next-combat skip integration
 
 - Added an end-to-end `GameSession` test that takes EV16's paid option, travels to the next ordinary COMBAT node, and verifies the node is consumed without XP/cargo/grants and the skip flag resets.
-- Commit `a5b0bc438635d40ed95250f816f22a0aedcf1727` is pushed to `development/codex`; local/remote SHA matched and worktree is clean. Local Godot 4.7.2 import exit 0; full native suite 23 tests / 88,689 assertions / 0 failures. Independent regression is pending.
+- Commit `a5b0bc438635d40ed95250f816f22a0aedcf1727` is pushed to `development/codex`; local/remote SHA matched and worktree is clean. Local and independent Godot 4.7.2 import exit 0; full native suite 23 tests / 88,689 assertions / 0 failures. Detached EV16 regression confirms no XP/cargo/grants, node consumption and flag reset. Worktree and `git diff --check` clean; logs `C:\Users\Matve\AppData\Local\Temp\cydle-regression-logs-a5b0bc438635d40e\`.
 
 ## Latest game checkpoint (2026-11-13; offline diagnostics precision and history)
 
