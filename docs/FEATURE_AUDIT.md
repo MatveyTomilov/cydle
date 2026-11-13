@@ -30,8 +30,8 @@ This is an implementation audit, not a release checklist. “Complete” means t
 ## Current checkpoint
 
 - Branch: `development/codex`.
-- Latest pushed game-code checkpoint: `40a662322610b12b1c38a35c5b72ad4c4d3ca107`.
+- Latest pushed game-code checkpoint: `a5b0bc438635d40ed95250f816f22a0aedcf1727`.
 - Godot 4.7.2 editor import exit 0; full native suite after EV13/EV07/EV16 changes: 23 tests, 88,689 assertions, 0 failures. Independent tester reproduced EV13 on `24e5fcc6b51c4e5b7ab2c3207a3b0454a856729d` and EV07 on `40a662322610b12b1c38a35c5b72ad4c4d3ca107`, including percentage-hull regression and clean detached worktree/diff. EV16 full suite result is local pending independent check. Legacy TypeScript on prior code-equivalent `62c76fcbf5c2bb08af88cfcabd2839c49c12c393`: 22 files / 207 tests and typecheck pass.
-- Bounded BOSS_B samples now cover three legal archetypes across three seeds (12 full fights): 5/6 lost on the first seed, then all Kinetic and Tech/Energy lost on both additional seeds; Drone/Hybrid split 1 win / 1 loss. This is strong balance risk evidence for the sampled builds, but still not proof of archetype-wide or campaign unviability. No simulator rejection or confirmed mechanic defect. See `HANDOFF.md` for exact scenario and artifact paths.
+- Bounded BOSS_B samples cover three seeds and legal Kinetic, Tech/Energy, and Drone/Hybrid builds. Same-build seed-sensitivity runs lost 5/6. A fourth Kinetic configuration using DR_GUN + DR_ARC won both new-seed fights; the first alternate Tech/Energy configuration lost both. This points to a Kinetic drone-loadout interaction and a Tech build risk, not broad archetype or campaign unviability. No simulator rejection or confirmed mechanic defect. See `HANDOFF.md` for exact setups/artifacts.
 - CI status was not queried. The complete test suite was not rerun after docs-only updates.
 - This is not a FEATURE COMPLETE BETA claim. Full spec coverage, campaign completion, and beta export are still outstanding.

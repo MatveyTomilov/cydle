@@ -10,7 +10,7 @@ Current strategy is **FEATURE COMPLETE BETA**: audit against the normative Maste
 
 Pushed game-code checkpoint `40a662322610b12b1c38a35c5b72ad4c4d3ca107`: EV13 charges `ceil(60% × ceil(rare shop price))`, so its d12 price is 267 credits, and EV07 removes 10% of maximum hull instead of 10 flat hull. Local and independent transaction regressions confirm both consequences. Godot 4.7.2 import exit 0; full suite 23 tests / 88,683 assertions / 0 failures. Independent EV07 check used a clean detached worktree and diff check. No TypeScript or Windows export was run for these Godot changes.
 
-The current local EV16 test adds a real next-node skip scenario and verifies that the skipped encounter produces no XP or loot and consumes the one-use flag. Local full suite: 23 / 88,689 assertions, exit 0; commit and detached regression are pending.
+Pushed checkpoint `a5b0bc438635d40ed95250f816f22a0aedcf1727` adds a real EV16 next-node skip scenario and verifies no XP/loot/grants and flag consumption. Local full suite: 23 / 88,689 assertions, exit 0; detached regression is pending. The bounded BOSS_B follow-up found a Kinetic drone-loadout effect (Gun + Arc won both new seeds) but no win for the tested Tech/Energy variant. See `HANDOFF.md`; do not generalize these boss-only results.
 
 ### Latest checkpoint — offline diagnostics precision and history (2026-11-13)
 
