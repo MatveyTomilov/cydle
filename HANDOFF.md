@@ -2,9 +2,10 @@
 
 ## Latest game checkpoint (2026-11-13; natural SIGNAL reward and contract death settlement)
 
-- Current test checkpoint: `4c6ed4ef6151aec058e5593d7d87518ae8e74aa3`; active contract death rule is in `517eca506f21f3a7251c6f231174f5c249bf8955`; natural SIGNAL target reward is in `06390ad706222fc47361b58de66093d5a9067721`.
-- Regression now drives a real simulated defeat through public `resolve_active_combat()`, verifies ACTIVE contract failure and loss of unsecured item/currencies, then reloads. ESCORT success goes through two real battles and checkpoint; a focused failure transaction enters a generated checkpoint at wanted 41 and verifies no payment.
-- Godot 4.7.2 headless import exit 0; full native suite: 23 tests / 88,661 assertions / 0 failures; `git diff --check` exit 0. Independent regression tester confirmed `517eca5` in a detached worktree (23 / 88,655, exit 0); independent check for `4c6ed4e` is pending. No Windows export, GUI smoke, campaign E2E or CI query.
+- Current test checkpoint: `b93a70dbe3dd58d9aeb34a1c5ab9ecd14b761014`; contract failure flows are in `4c6ed4ef6151aec058e5593d7d87518ae8e74aa3`; active contract death rule is in `517eca506f21f3a7251c6f231174f5c249bf8955`; natural SIGNAL target reward is in `06390ad706222fc47361b58de66093d5a9067721`.
+- Regression drives a real simulated defeat through public `resolve_active_combat()`, verifies ACTIVE contract failure and loss of unsecured item/currencies, then reloads. It also completes HUNT naturally, triggers death before extraction, and confirms the completed grant ID stays spent while the guaranteed item is lost rather than banked. ESCORT success runs two real battles to checkpoint; failure fixture enters a generated checkpoint at wanted 41 and verifies no payment.
+- Godot 4.7.2 headless import exit 0; full native suite: 23 tests / 88,665 assertions / 0 failures; `git diff --check` exit 0. Independent regression tester confirmed `4c6ed4e` in a detached worktree (23 / 88,661, exit 0); independent check for `b93a70d` is pending. No Windows export, GUI smoke, campaign E2E or CI query.
+- Remaining contract gaps: completed unsecured TECH/SIGNAL reward loss under death, broader faction consequences and contract offer/restart persistence. No feature-complete claim.
 - Remaining contract gaps: loss of completed but unsecured contract rewards under death, faction consequences beyond tested reputation/shop/route thresholds, and offer/restart persistence. No feature-complete claim.
 
 ## Latest game checkpoint (2026-11-13; HUNT, TECH and ESCORT contracts)
