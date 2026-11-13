@@ -1,5 +1,12 @@
 # CYDLE — Project handoff and development history
 
+## Latest workflow checkpoint (2026-11-13; project balance QA agent)
+
+- Configuration checkpoint: `928afbac8fba74c4cf51e55668fbfed59ca05163` adds `balance_qa` (`gpt-6-luna`, high) and sets `.codex/config.toml` concurrency to 3, so the root can work while `regression_tester` and `balance_qa` run together. Exactly four project agents are configured; the stale `quest_reliability` thread was stopped and no quest-only agent is in `.codex/agents/`.
+- The first bounded balance assignment is in progress on `928afba`, focused on BOSS_B at d8 across contrasting reachable builds. Scope is capped at 24 total fights, max 3 per archetype/strategy; read-only detached worktree, temporary artifacts only. No balance finding is available yet.
+- Config validation: `codex --strict-config exec` accepted the project configuration and enumerated the four agent definitions. Regression tester independently verified the config checkpoint: Godot import exit 0, full native suite 23 tests / 88,679 assertions / 0 failures, clean detached worktree.
+- Follow-up source checkpoint `e1c4b33fd237fe5df5d424a8e368fd61622ca60a` adds offline-report history reload assertions. Local import exit 0; native suite 23 tests / 88,680 assertions / 0 failures; independent regression check is pending.
+
 ## Latest game checkpoint (2026-11-13; offline diagnostics precision and history)
 
 - Game-code checkpoint: `50e61651290083ddb75893757d723b334607faab`. An explicit boolean now distinguishes an observed wall-clock delta from the API's default sentinel, so an exact -1 ms rollback is preserved instead of being rounded to -2 ms. The offline report history rows now show excess time or clock rollback, matching the current report.

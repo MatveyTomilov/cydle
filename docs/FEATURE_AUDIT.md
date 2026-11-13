@@ -30,7 +30,7 @@ This is an implementation audit, not a release checklist. “Complete” means t
 ## Current checkpoint
 
 - Branch: `development/codex`.
-- Latest game-code checkpoint: `50e61651290083ddb75893757d723b334607faab`; latest documentation checkpoint follows in Git history.
-- Godot 4.7.2 editor import exit 0; latest local full suite: 23 tests passed, 88,679 assertions, 0 failures.
+- Latest game-code checkpoint: `e1c4b33fd237fe5df5d424a8e368fd61622ca60a`; latest documentation checkpoint follows in Git history.
+- Godot 4.7.2 editor import exit 0; latest local full suite: 23 tests passed, 88,680 assertions, 0 failures.
 - CI status was not queried. The complete test suite was not rerun after docs-only updates.
 - This is not a FEATURE COMPLETE BETA claim. Full spec coverage, campaign completion, and beta export are still outstanding.

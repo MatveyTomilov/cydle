@@ -10,6 +10,8 @@ Current strategy is **FEATURE COMPLETE BETA**: audit against the normative Maste
 
 `50e61651290083ddb75893757d723b334607faab` fixes exact -1 ms rollback disclosure, persists the new diagnostics in report history, and renders them in historical UI rows. Tests cover +1 ms above the 12-hour cap and -1 ms rollback without game-time advancement. Local Godot import exit 0; 23 tests / 88,679 assertions / 0 failures. Independent regression/review are pending. No long offline simulation. Continue with interruption/retry idempotency and bounded long-window performance measurement.
 
+The balance workflow now has a dedicated `balance_qa` Luna High agent at configuration checkpoint `928afbac8fba74c4cf51e55668fbfed59ca05163`, with concurrency 3 so it runs alongside required regression checks while the main agent continues implementation. Its first bounded BOSS_B/d8 comparison is in progress; do not treat it as a balance result until its SHA-pinned report arrives. Code checkpoint `e1c4b33fd237fe5df5d424a8e368fd61622ca60a` additionally verifies the offline diagnostics survive reload (23 tests / 88,680 assertions locally).
+
 ### Prior checkpoint — offline time boundary reporting (2026-11-13)
 
 `a406db440179ed7fdf3f408125018846672e4dfd` exposes wall time above the 12-hour offline cap instead of silently discarding it and reports backward system-clock movement while applying zero game-time. A visible autopilot notice explains either boundary; regressions use 1 ms over-cap and -5 s inputs without long simulation. Local Godot import exit 0; 23 tests / 88,677 assertions / 0 failures. Independent regression/review are pending. No full 12-hour simulation. Next: verify save/reload interruption/retry idempotency and report history.

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — parallel balance research and persisted offline diagnostics
+
+- Added project agent `balance_qa` on GPT-6 Luna High. Bounded BOSS_B research (up to 24 fights, no more than 3 per archetype) runs in a detached read-only worktree alongside required regression checks. No results yet.
+- Concurrency is set to 3; the config checkpoint was accepted by Codex strict-config and all four project agent definitions were exercised/visible. Removed the stale quest-only agent from active delegation.
+- Added a reload check for the 12-hour cap and negative-clock diagnostics in saved autopilot report history. Local Godot 4.7.2 import exit 0; 23 tests / 88,680 assertions passed. Independent test of the new source checkpoint is pending.
+
 ## Unreleased — retain exact offline diagnostics
 
 - Preserved an exact -1 ms wall-clock rollback via an explicit elapsed-delta-presence flag and exposed cap/rollback values in autopilot report history.
