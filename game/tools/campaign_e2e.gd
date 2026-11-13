@@ -474,6 +474,12 @@ func _prepare_boss_tactic(session: GameSession) -> bool:
 		var auto_skill_ok: bool = session.set_tactic_rule_skill("starter-burst", "AUTO")
 		var auto_condition_ok: bool = session.set_tactic_rule_condition("starter-burst", {"kind": "always"})
 		return auto_skill_ok and auto_condition_ok
+	var next_boss_depth: int = int(session.state.meta.unlocked_forpost) + 4
+	var defensive_guard: bool = next_boss_depth == 8
+	var reaction_skill: String = "SK_GUARD" if defensive_guard else "SK_EMP"
+	var unused_reaction: String = "SK_EMP" if defensive_guard else "SK_GUARD"
+	if session.state.meta.skill_ids.has(unused_reaction) and not session.set_skill_equipped(unused_reaction, false):
+		return false
 	if session.state.meta.skill_ids.has("SK_SHIELD") and not session.state.meta.skill_ids.has("SK_HEAL"):
 		if not session.set_skill_equipped("SK_SHIELD", false):
 			return false
@@ -485,12 +491,17 @@ func _prepare_boss_tactic(session: GameSession) -> bool:
 	if session.state.meta.skill_ids.has("SK_SHIELD"):
 		if not session.set_skill_equipped("SK_SHIELD", false):
 			return false
-	if not session.state.meta.skill_ids.has("SK_EMP") and not session.set_skill_equipped("SK_EMP", true):
+	if not session.state.meta.skill_ids.has(reaction_skill) and not session.set_skill_equipped(reaction_skill, true):
 		return false
 	for starter_skill: String in ["SK_BURST"]:
 		if not session.state.meta.skill_ids.has(starter_skill) and not session.set_skill_equipped(starter_skill, true):
 			return false
-	return session.set_tactic_rule_skill("starter-shield", "SK_HEAL") and session.set_tactic_rule_target("starter-shield", "self") and session.set_tactic_rule_condition("starter-shield", {"kind": "hpBelow", "value": 0.75}) and session.set_tactic_rule_skill("starter-emp", "SK_EMP") and session.set_tactic_rule_target("starter-emp", "boss") and session.set_tactic_rule_condition("starter-emp", {"kind": "enemyCasting", "interruptibleOnly": true}) and session.set_tactic_rule_skill("starter-burst", "SK_BURST") and session.set_tactic_rule_target("starter-burst", "healer") and session.set_tactic_rule_condition("starter-burst", {"kind": "always"})
+	var reaction_target: String = "self" if defensive_guard else "boss"
+	var reaction_condition: Dictionary = {"kind": "always"} if defensive_guard else {"kind": "enemyCasting", "interruptibleOnly": true}
+	var tactic_ok: bool = session.set_tactic_rule_skill("starter-shield", "SK_HEAL") and session.set_tactic_rule_target("starter-shield", "self") and session.set_tactic_rule_condition("starter-shield", {"kind": "hpBelow", "value": 0.75}) and session.set_tactic_rule_skill("starter-emp", reaction_skill) and session.set_tactic_rule_target("starter-emp", reaction_target) and session.set_tactic_rule_condition("starter-emp", reaction_condition) and session.set_tactic_rule_skill("starter-burst", "SK_BURST") and session.set_tactic_rule_target("starter-burst", "healer") and session.set_tactic_rule_condition("starter-burst", {"kind": "always"})
+	if tactic_ok:
+		print("E2E boss preparation: next gate d%d uses %s reaction" % [next_boss_depth, reaction_skill])
+	return tactic_ok
 
 func _item_rank(item: Dictionary) -> int:
 	var rarity_order: Dictionary = {"COMMON": 0, "MODIFIED": 1, "RARE": 2, "LEGENDARY": 3, "UNIQUE": 4}
