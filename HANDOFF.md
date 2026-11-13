@@ -65,6 +65,8 @@
 
 ### Current status override (2026-11-13; offline return report integration)
 
+- Latest local WIP also extends the quest journal with authored stage requirements, Q02's remaining sector deadline, both choices with consequences, and the player's previously selected branches. Quest state still comes from the existing META choice history; the UI does not simulate or infer progression. Latest full checks remain editor import 0, 22 scripts / 88,091 assertions, Windows export/EXE smoke 0, and diff check 0.
+
 - Latest local WIP additionally fixes Q03_S2's authored guarantee: after clearing the E09 objective, choice A now deterministically selects only DR_GUN/DR_ARC/DR_MED, forces RARE and exact current sector TechLevel, and grants it as unsecured cargo. Previously the category-only roll could choose an out-of-spec drone and random ±1 TechLevel. The quest catalog validates a nonempty unique template pool; regression executes the real stage choice after its E09 condition.
 - Latest checks after this Q03 audit: Godot editor import exit 0; 22 headless scripts / 88,091 assertions / 0 failures; Windows Desktop export exit 0; exported EXE `--headless --quit-after 3` exit 0; diff check exit 0. The WIP includes this quest content fix and the offline return reports; it is not yet committed.
 

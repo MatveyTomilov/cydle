@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — quest journal requirements and decision history
+
+- Active/paused quest cards now show the authored stage gate, remaining Q02 sector deadline, both choice consequences, and past player decisions. The UI reads the persisted quest state and does not duplicate progression logic.
+- Godot editor import exit 0; 22 scripts / 88,091 assertions / 0 failures; Windows Desktop export and EXE headless smoke exit 0; `git diff --check` passed.
+
 ## Unreleased — Q03 guaranteed drone reward
 
 - Q03 stage 2 now rolls only its authored DR_GUN / DR_ARC / DR_MED reward set at RARE and exact sector TechLevel. A game-session integration regression clears the actual E09 quest target, resolves the choice, and checks the unsecured reward. The generic quest catalog validates that authored candidate pools are nonempty and unique.

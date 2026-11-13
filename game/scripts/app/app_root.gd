@@ -786,11 +786,26 @@ func _show_quest_journal() -> void:
 		card.add_child(content)
 		content.add_child(_label("%s · %s · СЕКТОР %d+" % [str(quest.get("name", quest.get("id", "Квест"))), status, int(quest.get("minDepth", 1))], 15, COLOR_CYAN if status == "ACTIVE" else COLOR_TEXT))
 		content.add_child(_label(str(quest.get("desc", "")), 11, COLOR_MUTED))
+		var progress: Dictionary = quest.get("progress", {})
+		var choice_history: Array = progress.get("choiceHistory", [])
+		if not choice_history.is_empty():
+			content.add_child(_label("ПРИНЯТЫЕ РЕШЕНИЯ", 10, COLOR_AMBER))
+			for history_entry: Dictionary in choice_history:
+				content.add_child(_label(_quest_choice_history_text(quest, history_entry), 10, COLOR_MUTED))
 		if status in ["ACTIVE", "PAUSED"]:
 			var stage_index: int = clampi(int(quest.get("currentStage", 1)) - 1, 0, 2)
 			var stage: Dictionary = quest.get("stages", [])[stage_index]
 			content.add_child(_label("ЭТАП %d · %s" % [stage_index + 1, str(stage.get("name", ""))], 12, COLOR_AMBER))
 			content.add_child(_label(str(stage.get("text", "")), 11, COLOR_MUTED))
+			content.add_child(_label("УСЛОВИЕ · %s" % _quest_requirement_text(stage.get("requirement", {})), 10, COLOR_CYAN))
+			var deadline: int = int(stage.get("deadlineSectors", 0))
+			if deadline > 0:
+				var deadline_depth: int = int(progress.get("stageStartedDepth", progress.get("startedDepth", _session.state.meta.max_sector_cleared + 1))) + deadline
+				var sectors_remaining: int = maxi(0, deadline_depth - _session.state.meta.max_sector_cleared)
+				content.add_child(_label("СРОК · ещё %d новых сектора(ов), предел d%d" % [sectors_remaining, deadline_depth], 10, COLOR_AMBER))
+			content.add_child(_label("ВОЗМОЖНЫЕ РЕШЕНИЯ", 10, COLOR_AMBER))
+			for choice: Dictionary in stage.get("choices", []):
+				content.add_child(_label("%s · %s" % [str(choice.get("label", "")), str(choice.get("desc", ""))], 10, COLOR_MUTED))
 		if status in ["AVAILABLE", "PAUSED", "FAILED"] and bool(quest.get("available", false)) and can_accept:
 			var accept: Button = _button("ВОЗОБНОВИТЬ ЗАДАНИЕ" if status == "PAUSED" else "НАЧАТЬ ЗАНОВО" if status == "FAILED" else "ПРИНЯТЬ ЗАДАНИЕ", false)
 			accept.pressed.connect(_on_accept_quest.bind(str(quest.get("id", ""))))
@@ -799,6 +814,26 @@ func _show_quest_journal() -> void:
 	var back: Button = _body.get_child(_body.get_child_count() - 1) as Button
 	back.pressed.connect(_show_garage)
 	_footer.text = "РЕШЕНИЯ И РЕПУТАЦИЯ СОХРАНЯЮТСЯ В META"
+
+func _quest_requirement_text(requirement: Dictionary) -> String:
+	match str(requirement.get("kind", "none")):
+		"none": return "достигнуть связанного сюжетного узла"
+		"visitBiome": return "пройти новый сектор биома %s" % str(requirement.get("biome", ""))
+		"killElite": return "победить элиту %s в активной цепочке" % str(requirement.get("enemyId", ""))
+		"biomeCombat": return "выиграть %d боёв в биоме %s" % [int(requirement.get("count", 1)), str(requirement.get("biome", ""))]
+		"anomaly": return "пережить отмеченный аномальный маршрут"
+		_: return "условие %s" % str(requirement.get("kind", "unknown"))
+
+func _quest_choice_history_text(quest: Dictionary, history_entry: Dictionary) -> String:
+	var stage_index: int = int(history_entry.get("stage", 1)) - 1
+	var stages: Array = quest.get("stages", [])
+	if stage_index < 0 or stage_index >= stages.size() or not stages[stage_index] is Dictionary:
+		return "Этап %d · выбор %s" % [stage_index + 1, str(history_entry.get("choiceId", "?"))]
+	var stage: Dictionary = stages[stage_index]
+	for choice: Dictionary in stage.get("choices", []):
+		if str(choice.get("id", "")) == str(history_entry.get("choiceId", "")):
+			return "Этап %d · %s" % [stage_index + 1, str(choice.get("label", history_entry.get("choiceId", "")))]
+	return "Этап %d · выбор %s" % [stage_index + 1, str(history_entry.get("choiceId", "?"))]
 
 func _on_accept_quest(quest_id: String) -> void:
 	if not _session.accept_quest(quest_id):

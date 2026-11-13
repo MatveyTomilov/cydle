@@ -18,6 +18,10 @@ The existing shared autopilot now records actual travel, node, combat, checkpoin
 
 Q03_S2 now grants only its three specified RARE drone templates (DR_GUN, DR_ARC, DR_MED) at exact current sector TechLevel; prior generic category loot could violate both type and tier guarantees. The deterministic selection and transaction are exercised after the route's E09 elite objective. Godot editor import, 22 scripts / 88,091 assertions, Windows export/EXE smoke and diff check passed. This fixes one exact quest reward contract and does not complete all six quest chains.
 
+### Current status override (2026-11-13; quest journal requirements)
+
+The journal now displays stage requirements, Q02's remaining sector deadline, both authored choices and consequences, and choice history from META. No progression logic was added to the UI. Godot editor import, 22 scripts / 88,091 assertions, Windows export/EXE smoke, and diff check passed. Quest-chain content and consequence coverage remains partial.
+
 ### Previous status override (2026-11-13; periodic and attack-counter triggers)
 
 Periodic and every-N-attacks item/tree effects now dispatch by authored action data in the shared combat simulator, including support relay damage, drone shield/interrupt actions, U09 digital-skill repeat, U18 pulse flags, and ARC/FOCUS/DR_ARC counter effects. Chance, cooldown, once guards, and proc accounting use the same state/RNG path. Godot editor import passed; 22 headless scripts / 88,085 assertions and diff check passed. Windows export/EXE smoke not run.
