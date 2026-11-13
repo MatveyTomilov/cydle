@@ -120,7 +120,7 @@ func _begin_next_action(state: Dictionary) -> void:
 	var now: int = int(state["timeMs"])
 	var candidates: Array[Dictionary] = [
 		{"sourceId": "weapon:ARC-9", "actionId": "ARC-9:basic",
-			"classId": "BASIC_ATTACK", "targetMode": "HIGHEST_THREAT",
+			"classId": "BASIC_ATTACK", "targetDoctrine": AutobattleV2Contract.Doctrine.HIGHEST_THREAT, "targetMode": "HIGHEST_THREAT",
 			"readyAtMs": 0, "cooldownUntilMs": 0,
 			"hasValidTarget": float(state["enemy"].get("hp", 0.0)) > 0.0,
 			"energyCost": ARC_ENERGY_COST, "heatDelta": ARC_HEAT_GAIN,
@@ -130,7 +130,7 @@ func _begin_next_action(state: Dictionary) -> void:
 	if float(op["heat"]) >= VENT_THRESHOLD:
 		candidates.append({
 			"sourceId": "ability:thermal-vent", "actionId": "thermal-vent",
-			"classId": "DEFENSE", "targetMode": "SELF",
+			"classId": "DEFENSE", "targetDoctrine": AutobattleV2Contract.Doctrine.SELF, "targetMode": "SELF",
 			"readyAtMs": 0,
 			"energyCost": 0.0, "heatDelta": -45.0,
 			"prepareMs": 400, "recoveryMs": 0, "cooldownMs": VENT_COOLDOWN_MS,

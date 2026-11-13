@@ -6,13 +6,13 @@ func run(_tree: SceneTree) -> bool:
 	var contract: AutobattleV2Contract = CONTRACT.new() as AutobattleV2Contract
 	var weapon: Dictionary = {
 		"sourceId": "weapon:ARC-9", "actionId": "ARC-9:basic",
-		"classId": "BASIC_ATTACK", "targetMode": "HIGHEST_THREAT",
+		"classId": "BASIC_ATTACK", "targetDoctrine": AutobattleV2Contract.Doctrine.HIGHEST_THREAT, "targetMode": "HIGHEST_THREAT",
 		"readyAtMs": 0, "cooldownUntilMs": 0, "energyCost": 4.0, "heatDelta": 9.0,
 		"prepareMs": 600, "recoveryMs": 200, "cooldownMs": 0,
 	}
 	var special: Dictionary = {
 		"sourceId": "ability:vent", "actionId": "vent",
-		"classId": "DEFENSE", "targetMode": "SELF",
+		"classId": "DEFENSE", "targetDoctrine": AutobattleV2Contract.Doctrine.SELF, "targetMode": "SELF",
 		"readyAtMs": 0, "cooldownUntilMs": 0, "energyCost": 0.0, "heatDelta": -45.0,
 	}
 	var actions: Array[Dictionary] = [weapon, special]

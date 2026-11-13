@@ -2,7 +2,7 @@ class_name CombatState
 extends RefCounted
 
 const LEGACY_RULES_VERSION: String = "cydle-combat-1.0"
-const V2_RULES_VERSION: String = "cydle-combat-2.0-development"
+const V2_RULES_VERSION: String = "cydle-combat-2.1-development"
 var combat_rules_version: String = LEGACY_RULES_VERSION
 var action_channel: Dictionary = {}
 var seed: String = ""
@@ -80,17 +80,26 @@ static func from_dictionary(value: Dictionary, resolved_build: Dictionary) -> Co
 	if version == V2_RULES_VERSION:
 		if str(value.get("rulesHash", "")) != CombatFactory.new().v2_build_rules_hash(resolved_build):
 			return null
-		if not value.get("tactics", {}).is_empty() or not resolved_build.get("skills", []).is_empty() or not resolved_build.get("triggerEffects", []).is_empty() or not resolved_build.get("drones", []).is_empty():
+		if not value.get("tactics", {}).is_empty() or not resolved_build.get("triggerEffects", []).is_empty() or not resolved_build.get("drones", []).is_empty():
 			return null
+		for skill: Variant in resolved_build.get("skills", []):
+			if not skill is Dictionary or str(skill.get("channel", "main")) != "main" or not AutobattleV2Contract.SUPPORTED_MAIN_SKILLS.has(str(skill.get("id", ""))):
+				return null
 		if not value.get("actionChannel") is Dictionary or not AutobattleV2Channel.new()._validate(value["actionChannel"], int(value.get("timeMs", 0))).is_empty():
 			return null
 		var active: Dictionary = value["actionChannel"].get("active", {})
 		if not active.is_empty():
-			var canonical: Dictionary = CombatFactory.new().compile_v2_weapon_action(resolved_build)
+			var canonical_actions: Array[Dictionary] = CombatFactory.new().compile_v2_main_actions(resolved_build, resolved_build.get("stats", {}))
+			var canonical: Dictionary = {}
+			for candidate: Dictionary in canonical_actions:
+				if str(candidate.get("actionId", "")) == str(active["action"].get("actionId", "")):
+					canonical = candidate
+					break
+			if canonical.is_empty(): return null
 			for field: Variant in canonical.keys():
 				# Timing is captured from effective runtime buffs at preparation;
 				# those buffs can expire before this snapshot is resumed.
-				if str(field) in ["prepareMs", "recoveryMs"]:
+				if str(field) in ["prepareMs", "recoveryMs", "cooldownMs"]:
 					continue
 				if active["action"].get(field) != canonical[field]:
 					return null
@@ -112,6 +121,11 @@ static func from_dictionary(value: Dictionary, resolved_build: Dictionary) -> Co
 		if actor_value is Dictionary: state.enemies.append(CombatActorState.from_dictionary(actor_value))
 	for actor_value: Variant in value.get("allies", []):
 		if actor_value is Dictionary: state.allies.append(CombatActorState.from_dictionary(actor_value))
+	if version == V2_RULES_VERSION:
+		var active: Dictionary = state.action_channel.get("active", {})
+		if not active.is_empty():
+			for target_id: Variant in active.get("targetIds", active.get("action", {}).get("targetIds", [])):
+				if _actor_by_id(state, str(target_id)) == null: return null
 	var rng_value: Variant = value.get("rng", {})
 	if not rng_value is Dictionary:
 		return null
@@ -139,6 +153,11 @@ static func from_dictionary(value: Dictionary, resolved_build: Dictionary) -> Co
 	state.extra_enemy_digital_bonus = float(value.get("extraEnemyDigitalBonus", 0.0))
 	state.trigger_chains = value.get("triggerChains", {}).duplicate(true)
 	return state if state.operator != null and not state.rng.is_empty() else null
+
+static func _actor_by_id(state: CombatState, actor_id: String) -> CombatActorState:
+	for actor: CombatActorState in state.all_actors():
+		if actor.id == actor_id: return actor
+	return null
 
 func clone() -> CombatState:
 	var copy: CombatState = CombatState.new()

@@ -3,7 +3,7 @@ extends RefCounted
 
 # Serializable action channel. Effects and resource payment are the caller's
 # atomic responsibility when advance() returns commit; cooldowns never own it.
-const VERSION: String = "cydle-action-channel-2.0"
+const VERSION: String = "cydle-action-channel-2.1"
 const OFFENSIVE_CLASSES: Array[String] = ["BASIC_ATTACK", "SPECIAL_ATTACK"]
 var _contract: AutobattleV2Contract = AutobattleV2Contract.new()
 
@@ -92,6 +92,9 @@ func _validate(state: Dictionary, now_ms: int) -> String:
 		var timeline: Dictionary = active["timeline"]
 		if str(action.get("actionId", "")).is_empty() or str(action.get("sourceId", "")).is_empty() or not str(action.get("classId", "")) in AutobattleV2Contract.CLASS_ORDER:
 			return "INVALID_ACTION_CHANNEL"
+		var doctrine: int = int(action.get("targetDoctrine", -1))
+		if doctrine < 0 or doctrine >= AutobattleV2Contract.DOCTRINE_NAMES.size() or str(action.get("targetMode", "")) != AutobattleV2Contract.target_name(doctrine):
+			return "INVALID_ACTION_TARGET_DOCTRINE"
 		if str(timeline.get("actionId", "")) != str(action["actionId"]) or not timeline.get("committed") is bool or not timeline.get("interrupted") is bool:
 			return "INVALID_ACTION_CHANNEL"
 		for field: String in ["commitAtMs", "recoveryUntilMs", "readyAtMs"]:

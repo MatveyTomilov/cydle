@@ -1,22 +1,43 @@
 class_name AutobattleV2Contract
 extends RefCounted
 
-# Isolated V2 primitive. It is NOT a replacement for CombatSimulator until
-# a versioned CombatState adapter, item-authored actions, and replay tests exist.
-# Runtime/UI integration must not silently reuse editable v1 tactics.
+# Serializable V2 action and targeting contract consumed by the shared
+# CombatSimulator. Runtime/UI integration must not reuse editable V1 tactics.
 const TICK_MS: int = 100
 const MIN_REACTION_INTERVAL_MS: int = 500
 const MAX_CHAIN_DEPTH: int = 6
 const MAX_DERIVED_EFFECTS: int = 16
+const SUPPORTED_MAIN_SKILLS: Array[String] = [
+	"SK_BURST", "SK_PIERCE", "SK_EXEC", "SK_BLADE", "SK_PLASMA", "SK_ARC",
+	"SK_OVR", "SK_NEURO", "SK_SEED", "SK_DETONATE", "SK_BREAK", "SK_SCAN",
+	"SK_LEECH", "SK_CHAIN", "SK_KINETIC", "SK_SIDE_FIRE",
+]
+enum Doctrine { HIGHEST_THREAT, FOCUS, NEAREST, LOWEST_HP, LOWEST_HP_PERCENT, INFECTED, BOSS, ALL_ENEMIES, MARKED, RANDOM_SEEDED, ALL, SELF, ALLY }
+const DOCTRINE_NAMES: Array[String] = [
+	"HIGHEST_THREAT", "FOCUS", "NEAREST", "LOWEST_HP", "LOWEST_HP_PERCENT",
+	"INFECTED", "BOSS", "ALL_ENEMIES", "MARKED", "RANDOM_SEEDED", "ALL", "SELF", "ALLY",
+]
+const AUTHORED_DOCTRINES: Dictionary = {
+	"highestThreat": Doctrine.HIGHEST_THREAT, "focus": Doctrine.FOCUS,
+	"nearest": Doctrine.NEAREST, "lowestHP": Doctrine.LOWEST_HP,
+	"lowestHPPercent": Doctrine.LOWEST_HP_PERCENT, "infected": Doctrine.INFECTED,
+	"boss": Doctrine.BOSS, "allEnemies": Doctrine.ALL_ENEMIES,
+	"marked": Doctrine.MARKED, "randomSeeded": Doctrine.RANDOM_SEEDED,
+	"all": Doctrine.ALL, "self": Doctrine.SELF, "ally": Doctrine.ALLY,
+}
 const CLASS_ORDER: Array[String] = [
 	"EMERGENCY_DEFENSE", "CONTROL", "DEFENSE",
 	"SPECIAL_ATTACK", "BASIC_ATTACK", "UTILITY",
 ]
-const TARGET_DOCTRINES: Array[String] = [
-	"FOCUS", "NEAREST", "LOWEST_HP", "HIGHEST_THREAT",
-	"LOWEST_HP_PERCENT", "INFECTED", "BOSS", "ALL_ENEMIES",
-	"MARKED", "RANDOM_SEEDED", "ALL", "SELF", "ALLY",
-]
+
+static func compile_target(mode: String) -> Dictionary:
+	if not AUTHORED_DOCTRINES.has(mode):
+		return {"ok": false, "error": "UNSUPPORTED_TARGET_MODE:%s" % mode, "doctrine": -1, "name": ""}
+	var doctrine: int = int(AUTHORED_DOCTRINES[mode])
+	return {"ok": true, "error": "", "doctrine": doctrine, "name": target_name(doctrine)}
+
+static func target_name(doctrine: int) -> String:
+	return DOCTRINE_NAMES[doctrine] if doctrine >= 0 and doctrine < DOCTRINE_NAMES.size() else ""
 const FORBIDDEN_EDITABLE_FIELDS: Array[String] = [
 	"priority", "conditions", "logic", "targetPriority",
 	"userRule", "when", "script", "ruleId",
@@ -56,7 +77,8 @@ func _candidate_rejection(action: Dictionary, now_ms: int, energy: float, heat: 
 		return "MISSING_AUTHORED_SOURCE"
 	if not str(action.get("classId", "")) in CLASS_ORDER:
 		return "UNKNOWN_ACTION_CLASS"
-	if not str(action.get("targetMode", "")) in TARGET_DOCTRINES:
+	var target_doctrine: int = int(action.get("targetDoctrine", -1))
+	if target_doctrine < 0 or target_doctrine >= DOCTRINE_NAMES.size() or str(action.get("targetMode", "")) != target_name(target_doctrine):
 		return "UNKNOWN_TARGET_DOCTRINE"
 	if int(action.get("readyAtMs", 0)) > now_ms or int(action.get("cooldownUntilMs", 0)) > now_ms:
 		return "COOLDOWN"
@@ -158,7 +180,7 @@ func select_targets(doctrine: String, enemies: Array[Dictionary], focus_id: Stri
 		return str(left.get("id", "")) < str(right.get("id", ""))
 	)
 	var ids: PackedStringArray = PackedStringArray()
-	if living.is_empty() or not doctrine in TARGET_DOCTRINES:
+	if living.is_empty() or not DOCTRINE_NAMES.has(doctrine):
 		return ids
 	if doctrine == "SELF" or doctrine == "ALLY":
 		return ids # The caller resolves friendly actors, not the enemy roster.

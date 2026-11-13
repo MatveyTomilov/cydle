@@ -2,8 +2,8 @@ extends "res://tests/test_case.gd"
 
 func run(_tree: SceneTree) -> bool:
 	var channel: AutobattleV2Channel = AutobattleV2Channel.new()
-	var attack: Dictionary = {"sourceId": "weapon:test", "actionId": "basic", "classId": "BASIC_ATTACK", "targetMode": "HIGHEST_THREAT", "prepareMs": 200, "recoveryMs": 100, "cooldownMs": 0}
-	var defense: Dictionary = {"sourceId": "armor:test", "actionId": "shield", "classId": "DEFENSE", "targetMode": "SELF", "prepareMs": 100, "recoveryMs": 100, "cooldownMs": 8000}
+	var attack: Dictionary = {"sourceId": "weapon:test", "actionId": "basic", "classId": "BASIC_ATTACK", "targetDoctrine": AutobattleV2Contract.Doctrine.HIGHEST_THREAT, "targetMode": "HIGHEST_THREAT", "prepareMs": 200, "recoveryMs": 100, "cooldownMs": 0}
+	var defense: Dictionary = {"sourceId": "armor:test", "actionId": "shield", "classId": "DEFENSE", "targetDoctrine": AutobattleV2Contract.Doctrine.SELF, "targetMode": "SELF", "prepareMs": 100, "recoveryMs": 100, "cooldownMs": 8000}
 	var started: Dictionary = channel.start(channel.new_state(), [attack, defense], 0, 100, 0, 100)
 	check(str(started["action"]["actionId"]) == "shield", "channel: first defense not selected")
 	check(not bool(channel.start(started["state"], [attack], 0, 100, 0, 100)["ok"]), "channel: occupied channel overwritten")
