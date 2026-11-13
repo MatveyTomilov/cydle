@@ -95,6 +95,11 @@ func run(_tree: SceneTree) -> bool:
 
 	var autopilot_session: GameSession = GameSession.new()
 	autopilot_session.configure_save_directory("user://test-saves/autopilot")
+	var offline_cap_session: GameSession = GameSession.new()
+	offline_cap_session.configure_save_directory("user://test-saves/autopilot-offline-cap")
+	if check(offline_cap_session.start_new_game(1762900000049) and offline_cap_session.start_expedition("autopilot-offline-cap"), "game_session: could not prepare an isolated offline time-cap profile"):
+		var capped_offline_report: Dictionary = offline_cap_session.simulate_autopilot(1, 43200001)
+		check(int(capped_offline_report.get("elapsedWallClockMs", 0)) == 43200000 and int(capped_offline_report.get("simulatedMs", 0)) <= 1, "game_session: offline return exceeded the 12-hour wall-clock cap or ignored its simulation budget: %s" % capped_offline_report)
 	if check(autopilot_session.start_new_game(1762900000050), "game_session: could not create an autopilot profile"):
 		check(autopilot_session.state.meta.autopilot_profiles.size() == 3 and autopilot_session.active_autopilot_profile_id() == "BALANCED", "game_session: new profiles do not include the three authored pilot presets")
 		var old_pilot_payload: Dictionary = autopilot_session.state.to_payload()

@@ -3,7 +3,7 @@
 ## Unreleased — transaction-derived autopilot and offline return report
 
 - The existing autopilot records route/node/combat/checkpoint/terminal actions and derives its return report from actual state changes: battle/run outcomes, route, item gains/losses, strongest drop, gross/net currencies, faction changes, game-time, and real elapsed offline time. The road screen presents the added data; save validation checks optional new report fields and remains compatible with prior reports.
-- Godot import exit 0; 22 headless scripts / 88,087 assertions / 0 failures; Windows Desktop export and EXE headless smoke exit 0; `git diff --check` passed. A full 12-hour offline idempotency/parity acceptance run remains outstanding.
+- Godot import exit 0; 22 headless scripts / 88,089 assertions / 0 failures; Windows Desktop export and EXE headless smoke exit 0; `git diff --check` passed. The 12-hour elapsed-time clamp is covered; a full 12-hour offline idempotency/parity acceptance run remains outstanding.
 
 ## Unreleased — save checksum JSON-roundtrip stability
 
