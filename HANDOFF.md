@@ -13,7 +13,7 @@
 
 - Godot change in progress on top of the balance-report documentation checkpoint: Grey Dealer computes `ceil(60% × ceil(rare shop price))`, matching Master Spec §20.1. At d12 this fixes the charge from 266 to 267 credits.
 - Regression added to `game/tests/golden/event_catalog_test.gd`. Godot 4.7.2 headless editor import exit 0; full native suite exit 0: 23 tests, 88,682 assertions, 0 failures. TypeScript suite/typecheck were already green at prior code-equivalent HEAD and are unaffected by this Godot-only change.
-- Commit `24e5fcc6b51c4e5b7ab2c3207a3b0454a856729d` was pushed to `development/codex`; local and remote HEAD matched and the worktree was clean at the push checkpoint. Independent regression verification is running.
+- Commit `24e5fcc6b51c4e5b7ab2c3207a3b0454a856729d` was pushed to `development/codex`; local and remote HEAD matched and the worktree was clean at the push checkpoint. Independent regression verified this SHA: import exit 0, 23 tests / 88,682 assertions / 0 failures, EV13 price assertion 267, detached worktree clean, `git diff --check` clean. Logs: `C:\Users\Matve\AppData\Local\Temp\cydle-regression-logs-24e5fcc6b51c4e5b\`.
 
 ## Latest game checkpoint (2026-11-13; offline diagnostics precision and history)
 
