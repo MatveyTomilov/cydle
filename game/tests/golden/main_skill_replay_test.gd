@@ -6,7 +6,6 @@ func run(_tree: SceneTree) -> bool:
 	_run_replay("pierce_skill_replay", "SK_PIERCE")
 	_run_replay("execute_skill_replay", "SK_EXEC")
 	_run_replay("plasma_skill_replay", "SK_PLASMA")
-	_run_default_solo_burst()
 	_run_reaction_shield()
 	_run_reaction_emp_interrupt()
 	_run_target_scoped_cast_condition()
@@ -19,59 +18,6 @@ func run(_tree: SceneTree) -> bool:
 	_run_enemy_escape_wanted_protection()
 	_run_drone_roles()
 	return failure_count == 0
-
-func _run_default_solo_burst() -> void:
-	var created: Dictionary = GameSaveFactory.new().create_initial_payload("solo-boss-tactic-regression", 1700000000000)
-	var fixture: Dictionary = _read_dictionary("res://tests/fixtures/combat/main_skill_replay.json")
-	if not check(bool(created.get("ok", false)) and not fixture.is_empty(), "default_solo_burst: starter save or combat fixture is missing"):
-		return
-	var payload: Dictionary = created["payload"]
-	var tactics: Dictionary = payload["meta"]["tactics"][0]
-	var burst_rule: Dictionary = {}
-	for rule_value: Variant in tactics.get("rules", []):
-		if rule_value is Dictionary and str(rule_value.get("id", "")) == "starter-burst":
-			burst_rule = rule_value
-			break
-	if not check(str(burst_rule.get("target", "")) == "nearest" and str(burst_rule.get("conditions", [{}])[0].get("kind", "")) == "always", "default_solo_burst: starter tactic excludes a valid single target"):
-		return
-	var items_by_id: Dictionary = {}
-	for item_value: Dictionary in payload["meta"].get("inventory", []):
-		items_by_id[str(item_value["itemId"])] = item_value
-	var equipment: Dictionary = {}
-	for slot_value: Variant in payload["meta"].get("equipment", {}).keys():
-		var item_id: String = str(payload["meta"]["equipment"][slot_value])
-		if not items_by_id.has(item_id):
-			continue
-		var item: ItemInstance = ItemInstance.new()
-		if not check(item.instantiate_from_dictionary(items_by_id[item_id]), "default_solo_burst: starter item did not parse for %s" % str(slot_value)):
-			return
-		equipment[str(slot_value)] = item
-	var build: Dictionary = BuildResolver.new().resolve_build({
-		"equipment": equipment, "attributes": payload["meta"]["operator"]["attributes"],
-		"skillIds": payload["meta"]["skillIds"], "passiveIds": payload["meta"]["passiveIds"],
-		"treeNodeIds": payload["meta"]["treeNodeIds"], "attributePointsEarned": payload["meta"]["operator"]["attributePoints"],
-		"treePointsEarned": payload["meta"]["operator"]["treePoints"],
-		"unlockedImplantSlots": payload["meta"]["unlockedImplantSlots"], "unlockedDroneSlots": payload["meta"]["unlockedDroneSlots"],
-	})
-	if not check(bool(build.get("valid", false)), "default_solo_burst: BuildResolver rejected starter build: %s" % str(build.get("error", ""))):
-		return
-	var initialized: Dictionary = CombatSimulator.new().create_state({
-		"seed": "default-solo-boss-burst", "depth": 4, "biome": "B01", "nodeType": "BOSS",
-		"build": build, "enemies": [{"templateId": "BOSS_A"}], "tactics": tactics,
-		"maxDurationMs": 6000, "startEnergy": 100,
-	})
-	if not check(bool(initialized.get("ok", false)), "default_solo_burst: BOSS_A state initialization failed: %s" % initialized.get("error", "")):
-		return
-	var simulator: CombatSimulator = CombatSimulator.new()
-	var state: CombatState = initialized["state"] as CombatState
-	for _tick: int in range(30):
-		var stepped: Dictionary = simulator.step_combat(state)
-		if not check(bool(stepped.get("ok", false)), "default_solo_burst: simulator failed: %s" % stepped.get("error", "")):
-			return
-		state = stepped["state"] as CombatState
-		if not state.outcome.is_empty():
-			break
-	check(int(state.metrics.get("skillUses", {}).get("SK_BURST", 0)) > 0, "default_solo_burst: default combat tactics never use the starter main skill against a solo boss")
 
 func _run_reaction_shield() -> void:
 	var meta: Dictionary = _read_dictionary(SAVE_FIXTURE).get("meta", {})

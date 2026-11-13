@@ -16,6 +16,9 @@ func run(_tree: SceneTree) -> bool:
 	if expected is Dictionary:
 		check(_json_equivalent(created["payload"], expected), "initial_save_factory: native starter save differs from the TypeScript oracle")
 		check(created["payload"]["meta"]["inventory"].size() == 12, "initial_save_factory: expected twelve starter items")
+		var starter_burst: Dictionary = created["payload"]["meta"]["tactics"][0]["rules"].filter(func(rule: Dictionary) -> bool: return str(rule.get("id", "")) == "starter-burst")[0]
+		var burst_condition: Dictionary = starter_burst.get("conditions", [{}])[0]
+		check(str(starter_burst.get("target", "")) == "allEnemies" and str(burst_condition.get("kind", "")) == "enemiesAtLeast" and int(burst_condition.get("value", 0)) == 2, "initial_save_factory: starter burst rule differs from Master Spec's two-enemy condition")
 	return failure_count == 0
 
 func _json_equivalent(left: Variant, right: Variant) -> bool:

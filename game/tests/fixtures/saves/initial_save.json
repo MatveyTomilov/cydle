@@ -323,14 +323,15 @@
             "priority": 1,
             "enabled": true,
             "skillId": "SK_BURST",
-            "target": "nearest",
+            "target": "allEnemies",
             "conditions": [
               {
-                "kind": "always"
+                "kind": "enemiesAtLeast",
+                "value": 2
               }
             ],
             "logic": "AND",
-            "note": "Очередь по приоритетной цели"
+            "note": "Очередь по группе"
           },
           {
             "id": "starter-auto",
