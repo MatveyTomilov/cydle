@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — active/offline battle parity smoke
+
+- Compared identical seeded battles in manual and offline/autopilot sessions, including outcome, metrics, run economy, grants, operator progression and post-settlement reload.
+- Godot 4.7.2 editor import exit 0; 23 tests / 88,675 assertions passed. This is not full 12-hour offline validation; independent regression check pending.
+
 ## Unreleased — completed HUNT reward loss on death
 
 - Extended the natural HUNT contract flow: after exact contract reward and save reload, death before extraction loses the unsecured guaranteed item, preserves COMPLETE/reward-claimed status, and does not make the grant available again.

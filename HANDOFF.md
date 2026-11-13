@@ -1,5 +1,12 @@
 # CYDLE — Project handoff and development history
 
+## Latest game checkpoint (2026-11-13; active/offline combat parity smoke)
+
+- Game-code checkpoint: `99d944b576e382b642aba573cd120b5b623acde7`. Added a deterministic single-battle parity regression using two identical profiles and the same route/combat seed. One combat advances manually through the shared 100 ms step API; the other settles through `simulate_autopilot()` with an exact combat-time budget.
+- The regression compares outcome and combat metrics, run resources, currency, cargo item IDs, grants, cleared node and operator progression, then reloads the offline result. This verifies one finite combat handoff, not full 12-hour offline parity or all autopilot policies.
+- Godot 4.7.2 headless editor import exit 0; full native suite: 23 tests / 88,675 assertions / 0 failures; `git diff --check` exit 0. Independent regression tester is checking this SHA. No Windows export, GUI smoke, long campaign E2E or CI query.
+- Next offline/autopilot gaps: test long-window caps and interrupted/repeated processing, policy decisions/safe stops, and route/economy parity across multiple nodes. Preserve every existing profile and test save directory.
+
 ## Latest game checkpoint (2026-11-13; natural SIGNAL reward and contract death settlement)
 
 - Current test checkpoint: `b93a70dbe3dd58d9aeb34a1c5ab9ecd14b761014`; contract failure flows are in `4c6ed4ef6151aec058e5593d7d87518ae8e74aa3`; active contract death rule is in `517eca506f21f3a7251c6f231174f5c249bf8955`; natural SIGNAL target reward is in `06390ad706222fc47361b58de66093d5a9067721`.

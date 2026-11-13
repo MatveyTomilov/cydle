@@ -6,7 +6,11 @@
 
 Current strategy is **FEATURE COMPLETE BETA**: audit against the normative Master Spec, close significant runtime/UI gaps, and validate real state transitions. Boss balancing and repeated automatic boss retries are deferred unless a concrete gameplay defect requires them. Preserve all profile/save data; use short deterministic integration scenarios.
 
-### Latest checkpoint — contract reward paths and death settlement (2026-11-13)
+### Latest checkpoint — active/offline combat parity smoke (2026-11-13)
+
+`99d944b576e382b642aba573cd120b5b623acde7` creates two matching profiles, runs the same fixed combat by manual 100 ms stepping and `simulate_autopilot()` with an exact-duration budget, compares outcome/metrics/economy/progression and reloads the offline result. Local Godot import exit 0; 23 tests / 88,675 assertions / 0 failures. Independent regression check is pending. This is one battle, not validation of 12-hour limits, repeated interruption or full route parity. Next: cover bounded long-window behavior and save/reload idempotency without running an actual 12-hour simulation.
+
+### Prior checkpoint — contract reward paths and death settlement (2026-11-13)
 
 `06390ad706222fc47361b58de66093d5a9067721` adds natural SIGNAL completion: follow the generated route, clear preceding encounters through the shared simulator, win the target ELITE, verify its exact U09 UNIQUE grant and reload. `517eca506f21f3a7251c6f231174f5c249bf8955` marks any ACTIVE contract FAILED when death settles. `4c6ed4ef6151aec058e5593d7d87518ae8e74aa3` tests a real simulated defeat through `resolve_active_combat()`, death/cargo/wallet settlement, plus ESCORT's successful and wanted-threshold-failed checkpoint transactions. `b93a70dbe3dd58d9aeb34a1c5ab9ecd14b761014` verifies that dying after natural HUNT completion loses its unsecured reward without reopening or duplicating the grant. Latest local Godot import exit 0 and 23 tests / 88,665 assertions / 0 failures; independent tester confirmed `4c6ed4e`, and is checking `b93a70d`. No Windows export, GUI smoke or CI query. Remaining contract lifecycle gaps are unsecured TECH/SIGNAL reward death handling, broader faction consequences and offer/restart persistence.
 
