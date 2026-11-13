@@ -10,6 +10,23 @@ var _formula: CydleFormula = CydleFormula.new()
 var _catalog_loaded: bool = false
 var _catalog_error: String = ""
 
+func v2_build_rules_hash(build: Dictionary) -> String:
+	return StateHash.new().state_hash({"version": CombatState.V2_RULES_VERSION, "weapon": build.get("mainWeapon", {}), "stats": build.get("stats", {}), "modifiers": build.get("modifiers", [])})
+
+# Compile from the canonical resolved weapon. This adapter owns timing only;
+# damage packets, hit/crit, statuses and procs stay in CombatSimulator.
+func compile_v2_weapon_action(build: Dictionary) -> Dictionary:
+	if not bool(build.get("valid", false)) or not build.get("mainWeapon") is Dictionary:
+		return {}
+	var weapon: Dictionary = build["mainWeapon"]
+	if str(weapon.get("itemId", "")).is_empty():
+		return {}
+	var stats: Dictionary = build.get("stats", {})
+	var interval: float = _formula.attack_interval_ms(float(weapon.get("intervalMs", 1000)), float(stats.get("attackSpeed", 0)), float(stats.get("moreAttackSpeed", 1)))
+	var duration: int = maxi(100, int(ceili(interval / 100.0)) * 100)
+	var prepare: int = maxi(100, int(floorf(float(duration) * 0.75 / 100.0)) * 100)
+	return {"sourceId": str(weapon["itemId"]), "actionId": "weapon:basic", "classId": "BASIC_ATTACK", "targetMode": "HIGHEST_THREAT", "prepareMs": prepare, "recoveryMs": duration - prepare, "cooldownMs": 0, "energyCost": float(weapon.get("energyPerAttack", 0)), "heatDelta": float(weapon.get("heatPerAttack", 0))}
+
 func create_roster(build: Dictionary, enemy_specs: Array[Dictionary], depth: int, options: Dictionary = {}) -> Dictionary:
 	if not bool(build.get("valid", false)) or not build.get("mainWeapon") is Dictionary or build.get("mainWeapon", {}).is_empty():
 		return _failure("Для боя требуется валидная сборка с основным оружием.")

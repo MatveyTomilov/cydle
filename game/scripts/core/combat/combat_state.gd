@@ -2,7 +2,9 @@ class_name CombatState
 extends RefCounted
 
 const LEGACY_RULES_VERSION: String = "cydle-combat-1.0"
+const V2_RULES_VERSION: String = "cydle-combat-2.0-development"
 var combat_rules_version: String = LEGACY_RULES_VERSION
+var action_channel: Dictionary = {}
 var seed: String = ""
 var depth: int = 1
 var biome: String = "B01"
@@ -66,16 +68,27 @@ func to_dictionary() -> Dictionary:
 	# Preserve the historical V1 hash representation used by golden fixtures.
 	if combat_rules_version != LEGACY_RULES_VERSION:
 		result["combatRulesVersion"] = combat_rules_version
+		result["actionChannel"] = action_channel.duplicate(true)
 	return result
 
 static func from_dictionary(value: Dictionary, resolved_build: Dictionary) -> CombatState:
-	# Untagged historical snapshots are V1. Never reinterpret a V2/future
-	# snapshot through legacy casts, tactics and cooldown semantics.
-	if str(value.get("combatRulesVersion", LEGACY_RULES_VERSION)) != LEGACY_RULES_VERSION:
+	# Untagged historical snapshots are V1. V2 requires a validated explicit
+	# channel; unknown versions never enter either runtime.
+	var version: String = str(value.get("combatRulesVersion", LEGACY_RULES_VERSION))
+	if version not in [LEGACY_RULES_VERSION, V2_RULES_VERSION]:
 		return null
+	if version == V2_RULES_VERSION:
+		if str(value.get("rulesHash", "")) != CombatFactory.new().v2_build_rules_hash(resolved_build):
+			return null
+		if not value.get("tactics", {}).is_empty() or not resolved_build.get("skills", []).is_empty() or not resolved_build.get("triggerEffects", []).is_empty() or not resolved_build.get("drones", []).is_empty():
+			return null
+		if not value.get("actionChannel") is Dictionary or not AutobattleV2Channel.new()._validate(value["actionChannel"], int(value.get("timeMs", 0))).is_empty():
+			return null
 	if not value.get("operator") is Dictionary or resolved_build.is_empty():
 		return null
 	var state: CombatState = CombatState.new()
+	state.combat_rules_version = version
+	state.action_channel = value.get("actionChannel", {}).duplicate(true)
 	state.seed = str(value.get("seed", ""))
 	state.depth = int(value.get("depth", 1))
 	state.biome = str(value.get("biome", "B01"))

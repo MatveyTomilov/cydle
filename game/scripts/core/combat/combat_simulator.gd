@@ -22,8 +22,14 @@ var _status_catalog_loaded: bool = false
 var _status_catalog_error: String = ""
 
 func create_state(config: Dictionary) -> Dictionary:
-	if str(config.get("combatRulesVersion", COMBAT_RULES_VERSION)) != COMBAT_RULES_VERSION:
+	var requested_version: String = str(config.get("combatRulesVersion", COMBAT_RULES_VERSION))
+	if requested_version not in [COMBAT_RULES_VERSION, CombatState.V2_RULES_VERSION]:
 		return _failure("Неподдерживаемая версия боевых правил; требуется явная миграция.")
+	# Incremental adapter: never silently drop unported authored abilities.
+	if requested_version == CombatState.V2_RULES_VERSION:
+		var v2_build: Dictionary = config.get("build", {})
+		if not config.get("tactics", {}).is_empty() or not v2_build.get("skills", []).is_empty() or not v2_build.get("triggerEffects", []).is_empty() or not v2_build.get("drones", []).is_empty():
+			return _failure("V2 adapter: способности, proc-эффекты и дроны ещё не подключены; тактики V1 запрещены.")
 	var seed_value: Variant = config.get("seed", "")
 	var depth_value: Variant = config.get("depth", 0)
 	var enemy_value: Variant = config.get("enemies", [])
@@ -46,6 +52,11 @@ func create_state(config: Dictionary) -> Dictionary:
 	if not bool(roster.get("ok", false)):
 		return roster
 	var state: CombatState = CombatState.new()
+	state.combat_rules_version = requested_version
+	if requested_version == CombatState.V2_RULES_VERSION:
+		if _factory.compile_v2_weapon_action(build_value).is_empty():
+			return _failure("V2 adapter: не удалось скомпилировать реальное оружие.")
+		state.action_channel = AutobattleV2Channel.new().new_state()
 	state.seed = str(seed_value)
 	state.depth = int(depth_value)
 	state.biome = str(config.get("biome", "B01"))
@@ -67,7 +78,9 @@ func create_state(config: Dictionary) -> Dictionary:
 	state.extra_enemy_digital_bonus = float(config.get("extraEnemyDigitalBonus", 0.0))
 	state.metrics = _empty_metrics()
 	state.rng = _new_rng(state.seed).serialize()
-	state.rules_hash = _hash.hash_string(_hash.stable_stringify({"version": COMBAT_RULES_VERSION, "tactics": state.tactics}))
+	state.rules_hash = _hash.hash_string(_hash.stable_stringify({"version": requested_version, "tactics": state.tactics}))
+	if requested_version == CombatState.V2_RULES_VERSION:
+		state.rules_hash = _factory.v2_build_rules_hash(state.build)
 	state.next_event_id = 1
 	for trigger_value: Dictionary in state.build.get("triggerEffects", []):
 		var effect: Dictionary = trigger_value.get("effect", {})
@@ -90,7 +103,7 @@ func create_state(config: Dictionary) -> Dictionary:
 func step_combat(state: CombatState) -> Dictionary:
 	if state == null:
 		return _failure("Нельзя продвинуть пустое состояние боя.")
-	if state.combat_rules_version != COMBAT_RULES_VERSION:
+	if state.combat_rules_version not in [COMBAT_RULES_VERSION, CombatState.V2_RULES_VERSION]:
 		return _failure("Версия снимка не соответствует боевому движку.")
 	if not state.outcome.is_empty():
 		return {"ok": true, "state": state, "error": ""}
@@ -107,13 +120,20 @@ func step_combat(state: CombatState) -> Dictionary:
 	_run_periodic_drone_triggers(next, rng)
 	_advance_reaction_cast(next, rng)
 	_advance_drone_skill_casts(next, rng)
-	_advance_main_skill_cast(next, rng)
+	if next.combat_rules_version == COMBAT_RULES_VERSION:
+		_advance_main_skill_cast(next, rng)
 	_advance_enemy_ability_casts(next, rng)
-	_choose_reaction_skill(next, rng)
+	if next.combat_rules_version == COMBAT_RULES_VERSION:
+		_choose_reaction_skill(next, rng)
 	var ready: Array[CombatActorState] = next.all_actors()
 	ready.sort_custom(func(left: CombatActorState, right: CombatActorState) -> bool: return left.id < right.id)
 	for actor: CombatActorState in ready:
 		if not actor.alive:
+			continue
+		if actor.kind == "operator" and next.combat_rules_version == CombatState.V2_RULES_VERSION:
+			var v2_result: Dictionary = _step_v2_weapon_channel(next, rng)
+			if not bool(v2_result.get("ok", false)):
+				return v2_result
 			continue
 		if actor.side == "enemy" and actor.cast == null:
 			var scheduled_ability: Dictionary = _ready_enemy_ability(next, actor)
@@ -147,6 +167,53 @@ func step_combat(state: CombatState) -> Dictionary:
 	_check_terminal(next)
 	next.rng = rng.serialize()
 	return {"ok": true, "state": next, "error": ""}
+
+func _step_v2_weapon_channel(state: CombatState, rng: DeterministicRng) -> Dictionary:
+	var channel: AutobattleV2Channel = AutobattleV2Channel.new()
+	var actor: CombatActorState = state.operator
+	if _has_status(actor, "STUN") and not state.action_channel.get("active", {}).is_empty():
+		var interrupted: Dictionary = channel.interrupt(state.action_channel, state.time_ms)
+		if not bool(interrupted.get("ok", false)):
+			return _failure(str(interrupted.get("error", "INVALID_ACTION_CHANNEL")))
+		state.action_channel = interrupted["state"]
+		if bool(interrupted.get("interrupted", false)):
+			_emit(state, "ACTION_INTERRUPTED", actor.id, {"data": {"reason": "STUN", "phase": "PREPARE"}})
+	var advanced: Dictionary = channel.advance(state.action_channel, state.time_ms)
+	if not bool(advanced.get("ok", false)):
+		return _failure(str(advanced.get("error", "INVALID_ACTION_CHANNEL")))
+	state.action_channel = advanced["state"]
+	var target: CombatActorState = _pick_auto_target(state, actor)
+	if not advanced["commit"].is_empty():
+		var committed: Dictionary = advanced["commit"]
+		var reason: String = ""
+		if target == null:
+			reason = "NO_TARGET"
+		elif _has_status(actor, "STUN"):
+			reason = "STUN"
+		elif actor.energy < float(committed.get("energyCost", 0)):
+			reason = "ENERGY_AT_COMMIT"
+		elif actor.heat_lockout and float(committed.get("heatDelta", 0)) > 0:
+			reason = "THERMAL_LOCK"
+		if reason.is_empty():
+			var applied: Dictionary = _resolve_basic_attack(state, rng, actor, target)
+			if not bool(applied.get("ok", false)):
+				return applied
+		else:
+			_emit(state, "ACTION_UNAVAILABLE", actor.id, {"data": {"reason": reason, "phase": "COMMIT", "sourceId": committed.get("sourceId", "")}})
+	if state.action_channel["active"].is_empty():
+		var action: Dictionary = _factory.compile_v2_weapon_action(state.build)
+		action["hasValidTarget"] = target != null
+		if _has_status(actor, "STUN"):
+			return {"ok": true}
+		var chosen: Dictionary = channel.start(state.action_channel, [action], state.time_ms, actor.energy, actor.heat, float(actor.base_sheet.get("maxHeat", 100)), actor.heat_lockout)
+		if not bool(chosen.get("ok", false)):
+			return _failure(str(chosen.get("error", "INVALID_ACTION_CHANNEL")))
+		state.action_channel = chosen["state"]
+		for rejected: Dictionary in chosen["rejected"]:
+			_emit(state, "ACTION_UNAVAILABLE", actor.id, {"data": rejected})
+		if not chosen["action"].is_empty():
+			_emit(state, "ACTION_PREPARE", actor.id, {"targetId": target.id if target != null else "", "data": chosen["action"]})
+	return {"ok": true}
 
 func _supports_basic_auto_step(state: CombatState) -> bool:
 	if not _supports_skill_trigger_effects(state):
@@ -1932,6 +1999,8 @@ func _apply_basic_continuous(state: CombatState, rng: DeterministicRng) -> void:
 				ambient += float(_factory._enemy_catalog.get_template(enemy.template_id).get("ambientHeatPerSec", 0.0))
 		var cooling: float = maxf(0.0, float(sheet.get("heatCooling", 0.0)) - state.cooling_penalty)
 		var heat_before: float = operator.heat
+		if state.combat_rules_version == CombatState.V2_RULES_VERSION and (operator.heat_lockout or state.time_ms - int(operator.flags.get("v2LastHeatGainAt", -100000)) < 500):
+			cooling = 0.0
 		operator.heat = clampf(operator.heat + (ambient - cooling) * 0.1, 0.0, float(sheet.get("maxHeat", 0.0)))
 		_handle_heat_transition(state, rng, operator, heat_before, float(sheet.get("maxHeat", 0.0)))
 		if operator.heat <= 25.0:
@@ -1967,6 +2036,8 @@ func _pick_auto_target(state: CombatState, actor: CombatActorState) -> CombatAct
 		if enemy.alive:
 			enemies.append(enemy)
 	enemies.sort_custom(func(left: CombatActorState, right: CombatActorState) -> bool: return left.id < right.id)
+	if state.combat_rules_version == CombatState.V2_RULES_VERSION and actor.kind == "operator":
+		enemies.sort_custom(func(left: CombatActorState, right: CombatActorState) -> bool: return left.threat_units > right.threat_units if left.threat_units != right.threat_units else left.id < right.id)
 	if actor.kind == "drone" and actor.drone_role == "mark":
 		for enemy: CombatActorState in enemies:
 			if _has_status(enemy, "DRONE_MARK"):
@@ -2477,9 +2548,22 @@ func _gain_basic_heat(state: CombatState, actor: CombatActorState, amount: float
 	var max_heat: float = float(actor.base_sheet.get("maxHeat", 0.0))
 	var before: float = actor.heat
 	actor.heat = clampf(actor.heat + amount, 0.0, max_heat)
+	if state.combat_rules_version == CombatState.V2_RULES_VERSION:
+		actor.flags["v2LastHeatGainAt"] = state.time_ms
 	_handle_heat_transition(state, rng, actor, before, max_heat)
 
 func _handle_heat_transition(state: CombatState, rng: DeterministicRng, actor: CombatActorState, heat_before: float, max_heat: float) -> void:
+	if state.combat_rules_version == CombatState.V2_RULES_VERSION:
+		if actor.heat_lockout and state.time_ms >= actor.lockout_until:
+			actor.heat_lockout = false
+			actor.heat = minf(max_heat, 65.0)
+			_emit(state, "HEAT_LOCKOUT_END", actor.id, {"data": {"heat": actor.heat, "reason": "LOCK_DURATION_ELAPSED"}})
+		elif not actor.heat_lockout and actor.heat >= max_heat:
+			actor.heat_lockout = true
+			actor.lockout_until = state.time_ms + 1500
+			state.metrics["heatLockouts"] = int(state.metrics.get("heatLockouts", 0)) + 1
+			_emit(state, "HEAT_LOCKOUT", actor.id, {"data": {"heat": actor.heat, "untilMs": actor.lockout_until}})
+		return
 	if not actor.heat_lockout and heat_before < max_heat and actor.heat >= max_heat:
 		actor.heat_lockout = true
 		_emit(state, "HEAT", actor.id, {"text": "Нагрев достиг максимума.", "data": {"heat": actor.heat, "threshold": max_heat}})

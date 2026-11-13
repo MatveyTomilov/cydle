@@ -4,7 +4,7 @@ Working branch: `feature/autobattle-v2`; draft PR #3. Gate A is **OPEN**.
 
 | Stage | Actual state | Missing acceptance evidence |
 |---|---|---|
-| A1 core | Contract, serializable channel, fixed headless duel using canonical damage math; legacy snapshot guard | Real build/compiler, factory and session V2 dispatch, integrated save/replay and reaction bus |
+| A1 core | Contract, serialized channel, real-weapon compiler/factory and opt-in shared-simulator dispatch; legacy snapshot guard | Authored ability/proc/drone compiler, session V2 dispatch, integrated save/replay and reaction bus |
 | A2 Thermocircuit | Prototype ARC/HOT/Vent/heat-shield only | Real catalog equipment, armor, passive, KITE-3, branches |
 | A3 playable slice | Existing V1 screens and progression preserved | V2 garage/loot/Build Lab/battle integration |
 | A4 campaign | No V2 natural campaign attempted | Natural component acquisition, 12 sectors, ending, early endgame |
@@ -19,6 +19,8 @@ Working branch: `feature/autobattle-v2`; draft PR #3. Gate A is **OPEN**.
 4. Bind BattleView, session rewards, offline and Lab to that same versioned runtime. Retire isolated duel logic once the integrated tests replace its role.
 
 ## Initial evidence
+
+- `23194c2e2f8f0ce475247303b8409ce766d6322a`: independent detached regression, 29 native scripts / 89,072 assertions / 0 failures, import and diff check exit 0. First shared-runtime adapter is a subsequent checkpoint; it is not a playable migration yet.
 
 - Base `d6dc327`: CI run 43452520024 passed 28 scripts / 89,045 assertions and exported/smoked Windows EXE. This proves prototype and V1 only.
 - New targeted tests (fresh process): combat_step 483, V2 contract 54, channel 19, duel 26 assertions, zero failures, exit 0. Added JSON post-commit channel restore, interruption, support starvation, invalid state/version and overheat boundary regressions. Full committed-checkpoint regression/CI results are recorded in HANDOFF when available.
