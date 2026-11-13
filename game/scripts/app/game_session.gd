@@ -1783,6 +1783,8 @@ func resolve_event(choice_id: String, cargo_item_id: String = "") -> bool:
 	if special == "greyDealer": grant["rarity"] = "RARE"
 	var item_values: Array[Dictionary] = []
 	if not grant.is_empty():
+		if not _item_catalog_loaded():
+			return false
 		var loot: DeterministicRng = DeterministicRng.new()
 		loot.restore(run_payload["lootRng"])
 		var grant_id: String = "event:%s:%s:%s" % [str(run_payload["seed"]), node_id, choice_id]
