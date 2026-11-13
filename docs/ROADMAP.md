@@ -10,6 +10,10 @@ The active strategy is **FULL GAME FIRST**: connect every major Master Spec syst
 
 Save checksums now normalize numeric values through the same repeated JSON serialization/parsing path used by disk snapshots before hashing. This fixes a reproduced false-corruption failure when a float crossed a checksum bucket at commit time. Validation retains backward compatibility with in-memory 1e-5, prior 1e-8 and legacy checksums; gameplay values remain untouched. Godot editor import passed, 22 headless scripts / 88,085 assertions passed, and diff check passed. An isolated resumed campaign E2E is still running through repeated persisted transitions; no result or campaign completion is claimed yet. Windows export/EXE smoke was not run.
 
+### Current status override (2026-11-13; offline return event report)
+
+The existing shared autopilot now records actual travel, node, combat, checkpoint, and terminal-run actions in a bounded per-return event log. Offline/interactive reports derive gross currency gains, net currency/faction changes, items found/lost/secured, strongest drop, run/battle outcomes, elapsed wall-clock and game-time, and route endpoints from those transactions and snapshots. The road UI renders the return summary; the save schema validates new optional report fields while retaining old report compatibility. Godot editor import and 22 scripts / 88,087 assertions passed; Windows Desktop export and EXE headless smoke passed; diff check passed. Full 12-hour idempotency and active/offline state-hash parity are not yet verified.
+
 ### Previous status override (2026-11-13; periodic and attack-counter triggers)
 
 Periodic and every-N-attacks item/tree effects now dispatch by authored action data in the shared combat simulator, including support relay damage, drone shield/interrupt actions, U09 digital-skill repeat, U18 pulse flags, and ARC/FOCUS/DR_ARC counter effects. Chance, cooldown, once guards, and proc accounting use the same state/RNG path. Godot editor import passed; 22 headless scripts / 88,085 assertions and diff check passed. Windows export/EXE smoke not run.

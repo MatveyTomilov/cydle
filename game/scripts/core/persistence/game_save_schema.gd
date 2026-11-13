@@ -164,6 +164,49 @@ func _validate_autopilot_report_history(value: Variant) -> bool:
 		for key: String in ["simulatedMs", "nodesVisited", "battles", "itemsFound", "itemsSecured"]:
 			if not _is_integer(report.get(key)) or int(report[key]) < 0:
 				return false
+		for key: String in ["elapsedWallClockMs", "battlesWon", "battlesLost", "itemsLost", "runsStarted", "runsFinished", "finishedAtMs"]:
+			if report.has(key) and (not _is_integer(report[key]) or int(report[key]) < 0):
+				return false
+		if report.has("eventLog") and not _validate_autopilot_event_log(report["eventLog"]):
+			return false
+		for key: String in ["rawCurrencyGains", "netCurrencyDelta"]:
+			if report.has(key) and not _validate_autopilot_currency_summary(report[key], key == "rawCurrencyGains"):
+				return false
+		if report.has("factionChanges") and not report["factionChanges"] is Dictionary:
+			return false
+		if report.has("strongestDrop") and not report["strongestDrop"] is Dictionary:
+			return false
+		if report.has("routeGraph") and not report["routeGraph"] is Dictionary:
+			return false
+		if report.has("policy") and not report["policy"] is Dictionary:
+			return false
+	return true
+
+func _validate_autopilot_event_log(value: Variant) -> bool:
+	if not value is Array or value.size() > 4096:
+		return false
+	var sequences: Dictionary = {}
+	for event_value: Variant in value:
+		if not event_value is Dictionary:
+			return false
+		var event: Dictionary = event_value
+		if not _is_integer(event.get("sequence")) or int(event["sequence"]) < 0 or sequences.has(int(event["sequence"])):
+			return false
+		if not event.get("type") is String or str(event["type"]).is_empty() or not _is_integer(event.get("gameTimeMs")) or int(event["gameTimeMs"]) < 0:
+			return false
+		if not event.get("currencyDelta") is Dictionary or not event.get("currencyGains") is Dictionary or not event.get("reputationDelta") is Dictionary or not event.get("itemsAdded") is Array or not event.get("itemsRemoved") is Array:
+			return false
+		if not _validate_autopilot_currency_summary(event["currencyDelta"], false) or not _validate_autopilot_currency_summary(event["currencyGains"], true):
+			return false
+		sequences[int(event["sequence"])] = true
+	return true
+
+func _validate_autopilot_currency_summary(value: Variant, nonnegative: bool) -> bool:
+	if not value is Dictionary:
+		return false
+	for currency: String in ["CREDITS", "SCRAP", "DATA"]:
+		if not _is_finite_number(value.get(currency)) or (nonnegative and float(value[currency]) < 0.0):
+			return false
 	return true
 
 func _validate_codex_enemy_ids(value: Variant) -> bool:

@@ -127,6 +127,8 @@ func run(_tree: SceneTree) -> bool:
 		check(offline_resumed.load_saved_game(), "game_session: offline recovery could not load the profile: %s" % offline_resumed.last_error)
 		var offline_report: Dictionary = offline_resumed.last_autopilot_report
 		check(not offline_report.is_empty() and int(offline_report.get("simulatedMs", 0)) > 0 and int(offline_report.get("nodesVisited", 0)) > 0, "game_session: elapsed offline wall time did not run the shared autopilot simulation: %s" % offline_report)
+		check(int(offline_report.get("elapsedWallClockMs", 0)) > 0 and offline_report.get("policy", {}).has("id") and offline_report.get("routeGraph", {}).has("startNodeId") and offline_report.get("routeGraph", {}).has("endNodeId"), "game_session: offline return omitted its elapsed time, selected policy, or route endpoints: %s" % offline_report)
+		check(offline_report.get("eventLog", []) is Array and not (offline_report.get("eventLog", []) as Array).is_empty() and offline_report.get("rawCurrencyGains", {}).has("CREDITS") and offline_report.get("netCurrencyDelta", {}).has("DATA") and offline_report.get("factionChanges", {}) is Dictionary and offline_report.has("strongestDrop") and offline_report.has("itemsLost") and offline_report.has("runsFinished"), "game_session: offline return summary was not derived from recorded simulation transactions: %s" % offline_report)
 		var autopilot_report: Dictionary = offline_resumed.simulate_autopilot(600000)
 		check(bool(autopilot_report.get("ok", false)), "game_session: autopilot did not produce a route report: %s" % autopilot_report)
 		check(not ["SAFE_ERROR_STOP", "RUNNING"].has(str(autopilot_report.get("status", ""))), "game_session: autopilot returned without a clear stop state")

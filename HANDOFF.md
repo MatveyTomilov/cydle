@@ -63,6 +63,13 @@
 
 ## Current live continuation (2026-11-13; Q06 objective gating regression)
 
+### Current status override (2026-11-13; offline return report integration)
+
+- Current base: `5a1605b3ba5f41769195e3d59b54cfcad20333e2` on `development/codex`; remote matched at the last push. Local WIP extends the existing 12-hour autopilot/offline processor. Each completed route, node action, combat, checkpoint, extraction, tow, and abandonment records a compact transaction event; the resulting report summarizes elapsed wall-clock and simulated game-time, policy, route endpoints/path, battle outcomes, run counts, added/lost/secured items, strongest drop, gross currency gains, net currency changes, and faction deltas. The road screen exposes these results, and save validation checks the optional report fields while accepting older report records.
+- Actual checks for current WIP: Godot 4.7.2 editor import exit 0; 22 headless scripts / 88,087 assertions / 0 failures; `git diff --check` exit 0; Windows Desktop export exit 0; exported EXE `--headless --quit-after 3` exit 0. TypeScript/web checks were not run (Godot-only change).
+- The isolated campaign reproduction was resumed after the checksum correction and repeatedly saved/reloaded across d1–d3 retries without another checksum rejection. The harness was stopped during a d2 retry after a d4 defeat; this is not a successful campaign E2E. Preserve `%APPDATA%\Godot\app_userdata\CYDLE\campaign-e2e-repro` and backup `%TEMP%\CYDLE-campaign-e2e-repro-before-7f8c321`.
+- Exact continuation: commit/push the offline report implementation, then continue auditing campaign-wide event/quest/contract completion and core progression against the Master Spec. Do not divert to Simulation Lab presets, report exports, or cosmetic polish. Do not claim full offline acceptance until 12-hour cap, same-command-state parity, restart idempotency, and return UI have been exercised end to end.
+
 ### Current status override (2026-11-13; save checksum JSON-roundtrip fix)
 
 - Local WIP is based on pushed `7f8c321a6e7f9b9face78e922335e021923925ea` on `development/codex`. A resumed isolated campaign had failed to commit a save because a float crossed the checksum bucket during JSON serialization. New checksums now hash the same twice-JSON-normalized number representation used by on-disk validation; validation still accepts old in-memory 1e-5, previous 1e-8, and legacy checksum formats. The stored gameplay values are not rounded or changed.

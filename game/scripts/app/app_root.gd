@@ -1176,9 +1176,26 @@ func _show_road() -> void:
 	_body.add_child(offline_toggle)
 	if not _session.last_autopilot_report.is_empty():
 		var report: Dictionary = _session.last_autopilot_report
-		var report_label: Label = _label("АВТОПИЛОТ · %s · %s · узлов %d · боёв %d · симуляция %s" % [str(report.get("status", "")), str(report.get("reason", "")), int(report.get("nodesVisited", 0)), int(report.get("battles", 0)), _fmt(float(report.get("simulatedMs", 0.0)) / 1000.0) + " с"], 12, COLOR_CYAN)
+		var report_label: Label = _label("АВТОПИЛОТ · %s · %s · узлов %d · бои %d/%d · выездов %d/%d · game-time %s · офлайн %s" % [str(report.get("status", "")), str(report.get("reason", "")), int(report.get("nodesVisited", 0)), int(report.get("battlesWon", 0)), int(report.get("battlesLost", 0)), int(report.get("runsFinished", 0)), int(report.get("runsStarted", 0)), _fmt(float(report.get("simulatedMs", 0.0)) / 1000.0) + " с", _fmt(float(report.get("elapsedWallClockMs", 0.0)) / 1000.0) + " с"], 12, COLOR_CYAN)
 		report_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_body.add_child(report_label)
+		var report_currency: Dictionary = report.get("netCurrencyDelta", {})
+		var currency_summary: Array[String] = []
+		for currency: String in ["CREDITS", "SCRAP", "DATA"]:
+			var delta: float = float(report_currency.get(currency, 0.0))
+			currency_summary.append("%s %s%d" % [currency, "+" if delta >= 0.0 else "", roundi(delta)])
+		var report_details: Label = _label("ДОБЫЧА %d · ЗАКРЕПЛЕНО %d · ПОТЕРЯНО %d · %s · ПИК: %s" % [int(report.get("itemsFound", 0)), int(report.get("itemsSecured", 0)), int(report.get("itemsLost", 0)), " · ".join(currency_summary), str(report.get("strongestDrop", {}).get("templateId", "—"))], 11, COLOR_MUTED)
+		report_details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_body.add_child(report_details)
+		var faction_changes: Dictionary = report.get("factionChanges", {})
+		if not faction_changes.is_empty():
+			var faction_entries: Array[String] = []
+			for faction: Variant in faction_changes.keys():
+				var reputation_delta: int = int(faction_changes[faction])
+				faction_entries.append("%s %s%d" % [str(faction), "+" if reputation_delta >= 0 else "", reputation_delta])
+			var faction_report: Label = _label("РЕПУТАЦИЯ · %s" % " · ".join(faction_entries), 10, COLOR_MUTED)
+			faction_report.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			_body.add_child(faction_report)
 	var report_history: Array[Dictionary] = _session.state.meta.autopilot_report_history
 	if not report_history.is_empty():
 		_body.add_child(_label("ЖУРНАЛ АВТОПИЛОТА · последние %d из 20" % report_history.size(), 11, COLOR_MUTED))

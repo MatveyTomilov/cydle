@@ -35,7 +35,7 @@ func load_saved_game() -> bool:
 			var now_ms: int = int(Time.get_unix_time_from_system() * 1000.0)
 			var offline_elapsed_ms: int = clampi(now_ms - offline_since_ms, 0, 43200000)
 			if offline_elapsed_ms >= 1000:
-				last_autopilot_report = simulate_autopilot(offline_elapsed_ms)
+				last_autopilot_report = simulate_autopilot(offline_elapsed_ms, offline_elapsed_ms)
 		last_error = ""
 		return true
 	if bool(loaded.get("empty", false)):
@@ -1092,19 +1092,28 @@ func _anomaly_preview_available() -> bool:
 	var progress: Dictionary = state.meta.quest_progress.get("Q06", {})
 	return (progress.get("flags", []) as Array).has("earlyAnomaly") and not state.meta.campaign_flags.has("ANOMALY_PREVIEW_USED:EARLY")
 
-func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
+func simulate_autopilot(simulation_budget_ms: int = 43200000, elapsed_wall_clock_ms: int = -1) -> Dictionary:
 	const MAX_OFFLINE_MS: int = 43200000
 	const MAX_COMMANDS: int = 2048
 	var budget: int = clampi(simulation_budget_ms, 0, MAX_OFFLINE_MS)
-	var report: Dictionary = {"ok": true, "status": "RUNNING", "reasonCode": "BUDGET", "reason": "Достигнут лимит симуляции.", "simulatedMs": 0, "nodesVisited": 0, "battles": 0, "itemsFound": 0, "itemsSecured": 0, "runsStarted": 1, "seed": "", "error": ""}
+	var report: Dictionary = {"ok": true, "status": "RUNNING", "reasonCode": "BUDGET", "reason": "Достигнут лимит симуляции.", "simulatedMs": 0, "elapsedWallClockMs": 0, "nodesVisited": 0, "battles": 0, "battlesWon": 0, "battlesLost": 0, "itemsFound": 0, "itemsSecured": 0, "itemsLost": 0, "runsStarted": 1, "runsFinished": 0, "eventLog": [], "seed": "", "error": ""}
+	report["_elapsedWallClockMs"] = clampi(elapsed_wall_clock_ms, 0, MAX_OFFLINE_MS) if elapsed_wall_clock_ms >= 0 else -1
+	report["_wallClockStartedAtMs"] = int(Time.get_unix_time_from_system() * 1000.0)
 	if state == null or state.run == null or ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(state.run.phase):
 		return _autopilot_stop("PAUSED_FOR_DECISION", "NO_ACTIVE_RUN", "Автопилот продолжит движение только из активного выезда.", report)
 	if budget <= 0:
 		return _autopilot_stop("PAUSED_FOR_RESOURCES", "ZERO_BUDGET", "Нулевой лимит симуляции.", report)
 	report["seed"] = state.run.seed
+	var pilot_profile_id: String = active_autopilot_profile_id()
+	var pilot_profile: Dictionary = active_autopilot_profile()
+	report["policy"] = {"id": pilot_profile_id, "name": str(pilot_profile.get("name", pilot_profile_id))}
 	var starting_time: float = float(state.run.resources.get("gameTimeMs", 0.0))
 	var starting_items: int = state.run.unsecured_cargo.size()
 	var starting_inventory: int = state.meta.inventory.size()
+	report["_startingSnapshot"] = _capture_autopilot_economy_snapshot()
+	report["_startingNodeId"] = state.run.current_node_id
+	report["_startingDepth"] = state.run.depth
+	report["_routePath"] = [state.run.current_node_id]
 	report["_startingTime"] = starting_time
 	report["_startingItems"] = starting_items
 	report["_startingInventory"] = starting_inventory
@@ -1112,13 +1121,14 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
 	var actions: int = 0
 	var combat_time: int = 0
 	var policy: AutopilotPolicy = AutopilotPolicy.new()
-	var pilot_profile_id: String = active_autopilot_profile_id()
-	var pilot_profile: Dictionary = active_autopilot_profile()
 	while actions < MAX_COMMANDS:
+		var action_snapshot: Dictionary = _capture_autopilot_economy_snapshot()
 		var used_time: int = int(report.get("_completedRunTime", 0)) + maxi(0, roundi(float(state.run.resources.get("gameTimeMs", starting_time)) - float(report.get("_startingTime", starting_time)))) + combat_time
 		if used_time >= budget:
 			break
 		if _combat != null:
+			var combat_node_id: String = state.run.current_node_id
+			var combat_depth: int = state.run.depth
 			var ticks_left: int = mini(1800, int((budget - used_time) / 100))
 			if ticks_left <= 0:
 				break
@@ -1137,11 +1147,21 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
 				report["reasonCode"] = "TIME_BUDGET" if report["status"] == "OFFLINE_CAPPED" else "COMBAT_TICK_LIMIT"
 				report["reason"] = "Симуляция приостановлена между тиками боя; состояние сохранено."
 				break
+			var combat_outcome: String = _combat.outcome
+			var combat_ticks: int = int(_combat.time_ms / 100)
+			var combat_metrics: Dictionary = _combat.metrics.duplicate(true)
 			if not _persist_combat_snapshot():
 				return _autopilot_stop("SAFE_ERROR_STOP", "COMBAT_SAVE", last_error, report)
 			if not resolve_active_combat():
 				return _autopilot_stop("SAFE_ERROR_STOP", "COMBAT_SETTLEMENT", last_error, report)
 			report["battles"] = int(report["battles"]) + 1
+			if combat_outcome == "VICTORY":
+				report["battlesWon"] = int(report["battlesWon"]) + 1
+			else:
+				report["battlesLost"] = int(report["battlesLost"]) + 1
+				if state.run.phase == "DEFEATED":
+					report["runsFinished"] = int(report["runsFinished"]) + 1
+			_record_autopilot_event(report, "COMBAT", action_snapshot, {"depth": combat_depth, "nodeId": combat_node_id, "outcome": combat_outcome, "ticks": combat_ticks, "metrics": combat_metrics})
 			combat_time = 0
 			report["_combatTime"] = 0
 			actions += 1
@@ -1163,6 +1183,8 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
 						var tow_quote: Dictionary = emergency_exit_quote()
 						if bool(tow_quote.get("towAffordable", false)):
 							if call_evacuation_tow():
+								report["runsFinished"] = int(report.get("runsFinished", 0)) + 1
+								_record_autopilot_event(report, "TOW", action_snapshot, {"depth": state.run.depth, "nodeId": state.run.current_node_id})
 								report["status"] = "TOWED"
 								report["reasonCode"] = "PROFILE_ALLOWED_TOW"
 								report["reason"] = "Профиль %s разрешил оплачиваемую эвакуацию тягачом." % str(pilot_profile.get("name", pilot_profile_id))
@@ -1172,6 +1194,8 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
 							return _autopilot_stop("PAUSED_FOR_RESOURCES", "TOW_UNAFFORDABLE", "Профиль разрешил тягач, но выезд не может оплатить эвакуацию.", report)
 					if _emergency_exit_allowed() and bool(pilot_profile.get("allowAbandon", false)):
 						if abandon_run():
+							report["runsFinished"] = int(report.get("runsFinished", 0)) + 1
+							_record_autopilot_event(report, "ABANDON", action_snapshot, {"depth": state.run.depth, "nodeId": state.run.current_node_id})
 							report["status"] = "ABANDONED"
 							report["reasonCode"] = "PROFILE_ALLOWED_ABANDON"
 							report["reason"] = "Профиль %s разрешил отказаться от бесперспективного выезда." % str(pilot_profile.get("name", pilot_profile_id))
@@ -1203,6 +1227,10 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
 				if not travel_to(str(choice.get("id", ""))):
 					return _autopilot_stop("PAUSED_FOR_RESOURCES", "TRAVEL_REJECTED", last_error, report)
 				report["nodesVisited"] = int(report["nodesVisited"]) + 1
+				var travelled_node: Dictionary = current_node()
+				var travelled_id: String = str(travelled_node.get("id", choice.get("id", "")))
+				_record_autopilot_event(report, "TRAVEL", action_snapshot, {"depth": state.run.depth, "fromNodeId": str(action_snapshot.get("currentNodeId", "")), "nodeId": travelled_id, "nodeType": str(travelled_node.get("type", "UNKNOWN")), "fuel": float(state.run.resources.get("fuel", 0.0))})
+				(report["_routePath"] as Array).append(travelled_id)
 			"NODE":
 				var quest_stages: Array[Dictionary] = available_quest_stages()
 				if not quest_stages.is_empty():
@@ -1217,6 +1245,7 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
 								continue
 							if not resolve_quest_choice(quest_id, choice_id):
 								return _autopilot_stop("PAUSED_FOR_DECISION", "QUEST_NAMED_CHOICE_INVALID", last_error, report)
+							_record_autopilot_event(report, "QUEST", action_snapshot, {"depth": state.run.depth, "nodeId": state.run.current_node_id, "questId": quest_id, "stage": quest_stage, "choiceId": choice_id})
 							actions += 1
 							resolved_named_choice = true
 							break
@@ -1268,6 +1297,7 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
 					if not resolve_service_node("LEAVE_NODE"): return _autopilot_stop("SAFE_ERROR_STOP", "NODE_EXIT", last_error, report)
 				else:
 					return _autopilot_stop("SAFE_ERROR_STOP", "UNSUPPORTED_NODE", "Узел %s не поддерживает автоматическое действие." % kind, report)
+				_record_autopilot_event(report, "NODE_ACTION", action_snapshot, {"depth": state.run.depth, "nodeId": str(node.get("id", "")), "nodeType": kind, "eventId": str(node.get("eventId", ""))})
 				actions += 1
 			"CHECKPOINT":
 				if state.run.depth == 12 and state.meta.campaign_flags.has("CAMPAIGN_COMPLETED") and not state.meta.campaign_flags.has("ENDING_SELECTED"):
@@ -1297,6 +1327,8 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
 							restart_repair_blocked = true
 					if not extract_run():
 						return _autopilot_stop("SAFE_ERROR_STOP", "EXTRACTION", last_error, report)
+					report["runsFinished"] = int(report.get("runsFinished", 0)) + 1
+					_record_autopilot_event(report, "EXTRACTION", action_snapshot, {"depth": state.run.depth, "nodeId": state.run.current_node_id})
 					actions += 1
 					if restart_ready:
 						var completed_run_time: int = maxi(0, roundi(float(state.run.resources.get("gameTimeMs", 0.0)) - float(report.get("_startingTime", 0.0))))
@@ -1308,6 +1340,7 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
 							report["reason"] = "Добыча сохранена, но новый выезд не начат: %s" % last_error
 							break
 						report["runsStarted"] = int(report.get("runsStarted", 1)) + 1
+						_record_autopilot_event(report, "RUN_STARTED", _capture_autopilot_economy_snapshot(), {"depth": state.run.depth, "nodeId": state.run.current_node_id, "seed": state.run.seed})
 						report["_startingTime"] = 0.0
 						report["status"] = "RUNNING"
 						report["reasonCode"] = "AUTO_RESTART"
@@ -1334,6 +1367,7 @@ func simulate_autopilot(simulation_budget_ms: int = 43200000) -> Dictionary:
 					if state.run.depth == 12 and not state.meta.campaign_flags.has("ENDING_SELECTED"):
 						return _autopilot_stop("PAUSED_FOR_DECISION", "CAMPAIGN_ENDING", last_error, report)
 					return _autopilot_stop("PAUSED_FOR_RESOURCES", "CONTINUE_REJECTED", last_error, report)
+				_record_autopilot_event(report, "CHECKPOINT_CONTINUE", action_snapshot, {"depth": state.run.depth, "nodeId": state.run.current_node_id})
 				actions += 1
 			_:
 				return _autopilot_stop("PAUSED_FOR_DECISION", "RUN_STATE", "Текущий этап выезда требует ручного решения.", report)
@@ -1407,6 +1441,60 @@ func _autopilot_stop(status: String, code: String, reason: String, report: Dicti
 	report["error"] = last_error if status == "SAFE_ERROR_STOP" else ""
 	return _finalize_autopilot_report(report)
 
+func _capture_autopilot_economy_snapshot() -> Dictionary:
+	if state == null:
+		return {}
+	var currencies: Dictionary = {"CREDITS": 0.0, "SCRAP": 0.0, "DATA": 0.0}
+	for wallet: GameSaveState.WalletState in [state.meta.protected_bank, state.meta.unsecured_wallet]:
+		var values: Dictionary = wallet.to_dictionary()
+		for currency: String in currencies.keys():
+			currencies[currency] = float(currencies[currency]) + float(values.get(currency, 0.0))
+	if state.run != null:
+		var run_wallet: Dictionary = state.run.wallet.to_dictionary()
+		for currency: String in currencies.keys():
+			currencies[currency] = float(currencies[currency]) + float(run_wallet.get(currency, 0.0))
+	var items: Dictionary = {}
+	for item: Dictionary in state.meta.inventory:
+		var item_id: String = str(item.get("itemId", ""))
+		if not item_id.is_empty(): items[item_id] = item.duplicate(true)
+	if state.run != null:
+		for item: Dictionary in state.run.unsecured_cargo:
+			var item_id: String = str(item.get("itemId", ""))
+			if not item_id.is_empty(): items[item_id] = item.duplicate(true)
+	return {"currencies": currencies, "reputation": state.meta.reputation.duplicate(true), "items": items, "depth": state.run.depth if state.run != null else 0, "nodeId": state.run.current_node_id if state.run != null else ""}
+
+func _record_autopilot_event(report: Dictionary, event_type: String, before: Dictionary, details: Dictionary = {}) -> void:
+	if state == null:
+		return
+	var after: Dictionary = _capture_autopilot_economy_snapshot()
+	var currency_delta: Dictionary = {}
+	var currency_gains: Dictionary = {}
+	var before_currencies: Dictionary = before.get("currencies", {})
+	var after_currencies: Dictionary = after.get("currencies", {})
+	for currency: String in ["CREDITS", "SCRAP", "DATA"]:
+		var delta: float = float(after_currencies.get(currency, 0.0)) - float(before_currencies.get(currency, 0.0))
+		currency_delta[currency] = delta
+		currency_gains[currency] = maxf(0.0, delta)
+	var reputation_delta: Dictionary = {}
+	var before_reputation: Dictionary = before.get("reputation", {})
+	var after_reputation: Dictionary = after.get("reputation", {})
+	for faction: Variant in after_reputation.keys():
+		var delta: int = int(after_reputation[faction]) - int(before_reputation.get(faction, 0))
+		if delta != 0: reputation_delta[str(faction)] = delta
+	var before_items: Dictionary = before.get("items", {})
+	var after_items: Dictionary = after.get("items", {})
+	var added_items: Array[Dictionary] = []
+	var removed_items: Array[String] = []
+	for item_id: Variant in after_items.keys():
+		if not before_items.has(item_id):
+			var item: Dictionary = after_items[item_id]
+			added_items.append({"itemId": str(item_id), "templateId": str(item.get("templateId", "")), "rarity": str(item.get("rarity", "COMMON")), "techLevel": int(item.get("techLevel", 0)), "itemLevel": int(item.get("itemLevel", 0))})
+	for item_id: Variant in before_items.keys():
+		if not after_items.has(item_id): removed_items.append(str(item_id))
+	var event: Dictionary = {"sequence": (report.get("eventLog", []) as Array).size(), "type": event_type, "gameTimeMs": int(state.run.resources.get("gameTimeMs", 0.0)) if state.run != null else 0, "depth": int(details.get("depth", state.run.depth if state.run != null else before.get("depth", 0))), "currencyDelta": currency_delta, "currencyGains": currency_gains, "reputationDelta": reputation_delta, "itemsAdded": added_items, "itemsRemoved": removed_items}
+	for key: Variant in details.keys(): event[str(key)] = details[key]
+	(report["eventLog"] as Array).append(event)
+
 func _finalize_autopilot_report(report: Dictionary) -> Dictionary:
 	if state != null:
 		var start_time: float = float(report.get("_startingTime", state.run.resources.get("gameTimeMs", 0.0) if state.run != null else 0.0))
@@ -1417,7 +1505,47 @@ func _finalize_autopilot_report(report: Dictionary) -> Dictionary:
 		var current_run_items: int = state.run.unsecured_cargo.size() if state.run != null else 0
 		report["itemsFound"] = maxi(0, state.meta.inventory.size() + current_run_items - start_inventory - start_items)
 		report["itemsSecured"] = maxi(0, state.meta.inventory.size() - start_inventory)
-	for internal_key: String in ["_startingTime", "_startingItems", "_startingInventory", "_combatTime", "_completedRunTime"]:
+		var starting_snapshot: Dictionary = report.get("_startingSnapshot", {})
+		var ending_snapshot: Dictionary = _capture_autopilot_economy_snapshot()
+		var start_currencies: Dictionary = starting_snapshot.get("currencies", {})
+		var end_currencies: Dictionary = ending_snapshot.get("currencies", {})
+		var net_currency_delta: Dictionary = {}
+		var raw_currency_gains: Dictionary = {"CREDITS": 0.0, "SCRAP": 0.0, "DATA": 0.0}
+		for currency: String in ["CREDITS", "SCRAP", "DATA"]:
+			net_currency_delta[currency] = float(end_currencies.get(currency, 0.0)) - float(start_currencies.get(currency, 0.0))
+		for event: Dictionary in report.get("eventLog", []):
+			for currency: String in ["CREDITS", "SCRAP", "DATA"]:
+				raw_currency_gains[currency] = float(raw_currency_gains[currency]) + float(event.get("currencyGains", {}).get(currency, 0.0))
+		report["rawCurrencyGains"] = raw_currency_gains
+		report["netCurrencyDelta"] = net_currency_delta
+		var faction_changes: Dictionary = {}
+		var start_reputation: Dictionary = starting_snapshot.get("reputation", {})
+		var end_reputation: Dictionary = ending_snapshot.get("reputation", {})
+		for faction: Variant in end_reputation.keys():
+			var delta: int = int(end_reputation[faction]) - int(start_reputation.get(faction, 0))
+			if delta != 0: faction_changes[str(faction)] = delta
+		report["factionChanges"] = faction_changes
+		var starting_item_ids: Dictionary = starting_snapshot.get("items", {})
+		var ending_item_ids: Dictionary = ending_snapshot.get("items", {})
+		var event_found_items: Dictionary = {}
+		var event_lost_items: Dictionary = {}
+		var all_found_items: Array[Dictionary] = []
+		for event: Dictionary in report.get("eventLog", []):
+			for item: Dictionary in event.get("itemsAdded", []):
+				var item_id: String = str(item.get("itemId", ""))
+				if not item_id.is_empty() and not event_found_items.has(item_id):
+					event_found_items[item_id] = true
+					all_found_items.append(item)
+			for item_id: Variant in event.get("itemsRemoved", []): event_lost_items[str(item_id)] = true
+		for item_id: Variant in starting_item_ids.keys():
+			if not ending_item_ids.has(item_id): event_lost_items[str(item_id)] = true
+		report["itemsFound"] = event_found_items.size()
+		report["itemsLost"] = event_lost_items.size()
+		report["strongestDrop"] = _strongest_autopilot_drop(all_found_items)
+		report["routeGraph"] = {"seed": str(report.get("seed", "")), "startDepth": int(report.get("_startingDepth", 0)), "startNodeId": str(report.get("_startingNodeId", "")), "visitedNodeIds": (report.get("_routePath", []) as Array).duplicate(), "endDepth": int(ending_snapshot.get("depth", 0)), "endNodeId": str(ending_snapshot.get("nodeId", ""))}
+		report["finishedAtMs"] = int(Time.get_unix_time_from_system() * 1000.0)
+		report["elapsedWallClockMs"] = int(report.get("_elapsedWallClockMs", -1)) if int(report.get("_elapsedWallClockMs", -1)) >= 0 else maxi(0, int(report["finishedAtMs"]) - int(report.get("_wallClockStartedAtMs", report["finishedAtMs"])))
+	for internal_key: String in ["_startingTime", "_startingItems", "_startingInventory", "_startingSnapshot", "_startingNodeId", "_startingDepth", "_routePath", "_combatTime", "_completedRunTime", "_elapsedWallClockMs", "_wallClockStartedAtMs"]:
 		report.erase(internal_key)
 	last_autopilot_report = report.duplicate(true)
 	if state != null:
@@ -1432,6 +1560,16 @@ func _finalize_autopilot_report(report: Dictionary) -> Dictionary:
 		else:
 			last_autopilot_report = state.meta.autopilot_report_history.back().duplicate(true)
 	return last_autopilot_report
+
+func _strongest_autopilot_drop(items: Array[Dictionary]) -> Dictionary:
+	var rarity_rank: Dictionary = {"COMMON": 0, "MODIFIED": 1, "RARE": 2, "UNIQUE": 3}
+	var strongest: Dictionary = {}
+	for item: Dictionary in items:
+		var item_rank: int = int(rarity_rank.get(str(item.get("rarity", "COMMON")), 0)) * 100000 + int(item.get("techLevel", 0)) * 100 + int(item.get("itemLevel", 0))
+		var strongest_rank: int = int(rarity_rank.get(str(strongest.get("rarity", "COMMON")), 0)) * 100000 + int(strongest.get("techLevel", 0)) * 100 + int(strongest.get("itemLevel", 0))
+		if strongest.is_empty() or item_rank > strongest_rank:
+			strongest = {"itemId": str(item.get("itemId", "")), "templateId": str(item.get("templateId", "")), "rarity": str(item.get("rarity", "COMMON")), "techLevel": int(item.get("techLevel", 0)), "itemLevel": int(item.get("itemLevel", 0))}
+	return strongest
 
 func travel_to(node_id: String) -> bool:
 	if state == null or state.run == null or state.run.phase != "ROUTE":
