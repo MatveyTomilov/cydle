@@ -81,6 +81,13 @@ func run(_tree: SceneTree) -> bool:
 		if combat_session.combat_state() != null:
 			var combat_max_shield: float = float(combat_session.combat_state().operator.base_sheet.get("maxShield", 0.0))
 			check(is_equal_approx(combat_max_shield, float(combat_session.run_build_preview().get("stats", {}).get("maxShield", -1.0))), "run_equipment: real combat did not use the field BuildResolver result")
+			check(combat_session.save(), "run_equipment: active field combat could not be saved: %s" % combat_session.last_error)
+			var resumed_combat: GameSession = GameSession.new()
+			resumed_combat.configure_save_directory("user://test-saves/run-equipment-combat")
+			check(resumed_combat.load_saved_game() and resumed_combat.has_active_combat(), "run_equipment: active field combat did not resume after loading: %s" % resumed_combat.last_error)
+			if resumed_combat.has_active_combat():
+				var resumed_max_shield: float = float(resumed_combat.combat_state().operator.base_sheet.get("maxShield", 0.0))
+				check(is_equal_approx(resumed_max_shield, float(resumed_combat.run_build_preview().get("stats", {}).get("maxShield", -1.0))), "run_equipment: combat snapshot resume reverted to the garage build")
 	var transport_session: GameSession = GameSession.new()
 	transport_session.configure_save_directory("user://test-saves/run-equipment-transport")
 	if check(transport_session.start_new_game(1762900000303) and transport_session.start_expedition("run-equipment-transport"), "run_equipment: could not prepare transport-slot profile"):
