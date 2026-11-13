@@ -2,9 +2,11 @@
 
 ## Unreleased — parallel balance research and persisted offline diagnostics
 
-- Added project agent `balance_qa` on GPT-6 Luna High. Bounded BOSS_B research (up to 24 fights, no more than 3 per archetype) runs in a detached read-only worktree alongside required regression checks. No results yet.
+- Added project agent `balance_qa` on GPT-6 Luna High. Bounded BOSS_B research (up to 24 fights, no more than 3 per archetype) runs in a detached read-only worktree alongside required regression checks.
+- First six-fight result on SHA `928afbac8fba74c4cf51e55668fbfed59ca05163`: at d8/B04 with a shared seed, Kinetic and Tech/Energy each repeated defeat; Drone/Hybrid repeated victory at 20.3s with 16.998 operator HP. Treat as a balance risk signal, not campaign acceptance. All combat configurations were accepted by the existing simulator. The raw drone metrics match (`interrupts=1` both repeats); a temporary display counter searched the wrong event name (`INTERRUPT` instead of `CAST_INTERRUPT`), so no simulator nondeterminism is verified.
 - Concurrency is set to 3; the config checkpoint was accepted by Codex strict-config and all four project agent definitions were exercised/visible. Removed the stale quest-only agent from active delegation.
-- Added a reload check for the 12-hour cap and negative-clock diagnostics in saved autopilot report history. Local Godot 4.7.2 import exit 0; 23 tests / 88,680 assertions passed. Independent test of the new source checkpoint is pending.
+- Added a reload check for the 12-hour cap and negative-clock diagnostics in saved autopilot report history. Local and independent Godot 4.7.2 checks passed: 23 tests / 88,680 assertions. Detached worktree and diff check were clean.
+- Legacy TypeScript oracle on current code-equivalent `62c76fcbf5c2bb08af88cfcabd2839c49c12c393`: 22 files / 207 tests and `npm run typecheck` both pass.
 
 ## Unreleased — retain exact offline diagnostics
 

@@ -30,7 +30,8 @@ This is an implementation audit, not a release checklist. “Complete” means t
 ## Current checkpoint
 
 - Branch: `development/codex`.
-- Latest game-code checkpoint: `e1c4b33fd237fe5df5d424a8e368fd61622ca60a`; latest documentation checkpoint follows in Git history.
-- Godot 4.7.2 editor import exit 0; latest local full suite: 23 tests passed, 88,680 assertions, 0 failures.
+- Latest game-code checkpoint: `e1c4b33fd237fe5df5d424a8e368fd61622ca60a`; current code-equivalent/documentation checkpoint before this audit update: `62c76fcbf5c2bb08af88cfcabd2839c49c12c393`.
+- Godot 4.7.2 editor import exit 0; independent full native suite: 23 tests, 88,680 assertions, 0 failures. Legacy TypeScript: 22 files / 207 tests and typecheck pass.
+- First bounded BOSS_B study used six full fights on config checkpoint `928afba`: Kinetic and Tech/Energy lose reproducibly; Drone/Hybrid wins twice at 20.3s with 16.998 HP. This flags a balance risk for those tested configurations only; one seed and three builds do not establish overall viability. No simulator rejection or confirmed mechanic defect. See `HANDOFF.md` for exact scenario and artifact paths.
 - CI status was not queried. The complete test suite was not rerun after docs-only updates.
 - This is not a FEATURE COMPLETE BETA claim. Full spec coverage, campaign completion, and beta export are still outstanding.
