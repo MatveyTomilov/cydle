@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — contract failure integration coverage
+
+- Added a public GameSession flow that runs an actual simulator defeat and settles through `resolve_active_combat()`, proving active contract failure, unsecured cargo/currency loss and reload persistence.
+- Added ESCORT checkpoint failure coverage at wanted 41 in the generated route, confirming no reward or faction reputation is paid.
+- Godot 4.7.2 editor import exit 0; 23 tests / 88,661 assertions passed. Independent regression run is pending.
+
 ## Unreleased — fail active contracts on death
 
 - A sortie defeat now closes any still-active contract as `FAILED` while applying the existing death rule that loses unsecured cargo and run currency.

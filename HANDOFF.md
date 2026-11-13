@@ -2,16 +2,16 @@
 
 ## Latest game checkpoint (2026-11-13; natural SIGNAL reward and contract death settlement)
 
-- Game-code checkpoints: `517eca506f21f3a7251c6f231174f5c249bf8955` closes any ACTIVE contract as FAILED on sortie death; `06390ad706222fc47361b58de66093d5a9067721` adds the natural SIGNAL path through its generated route and target ELITE battle, exact U09 unique reward and save reload. The SIGNAL test passed before the death change; the combined latest code suite passed locally afterward.
-- Godot 4.7.2 headless import exit 0; full native suite: 23 tests / 88,655 assertions / 0 failures. `git diff --check` exit 0 before the source checkpoint. Independent regression tester confirmed the prior `06390ad` checkpoint in a detached worktree (23 / 88,647, exit 0); independent run for `517eca5` is pending. No Windows export, GUI smoke, campaign E2E or CI query.
-- Active contracts are now failed on death; failed-state and unsecured cargo/wallet loss survive reload in the focused GameSession settlement regression. Previously completed HUNT, TECH, SIGNAL, and ESCORT-success natural player-operation flows remain covered by the suite.
-- Remaining contract gaps: ESCORT checkpoint failure thresholds, HUNT/TECH/SIGNAL completed-reward loss under death, full faction consequences, and contract offer/restart persistence. No feature-complete claim.
+- Current test checkpoint: `4c6ed4ef6151aec058e5593d7d87518ae8e74aa3`; active contract death rule is in `517eca506f21f3a7251c6f231174f5c249bf8955`; natural SIGNAL target reward is in `06390ad706222fc47361b58de66093d5a9067721`.
+- Regression now drives a real simulated defeat through public `resolve_active_combat()`, verifies ACTIVE contract failure and loss of unsecured item/currencies, then reloads. ESCORT success goes through two real battles and checkpoint; a focused failure transaction enters a generated checkpoint at wanted 41 and verifies no payment.
+- Godot 4.7.2 headless import exit 0; full native suite: 23 tests / 88,661 assertions / 0 failures; `git diff --check` exit 0. Independent regression tester confirmed `517eca5` in a detached worktree (23 / 88,655, exit 0); independent check for `4c6ed4e` is pending. No Windows export, GUI smoke, campaign E2E or CI query.
+- Remaining contract gaps: loss of completed but unsecured contract rewards under death, faction consequences beyond tested reputation/shop/route thresholds, and offer/restart persistence. No feature-complete claim.
 
 ## Latest game checkpoint (2026-11-13; HUNT, TECH and ESCORT contracts)
 
 - Adds an ESCORT runtime flow on seed `escort-runtime-fixed-seed`: starts a fresh contract sortie, follows reachable route nodes, clears two real battles with the shared simulator, reaches the authored checkpoint, verifies the exact credit/faction reward and completion grant, then reloads the save. No game runtime or balance code changed.
 - Godot 4.7.2 editor import exit 0; full native suite 23 tests / 88,648 assertions / 0 failures. Windows export, GUI smoke, campaign E2E and CI were not run/queried.
-- At this checkpoint SIGNAL and death settlement were not yet covered; the later entry above records those additions. See `docs/FEATURE_AUDIT.md` for remaining contract gaps.
+- At this checkpoint SIGNAL and death settlement were not yet covered; later entries above record those additions. See `docs/FEATURE_AUDIT.md` for remaining contract gaps.
 
 ## Latest game checkpoint (2026-11-13; HUNT and TECH contracts)
 

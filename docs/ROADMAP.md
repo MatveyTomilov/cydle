@@ -8,11 +8,11 @@ Current strategy is **FEATURE COMPLETE BETA**: audit against the normative Maste
 
 ### Latest checkpoint — contract reward paths and death settlement (2026-11-13)
 
-`06390ad706222fc47361b58de66093d5a9067721` adds natural SIGNAL completion: follow the generated route, clear the preceding encounters through the shared simulator, win the target ELITE, verify its exact U09 UNIQUE grant and reload. `517eca506f21f3a7251c6f231174f5c249bf8955` marks any ACTIVE contract FAILED when death settles and tests loss of sortie cargo/currency plus persisted failed state. Latest local Godot import exit 0 and 23 tests / 88,655 assertions / 0 failures; independent tester is checking `517eca5`. No Windows export, GUI smoke or CI query. ESCORT failure thresholds, loss of completed unsecured contract rewards, faction effects and offer/restart persistence still need work.
+`06390ad706222fc47361b58de66093d5a9067721` adds natural SIGNAL completion: follow the generated route, clear preceding encounters through the shared simulator, win the target ELITE, verify its exact U09 UNIQUE grant and reload. `517eca506f21f3a7251c6f231174f5c249bf8955` marks any ACTIVE contract FAILED when death settles. `4c6ed4ef6151aec058e5593d7d87518ae8e74aa3` tests a real simulated defeat through `resolve_active_combat()`, the death/cargo/wallet failure state, plus ESCORT's successful and wanted-threshold-failed checkpoint settlements. Latest local Godot import exit 0 and 23 tests / 88,661 assertions / 0 failures; independent tester confirmed `517eca5`, and is checking `4c6ed4e`. No Windows export, GUI smoke or CI query. Remaining contract lifecycle gaps include loss of already-completed but unsecured rewards, broader faction consequences and offer/restart persistence.
 
 ### Prior checkpoint — HUNT, TECH and ESCORT natural contract paths (2026-11-13)
 
-The prior contract integration also runs ESCORT from a fresh profile through two actual shared-simulator battles and onto the generated checkpoint, then verifies credits, faction reputation, exactly-once grant state and reload. Full native suite: 23 tests / 88,648 assertions / 0 failures; Godot import exit 0. ESCORT failure-state behavior remains unverified.
+The prior contract integration also runs ESCORT from a fresh profile through two actual shared-simulator battles and onto the generated checkpoint, then verifies credits, faction reputation, exactly-once grant state and reload. Full native suite: 23 tests / 88,648 assertions / 0 failures; Godot import exit 0. ESCORT failure-state behavior was not yet covered at that checkpoint.
 
 ### Prior checkpoint — HUNT and TECH natural contract paths (2026-11-13)
 
