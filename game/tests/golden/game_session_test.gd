@@ -276,6 +276,45 @@ func run(_tree: SceneTree) -> bool:
 				for candidate: Dictionary in layer:
 					if str(candidate.get("id", "")) == str(tech_offer_session.state.run.contract.get("targetNodeId", "")): tech_target = candidate
 			check(str(tech_offer_session.state.run.biome) == "B01" and str(tech_offer_session.state.run.contract.get("targetBiome", "")) == "B01" and str(tech_target.get("type", "")) == "CACHE", "game_session: cross-biome TECH offer did not inject its target cache")
+			var tech_target_id: String = str(tech_offer_session.state.run.contract.get("targetNodeId", ""))
+			var tech_target_reachable: bool = hunt_session_target_reachable(tech_offer_session, tech_target_id)
+			if not tech_target_reachable:
+				var tech_first_step: Array[Dictionary] = tech_offer_session.reachable_nodes()
+				var entered_route_battle: bool = not tech_first_step.is_empty() and str(tech_first_step[0].get("type", "")) in ["COMBAT", "ELITE"] and tech_offer_session.travel_to(str(tech_first_step[0].get("id", ""))) and tech_offer_session.begin_combat()
+				check(entered_route_battle, "game_session: could not enter the actual combat preceding the TECH cache: %s" % tech_offer_session.last_error)
+				if entered_route_battle:
+					var tech_route_ticks: int = 0
+					while tech_offer_session.combat_state() != null and tech_offer_session.combat_state().outcome.is_empty() and tech_route_ticks < 1800:
+						if not tech_offer_session.advance_combat_step(): break
+						tech_route_ticks += 1
+					var tech_route_combat: CombatState = tech_offer_session.combat_state()
+					check(tech_route_combat != null and tech_route_combat.outcome == "VICTORY" and tech_offer_session.resolve_active_combat(), "game_session: combat before the TECH cache did not clear through shared settlement: %s" % tech_offer_session.last_error)
+					tech_target_reachable = hunt_session_target_reachable(tech_offer_session, tech_target_id)
+			check(tech_target_reachable and tech_offer_session.travel_to(tech_target_id), "game_session: TECH cache target was not reachable on the player's route after clearing its prerequisite node")
+			if tech_target_reachable and tech_offer_session.state.run.phase == "NODE":
+				var credits_before_tech: float = tech_offer_session.state.run.wallet.credits
+				var scrap_before_tech: float = tech_offer_session.state.run.wallet.scrap
+				var data_before_tech: float = tech_offer_session.state.run.wallet.data
+				var tech_instance_id: String = str(tech_offer_session.state.run.contract.get("instanceId", ""))
+				check(tech_offer_session.resolve_service_node("OPEN_CACHE"), "game_session: TECH target cache choice failed: %s" % tech_offer_session.last_error)
+				var completed_tech: Dictionary = tech_offer_session.state.run.contract
+				var tech_completion_id: String = "%s:reward" % tech_instance_id
+				var tech_reward_items: Array[Dictionary] = tech_offer_session.state.run.unsecured_cargo.filter(func(item: Dictionary) -> bool: return str(item.get("originGrantId", "")) == tech_completion_id + ":item")
+				var tech_item_valid: bool = false
+				if not tech_reward_items.is_empty():
+					var tech_reward: Dictionary = tech_reward_items[0]
+					var tech_item_catalog: ItemCatalog = ItemCatalog.new()
+					tech_item_catalog.load_catalog()
+					var tech_template: Dictionary = tech_item_catalog.get_template(str(tech_reward.get("templateId", "")))
+					tech_item_valid = str(tech_reward.get("rarity", "")) == "MODIFIED" and (tech_template.get("tags", []) as Array).has(str(tech_offer_session.state.run.contract.get("targetTechTag", "tech")))
+				var tech_scale: float = CydleFormula.new().reward_scale(float(tech_offer_session.state.run.depth))
+				var expected_tech_data: int = ceili(15.0 * CydleFormula.new().reward_scale(float(tech_offer_session.state.run.depth)))
+				check(str(completed_tech.get("status", "")) == "COMPLETE" and bool(completed_tech.get("rewardClaimed", false)) and tech_offer_session.state.run.grant_ids.has(tech_completion_id) and tech_offer_session.state.run.wallet.data >= data_before_tech + expected_tech_data, "game_session: real TECH cache completion did not grant its exact data reward")
+				check(tech_item_valid and tech_offer_session.state.run.wallet.credits >= credits_before_tech + ceili(8.0 * tech_scale) and tech_offer_session.state.run.wallet.scrap >= scrap_before_tech + ceili(2.0 * tech_scale), "game_session: TECH/cache flow lost its guaranteed tagged MODIFIED reward or cache currency")
+				check(tech_offer_session.state.meta.campaign_flags.has("contract-blueprint:CT_TECH"), "game_session: first TECH success did not unlock its blueprint")
+				var tech_reload: GameSession = GameSession.new()
+				tech_reload.configure_save_directory("user://test-saves/contracts-tech-any-biome")
+				check(tech_reload.load_saved_game() and str(tech_reload.state.run.contract.get("status", "")) == "COMPLETE" and tech_reload.state.meta.campaign_flags.has("contract-blueprint:CT_TECH"), "game_session: TECH completion or blueprint was lost on save reload")
 	var escort_session: GameSession = GameSession.new()
 	escort_session.configure_save_directory("user://test-saves/contracts-escort-faction")
 	if check(escort_session.start_new_game(1762900000107), "game_session: could not create a faction ESCORT profile"):
