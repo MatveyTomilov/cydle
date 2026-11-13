@@ -52,4 +52,7 @@ func run(_tree: SceneTree) -> bool:
 	corrupt = channel.new_state()
 	corrupt["supportStreak"] = -1
 	check(not bool(channel.advance(corrupt, 0)["ok"]), "channel: invalid fairness state accepted")
+	corrupt = channel.new_state()
+	corrupt["version"] = "cydle-action-channel-2.1"
+	check(not bool(channel.advance(corrupt, 0)["ok"]), "channel: prior cooldown semantics were restored under the new action-channel version")
 	return failure_count == 0

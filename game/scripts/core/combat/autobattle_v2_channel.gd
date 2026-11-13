@@ -3,7 +3,7 @@ extends RefCounted
 
 # Serializable action channel. Effects and resource payment are the caller's
 # atomic responsibility when advance() returns commit; cooldowns never own it.
-const VERSION: String = "cydle-action-channel-2.1"
+const VERSION: String = "cydle-action-channel-2.2"
 const OFFENSIVE_CLASSES: Array[String] = ["BASIC_ATTACK", "SPECIAL_ATTACK"]
 var _contract: AutobattleV2Contract = AutobattleV2Contract.new()
 

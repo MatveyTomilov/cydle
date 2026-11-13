@@ -2,7 +2,7 @@ class_name CombatState
 extends RefCounted
 
 const LEGACY_RULES_VERSION: String = "cydle-combat-1.0"
-const V2_RULES_VERSION: String = "cydle-combat-2.1-development"
+const V2_RULES_VERSION: String = "cydle-combat-2.2-development"
 var combat_rules_version: String = LEGACY_RULES_VERSION
 var action_channel: Dictionary = {}
 var seed: String = ""

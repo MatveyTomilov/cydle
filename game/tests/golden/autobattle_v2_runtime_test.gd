@@ -38,7 +38,7 @@ func run(_tree: SceneTree) -> bool:
 	sidearm_build["sidearm"] = {"itemId": "SIDEARM:fixture", "damage": 1.0, "type": "KINETIC"}
 	check(CombatState.from_dictionary(current.to_dictionary(), sidearm_build) == null, "v2_runtime: sidearm change silently reinterpreted an active snapshot")
 	var old_v2: Dictionary = current.to_dictionary()
-	old_v2["combatRulesVersion"] = "cydle-combat-2.0-development"
+	old_v2["combatRulesVersion"] = "cydle-combat-2.1-development"
 	check(CombatState.from_dictionary(old_v2, build) == null, "v2_runtime: older target/action snapshots were accepted without explicit migration")
 	var forged: Dictionary = current.to_dictionary()
 	forged["actionChannel"]["active"]["action"]["sourceId"] = "fake-weapon"
