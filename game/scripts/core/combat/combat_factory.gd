@@ -30,11 +30,14 @@ func compile_v2_weapon_action(build: Dictionary, effective_stats: Dictionary = {
 func compile_v2_main_actions(build: Dictionary, effective_stats: Dictionary, timing_multiplier: float = 1.0) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	var basic: Dictionary = compile_v2_weapon_action(build, effective_stats, timing_multiplier)
-	if not basic.is_empty(): result.append(basic)
+	if not basic.is_empty():
+		result.append(basic)
 	for skill: Dictionary in build.get("skills", []):
-		if str(skill.get("channel", "main")) != "main": continue
+		if str(skill.get("channel", "main")) != "main":
+			continue
 		var target: String = _v2_target(str(skill.get("targetMode", "HIGHEST_THREAT")))
-		if target.is_empty(): continue
+		if target.is_empty():
+			continue
 		var prepare: int = maxi(0, int(ceili(float(skill.get("windupMs", 0)) / 100.0)) * 100)
 		var recovery: int = maxi(0, int(ceili(float(skill.get("recoveryMs", 0)) / 100.0)) * 100)
 		var energy_cost: float = float(skill.get("energyCost", 0))
@@ -44,13 +47,15 @@ func compile_v2_main_actions(build: Dictionary, effective_stats: Dictionary, tim
 	return result
 
 func _v2_target(value: String) -> String:
-	match value.to_upper():
-		"NEAREST": return "NEAREST"
-		"LOWEST_HP": return "LOWEST_HP"
-		"HIGHEST_THREAT": return "HIGHEST_THREAT"
-		"ALL": return "ALL"
-		"SELF": return "SELF"
-		_: return "HIGHEST_THREAT"
+	match value:
+		"nearest": return "NEAREST"
+		"lowestHP": return "LOWEST_HP"
+		"lowestHPPercent": return "LOWEST_HP_PERCENT"
+		"infected": return "INFECTED"
+		"boss": return "BOSS"
+		"allEnemies": return "ALL_ENEMIES"
+		"self": return "SELF"
+		_: return ""
 
 func create_roster(build: Dictionary, enemy_specs: Array[Dictionary], depth: int, options: Dictionary = {}) -> Dictionary:
 	if not bool(build.get("valid", false)) or not build.get("mainWeapon") is Dictionary or build.get("mainWeapon", {}).is_empty():

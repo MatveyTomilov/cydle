@@ -14,6 +14,7 @@ const CLASS_ORDER: Array[String] = [
 ]
 const TARGET_DOCTRINES: Array[String] = [
 	"FOCUS", "NEAREST", "LOWEST_HP", "HIGHEST_THREAT",
+	"LOWEST_HP_PERCENT", "INFECTED", "BOSS", "ALL_ENEMIES",
 	"MARKED", "RANDOM_SEEDED", "ALL", "SELF", "ALLY",
 ]
 const FORBIDDEN_EDITABLE_FIELDS: Array[String] = [

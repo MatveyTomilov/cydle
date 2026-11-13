@@ -183,7 +183,7 @@ func _step_v2_weapon_channel(state: CombatState, rng: DeterministicRng) -> Dicti
 	if not bool(advanced.get("ok", false)):
 		return _failure(str(advanced.get("error", "INVALID_ACTION_CHANNEL")))
 	state.action_channel = advanced["state"]
-	var target: CombatActorState = _pick_auto_target(state, actor)
+	var target: CombatActorState = _pick_rule_target(state, actor, str(advanced.get("commit", {}).get("targetMode", "HIGHEST_THREAT"))) if not advanced["commit"].is_empty() else _pick_auto_target(state, actor)
 	if not advanced["commit"].is_empty():
 		var committed: Dictionary = advanced["commit"]
 		var reason: String = ""
@@ -202,11 +202,22 @@ func _step_v2_weapon_channel(state: CombatState, rng: DeterministicRng) -> Dicti
 		else:
 			_emit(state, "ACTION_UNAVAILABLE", actor.id, {"data": {"reason": reason, "phase": "COMMIT", "sourceId": committed.get("sourceId", "")}})
 	if state.action_channel["active"].is_empty():
-		var action: Dictionary = _factory.compile_v2_weapon_action(state.build, _effective_sheet(state, actor), 1.0 / 0.7 if _has_status(actor, "SHOCK") else 1.0)
-		action["hasValidTarget"] = target != null
+		var actions: Array[Dictionary] = _factory.compile_v2_main_actions(state.build, _effective_sheet(state, actor), 1.0 / 0.7 if _has_status(actor, "SHOCK") else 1.0)
+		var available: Array[Dictionary] = []
+		for action: Dictionary in actions:
+			var action_target: CombatActorState = _pick_rule_target(state, actor, str(action["targetMode"]))
+			action["hasValidTarget"] = action_target != null or str(action["targetMode"]) == "SELF"
+			var skill: Dictionary = _v2_skill(state, str(action.get("skillId", "")))
+			for requirement: Variant in action.get("requires", []):
+				if requirement is String and requirement == "VIRUS" and (action_target == null or not _has_status(action_target, "VIRUS")):
+					action["hasValidTarget"] = false
+			if not action["hasValidTarget"]:
+				_emit(state, "ACTION_UNAVAILABLE", actor.id, {"data": {"actionId": action["actionId"], "reason": "NO_TARGET"}})
+				continue
+			available.append(action)
 		if _has_status(actor, "STUN"):
 			return {"ok": true}
-		var chosen: Dictionary = channel.start(state.action_channel, [action], state.time_ms, actor.energy, actor.heat, float(actor.base_sheet.get("maxHeat", 100)), actor.heat_lockout)
+		var chosen: Dictionary = channel.start(state.action_channel, available, state.time_ms, actor.energy, actor.heat, float(actor.base_sheet.get("maxHeat", 100)), actor.heat_lockout)
 		if not bool(chosen.get("ok", false)):
 			return _failure(str(chosen.get("error", "INVALID_ACTION_CHANNEL")))
 		state.action_channel = chosen["state"]
@@ -214,10 +225,18 @@ func _step_v2_weapon_channel(state: CombatState, rng: DeterministicRng) -> Dicti
 			_emit(state, "ACTION_UNAVAILABLE", actor.id, {"data": rejected})
 		if not chosen["action"].is_empty():
 			var instance_id: String = "%s:v2:%d" % [actor.id, state.time_ms]
-			var prepare_event: Dictionary = _emit(state, "ACTION_PREPARE", actor.id, {"actionId": instance_id, "sourceId": str(action["sourceId"]), "targetId": target.id if target != null else "", "data": chosen["action"]})
+			var chosen_action: Dictionary = chosen["action"]
+			var chosen_target: CombatActorState = _pick_rule_target(state, actor, str(chosen_action.get("targetMode", "HIGHEST_THREAT")))
+			var prepare_event: Dictionary = _emit(state, "ACTION_PREPARE", actor.id, {"actionId": instance_id, "sourceId": str(chosen_action["sourceId"]), "targetId": chosen_target.id if chosen_target != null else "", "data": chosen_action})
 			state.action_channel["active"]["instanceId"] = instance_id
 			state.action_channel["active"]["prepareEventId"] = int(prepare_event["eventId"])
 	return {"ok": true}
+
+func _v2_skill(state: CombatState, skill_id: String) -> Dictionary:
+	for skill: Dictionary in state.build.get("skills", []):
+		if str(skill.get("id", "")) == skill_id:
+			return skill
+	return {}
 
 func _supports_basic_auto_step(state: CombatState) -> bool:
 	if not _supports_skill_trigger_effects(state):
