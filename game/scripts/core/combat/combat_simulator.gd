@@ -183,7 +183,13 @@ func _step_v2_weapon_channel(state: CombatState, rng: DeterministicRng) -> Dicti
 	if not bool(advanced.get("ok", false)):
 		return _failure(str(advanced.get("error", "INVALID_ACTION_CHANNEL")))
 	state.action_channel = advanced["state"]
-	var target: CombatActorState = _pick_rule_target(state, actor, str(advanced.get("commit", {}).get("targetMode", "HIGHEST_THREAT"))) if not advanced["commit"].is_empty() else _pick_auto_target(state, actor)
+	var captured_targets: Array = context.get("targetIds", context.get("action", {}).get("targetIds", []))
+	var target: CombatActorState = _actor_by_id(state, str(captured_targets[0])) if not captured_targets.is_empty() else null
+	if not advanced["commit"].is_empty() and (target == null or not target.alive):
+		var retargeted: Dictionary = AutobattleV2Targets.new().resolve(state, str(advanced["commit"].get("targetMode", "HIGHEST_THREAT")))
+		target = _actor_by_id(state, str(retargeted.get("targets", [""])[0])) if bool(retargeted.get("ok", false)) and not retargeted.get("targets", []).is_empty() else null
+		if target != null:
+			_emit(state, "TARGET_REACQUIRED", actor.id, {"actionId": context.get("instanceId", ""), "targetId": target.id, "reason": "PREPARED_TARGET_UNAVAILABLE"})
 	if not advanced["commit"].is_empty():
 		var committed: Dictionary = advanced["commit"]
 		var reason: String = ""
@@ -205,8 +211,15 @@ func _step_v2_weapon_channel(state: CombatState, rng: DeterministicRng) -> Dicti
 		var actions: Array[Dictionary] = _factory.compile_v2_main_actions(state.build, _effective_sheet(state, actor), 1.0 / 0.7 if _has_status(actor, "SHOCK") else 1.0)
 		var available: Array[Dictionary] = []
 		for action: Dictionary in actions:
-			var action_target: CombatActorState = _pick_rule_target(state, actor, str(action["targetMode"]))
-			action["hasValidTarget"] = action_target != null or str(action["targetMode"]) == "SELF"
+			if not str(action.get("targetError", "")).is_empty():
+				return _failure(str(action["targetError"]))
+			var resolved_targets: Dictionary = AutobattleV2Targets.new().resolve(state, str(action["targetMode"]))
+			if not bool(resolved_targets.get("ok", false)):
+				return _failure(str(resolved_targets.get("error", "TARGET_RESOLUTION_FAILED")))
+			var target_ids: Array[String] = resolved_targets["targets"]
+			var action_target: CombatActorState = _actor_by_id(state, target_ids[0]) if not target_ids.is_empty() else null
+			action["hasValidTarget"] = not target_ids.is_empty()
+			action["targetIds"] = target_ids.duplicate()
 			var skill: Dictionary = _v2_skill(state, str(action.get("skillId", "")))
 			for requirement: Variant in action.get("requires", []):
 				if requirement is String and requirement == "VIRUS" and (action_target == null or not _has_status(action_target, "VIRUS")):
@@ -226,10 +239,11 @@ func _step_v2_weapon_channel(state: CombatState, rng: DeterministicRng) -> Dicti
 		if not chosen["action"].is_empty():
 			var instance_id: String = "%s:v2:%d" % [actor.id, state.time_ms]
 			var chosen_action: Dictionary = chosen["action"]
-			var chosen_target: CombatActorState = _pick_rule_target(state, actor, str(chosen_action.get("targetMode", "HIGHEST_THREAT")))
-			var prepare_event: Dictionary = _emit(state, "ACTION_PREPARE", actor.id, {"actionId": instance_id, "sourceId": str(chosen_action["sourceId"]), "targetId": chosen_target.id if chosen_target != null else "", "data": chosen_action})
+			var chosen_targets: Array = chosen_action.get("targetIds", [])
+			var prepare_event: Dictionary = _emit(state, "ACTION_PREPARE", actor.id, {"actionId": instance_id, "sourceId": str(chosen_action["sourceId"]), "targetId": str(chosen_targets[0]) if not chosen_targets.is_empty() else "", "targetIds": chosen_targets.duplicate(), "data": chosen_action})
 			state.action_channel["active"]["instanceId"] = instance_id
 			state.action_channel["active"]["prepareEventId"] = int(prepare_event["eventId"])
+			state.action_channel["active"]["targetIds"] = chosen_targets.duplicate()
 	return {"ok": true}
 
 func _v2_skill(state: CombatState, skill_id: String) -> Dictionary:
@@ -2095,9 +2109,10 @@ func _resolve_basic_attack(state: CombatState, rng: DeterministicRng, actor: Com
 	_emit(state, "ATTACK", actor.id, attack_fields)
 	actor.last_target_id = target.id
 	var packets: Array[Dictionary] = _attack_packets(actor, weapon)
+	var locked_target: CombatActorState = target
 	var landed: bool = false
 	for packet: Dictionary in packets:
-		var current_target: CombatActorState = _pick_auto_target(state, actor)
+		var current_target: CombatActorState = locked_target if state.combat_rules_version == CombatState.V2_RULES_VERSION else _pick_auto_target(state, actor)
 		if current_target == null:
 			break
 		var hit_result: Dictionary = _resolve_basic_hit(state, rng, actor, current_target, float(packet["amount"]), str(packet["type"]), action_id, actor.kind == "operator")

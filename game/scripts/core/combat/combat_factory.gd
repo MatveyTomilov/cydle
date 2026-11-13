@@ -36,14 +36,12 @@ func compile_v2_main_actions(build: Dictionary, effective_stats: Dictionary, tim
 		if str(skill.get("channel", "main")) != "main":
 			continue
 		var target: String = _v2_target(str(skill.get("targetMode", "HIGHEST_THREAT")))
-		if target.is_empty():
-			continue
 		var prepare: int = maxi(0, int(ceili(float(skill.get("windupMs", 0)) / 100.0)) * 100)
 		var recovery: int = maxi(0, int(ceili(float(skill.get("recoveryMs", 0)) / 100.0)) * 100)
 		var energy_cost: float = float(skill.get("energyCost", 0))
 		if str(skill.get("basis", "")) == "TECH_E": energy_cost = maxf(1.0, energy_cost - float(effective_stats.get("energySkillCostFlat", 0)))
 		energy_cost *= 1.0 - clampf(float(effective_stats.get("skillEnergyCostLess", 0)), 0.0, 60.0) / 100.0
-		result.append({"sourceId": str(skill.get("id", "")), "actionId": "skill:%s" % str(skill.get("id", "")), "skillId": str(skill.get("id", "")), "classId": "SPECIAL_ATTACK", "targetMode": target, "prepareMs": prepare, "recoveryMs": recovery, "cooldownMs": maxi(0, int(ceili(float(skill.get("cooldownMs", 0)) / 100.0)) * 100), "energyCost": maxf(0, energy_cost), "heatDelta": float(skill.get("heatDelta", 0)), "requires": skill.get("requires", []).duplicate(true)})
+		result.append({"sourceId": str(skill.get("id", "")), "actionId": "skill:%s" % str(skill.get("id", "")), "skillId": str(skill.get("id", "")), "classId": "SPECIAL_ATTACK", "targetMode": target, "targetError": "UNSUPPORTED_TARGET_MODE:%s" % str(skill.get("targetMode", "")) if target.is_empty() else "", "prepareMs": prepare, "recoveryMs": recovery, "cooldownMs": maxi(0, int(ceili(float(skill.get("cooldownMs", 0)) / 100.0)) * 100), "energyCost": maxf(0, energy_cost), "heatDelta": float(skill.get("heatDelta", 0)), "requires": skill.get("requires", []).duplicate(true)})
 	return result
 
 func _v2_target(value: String) -> String:
