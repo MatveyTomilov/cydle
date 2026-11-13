@@ -73,6 +73,7 @@ func run(_tree: SceneTree) -> bool:
 	_test_direct_status_tree_trigger(config, build)
 	_test_direct_hit_trigger_actions(config, build)
 	_test_on_kill_triggers(config, build)
+	_test_before_hit_and_shield_absorb(config, build)
 	_test_unsupported_trigger_is_rejected(config, build)
 	_test_event_turret_ally(config, build)
 	return failure_count == 0
@@ -174,6 +175,50 @@ func _test_on_kill_triggers(config: Dictionary, build: Dictionary) -> void:
 	check(living_target.statuses.get("VIRUS", []).size() == 2, "combat_step: N4C did not transfer two VIRUS stacks from a killed target")
 	check(living_target.hp < hp_before, "combat_step: U02 did not echo digital kill damage onto another enemy")
 	check(int(state.metrics.get("procsTriggered", 0)) == 4, "combat_step: ON_KILL actions were not each counted once")
+
+func _test_before_hit_and_shield_absorb(config: Dictionary, build: Dictionary) -> void:
+	var trigger_build: Dictionary = build.duplicate(true)
+	trigger_build["triggerEffects"] = [
+		{"sourceId": "U04", "sourceKind": "item", "effect": {"type": "trigger", "id": "U04_charge", "event": "ON_SHIELD_ABSORB", "action": {"kind": "charge", "amountFromAbsorbed": 0.2, "capFormula": "H(T)", "capFlat": 100}}},
+		{"sourceId": "U04", "sourceKind": "item", "effect": {"type": "trigger", "id": "U04_release", "event": "ON_BEFORE_HIT", "icdMs": 4000, "action": {"kind": "spendFlagForDamage", "flag": "charge", "perStack": 1, "maxStacks": 1, "intervalMs": 4000}}},
+		{"sourceId": "K4C", "sourceKind": "tree", "effect": {"type": "trigger", "id": "K4C", "event": "ON_BEFORE_HIT", "action": {"kind": "packetMod", "penMultiplier": 2}}},
+		{"sourceId": "H4D", "sourceKind": "tree", "effect": {"type": "trigger", "id": "H4D", "event": "ON_BEFORE_HIT", "action": {"kind": "packetMod", "damageMultiplier": 1.25, "consumeShield": 10, "requireShield": 10}}},
+		{"sourceId": "X1", "sourceKind": "tree", "effect": {"type": "trigger", "id": "X1", "event": "ON_EFFECT_SHIELD_SPENT", "action": {"kind": "tempShield", "amount": 0, "cap": 25, "durationMs": 5000, "fromFlag": "effectShieldSpent", "ratio": 0.5}}},
+		{"sourceId": "S3A", "sourceKind": "tree", "effect": {"type": "trigger", "id": "S3A", "event": "ON_SHIELD_ABSORB", "action": {"kind": "restoreEnergy", "amount": 8}}},
+		{"sourceId": "S4D", "sourceKind": "tree", "effect": {"type": "trigger", "id": "S4D", "event": "ON_SHIELD_ABSORB", "action": {"kind": "secondaryDamage", "basis": "consumedShield", "coefficient": 0.15, "damageType": "DIGITAL", "targeting": "attacker", "canProc": false}}},
+	]
+	var initialized: Dictionary = CombatSimulator.new().create_state({
+		"seed": "before-hit-shield-absorb-fixture", "depth": int(config.get("depth", 1)), "biome": str(config.get("biome", "B01")),
+		"nodeType": "COMBAT", "build": trigger_build, "enemies": [config.get("enemy", {})], "tactics": config.get("tactics", {}),
+	})
+	if not check(bool(initialized.get("ok", false)), "combat_step: before-hit fixture failed to initialize"):
+		return
+	var simulator: CombatSimulator = CombatSimulator.new()
+	var state: CombatState = initialized["state"] as CombatState
+	var attacker: CombatActorState = state.enemies[0]
+	attacker.base_sheet["evasion"] = 0.0
+	state.operator.shield = 100.0
+	state.operator.energy = maxf(0.0, float(state.operator.base_sheet.get("maxEnergy", 0.0)) - 20.0)
+	var energy_before: float = state.operator.energy
+	var incoming_rng: DeterministicRng = DeterministicRng.new()
+	incoming_rng.seed("before-hit-shield-absorb-fixture", "incoming")
+	var incoming: Dictionary = simulator._resolve_basic_hit(state, incoming_rng, attacker, state.operator, 20.0, "ENERGY", "enemy-hit", false)
+	if not check(bool(incoming.get("ok", false)), "combat_step: shield-absorb hit did not resolve"):
+		return
+	check(float(state.operator.flags.get("charge", 0.0)) > 0.0, "combat_step: U04 did not charge from absorbed shield")
+	check(is_equal_approx(state.operator.energy, energy_before + 8.0), "combat_step: S3A did not restore energy on shield absorb")
+	var shield_before: float = state.operator.shield
+	var player_rng: DeterministicRng = DeterministicRng.new()
+	player_rng.seed("before-hit-shield-absorb-fixture", "player")
+	var outgoing: Dictionary = simulator._resolve_basic_hit(state, player_rng, state.operator, attacker, 20.0, "KINETIC", "operator-hit", true, "", 0.0, true, 1.0)
+	if not check(bool(outgoing.get("ok", false)), "combat_step: modified direct hit did not resolve"):
+		return
+	check(is_zero_approx(float(state.operator.flags.get("charge", 0.0))), "combat_step: U04 release did not consume stored charge")
+	check(is_equal_approx(shield_before - state.operator.shield, 10.0), "combat_step: H4D did not consume its authored 10 shield")
+	var temporary_shield: float = 0.0
+	for pool: Dictionary in state.operator.temp_shields:
+		temporary_shield += float(pool.get("amount", 0.0))
+	check(is_equal_approx(temporary_shield, 5.0), "combat_step: X1 did not convert spent effect shield into temporary shield")
 
 func _test_event_turret_ally(config: Dictionary, build: Dictionary) -> void:
 	var initialized: Dictionary = CombatSimulator.new().create_state({

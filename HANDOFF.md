@@ -1,8 +1,15 @@
 # CYDLE — Project handoff and development history
 
+## Live continuation (2026-11-13; packet/shield trigger integration)
+
+- Pushed base: `6f94d3613e30724974b18c089a8b62011522d145` on `development/codex`. Current uncommitted WIP extends the shared simulator with ON_BEFORE_HIT flag spending and packet modifiers, ON_SHIELD_ABSORB energy/secondary responses, and ON_EFFECT_SHIELD_SPENT temporary shields.
+- Covered authored actions include U04 charge/release, K4C penetration, H4D damage/shield exchange, S3A energy restoration, S4D consumed-shield retaliation, and X1 temporary shielding. These execute through the existing combat engine, retaining its deterministic RNG and snapshot state.
+- Godot editor import exit 0; 22 headless scripts exit 0 (88,085 assertions); `git diff --check` should be rerun before commit. Windows export/smoke not run. TypeScript was not rerun.
+- Next: review/save/push this WIP, then continue campaign-critical trigger families (dodge, taken damage, cast, interrupt, heat, expiry, drone death) and enemy behavior parity. Do not treat the additional trigger subset as full combat parity; keep unsupported events rejected. Full campaign/endgame, offline/autopilot breadth and release export still need acceptance.
+
 ## Live continuation (2026-11-13; ON_KILL trigger integration)
 
-- Base checkpoint: `58dedab1c8ae398f3e6afcc6d0cfa16ee5c1f895` on `development/codex` (pushed). This WIP stores last-hit source, type, event origin, proc weight, and cause ID as backward-compatible serialized `CombatActorState` fields, not public gameplay flags.
+- Base checkpoint for the ON_KILL implementation was `58dedab1c8ae398f3e6afcc6d0cfa16ee5c1f895`; it was pushed as `6f94d3613e30724974b18c089a8b62011522d145`. That commit stores last-hit source, type, event origin, proc weight, and cause ID as backward-compatible serialized `CombatActorState` fields, not public gameplay flags.
 - Enemy death resolution now dispatches authored ON_KILL effects through the existing combat RNG and simulator. Implemented actions: restore energy, change heat, transfer VIRUS stacks, and secondary damage. Direct/secondary/status-tick filters, damage type, status conditions, chance, ICD, and once guards are considered. Regression covers K3D energy on kinetic kill, H3C cooling on energy kill, U02 digital echo, and N4C VIRUS transfer.
 - Verification: Godot 4.7.2 editor import exit 0; 22 headless scripts exit 0 (88,077 assertions); `git diff --check` exit 0. Windows export/smoke not run for this WIP. TypeScript oracle not rerun (legacy source unchanged).
 - Worktree includes this ON_KILL WIP plus the preceding pushed direct-hit trigger checkpoint. Next: inspect exact diff, commit/push on `development/codex`, then implement the next campaign-critical trigger family (prefer ON_BEFORE_HIT/packet mods, preserving the same engine for active play/offline/autopilot/labs). Many event families, enemy behavior breadth, campaign acceptance, and release export acceptance are still outstanding.

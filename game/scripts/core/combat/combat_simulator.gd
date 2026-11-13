@@ -192,9 +192,200 @@ func _supports_skill_trigger_effects(state: CombatState) -> bool:
 		var attack_counter_trigger: bool = effect_id in ["ARC_E2_splash", "FOCUS_D1_virus", "DR_ARC_shock"] and str(effect.get("event", "")) == "ON_ATTACK_COUNTER" and str(trigger_value.get("sourceKind", "")) == "item"
 		var direct_hit_trigger: bool = str(effect.get("event", "")) == "ON_HIT" and str(trigger_value.get("sourceKind", "")) != "skill" and _supports_direct_hit_trigger(effect)
 		var kill_trigger: bool = str(effect.get("event", "")) == "ON_KILL" and _supports_kill_trigger(effect)
-		if not skill_trigger and not periodic_item_trigger and not attack_counter_trigger and not direct_hit_trigger and not kill_trigger:
+		var before_hit_trigger: bool = str(effect.get("event", "")) == "ON_BEFORE_HIT" and _supports_before_hit_trigger(effect)
+		var shield_absorb_trigger: bool = str(effect.get("event", "")) == "ON_SHIELD_ABSORB" and _supports_shield_absorb_trigger(effect)
+		var effect_shield_trigger: bool = str(effect.get("event", "")) == "ON_EFFECT_SHIELD_SPENT" and str(effect.get("action", {}).get("kind", "")) == "tempShield"
+		if not skill_trigger and not periodic_item_trigger and not attack_counter_trigger and not direct_hit_trigger and not kill_trigger and not before_hit_trigger and not shield_absorb_trigger and not effect_shield_trigger:
 			return false
 	return true
+
+func _supports_before_hit_trigger(effect: Dictionary) -> bool:
+	var action: Dictionary = effect.get("action", {})
+	match str(action.get("kind", "")):
+		"spendFlagForDamage": return not str(action.get("flag", "")).is_empty() and int(action.get("maxStacks", 0)) > 0
+		"packetMod": return action.has("damageMultiplier") or action.has("penMultiplier") or float(action.get("consumeShield", 0.0)) > 0.0
+		_: return false
+
+func _supports_shield_absorb_trigger(effect: Dictionary) -> bool:
+	var action: Dictionary = effect.get("action", {})
+	match str(action.get("kind", "")):
+		"restoreEnergy": return float(action.get("amount", 0.0)) > 0.0
+		"charge": return float(action.get("amountFromAbsorbed", 0.0)) > 0.0
+		"secondaryDamage": return str(action.get("basis", "")) == "consumedShield" and float(action.get("coefficient", 0.0)) > 0.0 and str(action.get("damageType", "")) in ["KINETIC", "ENERGY", "DIGITAL"] and str(action.get("targeting", "")) == "attacker"
+		_: return false
+
+func _dispatch_shield_absorb_triggers(state: CombatState, rng: DeterministicRng, attacker: CombatActorState, shield_owner: CombatActorState, damage_type: String, action_id: String, direct: bool, amount: float) -> void:
+	for trigger_value: Variant in state.build.get("triggerEffects", []):
+		if not trigger_value is Dictionary: continue
+		var effect: Dictionary = trigger_value.get("effect", {})
+		if str(effect.get("event", "")) != "ON_SHIELD_ABSORB" or not _supports_shield_absorb_trigger(effect): continue
+		var source_id: String = str(trigger_value.get("sourceId", ""))
+		var owner: CombatActorState = _trigger_owner(state, source_id)
+		if not owner.alive or owner.id != shield_owner.id: continue
+		if bool(effect.get("requireDirect", false)) and not direct: continue
+		var type_filter: Array = effect.get("damageTypeFilter", [])
+		if not type_filter.is_empty() and not type_filter.has(damage_type): continue
+		if not _trigger_status_condition_passes(state, owner, attacker, effect.get("condition", {})): continue
+		var trigger_id: String = str(effect.get("id", ""))
+		var trigger_key: String = "%s:%s" % [source_id, trigger_id]
+		if bool(effect.get("oncePerCombat", false)) and bool(owner.once_per_combat.get(trigger_key, false)): continue
+		if float(owner.icds.get(trigger_key, 0.0)) > float(state.time_ms): continue
+		var chance: float = clampf(float(effect.get("chance", 1.0)) * float(_effective_sheet(state, owner, attacker).get("procMultiplier", 1.0)), 0.0, 1.0)
+		if not rng.chance(chance): continue
+		if bool(effect.get("oncePerCombat", false)): owner.once_per_combat[trigger_key] = true
+		var icd_ms: float = float(effect.get("icdMs", 0.0))
+		if icd_ms > 0.0: owner.icds[trigger_key] = float(state.time_ms) + icd_ms
+		state.metrics["procsTriggered"] = int(state.metrics.get("procsTriggered", 0)) + 1
+		var trigger_action_id: String = "%s:trigger:%s" % [action_id, trigger_id]
+		_emit(state, "TRIGGER", owner.id, {"targetId": attacker.id, "actionId": trigger_action_id, "damageType": damage_type, "text": "%s: сработал эффект «%s» при поглощении урона щитом." % [owner.display_name, trigger_id], "data": {"sourceId": source_id, "amount": amount, "chance": chance}})
+		var trigger_action: Dictionary = effect.get("action", {})
+		match str(trigger_action.get("kind", "")):
+			"restoreEnergy":
+				_restore_trigger_energy(state, owner, trigger_action, trigger_action_id)
+			"charge":
+				var charge_cap: float = float(trigger_action.get("capFlat", 100.0))
+				if str(trigger_action.get("capFormula", "")) == "H(T)":
+					charge_cap = 100.0 * _formula.h_depth(float(_trigger_item_tech_level(state, source_id)))
+				owner.flags["charge"] = minf(charge_cap, float(owner.flags.get("charge", 0.0)) + amount * float(trigger_action.get("amountFromAbsorbed", 0.0)))
+			"secondaryDamage":
+				if attacker.alive:
+					var raw: float = amount * float(trigger_action.get("coefficient", 0.0))
+					_resolve_basic_hit(state, rng, owner, attacker, raw, str(trigger_action.get("damageType", "DIGITAL")), trigger_action_id, false, "", 0.0, false, 0.0)
+
+func _dispatch_before_hit_triggers(state: CombatState, rng: DeterministicRng, actor: CombatActorState, target: CombatActorState, action_id: String, skill_id: String, damage_type: String, raw_amount: float, is_main: bool, direct: bool, proc_weight: float, penetration: Dictionary) -> Dictionary:
+	if actor.side != "player" or not direct or (not is_main and actor.kind != "drone"):
+		return {"raw": raw_amount, "penetration": penetration}
+	var raw: float = raw_amount
+	var initial_raw: float = raw_amount
+	var pen: Dictionary = penetration.duplicate(true)
+	var chain: Dictionary = state.trigger_chains.get(action_id, {"childEvents": 0, "seen": {}, "limitReported": false, "lastAt": state.time_ms, "packetMods": {}})
+	var packet_mods: Dictionary = chain.get("packetMods", {})
+	var packet_key: String = "%s:%s" % [action_id, target.id]
+	if packet_mods.has(packet_key):
+		var cached: Dictionary = packet_mods[packet_key]
+		var cached_penetration: Dictionary = cached.get("penetration", penetration)
+		return {"raw": raw_amount * float(cached.get("multiplier", 1.0)), "penetration": cached_penetration.duplicate(true)}
+	state.trigger_chains[action_id] = chain
+	for trigger_value: Variant in state.build.get("triggerEffects", []):
+		if not trigger_value is Dictionary:
+			continue
+		var effect: Dictionary = trigger_value.get("effect", {})
+		if str(effect.get("event", "")) != "ON_BEFORE_HIT" or not _supports_before_hit_trigger(effect):
+			continue
+		if bool(effect.get("requireDirect", false)) and not direct:
+			continue
+		if bool(effect.get("requireDrone", false)) and actor.kind != "drone":
+			continue
+		var type_filter: Array = effect.get("damageTypeFilter", [])
+		if not type_filter.is_empty() and not type_filter.has(damage_type):
+			continue
+		var skill_filter: Array = effect.get("skillFilter", [])
+		if not skill_filter.is_empty() and not skill_filter.has(skill_id):
+			continue
+		var source_id: String = str(trigger_value.get("sourceId", ""))
+		var owner: CombatActorState = _trigger_owner(state, source_id)
+		if not owner.alive or (owner.kind != "operator" and owner.id != actor.id):
+			continue
+		if not _trigger_status_condition_passes(state, owner, target, effect.get("condition", {})):
+			continue
+		var trigger_id: String = str(effect.get("id", ""))
+		var key: String = "%s:%s" % [source_id, trigger_id]
+		var visit_key: String = "%s:%s" % [key, target.id]
+		var seen: Dictionary = chain.get("seen", {})
+		if bool(seen.get(visit_key, false)):
+			continue
+		var instance_key: String = "%s:%s" % [key, actor.id] if bool(effect.get("oncePerDrone", false)) else key
+		if bool(effect.get("oncePerCombat", false)) and bool(owner.once_per_combat.get(key, false)):
+			continue
+		if bool(effect.get("oncePerDrone", false)) and bool(owner.once_per_combat.get(instance_key, false)):
+			continue
+		if float(owner.icds.get(instance_key, 0.0)) > float(state.time_ms):
+			continue
+		var chance: float = clampf(float(effect.get("chance", 1.0)) * proc_weight * float(_effective_sheet(state, owner, target).get("procMultiplier", 1.0)), 0.0, 1.0)
+		if not rng.chance(chance):
+			continue
+		seen[visit_key] = true
+		chain["seen"] = seen
+		chain["lastAt"] = state.time_ms
+		chain["childEvents"] = int(chain.get("childEvents", 0)) + 1
+		state.trigger_chains[action_id] = chain
+		if bool(effect.get("oncePerCombat", false)):
+			owner.once_per_combat[key] = true
+		if bool(effect.get("oncePerDrone", false)):
+			owner.once_per_combat[instance_key] = true
+		var icd_ms: float = float(effect.get("icdMs", 0.0))
+		if icd_ms > 0.0: owner.icds[instance_key] = float(state.time_ms) + icd_ms
+		state.metrics["procsTriggered"] = int(state.metrics.get("procsTriggered", 0)) + 1
+		var trigger_action_id: String = "%s:trigger:%s" % [action_id, trigger_id]
+		_emit(state, "TRIGGER", owner.id, {"targetId": target.id, "actionId": trigger_action_id, "skillId": skill_id, "text": "%s: подготовил эффект «%s» к попаданию." % [owner.display_name, trigger_id], "data": {"sourceId": source_id, "chance": chance}})
+		var action: Dictionary = effect.get("action", {})
+		match str(action.get("kind", "")):
+			"spendFlagForDamage":
+				var flag: String = str(action.get("flag", ""))
+				var flag_amount: float = maxf(0.0, float(owner.flags.get(flag, 0.0)))
+				var stacks: int = maxi(0, floori(flag_amount))
+				var max_stacks: int = maxi(1, int(action.get("maxStacks", 1)))
+				var used: int = mini(stacks, max_stacks)
+				var interval: float = float(action.get("intervalMs", 0.0))
+				var has_charge: bool = flag == "charge" and flag_amount > 0.0
+				if (used <= 0 and not has_charge) or bool(action.get("onlyAtMax", false)) and used < max_stacks or interval > 0.0 and float(state.time_ms) - float(owner.flags.get("%sLastUsedAt" % flag, -interval)) < interval:
+					continue
+				if flag == "charge":
+					var charge_amount: float = flag_amount
+					owner.flags[flag] = 0.0
+					owner.flags["%sLastUsedAt" % flag] = float(state.time_ms)
+					_resolve_basic_hit(state, rng, owner, target, charge_amount, "ENERGY", "%s:charge" % trigger_action_id, false, "", 0.0, false, 0.0)
+				else:
+					owner.flags[flag] = float(stacks - used)
+					owner.flags["%sLastUsedAt" % flag] = float(state.time_ms)
+					if flag == "phase":
+						for phase_slot: int in range(1, 4): owner.flags.erase("phaseExpiresAt%d" % phase_slot)
+					raw *= 1.0 + float(action.get("perStack", 0.0)) * float(used)
+			"packetMod":
+				var required_shield: float = float(action.get("requireShield", 0.0))
+				if owner.shield < required_shield:
+					continue
+				var consume_shield: float = float(action.get("consumeShield", 0.0))
+				if consume_shield > 0.0:
+					var spent: float = minf(owner.shield, consume_shield)
+					if spent < required_shield:
+						continue
+					owner.shield -= spent
+					_dispatch_effect_shield_spent(state, owner, target, trigger_action_id, spent)
+				raw *= float(action.get("damageMultiplier", 1.0))
+				if action.has("penMultiplier"):
+					for stat: String in ["armorPen", "energyPen", "digitalPen"]: pen[stat] = float(pen.get(stat, 0.0)) * float(action.get("penMultiplier", 1.0))
+	packet_mods[packet_key] = {"multiplier": raw / initial_raw if initial_raw > 0.0 else 1.0, "penetration": pen.duplicate(true)}
+	chain["packetMods"] = packet_mods
+	chain["lastAt"] = state.time_ms
+	state.trigger_chains[action_id] = chain
+	return {"raw": raw, "penetration": pen}
+
+func _dispatch_effect_shield_spent(state: CombatState, owner: CombatActorState, target: CombatActorState, action_id: String, spent: float) -> void:
+	for trigger_value: Variant in state.build.get("triggerEffects", []):
+		if not trigger_value is Dictionary: continue
+		var effect: Dictionary = trigger_value.get("effect", {})
+		if str(effect.get("event", "")) != "ON_EFFECT_SHIELD_SPENT" or str(effect.get("action", {}).get("kind", "")) != "tempShield": continue
+		var source_id: String = str(trigger_value.get("sourceId", ""))
+		var trigger_owner: CombatActorState = _trigger_owner(state, source_id)
+		if trigger_owner.id != owner.id: continue
+		var action: Dictionary = effect.get("action", {})
+		state.metrics["procsTriggered"] = int(state.metrics.get("procsTriggered", 0)) + 1
+		var amount: float = spent * float(action.get("ratio", 1.0))
+		var cap: float = float(action.get("cap", amount))
+		var effect_id: String = str(effect.get("id", ""))
+		var shield_source_id: String = "trigger:%s:%s" % [source_id, effect_id]
+		var existing: Dictionary = {}
+		for pool: Dictionary in owner.temp_shields:
+			if str(pool.get("sourceId", "")) == shield_source_id: existing = pool; break
+		if existing.is_empty():
+			owner.temp_shields.append({"sourceId": shield_source_id, "amount": minf(cap, amount), "cap": cap, "expiresAt": float(state.time_ms) + float(action.get("durationMs", 0.0))})
+		else:
+			existing["amount"] = minf(cap, float(existing.get("amount", 0.0)) + amount)
+			existing["cap"] = cap
+			existing["expiresAt"] = float(state.time_ms) + float(action.get("durationMs", 0.0))
+		if amount > 0.0:
+			_emit(state, "SHIELD_GAIN", owner.id, {"targetId": owner.id, "actionId": action_id, "text": "%s: временный щит +%s." % [owner.display_name, _one_decimal(minf(cap, amount))], "data": {"amount": minf(cap, amount), "durationMs": action.get("durationMs", 0.0)}})
 
 func _supports_kill_trigger(effect: Dictionary) -> bool:
 	var action: Dictionary = effect.get("action", {})
@@ -1589,6 +1780,9 @@ func _resolve_basic_hit(state: CombatState, rng: DeterministicRng, actor: Combat
 	}
 	if skill_id == "SK_PIERCE":
 		penetration["armorPen"] = float(penetration["armorPen"]) + 20.0
+	var before_hit: Dictionary = _dispatch_before_hit_triggers(state, rng, actor, target, action_id, skill_id, damage_type, raw, is_main, direct, proc_weight, penetration)
+	raw = float(before_hit.get("raw", raw))
+	penetration = before_hit.get("penetration", penetration)
 	var redirected_raw: float = 0.0
 	var bulwark: CombatActorState = null
 	if actor.side == "enemy" and target.kind == "operator":
@@ -1650,6 +1844,8 @@ func _resolve_basic_hit(state: CombatState, rng: DeterministicRng, actor: Combat
 	target.last_hit_proc_weight = proc_weight
 	target.last_hit_event_source = "DIRECT" if direct else "SECONDARY"
 	_dispatch_direct_status_triggers(state, rng, actor, target, damage_type, action_id, skill_id, direct, proc_weight)
+	if float(partition["shieldConsumed"]) > 0.0:
+		_dispatch_shield_absorb_triggers(state, rng, actor, target, damage_type, action_id, direct, float(partition["shieldConsumed"]))
 	if actor.side == "enemy" and target.side == "player":
 		_resolve_enemy_direct_hit_effects(state, actor, target, action_id, raw)
 	if bulwark != null and redirected_raw > 0.0:

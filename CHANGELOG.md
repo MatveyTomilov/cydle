@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — packet and shield-response triggers
+
+- The shared combat engine now runs catalogued ON_BEFORE_HIT packet modifiers and flag spending, shield absorption responses, and ON_EFFECT_SHIELD_SPENT temporary shields. This connects K4C/H4D, U04 charge/release, S3A/S4D, and X1 through the same 100 ms combat path.
+- Regression exercises shield charging, energy recovery, consumed-shield damage, pre-hit penetration/damage changes, charge release, and X1 temporary shielding. Godot editor import passed; 22 scripts / 88,085 assertions passed; export/smoke not run for this delta.
+
 ## Unreleased — ON_KILL combat triggers
 
 - The shared simulator now preserves last-hit provenance in typed, serialized combat actor state and dispatches catalogued kill triggers for energy recovery, heat change, VIRUS transfer, and secondary damage. Direct, secondary, and status-tick origins are distinguished for filters; unsupported event/action pairs still fail closed.

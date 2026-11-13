@@ -10,6 +10,10 @@ The active strategy is **FULL GAME FIRST**: connect every major Master Spec syst
 
 The shared simulator now tracks last-hit provenance in backward-compatible typed actor snapshot fields and runs authored ON_KILL actions for K3D/H3C/U02/N4C patterns: energy recovery, heat adjustment, VIRUS transfer, and non-proccing secondary damage. Direct/secondary/status-tick sources are filtered; other trigger event families remain incomplete. Godot import and 22 headless scripts pass at 88,077 assertions; Windows export/smoke not rerun.
 
+### Current status override (2026-11-13; packet and shield-response triggers)
+
+The simulator also runs ON_BEFORE_HIT packet modifiers/flag spending, ON_SHIELD_ABSORB energy/secondary-damage effects, and ON_EFFECT_SHIELD_SPENT temporary shields. U04 charge/release and K4C/H4D/S3A/S4D/X1 have focused integration coverage. Other event families (including dodge, cast, drone death, interrupt, status expiry, heat and full trigger-chain accounting) remain incomplete. Godot import and 22 scripts pass at 88,085 assertions; Windows export/smoke not rerun.
+
 ### Current status override (2026-11-13; direct-hit trigger actions)
 
 The native 100 ms simulator now executes active `ON_HIT` tree/item actions for status application, energy/shield recovery, status extension, and secondary damage. Proc filters, chance, ICD and one-time guards are enforced. A targeted regression passes for K4B, U12, X2, and X4; an unsupported ON_HEAT_FULL effect is still rejected. This closes only part of combat-trigger coverage: ON_KILL, ON_BEFORE_HIT, ON_SHIELD_ABSORB, ON_DODGE, ON_CAST, boss/elite interactions, and other authored trigger/event families remain incomplete. Godot editor import and 22 headless scripts pass (88,071 assertions); export is not run for this delta.
