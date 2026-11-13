@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — CI actually runs Godot and publishes a Windows build
+
+- Root cause of every red GitHub Actions run: `chickensoft-games/setup-godot` exposes only the GUI-subsystem editor executable. PowerShell neither waits for it nor captures its output, so import, tests, asset validation and export each returned exit 0 in under a second without executing anything. The export therefore produced no file and `upload-artifact` failed with `No files were found with the provided path: game/build/CYDLE.exe`. The green Godot steps were false positives, not passing checks.
+- Replaced the action with `scripts/ci/install-godot.ps1`, which downloads the official 4.7.2-stable editor archive (including `Godot_v4.7.2-stable_win64_console.exe`) and the Windows export templates, installs them into `%APPDATA%\Godot\export_templates\4.7.2.stable`, and verifies the reported engine version. Editor and templates are cached between runs.
+- Every Godot step now runs through the console wrapper, echoes its log, and asserts its exit code. The test step additionally requires the real runner summary and rejects a run with fewer than 23 tests or 80,000 assertions, so a silent no-op can never pass again.
+- The export step asserts the executable exists and is at least 50 MB. A new smoke step launches the exported build with an isolated `APPDATA`, requires the `CYDLE shell ready` boot marker, rejects runtime errors, and requires the user data directory to be created. Added `print("CYDLE shell ready: %s" % _screen)` at the end of `app_root._ready()` as that boot marker.
+- Added superseding-run cancellation and a verification-log artifact.
+- Verified on SHA `4f7d19c78af8a4ea505d001eaaca200342143a87`, run `43409888278`: all 17 steps success. CI log shows `23 tests passed, 0 tests failed; 88689 assertions, 0 assertion failures`, asset manifest valid (16 entries), and `savepack [ DONE ]`.
+- The published artifact `cydle-windows-4f7d19c7…` was downloaded independently: `CYDLE.exe` is 116,396,408 bytes, and running it headless with an isolated `APPDATA` printed `CYDLE shell ready: menu`, exited 0, produced no stderr, and created `Godot/app_userdata/CYDLE`.
+- Local CI-equivalent verification before the push: import exit 0, 23 tests / 88,689 assertions / 0 failures, asset validation exit 0, export exit 0, exported EXE smoke exit 0.
+
 ## Unreleased — EV16 real encounter skip verification
 
 - Added a generated-route integration scenario: EV16's paid choice then consumes the next ordinary COMBAT node, clears its skip flag, and grants no XP, cargo, or item grants.

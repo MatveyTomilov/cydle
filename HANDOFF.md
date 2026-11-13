@@ -1,5 +1,24 @@
 # CYDLE — Project handoff and development history
 
+## Latest checkpoint (2026-11-13; GitHub CI restored and Windows artifact verified)
+
+- Checkpoint `4f7d19c78af8a4ea505d001eaaca200342143a87` on `development/codex`. GitHub Actions run `43409888278` is **success** on all 17 steps. This is the first run in which the Godot steps actually executed.
+- Root cause of all 188 previous failures: `chickensoft-games/setup-godot` symlinks only the GUI-subsystem `Godot_v4.7.2-stable_win64.exe`. PowerShell does not wait for GUI-subsystem processes and does not capture their stdout, so `godot --headless …` returned 0 immediately. Import took 2.8 s, tests 0.5 s, asset validation 0.54 s, export 0.5 s, with **zero output** — the real local suite takes 123 s. The export never wrote a file, so `upload-artifact` failed with `No files were found with the provided path: game/build/CYDLE.exe`. A green Godot step in the old workflow was a false positive.
+- Fix: `scripts/ci/install-godot.ps1` downloads the official editor zip (which contains both `…_win64.exe` and `…_win64_console.exe`) and the export templates tpz, extracts the Windows templates plus `version.txt`, installs them to `%APPDATA%\Godot\export_templates\4.7.2.stable`, and asserts `--version` reports `4.7.2.stable`. All Godot steps call `$env:GODOT_CONSOLE`. Archive member names were confirmed against the real release assets before writing the script.
+- Anti-false-positive gates now in CI: the test step requires the runner summary line and at least 23 tests / 80,000 assertions; the export step requires `game/build/CYDLE.exe` ≥ 50 MB; a smoke step runs the exported EXE with an isolated `APPDATA` and requires the `CYDLE shell ready` marker, no runtime errors, and a created user-data directory. `app_root._ready()` prints that marker.
+- Independently verified artifact: downloaded `cydle-windows-4f7d19c7…` (40,778,794 bytes zipped), extracted `CYDLE.exe` = **116,396,408 bytes**, ran it headless with isolated `APPDATA`: printed `CYDLE shell ready: menu`, exit 0, empty stderr, created `Godot/app_userdata/CYDLE/logs/godot.log`. CI's own `godot-tests.log` artifact shows all 23 PASS lines and `88689 assertions, 0 assertion failures`; `godot-export.log` ends with `savepack [ DONE ]`.
+- Local pre-push verification reproduced the same gates: import exit 0, 23 tests / 88,689 assertions / 0 failures, asset manifest valid (16 planned/concept entries, 0 integrated), export exit 0, EXE smoke exit 0.
+- CI now cancels superseded runs on the same ref and uploads a `cydle-ci-logs-<sha>` artifact for diagnosis.
+
+### Measured combat performance defect (new finding, not yet fixed)
+
+- A scratch headless probe on this checkpoint measured one interactive combat tick at **~155–165 ms**, while the pure simulator step is **~1.05 ms**. Breakdown for a 30 KB save: `state.to_payload()` 0.37 ms, `GameSaveState.parse_payload()` 25 ms, `SaveRepository.save_game()` **104 ms**.
+- `save_game` runs the full transactional protocol on every tick: schema validation, checksum validation, temp write, temp read-back verification, backup rotation (read + validate backup 1, write backup 2, write backup 1), then promote. That is ~4 writes and ~3 read/parse/validate passes per 100 ms of game time.
+- Player impact: `ПРОСЧИТАТЬ ДО ИСХОДА` loops up to 1800 ticks, i.e. up to ~5 minutes of frozen UI for one battle, and real-time ×1/×2/×4 autobattle (Master Spec §25) is impossible at 10 ticks/s.
+- The offline/autopilot path already avoids this: `game_session.gd:1164-1183` steps `_simulator.step_combat()` in a tight loop and persists once at the outcome or budget cap. The interactive `advance_combat_step()` (`game_session.gd:2809`) is the outlier that persists every tick.
+- Planned fix direction: keep `advance_combat_step()` semantics for tests/tools, add a playback entry point that steps in memory and persists on a bounded cadence plus a forced flush, and make skip simulate to outcome with a single persist. Do not weaken the save protocol for real transactions.
+- The probe script was scratch and was deleted; it is not in Git. No balance, combat rule, or save format was changed.
+
 ## Latest workflow checkpoint (2026-11-13; project balance QA agent)
 
 - Configuration checkpoint: `928afbac8fba74c4cf51e55668fbfed59ca05163` adds `balance_qa` (`gpt-6-luna`, high) and sets `.codex/config.toml` concurrency to 3, so the root can work while `regression_tester` and `balance_qa` run together. Exactly four project agents are configured; the stale `quest_reliability` thread was stopped and no quest-only agent is in `.codex/agents/`.
