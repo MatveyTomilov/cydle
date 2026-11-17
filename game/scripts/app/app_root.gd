@@ -351,6 +351,12 @@ func _show_garage() -> void:
 func _show_build() -> void:
 	_screen = "build"
 	_clear_body()
+	if _session.state == null:
+		_body.add_child(_label("Сначала создайте профиль оператора.", 16, COLOR_AMBER))
+		var new_button: Button = _button("НОВАЯ ИГРА", true)
+		new_button.pressed.connect(_on_new_game)
+		_body.add_child(new_button)
+		return
 	var field_loadout: bool = _session.state.run != null and not ["EXTRACTED", "DEFEATED", "ABANDONED", "TOWED"].has(_session.state.run.phase)
 	_body.add_child(_label("ПОЛЕВАЯ СБОРКА" if field_loadout else "BUILD LAB   /   ТЕКУЩАЯ СБОРКА", 12, COLOR_CYAN))
 	_body.add_child(_label("Билдинг", 28, COLOR_TEXT))
