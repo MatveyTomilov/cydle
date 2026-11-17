@@ -109,6 +109,8 @@ func _create_drone(build: Dictionary, drone: Variant, index: int, options: Dicti
 	sheet["accuracy"] = 100.0 + float(owner_stats.get("droneAccuracy", 0.0))
 	sheet["critChance"] = 0.0
 	sheet["procMultiplier"] = float(owner_stats.get("procMultiplier", 1.0))
+	sheet["droneDamage"] = float(owner_stats.get("droneDamage", 0.0))
+	sheet["moreDrone"] = float(owner_stats.get("moreDrone", 1.0))
 	var interval: float = _formula.attack_interval_ms(float(drone.get("intervalMs", 1000.0)), float(owner_stats.get("droneAttackSpeed", 0.0)), 1.0)
 	var drone_template_id: String = str(drone.get("templateId", ""))
 	var drone_template: Dictionary = _item_catalog.get_template(drone_template_id)
