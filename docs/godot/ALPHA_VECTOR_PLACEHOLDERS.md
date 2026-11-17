@@ -1,3 +1,5 @@
+> **DEPRECATED / TRANSITION ONLY (2026-11-12):** CYDLE no longer creates or commissions SVG for new alpha visuals. The original vector placeholders documented below already exist and are still referenced by current Godot screens. Preserve them only until equivalent cropped transparent PNG assets are imported and references updated; then retire per-ID without breaking builds. New work must follow `PAPERDOLL_VISUAL_CONTRACT.md` (PNG source/master/cropped runtime/JSON). The historical contents below are retained solely for audit/reproducibility.
+
 # CYDLE — Alpha Vector Placeholders (visual-only source kit)
 
 Status: **SOURCE READY, NOT INTEGRATED**. These are original, lightweight SVG drawings for the alpha presentation phase, not final art.
