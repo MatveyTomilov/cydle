@@ -201,7 +201,7 @@ func _base_actor(actor_id: String, kind: String, side: String, template_id: Stri
 
 func _override_modifiers(sheet: Dictionary, source: Dictionary) -> Array[Dictionary]:
 	var modifiers: Array[Dictionary] = []
-	for stat: String in ["maxHP", "maxShield", "armor", "energyRes", "digitalRes", "evasion", "accuracy", "critChance", "critMultiplier"]:
+	for stat: String in ["maxHP", "maxShield", "armor", "energyRes", "digitalRes", "evasion", "accuracy", "critChance", "critMultiplier", "droneDamage", "moreDrone"]:
 		modifiers.append(_stats.make_modifier(stat, "OVERRIDE", float(sheet.get(stat, 0.0)), source, {"id": "%s:base:%s" % [str(source["id"]), stat]}))
 	return modifiers
 
