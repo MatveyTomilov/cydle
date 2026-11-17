@@ -427,7 +427,7 @@ func _dispatch_effect_shield_spent(state: CombatState, owner: CombatActorState, 
 		if amount > 0.0:
 			_emit(state, "SHIELD_GAIN", owner.id, {"targetId": owner.id, "actionId": action_id, "text": "%s: временный щит +%s." % [owner.display_name, _one_decimal(minf(cap, amount))], "data": {"amount": minf(cap, amount), "durationMs": action.get("durationMs", 0.0)}})
 
-func _dispatch_authored_event(state: CombatState, rng: DeterministicRng, event_name: String, actor: CombatActorState, target: CombatActorState, action_id: String, cause_id: int = 0, damage_type: String = "", skill_id: String = "", direct: bool = true, proc_weight: float = 1.0, amount: float = 0.0) -> void:
+func _dispatch_authored_event(state: CombatState, rng: DeterministicRng, event_name: String, actor: CombatActorState, target: CombatActorState, action_id: String, cause_id: int = 0, damage_type: String = "", skill_id: String = "", direct: bool = true, proc_weight: float = 1.0, amount: float = 0.0, status_id: String = "") -> void:
 	for trigger_value: Variant in state.build.get("triggerEffects", []):
 		if not trigger_value is Dictionary: continue
 		var effect: Dictionary = trigger_value.get("effect", {})
@@ -452,6 +452,8 @@ func _dispatch_authored_event(state: CombatState, rng: DeterministicRng, event_n
 		if not type_filter.is_empty() and not type_filter.has(damage_type): continue
 		var skill_filter: Array = effect.get("skillFilter", [])
 		if not skill_filter.is_empty() and not skill_filter.has(skill_id): continue
+		var status_filter: Array = effect.get("statusFilter", [])
+		if not status_filter.is_empty() and not status_filter.has(status_id): continue
 		if not _trigger_status_condition_passes(state, owner, target, effect.get("condition", {})): continue
 		if effect.has("minAmount") and amount < float(effect.get("minAmount", 0.0)): continue
 		if effect.has("hpThreshold") and owner.hp / maxf(1.0, float(_effective_sheet(state, owner).get("maxHP", 1.0))) > float(effect.get("hpThreshold", 0.0)): continue
@@ -1810,7 +1812,7 @@ func _expire_dot_statuses(state: CombatState, rng: DeterministicRng) -> void:
 					"actionId": expire_action_id,
 					"text": "%s: %s истёк." % [actor.display_name, str(_status_catalog.get_definition(status_id).get("name", status_id))],
 				})
-				_dispatch_authored_event(state, rng, "ON_STATUS_EXPIRE", state.operator, actor, expire_action_id, int(expired_event.get("eventId", 0)), "", "", false, 1.0)
+				_dispatch_authored_event(state, rng, "ON_STATUS_EXPIRE", state.operator, actor, expire_action_id, int(expired_event.get("eventId", 0)), "", "", false, 1.0, 0.0, status_id)
 			if kept.is_empty():
 				actor.statuses.erase(status_id)
 			else:
@@ -2142,7 +2144,7 @@ func _resolve_basic_hit(state: CombatState, rng: DeterministicRng, actor: Combat
 	if direct and actor.buffs.any(func(buff: Dictionary) -> bool: return bool(buff.get("consumeOnHit", false))):
 		actor.flags["consumeHitBuffs"] = 1.0
 	var crit: bool = rng.chance(_damage.crit_probability(float(attacker.get("critChance", 0.0))))
-	var raw: float = raw_base * _outgoing_multiplier(attacker, damage_type, is_main)
+	var raw: float = raw_base * _outgoing_multiplier(attacker, damage_type, is_main, actor.kind == "drone")
 	var berserk_stacks: int = _status_stacks(actor, "BERSERK")
 	if berserk_stacks > 0:
 		raw *= 1.0 + 0.15 * berserk_stacks
@@ -2429,7 +2431,7 @@ func _add_virus_status(state: CombatState, source: CombatActorState, target: Com
 	target.statuses["VIRUS"] = entries
 	_emit(state, "STATUS_APPLY", source.id, {"targetId": target.id, "actionId": action_id, "statusId": "VIRUS", "text": "%s: %s." % [target.display_name, str(definition.get("name", "VIRUS"))], "data": {"stacks": entries.size(), "snapshot": snapshot, "durationMs": duration}})
 
-func _outgoing_multiplier(sheet: Dictionary, damage_type: String, is_main: bool) -> float:
+func _outgoing_multiplier(sheet: Dictionary, damage_type: String, is_main: bool, is_drone: bool = false) -> float:
 	var type_stat: String = "kineticDamage" if damage_type == "KINETIC" else "energyDamage" if damage_type == "ENERGY" else "digitalDamage"
 	var more_type: String = "moreKinetic" if damage_type == "KINETIC" else "moreEnergy" if damage_type == "ENERGY" else "moreDigital"
 	var multiplier: float = (1.0 + float(sheet.get(type_stat, 0.0)) / 100.0) * (1.0 + float(sheet.get("allDamage", 0.0)) / 100.0)
@@ -2438,6 +2440,8 @@ func _outgoing_multiplier(sheet: Dictionary, damage_type: String, is_main: bool)
 	multiplier *= float(sheet.get(more_type, 1.0)) * float(sheet.get("moreDirect", 1.0))
 	if is_main:
 		multiplier *= float(sheet.get("moreMain", 1.0))
+	if is_drone:
+		multiplier *= (1.0 + float(sheet.get("droneDamage", 0.0)) / 100.0) * float(sheet.get("moreDrone", 1.0))
 	return multiplier
 
 func _apply_partition(actor: CombatActorState, result: Dictionary) -> void:
