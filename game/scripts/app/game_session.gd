@@ -37,7 +37,12 @@ func restore_save_snapshot(snapshot_index: int) -> bool:
 func load_saved_game() -> bool:
 	var loaded: Dictionary = _repository.load_game(SLOT_ID)
 	if bool(loaded.get("ok", false)):
+		# A loaded save is authoritative: discard combat objects from the previous profile.
 		state = loaded["state"] as GameSaveState
+		_combat = null
+		_active_node_type = ""
+		_active_reward_modifiers = {}
+		_loot_rng = null
 		var offline_since_ms: int = state.updated_at
 		if state.run != null and state.run.combat_snapshot != null:
 			if not _restore_combat_snapshot():
@@ -53,6 +58,10 @@ func load_saved_game() -> bool:
 		return true
 	if bool(loaded.get("empty", false)):
 		state = null
+		_combat = null
+		_active_node_type = ""
+		_active_reward_modifiers = {}
+		_loot_rng = null
 		last_error = ""
 		return false
 	last_error = str(loaded.get("error", "Ошибка чтения сохранения."))
@@ -69,7 +78,13 @@ func start_new_game(now_ms: int = -1) -> bool:
 	if not bool(parsed.get("ok", false)):
 		last_error = str(parsed.get("error", "Стартовый профиль не прошёл проверку."))
 		return false
-	return _commit(parsed["state"] as GameSaveState)
+	if not _commit(parsed["state"] as GameSaveState):
+		return false
+	_combat = null
+	_active_node_type = ""
+	_active_reward_modifiers = {}
+	_loot_rng = null
+	return true
 
 func save() -> bool:
 	if state == null:
@@ -214,6 +229,11 @@ func equip_run_item(slot: String, item_id: String) -> bool:
 	resources["hp"] = minf(float(resources.get("hp", 0.0)), float(resources["maxHP"]))
 	resources["shield"] = minf(float(resources.get("shield", 0.0)), float(resources["maxShield"]))
 	resources["energy"] = minf(float(resources.get("energy", 0.0)), float(resources["maxEnergy"]))
+	var missing_hull: float = maxf(0.0, float(resources.get("maxHull", 100.0)) - float(resources.get("hull", 0.0)))
+	resources["maxFuel"] = maxf(0.0, float(stats.get("fuelMax", resources.get("maxFuel", 24.0))))
+	resources["maxHull"] = maxf(1.0, float(stats.get("hullMax", resources.get("maxHull", 100.0))))
+	resources["fuel"] = clampf(float(resources.get("fuel", 0.0)), 0.0, float(resources["maxFuel"]))
+	resources["hull"] = clampf(float(resources["maxHull"]) - missing_hull, 0.0, float(resources["maxHull"]))
 	run_payload["lastCommandId"] = "run:equipment:%s:%s:%d" % [slot, item_id, state.revision]
 	return _commit_payload(payload)
 
@@ -256,6 +276,11 @@ func unequip_run_item(slot: String) -> bool:
 	resources["hp"] = minf(float(resources.get("hp", 0.0)), float(resources["maxHP"]))
 	resources["shield"] = minf(float(resources.get("shield", 0.0)), float(resources["maxShield"]))
 	resources["energy"] = minf(float(resources.get("energy", 0.0)), float(resources["maxEnergy"]))
+	var missing_hull: float = maxf(0.0, float(resources.get("maxHull", 100.0)) - float(resources.get("hull", 0.0)))
+	resources["maxFuel"] = maxf(0.0, float(stats.get("fuelMax", resources.get("maxFuel", 24.0))))
+	resources["maxHull"] = maxf(1.0, float(stats.get("hullMax", resources.get("maxHull", 100.0))))
+	resources["fuel"] = clampf(float(resources.get("fuel", 0.0)), 0.0, float(resources["maxFuel"]))
+	resources["hull"] = clampf(float(resources["maxHull"]) - missing_hull, 0.0, float(resources["maxHull"]))
 	run_payload["lastCommandId"] = "run:equipment:restore:%s:%d" % [slot, state.revision]
 	return _commit_payload(payload)
 
@@ -1012,8 +1037,12 @@ func start_expedition(seed_value: String = "", use_medical_restore: bool = false
 	var loot_rng: DeterministicRng = DeterministicRng.new()
 	loot_rng.seed("loot", seed)
 	var transport: GameSaveState.TransportState = state.meta.transport
-	var sortie_fuel_max: float = maxf(24.0, transport.fuel_max)
 	var stats: Dictionary = build.get("stats", {})
+	var sortie_fuel_max: float = maxf(0.0, float(stats.get("fuelMax", transport.fuel_max)))
+	var sortie_hull_max: float = maxf(1.0, float(stats.get("hullMax", transport.hull_max)))
+	# Keep persistent chassis damage when equipment changes the maximum.
+	var missing_hull: float = maxf(0.0, transport.hull_max - transport.hull)
+	var sortie_hull: float = clampf(sortie_hull_max - missing_hull, 0.0, sortie_hull_max)
 	var run_payload: Dictionary = {
 		"seed": seed, "depth": depth, "biome": biome, "graph": generated["graph"],
 		"equipment": state.meta.equipment.duplicate(true), "currentNodeId": "START",
@@ -1031,7 +1060,7 @@ func start_expedition(seed_value: String = "", use_medical_restore: bool = false
 			# A new sortie leaves the garage with a full transport tank. Fuel is
 			# persistent only while continuing through checkpoints in the same run.
 			"fuel": sortie_fuel_max, "maxFuel": sortie_fuel_max,
-			"hull": transport.hull, "maxHull": transport.hull_max,
+			"hull": sortie_hull, "maxHull": sortie_hull_max,
 			"hp": float(stats.get("maxHP", 0.0)), "maxHP": float(stats.get("maxHP", 0.0)),
 			"shield": float(stats.get("maxShield", 0.0)), "maxShield": float(stats.get("maxShield", 0.0)),
 			"energy": float(stats.get("maxEnergy", 0.0)), "heat": 0.0, "gameTimeMs": 0.0,
@@ -1794,8 +1823,16 @@ func travel_to(node_id: String) -> bool:
 		return false
 	var payload: Dictionary = state.to_payload()
 	run_payload["resources"]["fuel"] = float(run_payload["resources"]["fuel"]) - cost
-	var travel_time: int = 25000
+	var travel_build: Dictionary = run_build_preview()
+	if not bool(travel_build.get("valid", false)):
+		last_error = "Нельзя рассчитать время перехода для недействительной сборки."
+		return false
+	var travel_less: float = clampf(float(travel_build.get("stats", {}).get("travelDurationLess", 0.0)), 0.0, 60.0)
+	var travel_time: int = roundi(25000.0 * (1.0 - travel_less / 100.0))
 	if state.run.escalation_ids.has("LONG_RUN"): travel_time += 15000
+	travel_time = maxi(1000, travel_time + int(run_payload.get("pendingTravelDeltaMs", 0)))
+	# A road event only affects the next successful journey.
+	run_payload["pendingTravelDeltaMs"] = 0
 	run_payload["resources"]["gameTimeMs"] = float(run_payload["resources"]["gameTimeMs"]) + travel_time
 	run_payload["currentNodeId"] = node_id
 	run_payload["visitedNodeIds"].append(node_id)
@@ -3067,8 +3104,9 @@ func resolve_active_combat() -> bool:
 	resources["gameTimeMs"] = float(resources["gameTimeMs"]) + _combat.time_ms
 	var node: Dictionary = current_node()
 	var node_id: String = str(node.get("id", ""))
-	if _combat.outcome == "DEFEAT":
-		return _resolve_combat_defeat(run_payload, node_id)
+	if _combat.outcome in ["DEFEAT", "TIMEOUT"]:
+		# A timed-out encounter is a lost sortie, not an unresolvable combat snapshot.
+		return _resolve_combat_defeat(run_payload, node_id, _combat.outcome)
 	if _combat.outcome != "VICTORY":
 		last_error = "Бой завершился без победы; безопасное восстановление ещё не реализовано."
 		return false
@@ -3252,7 +3290,10 @@ func _cargo_fits(run_payload: Dictionary, candidate: Dictionary) -> bool:
 	for item_value: Dictionary in run_payload.get("unsecuredCargo", []):
 		used += int(_item_catalog.get_template(str(item_value.get("templateId", ""))).get("cargoUnits", 1))
 	var units: int = int(_item_catalog.get_template(str(candidate.get("templateId", ""))).get("cargoUnits", 1))
-	var capacity: int = int(state.meta.transport.cargo_capacity)
+	var build: Dictionary = run_build_preview()
+	if not bool(build.get("valid", false)):
+		return false
+	var capacity: int = maxi(0, floori(float(build.get("stats", {}).get("cargoUnits", state.meta.transport.cargo_capacity))))
 	return used + units <= capacity
 
 func _grant_experience(operator: Dictionary, amount: int) -> void:
@@ -3273,7 +3314,7 @@ func _grant_experience(operator: Dictionary, amount: int) -> void:
 	operator["attributePoints"] = attribute_points
 	operator["treePoints"] = tree_points
 
-func _resolve_combat_defeat(run_payload: Dictionary, node_id: String) -> bool:
+func _resolve_combat_defeat(run_payload: Dictionary, node_id: String, outcome: String = "DEFEAT") -> bool:
 	var payload: Dictionary = state.to_payload()
 	var meta: Dictionary = payload["meta"]
 	var contract: Dictionary = run_payload.get("contract", {})
@@ -3301,7 +3342,7 @@ func _resolve_combat_defeat(run_payload: Dictionary, node_id: String) -> bool:
 	run_payload["pendingCombatEffects"] = {"initialTempShield": 0.0, "extraHeat": 0.0}
 	run_payload["pendingNextCombat"] = {"skipOrdinary": false, "forceElite": false, "extraItemRoll": false, "forceBounty": false, "bountyCreditsBonus": 0.0, "bountyEnemyId": null, "extraRareItemRoll": false, "alliedTurret": false, "extraRareOnElite": false}
 	run_payload["equipment"] = meta["equipment"].duplicate(true)
-	run_payload["lastCommandId"] = "combat:defeat:%s" % node_id
+	run_payload["lastCommandId"] = "combat:%s:%s" % [outcome.to_lower(), node_id]
 	payload["meta"] = meta
 	payload["run"] = run_payload
 	var parsed: Dictionary = GameSaveState.new().parse_payload(payload)
@@ -4795,6 +4836,7 @@ func _slot_accepts(slot: String, category: String) -> bool:
 		"ARMOR": return slot == "ARMOR"
 		"IMPLANT": return slot.begins_with("IMP_")
 		"DRONE": return slot.begins_with("DRONE_")
+		"ENGINE", "CHASSIS", "SCANNER", "SERVICE", "CARGO", "SUPPORT": return slot == category
 	return false
 
 func _inventory_has(items: Array, item_id: String) -> bool:
