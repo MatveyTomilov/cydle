@@ -23,6 +23,12 @@ func run(tree: SceneTree) -> bool:
 	check(_has_label(app, "CYDLE"), "test_app_boot: CYDLE title is missing from the game shell")
 	check(_has_button(body, "НОВАЯ ИГРА"), "test_app_boot: new game action is missing")
 	check(_has_button(body, "ПРОДОЛЖИТЬ"), "test_app_boot: continue action is missing")
+	var unsaved_session: GameSession = GameSession.new()
+	app.set("_session", unsaved_session)
+	app.call("_show_build")
+	check(_has_label(app, "Сначала создайте профиль оператора."), "test_app_boot: Build Lab crashes instead of showing onboarding for an unsaved player")
+	check(_has_button(body, "НОВАЯ ИГРА"), "test_app_boot: Build Lab did not offer new-game onboarding")
+	app.call("_show_menu")
 	var pilot_session: GameSession = GameSession.new()
 	pilot_session.configure_save_directory("user://test-saves/autopilot-ui")
 	if check(pilot_session.start_new_game(17629000000501), "test_app_boot: could not create an isolated autopilot UI profile"):
