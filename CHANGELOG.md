@@ -1,3 +1,17 @@
+## Unreleased — Autobattle V2 migration branch (13 November 2026)
+
+- V2 weapon timing samples runtime speed/SHOCK and restores it across status expiry. Added preparation-to-attack causal IDs and canonical build/source checks on snapshot restore.
+
+- Added opt-in real-weapon V2 adapter within the existing CombatSimulator, sourced from CombatFactory/BuildResolver, using canonical damage math and explicit versioned channel snapshots. Unported loadout features are rejected; live GameSession remains V1 until the migration gate is met.
+
+- Added serializable V2 action channel with independent cooldowns, exactly-once commit, interruption and bounded defensive scheduling; duel uses this channel.
+- Corrected unreachable prototype overheat and stable equal-time action ordering; added targeted regressions.
+- Added explicit live snapshot wrapper version and V1 compatibility guards without changing historical V1 replay hashes. V2 gameplay integration remains incomplete.
+
+- Adopted CYDLE_MASTER_SPEC.md v2.1 §8 as the normative item-authored combat model, superseding player-programmable tactics.
+- Added isolated AutobattleV2Contract deterministic action selector, action timeline, reaction budget, bounded proc ledger, target doctrines and Why-Not rejection codes, with a headless contract test registered in the native runner.
+- Added isolated AutobattleV2Duel: ARC-9 basic action with canonical DamageMath, Energy/Heat, HOT damage, authored Vent and Heat-to-Shield, enemy autoattack, causal event records and replay/snapshot tests. Fixed channel occupancy semantics so cooldown does not block further weapon actions. This is **headless prototype-only**, not connected to GameSession, Build Lab, consumables or campaign. V1 saves and live combat remain unchanged; new SHA's CI and rendered/headless parity remain to be verified before merge.
+
 # Changelog
 
 ## Unreleased — every equipment category is available to the active expedition build

@@ -1,5 +1,15 @@
 # CYDLE 1.0 delivery roadmap — Godot
 
+## Active priority: Autobattle V2 Gate A (13 November 2026)
+
+Snapshot compatibility follow-up: V2 rules/action-channel versions move from 2.1 to 2.2 because cooldown semantics are PREPARE-captured. Regressions verify that existing V2 2.1 snapshots fail closed; V1 snapshot compatibility remains unchanged. Godot 4.7.2 import and full native suite passed locally (33 tests / 89,513 assertions / 0 failures), along with TypeScript checks/tests, catalog validation and production build. Source SHA `0c0434a023825e55a1c9198659628994fedddc65` is pushed and its GitHub CI run `43488237178` passed.
+
+Latest source checkpoint `0c0434a023825e55a1c9198659628994fedddc65` adds strict BuildCatalog skill identity, typed target doctrine, all 16 current BuildResolver main skills, and opt-in GameSession V2 battles through the shared CombatSimulator. V2 PREPARE captures target/cooldown state; snapshots validate action/target consistency and version; V1 remains the default. V2 rules/channel version is now 2.2; active 2.1 snapshots are rejected while V1 stays compatible. Local full suite: 33 tests / 89,513 assertions / 0 failures; TypeScript's 207 tests, typecheck, catalog validation, and production build pass. GitHub CI run `43488237178` passed on the exact source SHA, including Windows x64 export (116,543,440-byte EXE), EXE smoke, and artifact upload. Independent review approved the follow-up.
+
+Remaining A1 work: extend V2 from supported main skills into authored item effects, reactions, and drones, keeping explicit rejection until each action works. The GameSession V2 path is opt-in and rejects unsupported gear with a diagnostic; V1 is still the normal default. The V2 save/reload session regression and V1 active-snapshot compatibility pass locally. CI's Windows export/smoke artifact corresponds to this source checkpoint; older ignored local binaries are not evidence for it.
+
+Owner's V2 assignment supersedes FULL GAME FIRST for this migration: first one complete Thermocircuit synergy through 12 sectors and early endgame. Work in `feature/autobattle-v2`, PR #3 stays draft. Keep V2 opt-in until the remaining supported loadout classes are implemented; do not silently drop unsupported mechanics. Track evidence in [Gate A](AUTOBATTLE_V2_GATE_A.md).
+
 `CYDLE_MASTER_SPEC.md` is the normative source for game design and release requirements. `docs/godot/` records the current engine, architecture, visual direction, and asset production rules. This roadmap records what actually exists; a plan or catalog entry is not working gameplay.
 
 ## Development strategy (2026-11-13)

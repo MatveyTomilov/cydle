@@ -1,6 +1,10 @@
 class_name CombatState
 extends RefCounted
 
+const LEGACY_RULES_VERSION: String = "cydle-combat-1.0"
+const V2_RULES_VERSION: String = "cydle-combat-2.2-development"
+var combat_rules_version: String = LEGACY_RULES_VERSION
+var action_channel: Dictionary = {}
 var seed: String = ""
 var depth: int = 1
 var biome: String = "B01"
@@ -49,7 +53,7 @@ func to_dictionary() -> Dictionary:
 	var ally_values: Array[Dictionary] = []
 	for actor: CombatActorState in allies:
 		ally_values.append(actor.to_dictionary())
-	return {
+	var result: Dictionary = {
 		"seed": seed, "depth": depth, "biome": biome, "nodeType": node_type, "timeMs": time_ms,
 		"maxDurationMs": max_duration_ms, "operator": operator.to_dictionary(), "drones": drone_values,
 		"enemies": enemy_values, "allies": ally_values, "rng": rng.duplicate(true), "nextEventId": next_event_id,
@@ -61,11 +65,50 @@ func to_dictionary() -> Dictionary:
 		"minimumEnemyTelegraphMs": minimum_enemy_telegraph_ms, "droneWar": drone_war,
 		"extraEnemyDigitalBonus": extra_enemy_digital_bonus, "triggerChains": trigger_chains.duplicate(true),
 	}
+	# Preserve the historical V1 hash representation used by golden fixtures.
+	if combat_rules_version != LEGACY_RULES_VERSION:
+		result["combatRulesVersion"] = combat_rules_version
+		result["actionChannel"] = action_channel.duplicate(true)
+	return result
 
 static func from_dictionary(value: Dictionary, resolved_build: Dictionary) -> CombatState:
+	# Untagged historical snapshots are V1. V2 requires a validated explicit
+	# channel; unknown versions never enter either runtime.
+	var version: String = str(value.get("combatRulesVersion", LEGACY_RULES_VERSION))
+	if version not in [LEGACY_RULES_VERSION, V2_RULES_VERSION]:
+		return null
+	if version == V2_RULES_VERSION:
+		if str(value.get("rulesHash", "")) != CombatFactory.new().v2_build_rules_hash(resolved_build):
+			return null
+		if not value.get("tactics", {}).is_empty() or not AutobattleV2Contract.validate_build(resolved_build).is_empty():
+			return null
+		if not value.get("actionChannel") is Dictionary or not AutobattleV2Channel.new()._validate(value["actionChannel"], int(value.get("timeMs", 0))).is_empty():
+			return null
+		var active: Dictionary = value["actionChannel"].get("active", {})
+		if not active.is_empty():
+			var canonical_actions: Array[Dictionary] = CombatFactory.new().compile_v2_main_actions(resolved_build, resolved_build.get("stats", {}))
+			var canonical: Dictionary = {}
+			for candidate: Dictionary in canonical_actions:
+				if str(candidate.get("actionId", "")) == str(active["action"].get("actionId", "")):
+					canonical = candidate
+					break
+			if canonical.is_empty(): return null
+			for field: Variant in canonical.keys():
+				# Timing is captured from effective runtime buffs at preparation;
+				# those buffs can expire before this snapshot is resumed.
+				if str(field) in ["prepareMs", "recoveryMs", "cooldownMs"]:
+					continue
+				if active["action"].get(field) != canonical[field]:
+					return null
+			var locked_targets: Variant = active.get("targetIds", null)
+			var action_targets: Variant = active["action"].get("targetIds", null)
+			if not locked_targets is Array or not action_targets is Array or locked_targets != action_targets:
+				return null
 	if not value.get("operator") is Dictionary or resolved_build.is_empty():
 		return null
 	var state: CombatState = CombatState.new()
+	state.combat_rules_version = version
+	state.action_channel = value.get("actionChannel", {}).duplicate(true)
 	state.seed = str(value.get("seed", ""))
 	state.depth = int(value.get("depth", 1))
 	state.biome = str(value.get("biome", "B01"))
@@ -79,6 +122,19 @@ static func from_dictionary(value: Dictionary, resolved_build: Dictionary) -> Co
 		if actor_value is Dictionary: state.enemies.append(CombatActorState.from_dictionary(actor_value))
 	for actor_value: Variant in value.get("allies", []):
 		if actor_value is Dictionary: state.allies.append(CombatActorState.from_dictionary(actor_value))
+	if version == V2_RULES_VERSION:
+		var active: Dictionary = state.action_channel.get("active", {})
+		if not active.is_empty():
+			var doctrine: int = int(active.get("action", {}).get("targetDoctrine", -1))
+			var locked_targets: Array = active.get("targetIds", [])
+			var seen_targets: Dictionary = {}
+			for target_id: Variant in locked_targets:
+				var target_actor: CombatActorState = _actor_by_id(state, str(target_id))
+				if target_actor == null or seen_targets.has(str(target_id)): return null
+				seen_targets[str(target_id)] = true
+				if doctrine == AutobattleV2Contract.Doctrine.SELF and target_actor.id != state.operator.id: return null
+				if doctrine == AutobattleV2Contract.Doctrine.ALLY and target_actor.side != "player": return null
+				if doctrine not in [AutobattleV2Contract.Doctrine.SELF, AutobattleV2Contract.Doctrine.ALLY] and target_actor.side != "enemy": return null
 	var rng_value: Variant = value.get("rng", {})
 	if not rng_value is Dictionary:
 		return null
@@ -106,6 +162,11 @@ static func from_dictionary(value: Dictionary, resolved_build: Dictionary) -> Co
 	state.extra_enemy_digital_bonus = float(value.get("extraEnemyDigitalBonus", 0.0))
 	state.trigger_chains = value.get("triggerChains", {}).duplicate(true)
 	return state if state.operator != null and not state.rng.is_empty() else null
+
+static func _actor_by_id(state: CombatState, actor_id: String) -> CombatActorState:
+	for actor: CombatActorState in state.all_actors():
+		if actor.id == actor_id: return actor
+	return null
 
 func clone() -> CombatState:
 	var copy: CombatState = CombatState.new()

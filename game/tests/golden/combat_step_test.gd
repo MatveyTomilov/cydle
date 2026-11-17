@@ -32,6 +32,13 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	var simulator: CombatSimulator = CombatSimulator.new()
 	var state: CombatState = state_result["state"] as CombatState
+	var legacy_payload: Dictionary = state.to_dictionary()
+	check(CombatState.from_dictionary(legacy_payload, build) != null, "combat_step: untagged V1 snapshot no longer loads")
+	legacy_payload["combatRulesVersion"] = "cydle-combat-2.0"
+	check(CombatState.from_dictionary(legacy_payload, build) == null, "combat_step: V2 snapshot interpreted as V1")
+	var incompatible: CombatState = state.clone()
+	incompatible.combat_rules_version = "cydle-combat-2.0"
+	check(not bool(simulator.step_combat(incompatible).get("ok", true)), "combat_step: V1 engine stepped V2 state")
 	var threshold_actor: CombatActorState = state.operator.clone()
 	threshold_actor.hp = float(threshold_actor.base_sheet.get("maxHP", 1.0)) * 0.5
 	check(not simulator._eval_tactic_condition(state, threshold_actor, {"kind": "hpBelow", "value": 45.0}, null), "combat_step: legacy 45-percent HP condition did not retain its intended threshold")
