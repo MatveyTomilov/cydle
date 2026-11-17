@@ -1,0 +1,1204 @@
+{
+  "schemaVersion": 1,
+  "enemies": [
+    {
+      "id": "E01",
+      "name": "Рейдер",
+      "hp": 140,
+      "shield": 0,
+      "armor": 3,
+      "resE": 0,
+      "resD": 0,
+      "evasion": 20,
+      "damage": 19,
+      "intervalMs": 1100,
+      "type": "KINETIC",
+      "threatUnits": 1,
+      "mechanical": false,
+      "healer": false,
+      "role": "melee",
+      "abilities": [],
+      "unlockDepth": 1,
+      "biomes": [
+        "B01",
+        "B03"
+      ],
+      "desc": "Быстрые одиночные атаки."
+    },
+    {
+      "id": "E02",
+      "name": "Ночной стрелок",
+      "hp": 110,
+      "shield": 0,
+      "armor": 2,
+      "resE": 0,
+      "resD": 0,
+      "evasion": 30,
+      "damage": 29,
+      "intervalMs": 1800,
+      "type": "KINETIC",
+      "threatUnits": 1,
+      "mechanical": false,
+      "healer": false,
+      "role": "sniper",
+      "abilities": [
+        {
+          "firstAtMs": 5000,
+          "everyMs": 9000,
+          "windupMs": 900,
+          "telegraphMs": 900,
+          "interruptible": true,
+          "id": "E02_snipe",
+          "kind": "heavyAttack",
+          "damage": 58,
+          "damageType": "KINETIC",
+          "desc": "Прицельный выстрел двойного урона"
+        }
+      ],
+      "unlockDepth": 1,
+      "biomes": [
+        "B01"
+      ],
+      "desc": "Опасный выстрел с телеграфом 900 мс после 5 с."
+    },
+    {
+      "id": "E03",
+      "name": "Уличный щитоносец",
+      "hp": 230,
+      "shield": 60,
+      "armor": 14,
+      "resE": 5,
+      "resD": 0,
+      "evasion": 10,
+      "damage": 14,
+      "intervalMs": 1600,
+      "type": "KINETIC",
+      "threatUnits": 1,
+      "mechanical": false,
+      "healer": false,
+      "role": "tank",
+      "abilities": [
+        {
+          "firstAtMs": 8000,
+          "everyMs": 8000,
+          "windupMs": 0,
+          "telegraphMs": 0,
+          "interruptible": false,
+          "id": "E03_shield",
+          "kind": "shieldRestore",
+          "amount": 20,
+          "desc": "Восстановление 20 щита"
+        }
+      ],
+      "unlockDepth": 1,
+      "biomes": [
+        "B01",
+        "B02"
+      ],
+      "desc": "Восстанавливает 20 щита каждые 8 с."
+    },
+    {
+      "id": "E04",
+      "name": "Дозорный",
+      "hp": 150,
+      "shield": 20,
+      "armor": 6,
+      "resE": 0,
+      "resD": 0,
+      "evasion": 20,
+      "damage": 17,
+      "intervalMs": 950,
+      "type": "KINETIC",
+      "threatUnits": 1,
+      "mechanical": false,
+      "healer": false,
+      "role": "marker",
+      "abilities": [
+        {
+          "firstAtMs": 4000,
+          "everyMs": 8000,
+          "windupMs": 0,
+          "telegraphMs": 0,
+          "interruptible": false,
+          "id": "E04_mark",
+          "kind": "mark",
+          "status": "MARK",
+          "statusDurationMs": 6000,
+          "desc": "Метка: следующий удар по оператору +30%"
+        }
+      ],
+      "unlockDepth": 1,
+      "biomes": [
+        "B01",
+        "B02"
+      ],
+      "desc": "Отмечает героя: следующий удар +30%."
+    },
+    {
+      "id": "E05",
+      "name": "Курьер-тень",
+      "hp": 95,
+      "shield": 0,
+      "armor": 1,
+      "resE": 0,
+      "resD": 0,
+      "evasion": 60,
+      "damage": 17,
+      "intervalMs": 650,
+      "type": "KINETIC",
+      "threatUnits": 1,
+      "mechanical": false,
+      "healer": false,
+      "role": "evader",
+      "abilities": [],
+      "unlockDepth": 1,
+      "biomes": [
+        "B01"
+      ],
+      "desc": "Высокое уклонение."
+    },
+    {
+      "id": "E06",
+      "name": "Сборщик",
+      "hp": 200,
+      "shield": 0,
+      "armor": 8,
+      "resE": 0,
+      "resD": 0,
+      "evasion": 15,
+      "damage": 23,
+      "intervalMs": 1450,
+      "type": "KINETIC",
+      "threatUnits": 1,
+      "mechanical": false,
+      "healer": false,
+      "role": "looter",
+      "abilities": [
+        {
+          "firstAtMs": 15000,
+          "everyMs": 999000,
+          "windupMs": 0,
+          "telegraphMs": 0,
+          "interruptible": false,
+          "id": "E06_escape",
+          "kind": "escape",
+          "desc": "Побег с грузом через 15 с"
+        }
+      ],
+      "unlockDepth": 1,
+      "biomes": [
+        "B03"
+      ],
+      "desc": "Если выживает 15 с — сбегает с одним незакреплённым предметом."
+    },
+    {
+      "id": "E07",
+      "name": "Артиллерист",
+      "hp": 150,
+      "shield": 0,
+      "armor": 5,
+      "resE": 0,
+      "resD": 0,
+      "evasion": 10,
+      "damage": 39,
+      "intervalMs": 2500,
+      "type": "KINETIC",
+      "threatUnits": 2,
+      "mechanical": false,
+      "healer": false,
+      "role": "burst",
+      "abilities": [
+        {
+          "firstAtMs": 5000,
+          "everyMs": 9000,
+          "windupMs": 2000,
+          "telegraphMs": 2000,
+          "interruptible": true,
+          "id": "E07_shell",
+          "kind": "heavyAttack",
+          "damage": 78,
+          "damageType": "KINETIC",
+          "desc": "Артобстрел двойного урона"
+        }
+      ],
+      "unlockDepth": 2,
+      "biomes": [
+        "B02",
+        "B03"
+      ],
+      "desc": "Опасный каст с windup 2.0 с, прерываемый."
+    },
+    {
+      "id": "E08",
+      "name": "Турель",
+      "hp": 190,
+      "shield": 20,
+      "armor": 10,
+      "resE": 10,
+      "resD": 0,
+      "evasion": 0,
+      "damage": 17,
+      "intervalMs": 800,
+      "type": "KINETIC",
+      "threatUnits": 2,
+      "mechanical": true,
+      "healer": false,
+      "role": "turret",
+      "abilities": [],
+      "unlockDepth": 2,
+      "biomes": [
+        "B03",
+        "B02"
+      ],
+      "desc": "Стационарна, иммунитет только к смещению."
+    },
+    {
+      "id": "E09",
+      "name": "Техник",
+      "hp": 170,
+      "shield": 30,
+      "armor": 4,
+      "resE": 0,
+      "resD": 10,
+      "evasion": 20,
+      "damage": 13,
+      "intervalMs": 1500,
+      "type": "ENERGY",
+      "threatUnits": 2,
+      "mechanical": true,
+      "healer": true,
+      "role": "healer",
+      "abilities": [
+        {
+          "firstAtMs": 8000,
+          "everyMs": 8000,
+          "windupMs": 800,
+          "telegraphMs": 800,
+          "interruptible": true,
+          "id": "E09_heal",
+          "kind": "heal",
+          "amount": 30,
+          "desc": "Ремонт союзника 30 HP"
+        }
+      ],
+      "unlockDepth": 2,
+      "biomes": [
+        "B02",
+        "B03"
+      ],
+      "desc": "Лечит союзника с наименьшим HP на 30 каждые 8 с."
+    },
+    {
+      "id": "E10",
+      "name": "Дроновод",
+      "hp": 145,
+      "shield": 20,
+      "armor": 3,
+      "resE": 0,
+      "resD": 10,
+      "evasion": 15,
+      "damage": 16,
+      "intervalMs": 1200,
+      "type": "DIGITAL",
+      "threatUnits": 2,
+      "mechanical": true,
+      "healer": false,
+      "role": "summoner",
+      "abilities": [
+        {
+          "firstAtMs": 5000,
+          "everyMs": 999000,
+          "windupMs": 1000,
+          "telegraphMs": 1000,
+          "interruptible": true,
+          "id": "E10_summon",
+          "kind": "summon",
+          "summonId": "E20",
+          "summonCount": 1,
+          "desc": "Призыв роя"
+        }
+      ],
+      "unlockDepth": 2,
+      "biomes": [
+        "B03",
+        "B04"
+      ],
+      "desc": "Выпускает мелкий рой на 5-й секунде (лимит 2)."
+    },
+    {
+      "id": "E11",
+      "name": "Перехватчик",
+      "hp": 180,
+      "shield": 0,
+      "armor": 6,
+      "resE": 0,
+      "resD": 0,
+      "evasion": 30,
+      "damage": 21,
+      "intervalMs": 1100,
+      "type": "KINETIC",
+      "threatUnits": 2,
+      "mechanical": false,
+      "healer": false,
+      "role": "hunter",
+      "abilities": [
+        {
+          "firstAtMs": 5000,
+          "everyMs": 10000,
+          "windupMs": 0,
+          "telegraphMs": 0,
+          "interruptible": false,
+          "id": "E11_wanted",
+          "kind": "wantedBoost",
+          "amount": 3,
+          "desc": "+3 розыска после боя"
+        }
+      ],
+      "unlockDepth": 2,
+      "biomes": [
+        "B01",
+        "B02"
+      ],
+      "desc": "После боя +3 розыска."
+    },
+    {
+      "id": "E12",
+      "name": "Корп. щитовик",
+      "hp": 290,
+      "shield": 95,
+      "armor": 16,
+      "resE": 15,
+      "resD": 5,
+      "evasion": 10,
+      "damage": 20,
+      "intervalMs": 1500,
+      "type": "KINETIC",
+      "threatUnits": 2,
+      "mechanical": false,
+      "healer": false,
+      "role": "protector",
+      "abilities": [
+        {
+          "firstAtMs": 5000,
+          "everyMs": 10000,
+          "windupMs": 0,
+          "telegraphMs": 0,
+          "interruptible": false,
+          "id": "E12_protect",
+          "kind": "protectAlly",
+          "amount": 15,
+          "desc": "Прикрытие союзника"
+        }
+      ],
+      "unlockDepth": 2,
+      "biomes": [
+        "B02"
+      ],
+      "desc": "Прикрывает слабейшего союзника: −15% получаемого урона."
+    },
+    {
+      "id": "E13",
+      "name": "Нейроловец",
+      "hp": 175,
+      "shield": 0,
+      "armor": 3,
+      "resE": 0,
+      "resD": 30,
+      "evasion": 25,
+      "damage": 27,
+      "intervalMs": 1800,
+      "type": "DIGITAL",
+      "threatUnits": 2,
+      "mechanical": false,
+      "healer": false,
+      "role": "jammer",
+      "abilities": [
+        {
+          "firstAtMs": 6000,
+          "everyMs": 10000,
+          "windupMs": 800,
+          "telegraphMs": 800,
+          "interruptible": true,
+          "id": "E13_jam",
+          "kind": "applyStatus",
+          "status": "JAM",
+          "statusDurationMs": 3000,
+          "desc": "Цифровые помехи"
+        }
+      ],
+      "unlockDepth": 5,
+      "biomes": [
+        "B04"
+      ],
+      "desc": "JAM 3 с каждые 10 с."
+    },
+    {
+      "id": "E14",
+      "name": "Паразит",
+      "hp": 140,
+      "shield": 10,
+      "armor": 3,
+      "resE": 0,
+      "resD": 10,
+      "evasion": 35,
+      "damage": 16,
+      "intervalMs": 1050,
+      "type": "DIGITAL",
+      "threatUnits": 2,
+      "mechanical": false,
+      "healer": false,
+      "role": "infector",
+      "abilities": [
+        {
+          "firstAtMs": 0,
+          "everyMs": 0,
+          "windupMs": 0,
+          "telegraphMs": 0,
+          "interruptible": false,
+          "id": "E14_virus",
+          "kind": "applyStatus",
+          "status": "VIRUS",
+          "desc": "VIRUS на каждом 3-м ударе"
+        }
+      ],
+      "unlockDepth": 5,
+      "biomes": [
+        "B04"
+      ],
+      "desc": "Каждый третий прямой удар накладывает VIRUS."
+    },
+    {
+      "id": "E15",
+      "name": "Кодер",
+      "hp": 200,
+      "shield": 20,
+      "armor": 5,
+      "resE": 5,
+      "resD": 20,
+      "evasion": 20,
+      "damage": 21,
+      "intervalMs": 1350,
+      "type": "DIGITAL",
+      "threatUnits": 2,
+      "mechanical": true,
+      "healer": false,
+      "role": "droneDenial",
+      "abilities": [
+        {
+          "firstAtMs": 5000,
+          "everyMs": 9000,
+          "windupMs": 700,
+          "telegraphMs": 700,
+          "interruptible": true,
+          "id": "E15_dronejam",
+          "kind": "applyStatus",
+          "status": "DRONE_JAM",
+          "statusDurationMs": 2000,
+          "desc": "Помехи дронам"
+        }
+      ],
+      "unlockDepth": 5,
+      "biomes": [
+        "B04",
+        "B03"
+      ],
+      "desc": "DRONE_JAM 2 с каждые 9 с."
+    },
+    {
+      "id": "E16",
+      "name": "Медик корпорации",
+      "hp": 165,
+      "shield": 35,
+      "armor": 5,
+      "resE": 0,
+      "resD": 15,
+      "evasion": 15,
+      "damage": 13,
+      "intervalMs": 1500,
+      "type": "ENERGY",
+      "threatUnits": 2,
+      "mechanical": false,
+      "healer": true,
+      "role": "healer",
+      "abilities": [
+        {
+          "firstAtMs": 9000,
+          "everyMs": 9000,
+          "windupMs": 1200,
+          "telegraphMs": 1200,
+          "interruptible": true,
+          "id": "E16_heal",
+          "kind": "heal",
+          "amount": 40,
+          "desc": "Лечение союзника 40 HP"
+        }
+      ],
+      "unlockDepth": 5,
+      "biomes": [
+        "B02"
+      ],
+      "desc": "+40 HP союзнику каждые 9 с, прерываемо."
+    },
+    {
+      "id": "E17",
+      "name": "Пиромант",
+      "hp": 180,
+      "shield": 20,
+      "armor": 3,
+      "resE": 20,
+      "resD": 0,
+      "evasion": 20,
+      "damage": 22,
+      "intervalMs": 1300,
+      "type": "ENERGY",
+      "threatUnits": 3,
+      "mechanical": false,
+      "healer": false,
+      "role": "heat",
+      "abilities": [
+        {
+          "firstAtMs": 6000,
+          "everyMs": 6000,
+          "windupMs": 600,
+          "telegraphMs": 600,
+          "interruptible": true,
+          "id": "E17_heat",
+          "kind": "heat",
+          "amount": 10,
+          "desc": "Тепловой импульс"
+        }
+      ],
+      "unlockDepth": 5,
+      "biomes": [
+        "B05"
+      ],
+      "desc": "+10 нагрева герою каждые 6 с."
+    },
+    {
+      "id": "E18",
+      "name": "Тепловой страж",
+      "hp": 260,
+      "shield": 55,
+      "armor": 12,
+      "resE": 25,
+      "resD": 0,
+      "evasion": 10,
+      "damage": 22,
+      "intervalMs": 1750,
+      "type": "ENERGY",
+      "threatUnits": 3,
+      "mechanical": false,
+      "healer": false,
+      "role": "tank",
+      "abilities": [
+        {
+          "firstAtMs": 0,
+          "everyMs": 0,
+          "windupMs": 0,
+          "telegraphMs": 0,
+          "interruptible": false,
+          "id": "E18_leak",
+          "kind": "applyStatus",
+          "status": "SHIELD_LEAK",
+          "statusDurationMs": 4000,
+          "desc": "Утечка щита при первом ударе"
+        }
+      ],
+      "unlockDepth": 5,
+      "biomes": [
+        "B05"
+      ],
+      "desc": "SHIELD_LEAK 4 с при первом попадании."
+    },
+    {
+      "id": "E19",
+      "name": "Реактор",
+      "hp": 270,
+      "shield": 40,
+      "armor": 9,
+      "resE": 35,
+      "resD": 0,
+      "evasion": 5,
+      "damage": 25,
+      "intervalMs": 1700,
+      "type": "ENERGY",
+      "threatUnits": 3,
+      "mechanical": true,
+      "healer": false,
+      "role": "burst",
+      "abilities": [
+        {
+          "firstAtMs": 5000,
+          "everyMs": 10000,
+          "windupMs": 0,
+          "telegraphMs": 1200,
+          "interruptible": false,
+          "id": "E19_death",
+          "kind": "deathBurst",
+          "damage": 45,
+          "damageType": "ENERGY",
+          "desc": "Взрыв при гибели"
+        }
+      ],
+      "unlockDepth": 5,
+      "biomes": [
+        "B05"
+      ],
+      "desc": "При гибели 45 E вторичного урона с телеграфом 1.2 с."
+    },
+    {
+      "id": "E20",
+      "name": "Рой мелких",
+      "hp": 75,
+      "shield": 0,
+      "armor": 0,
+      "resE": 0,
+      "resD": 0,
+      "evasion": 40,
+      "damage": 8,
+      "intervalMs": 550,
+      "type": "KINETIC",
+      "threatUnits": 3,
+      "mechanical": false,
+      "healer": false,
+      "role": "swarm",
+      "abilities": [],
+      "unlockDepth": 5,
+      "biomes": [
+        "B03",
+        "B04",
+        "B06"
+      ],
+      "desc": "Появляется группой 2–4, без бесконечного спавна."
+    },
+    {
+      "id": "E21",
+      "name": "Охотник нуль",
+      "hp": 280,
+      "shield": 50,
+      "armor": 12,
+      "resE": 5,
+      "resD": 20,
+      "evasion": 20,
+      "damage": 28,
+      "intervalMs": 1450,
+      "type": "DIGITAL",
+      "threatUnits": 3,
+      "mechanical": false,
+      "healer": false,
+      "role": "hunter",
+      "abilities": [
+        {
+          "firstAtMs": 6000,
+          "everyMs": 12000,
+          "windupMs": 800,
+          "telegraphMs": 800,
+          "interruptible": true,
+          "id": "E21_jam",
+          "kind": "applyStatus",
+          "status": "DRONE_JAM",
+          "statusDurationMs": 2000,
+          "desc": "Помехи дронам"
+        },
+        {
+          "firstAtMs": 12000,
+          "everyMs": 12000,
+          "windupMs": 1000,
+          "telegraphMs": 1000,
+          "interruptible": true,
+          "id": "E21_bypass",
+          "kind": "shieldBypass",
+          "amount": 0.2,
+          "desc": "Обход щита 20%"
+        }
+      ],
+      "unlockDepth": 9,
+      "biomes": [
+        "B06",
+        "B04"
+      ],
+      "desc": "Чередует DRONE_JAM и обход щита 20%."
+    },
+    {
+      "id": "E22",
+      "name": "Хамелеон",
+      "hp": 150,
+      "shield": 0,
+      "armor": 2,
+      "resE": 0,
+      "resD": 0,
+      "evasion": 80,
+      "damage": 19,
+      "intervalMs": 900,
+      "type": "KINETIC",
+      "threatUnits": 3,
+      "mechanical": false,
+      "healer": false,
+      "role": "evader",
+      "abilities": [],
+      "unlockDepth": 9,
+      "biomes": [
+        "B01",
+        "B06"
+      ],
+      "desc": "Очень высокое уклонение, сканирование раскрывает слабость."
+    },
+    {
+      "id": "E23",
+      "name": "Киберберсерк",
+      "hp": 240,
+      "shield": 0,
+      "armor": 6,
+      "resE": 0,
+      "resD": 0,
+      "evasion": 5,
+      "damage": 28,
+      "intervalMs": 1200,
+      "type": "KINETIC",
+      "threatUnits": 3,
+      "mechanical": false,
+      "healer": false,
+      "role": "melee",
+      "abilities": [
+        {
+          "firstAtMs": 0,
+          "everyMs": 0,
+          "windupMs": 0,
+          "telegraphMs": 0,
+          "interruptible": false,
+          "id": "E23_rage",
+          "kind": "applyStatus",
+          "status": "BERSERK",
+          "desc": "Ярость после гибели союзника"
+        }
+      ],
+      "unlockDepth": 9,
+      "biomes": [
+        "B06",
+        "B05"
+      ],
+      "desc": "+15% MORE урона после гибели союзника, максимум 2 стека."
+    },
+    {
+      "id": "E24",
+      "name": "Архивный судья",
+      "hp": 250,
+      "shield": 80,
+      "armor": 10,
+      "resE": 10,
+      "resD": 25,
+      "evasion": 20,
+      "damage": 25,
+      "intervalMs": 1550,
+      "type": "DIGITAL",
+      "threatUnits": 3,
+      "mechanical": true,
+      "healer": false,
+      "role": "punisher",
+      "abilities": [
+        {
+          "firstAtMs": 5000,
+          "everyMs": 10000,
+          "windupMs": 0,
+          "telegraphMs": 0,
+          "interruptible": false,
+          "id": "E24_punish",
+          "kind": "jamPunish",
+          "status": "JAM",
+          "statusDurationMs": 2000,
+          "desc": "Наказание за повтор программы"
+        }
+      ],
+      "unlockDepth": 9,
+      "biomes": [
+        "B06",
+        "B04"
+      ],
+      "desc": "Троекратное подряд применение одной программы вызывает JAM 2 с."
+    }
+  ],
+  "bosses": [
+    {
+      "id": "BOSS_A",
+      "name": "Бастион",
+      "hp": 1250,
+      "shield": 250,
+      "armor": 25,
+      "resE": 15,
+      "resD": 10,
+      "evasion": 10,
+      "damage": 45,
+      "intervalMs": 1700,
+      "type": "KINETIC",
+      "threatUnits": 6,
+      "mechanical": true,
+      "healer": false,
+      "role": "boss",
+      "abilities": [
+        {
+          "firstAtMs": 12000,
+          "everyMs": 12000,
+          "windupMs": 1500,
+          "telegraphMs": 1500,
+          "interruptible": true,
+          "id": "BOSS_A_rail",
+          "kind": "heavyAttack",
+          "damage": 125,
+          "damageType": "KINETIC",
+          "desc": "Рельсовый выстрел 125 K"
+        }
+      ],
+      "unlockDepth": 4,
+      "biomes": [
+        "B01"
+      ],
+      "desc": "Координатор блокпостов. Тяжёлый рельсовый выстрел и подкрепление.",
+      "isBoss": true,
+      "accuracy": 110,
+      "phases": [
+        {
+          "hpFraction": 0.7,
+          "kind": "summon",
+          "summonId": "E09",
+          "desc": "На 70% вызывает техника"
+        },
+        {
+          "hpFraction": 0.35,
+          "kind": "attackSpeed",
+          "amount": 0.2,
+          "desc": "На 35% +20% скорости атаки"
+        }
+      ]
+    },
+    {
+      "id": "BOSS_B",
+      "name": "Хирург",
+      "hp": 1550,
+      "shield": 180,
+      "armor": 18,
+      "resE": 10,
+      "resD": 20,
+      "evasion": 15,
+      "damage": 40,
+      "intervalMs": 1300,
+      "type": "KINETIC",
+      "threatUnits": 6,
+      "mechanical": false,
+      "healer": false,
+      "role": "boss",
+      "abilities": [
+        {
+          "firstAtMs": 11000,
+          "everyMs": 11000,
+          "windupMs": 1500,
+          "telegraphMs": 1500,
+          "interruptible": true,
+          "id": "BOSS_B_scalpel",
+          "kind": "heavyAttack",
+          "damage": 95,
+          "damageType": "DIGITAL",
+          "bypassShieldRatio": 0.25,
+          "status": "SHIELD_LEAK",
+          "statusDurationMs": 4000,
+          "desc": "Скальпель 95 D, обход щита 25%, SHIELD_LEAK"
+        }
+      ],
+      "unlockDepth": 8,
+      "biomes": [
+        "B04"
+      ],
+      "desc": "Перехватчик подсети. Цифровой скальпель обходит щит и вызывает утечку.",
+      "isBoss": true,
+      "accuracy": 110,
+      "phases": [
+        {
+          "hpFraction": 0.6,
+          "kind": "intervalReduce",
+          "target": "attacks",
+          "amount": 0.15,
+          "desc": "На 60% ускоряет атаки"
+        },
+        {
+          "hpFraction": 0.3,
+          "kind": "cleanse",
+          "desc": "На 30% один раз снимает свои статусы"
+        }
+      ]
+    },
+    {
+      "id": "BOSS_C",
+      "name": "Хор-9",
+      "hp": 1350,
+      "shield": 350,
+      "armor": 12,
+      "resE": 5,
+      "resD": 35,
+      "evasion": 15,
+      "damage": 45,
+      "intervalMs": 1600,
+      "type": "DIGITAL",
+      "threatUnits": 6,
+      "mechanical": true,
+      "healer": false,
+      "role": "boss",
+      "abilities": [
+        {
+          "firstAtMs": 15000,
+          "everyMs": 15000,
+          "windupMs": 1500,
+          "telegraphMs": 1500,
+          "interruptible": true,
+          "id": "BOSS_C_pulse",
+          "kind": "heavyAttack",
+          "damage": 75,
+          "damageType": "DIGITAL",
+          "desc": "Сетевой импульс 75 D"
+        }
+      ],
+      "unlockDepth": 8,
+      "biomes": [
+        "B04"
+      ],
+      "desc": "Автономный ИИ-хор. Призывы и сетевой импульс.",
+      "isBoss": true,
+      "accuracy": 110,
+      "phases": [
+        {
+          "hpFraction": 0.65,
+          "kind": "summon",
+          "summonId": "E14",
+          "desc": "На 65% призывает паразита"
+        },
+        {
+          "hpFraction": 0.3,
+          "kind": "summon",
+          "summonId": "E15",
+          "desc": "На 30% призывает кодера"
+        }
+      ]
+    },
+    {
+      "id": "BOSS_D",
+      "name": "Огненное сердце",
+      "hp": 1650,
+      "shield": 150,
+      "armor": 16,
+      "resE": 35,
+      "resD": 5,
+      "evasion": 10,
+      "damage": 48,
+      "intervalMs": 1700,
+      "type": "ENERGY",
+      "threatUnits": 6,
+      "mechanical": true,
+      "healer": false,
+      "role": "boss",
+      "abilities": [
+        {
+          "firstAtMs": 14000,
+          "everyMs": 14000,
+          "windupMs": 1500,
+          "telegraphMs": 1500,
+          "interruptible": true,
+          "id": "BOSS_D_burst",
+          "kind": "heavyAttack",
+          "damage": 85,
+          "damageType": "ENERGY",
+          "desc": "Тепловой взрыв 85 E"
+        }
+      ],
+      "unlockDepth": 8,
+      "biomes": [
+        "B05"
+      ],
+      "desc": "Реактор термического пояса. Постоянный нагрев и тепловые взрывы.",
+      "isBoss": true,
+      "accuracy": 110,
+      "ambientHeatPerSec": 2,
+      "phases": [
+        {
+          "hpFraction": 0.6,
+          "kind": "attackSpeed",
+          "amount": 0.1,
+          "desc": "На 60% +10% скорости атаки"
+        },
+        {
+          "hpFraction": 0.25,
+          "kind": "intervalReduce",
+          "target": "abilities",
+          "amount": 0.29,
+          "desc": "На 25% интервал взрыва 10 с"
+        }
+      ]
+    },
+    {
+      "id": "BOSS_E",
+      "name": "Патрон",
+      "hp": 1500,
+      "shield": 230,
+      "armor": 20,
+      "resE": 10,
+      "resD": 10,
+      "evasion": 10,
+      "damage": 40,
+      "intervalMs": 1400,
+      "type": "KINETIC",
+      "threatUnits": 6,
+      "mechanical": false,
+      "healer": false,
+      "role": "boss",
+      "abilities": [
+        {
+          "firstAtMs": 13000,
+          "everyMs": 13000,
+          "windupMs": 1600,
+          "telegraphMs": 1600,
+          "interruptible": true,
+          "id": "BOSS_E_heavy",
+          "kind": "heavyAttack",
+          "damage": 100,
+          "damageType": "KINETIC",
+          "desc": "Тяжёлый удар 100 K"
+        }
+      ],
+      "unlockDepth": 8,
+      "biomes": [
+        "B02"
+      ],
+      "desc": "Корпоративный куратор. Подкрепления и тяжёлый удар.",
+      "isBoss": true,
+      "accuracy": 110,
+      "phases": [
+        {
+          "hpFraction": 0.7,
+          "kind": "summon",
+          "summonId": "E09",
+          "desc": "На 70% вызывает техника"
+        },
+        {
+          "hpFraction": 0.4,
+          "kind": "summon",
+          "summonId": "E08",
+          "desc": "На 40% ставит турель"
+        }
+      ]
+    },
+    {
+      "id": "BOSS_CORE",
+      "name": "Сердце тракта",
+      "hp": 1900,
+      "shield": 400,
+      "armor": 22,
+      "resE": 20,
+      "resD": 25,
+      "evasion": 15,
+      "damage": 45,
+      "intervalMs": 1400,
+      "type": "ENERGY",
+      "threatUnits": 8,
+      "mechanical": true,
+      "healer": false,
+      "role": "boss",
+      "abilities": [],
+      "unlockDepth": 12,
+      "biomes": [
+        "B06"
+      ],
+      "desc": "CORE_12. Двойной пакет 22.5 E + 22.5 D и ротация трёх телеграфируемых волн.",
+      "isBoss": true,
+      "accuracy": 110,
+      "phases": [
+        {
+          "hpFraction": 0.7,
+          "kind": "summon",
+          "summonId": "E09",
+          "desc": "На 70% вызывает техника"
+        },
+        {
+          "hpFraction": 0.4,
+          "kind": "bypassUpgrade",
+          "amount": 0.25,
+          "desc": "На 40% цифровая волна обходит 25% щита"
+        },
+        {
+          "hpFraction": 0.15,
+          "kind": "castSpeed",
+          "amount": 0.2,
+          "desc": "На 15% +20% скорости каста"
+        }
+      ],
+      "rotating": [
+        {
+          "firstAtMs": 12000,
+          "everyMs": 36000,
+          "windupMs": 1500,
+          "telegraphMs": 1500,
+          "interruptible": true,
+          "id": "CORE_rail",
+          "kind": "heavyAttack",
+          "damage": 115,
+          "damageType": "KINETIC",
+          "desc": "K-рельс 115"
+        },
+        {
+          "firstAtMs": 24000,
+          "everyMs": 36000,
+          "windupMs": 1500,
+          "telegraphMs": 1500,
+          "interruptible": true,
+          "id": "CORE_jam",
+          "kind": "heavyAttack",
+          "damage": 80,
+          "damageType": "DIGITAL",
+          "status": "JAM",
+          "statusDurationMs": 3000,
+          "desc": "Цифровая волна 80 D + JAM"
+        },
+        {
+          "firstAtMs": 36000,
+          "everyMs": 36000,
+          "windupMs": 1500,
+          "telegraphMs": 1500,
+          "interruptible": true,
+          "id": "CORE_suppress",
+          "kind": "applyStatus",
+          "status": "DRONE_JAM",
+          "statusDurationMs": 2000,
+          "desc": "Подавление дронов 2 с"
+        }
+      ]
+    }
+  ],
+  "eliteMods": [
+    {
+      "id": "EL_SHIELD",
+      "name": "Щитовой",
+      "desc": "+30% щита и разовое восстановление 20 щита при HP<50%"
+    },
+    {
+      "id": "EL_FAST",
+      "name": "Скоростной",
+      "desc": "+20% скорости атаки, −10% HP"
+    },
+    {
+      "id": "EL_VIRUS",
+      "name": "Заражённый",
+      "desc": "Каждый 3-й удар накладывает VIRUS, +10% цифрового сопротивления"
+    },
+    {
+      "id": "EL_ANTI_DRONE",
+      "name": "Противодроновый",
+      "desc": "DRONE_JAM каждые 8 с с телеграфом 1.2 с"
+    },
+    {
+      "id": "EL_PEN",
+      "name": "Пробивающий",
+      "desc": "+10 плоского пробития брони, +200 мс windup"
+    },
+    {
+      "id": "EL_SPLIT",
+      "name": "Делящийся",
+      "desc": "При гибели появляются два E20 с 50% HP без лута"
+    }
+  ]
+}

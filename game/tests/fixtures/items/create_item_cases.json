@@ -1,0 +1,373 @@
+{
+  "cases": [
+    {
+      "name": "common",
+      "stream": "loot",
+      "seed": "item-factory-golden",
+      "options": {
+        "templateId": "PISTOL_K1",
+        "techLevel": 1,
+        "rarity": "COMMON",
+        "secured": true,
+        "originGrantId": "grant-common",
+        "origin": "cache"
+      },
+      "expected": {
+        "itemId": "it:grant-common:PISTOL_K1",
+        "templateId": "PISTOL_K1",
+        "techLevel": 1,
+        "rarity": "COMMON",
+        "affixes": [],
+        "uniqueEffectIds": [],
+        "neuralCost": 0,
+        "durability": 100,
+        "secured": true,
+        "originGrantId": "grant-common",
+        "rollSeed": "loot:1",
+        "tr": 9,
+        "acquiredAt": 0,
+        "origin": "cache"
+      }
+    },
+    {
+      "name": "rare",
+      "stream": "loot",
+      "seed": "item-factory-golden",
+      "options": {
+        "templateId": "ARM_CLOTH",
+        "techLevel": 7,
+        "rarity": "RARE",
+        "secured": false,
+        "originGrantId": "grant-rare",
+        "origin": "combat",
+        "affixCount": 4,
+        "acquiredAt": 12345
+      },
+      "expected": {
+        "itemId": "it:grant-rare:ARM_CLOTH",
+        "templateId": "ARM_CLOTH",
+        "techLevel": 7,
+        "rarity": "RARE",
+        "affixes": [
+          {
+            "affixId": "AF_ARM",
+            "tier": 2,
+            "value": 4,
+            "rawRoll": 0.8839,
+            "tierBoosted": false,
+            "center": 4,
+            "min": 3,
+            "max": 5
+          },
+          {
+            "affixId": "AF_SH",
+            "tier": 2,
+            "value": 19.84,
+            "rawRoll": 0.9922,
+            "tierBoosted": false,
+            "center": 20,
+            "min": 16,
+            "max": 24
+          },
+          {
+            "affixId": "AF_ERE",
+            "tier": 3,
+            "value": 7.2,
+            "rawRoll": 1.029,
+            "tierBoosted": true,
+            "center": 7,
+            "min": 5.6,
+            "max": 8.4
+          },
+          {
+            "affixId": "AF_HEA",
+            "tier": 3,
+            "value": 14.97,
+            "rawRoll": 0.9978,
+            "tierBoosted": true,
+            "center": 15,
+            "min": 12,
+            "max": 18
+          }
+        ],
+        "uniqueEffectIds": [],
+        "neuralCost": 0,
+        "durability": 100,
+        "secured": false,
+        "originGrantId": "grant-rare",
+        "rollSeed": "loot:13",
+        "tr": 20,
+        "acquiredAt": 12345,
+        "origin": "combat"
+      }
+    },
+    {
+      "name": "unique",
+      "stream": "loot",
+      "seed": "item-factory-golden",
+      "options": {
+        "templateId": "U01",
+        "techLevel": 13,
+        "rarity": "UNIQUE",
+        "secured": true,
+        "originGrantId": "grant-unique",
+        "origin": "boss",
+        "affixCount": 2
+      },
+      "expected": {
+        "itemId": "it:grant-unique:U01",
+        "templateId": "U01",
+        "techLevel": 13,
+        "rarity": "UNIQUE",
+        "affixes": [
+          {
+            "affixId": "AF_EDM",
+            "tier": 4,
+            "value": 21.58,
+            "rawRoll": 1.1991,
+            "tierBoosted": false,
+            "center": 18,
+            "min": 14.4,
+            "max": 21.6
+          },
+          {
+            "affixId": "AF_ARM",
+            "tier": 4,
+            "value": 7,
+            "rawRoll": 0.898,
+            "tierBoosted": false,
+            "center": 8,
+            "min": 6,
+            "max": 10
+          }
+        ],
+        "uniqueEffectIds": [
+          "U01"
+        ],
+        "neuralCost": 20,
+        "durability": 100,
+        "secured": true,
+        "originGrantId": "grant-unique",
+        "rollSeed": "loot:4",
+        "tr": 0,
+        "acquiredAt": 0,
+        "origin": "boss"
+      }
+    }
+  ],
+  "rarityCases": [
+    {
+      "name": "ordinary",
+      "seed": "rarity-golden",
+      "stream": "loot",
+      "table": "ORDINARY",
+      "rareShift": 0,
+      "expected": "MODIFIED"
+    },
+    {
+      "name": "elite-shifted",
+      "seed": "rarity-golden",
+      "stream": "loot",
+      "table": "ELITE",
+      "rareShift": 0.35,
+      "expected": "RARE"
+    },
+    {
+      "name": "boss",
+      "seed": "rarity-golden",
+      "stream": "loot",
+      "table": "BOSS",
+      "rareShift": 0,
+      "expected": "RARE"
+    }
+  ],
+  "lootCases": [
+    {
+      "name": "ordinary-pool",
+      "seed": "loot-golden",
+      "stream": "loot",
+      "options": {
+        "depth": 5,
+        "biome": "B01",
+        "table": "ORDINARY",
+        "secured": false,
+        "grantId": "loot-normal",
+        "origin": "combat"
+      },
+      "expected": {
+        "item": {
+          "itemId": "it:loot-normal:ARM_HEAT",
+          "templateId": "ARM_HEAT",
+          "techLevel": 4,
+          "rarity": "MODIFIED",
+          "affixes": [
+            {
+              "affixId": "AF_SR",
+              "tier": 1,
+              "value": 0.9,
+              "rawRoll": 0.901,
+              "tierBoosted": false,
+              "center": 1,
+              "min": 0.8,
+              "max": 1.2
+            }
+          ],
+          "uniqueEffectIds": [],
+          "neuralCost": 0,
+          "durability": 100,
+          "secured": false,
+          "originGrantId": "loot-normal",
+          "rollSeed": "loot:7",
+          "tr": 18,
+          "acquiredAt": 0,
+          "origin": "combat"
+        },
+        "fallbackFromUnique": false,
+        "rarity": "MODIFIED"
+      }
+    },
+    {
+      "name": "unique-biome",
+      "seed": "loot-golden",
+      "stream": "loot",
+      "options": {
+        "depth": 10,
+        "biome": "B05",
+        "table": "BOSS",
+        "secured": true,
+        "grantId": "loot-unique",
+        "origin": "boss",
+        "forceRarity": "UNIQUE"
+      },
+      "expected": {
+        "item": {
+          "itemId": "it:loot-unique:U01",
+          "templateId": "U01",
+          "techLevel": 10,
+          "rarity": "UNIQUE",
+          "affixes": [
+            {
+              "affixId": "AF_EDM",
+              "tier": 3,
+              "value": 15.54,
+              "rawRoll": 1.1957,
+              "tierBoosted": false,
+              "center": 13,
+              "min": 10.4,
+              "max": 15.6
+            },
+            {
+              "affixId": "AF_EVA",
+              "tier": 3,
+              "value": 12,
+              "rawRoll": 1.1689,
+              "tierBoosted": false,
+              "center": 10,
+              "min": 8,
+              "max": 12
+            }
+          ],
+          "uniqueEffectIds": [
+            "U01"
+          ],
+          "neuralCost": 20,
+          "durability": 100,
+          "secured": true,
+          "originGrantId": "loot-unique",
+          "rollSeed": "loot:7",
+          "tr": 0,
+          "acquiredAt": 0,
+          "origin": "boss"
+        },
+        "fallbackFromUnique": false,
+        "rarity": "UNIQUE"
+      }
+    },
+    {
+      "name": "unique-fallback",
+      "seed": "loot-golden",
+      "stream": "loot",
+      "options": {
+        "depth": 2,
+        "biome": "B01",
+        "table": "ELITE",
+        "secured": false,
+        "grantId": "loot-fallback",
+        "origin": "elite",
+        "forceRarity": "UNIQUE",
+        "forceTag": "no-such-tag"
+      },
+      "expected": {
+        "item": {
+          "itemId": "it:loot-fallback:RIFLE_K2",
+          "templateId": "RIFLE_K2",
+          "techLevel": 2,
+          "rarity": "LEGENDARY",
+          "affixes": [
+            {
+              "affixId": "AF_AS",
+              "tier": 1,
+              "value": 2.7,
+              "rawRoll": 0.901,
+              "tierBoosted": false,
+              "center": 3,
+              "min": 2.4,
+              "max": 3.6
+            },
+            {
+              "affixId": "AF_VIR",
+              "tier": 1,
+              "value": 4.06,
+              "rawRoll": 0.8129,
+              "tierBoosted": false,
+              "center": 5,
+              "min": 4,
+              "max": 6
+            },
+            {
+              "affixId": "AF_KDM",
+              "tier": 2,
+              "value": 8.85,
+              "rawRoll": 0.9832,
+              "tierBoosted": true,
+              "center": 9,
+              "min": 7.2,
+              "max": 10.8
+            },
+            {
+              "affixId": "AF_CM",
+              "tier": 1,
+              "value": 5.77,
+              "rawRoll": 1.1543,
+              "tierBoosted": false,
+              "center": 5,
+              "min": 4,
+              "max": 6
+            },
+            {
+              "affixId": "AF_DDM",
+              "tier": 1,
+              "value": 5.3,
+              "rawRoll": 1.0595,
+              "tierBoosted": false,
+              "center": 5,
+              "min": 4,
+              "max": 6
+            }
+          ],
+          "uniqueEffectIds": [],
+          "neuralCost": 0,
+          "durability": 100,
+          "secured": false,
+          "originGrantId": "loot-fallback",
+          "rollSeed": "loot:19",
+          "tr": 17,
+          "acquiredAt": 0,
+          "origin": "elite"
+        },
+        "fallbackFromUnique": true,
+        "rarity": "LEGENDARY"
+      }
+    }
+  ]
+}

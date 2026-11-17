@@ -1,0 +1,618 @@
+[
+ {
+  "fn": "h_depth",
+  "args": [
+   1
+  ],
+  "expected": 1
+ },
+ {
+  "fn": "d_depth",
+  "args": [
+   1
+  ],
+  "expected": 1
+ },
+ {
+  "fn": "reward_scale",
+  "args": [
+   1
+  ],
+  "expected": 1
+ },
+ {
+  "fn": "h_depth",
+  "args": [
+   2
+  ],
+  "expected": 1.2495057162231977
+ },
+ {
+  "fn": "d_depth",
+  "args": [
+   2
+  ],
+  "expected": 1.1223689233046326
+ },
+ {
+  "fn": "reward_scale",
+  "args": [
+   2
+  ],
+  "expected": 1.0849961855602455
+ },
+ {
+  "fn": "h_depth",
+  "args": [
+   4
+  ],
+  "expected": 1.8150566543406168
+ },
+ {
+  "fn": "d_depth",
+  "args": [
+   4
+  ],
+  "expected": 1.3808055619818453
+ },
+ {
+  "fn": "reward_scale",
+  "args": [
+   4
+  ],
+  "expected": 1.260766934373971
+ },
+ {
+  "fn": "h_depth",
+  "args": [
+   8
+  ],
+  "expected": 3.193969932490304
+ },
+ {
+  "fn": "d_depth",
+  "args": [
+   8
+  ],
+  "expected": 1.9484393755003004
+ },
+ {
+  "fn": "reward_scale",
+  "args": [
+   8
+  ],
+  "expected": 1.6338180214571283
+ },
+ {
+  "fn": "h_depth",
+  "args": [
+   12
+  ],
+  "expected": 4.877725073707039
+ },
+ {
+  "fn": "d_depth",
+  "args": [
+   12
+  ],
+  "expected": 2.5777261297507925
+ },
+ {
+  "fn": "reward_scale",
+  "args": [
+   12
+  ],
+  "expected": 2.033065277973332
+ },
+ {
+  "fn": "h_depth",
+  "args": [
+   20
+  ],
+  "expected": 9.076488153852045
+ },
+ {
+  "fn": "d_depth",
+  "args": [
+   20
+  ],
+  "expected": 4.000375982329661
+ },
+ {
+  "fn": "reward_scale",
+  "args": [
+   20
+  ],
+  "expected": 2.901210781285817
+ },
+ {
+  "fn": "h_depth",
+  "args": [
+   100
+  ],
+  "expected": 98.27249357569391
+ },
+ {
+  "fn": "d_depth",
+  "args": [
+   100
+  ],
+  "expected": 26.640801189153454
+ },
+ {
+  "fn": "reward_scale",
+  "args": [
+   100
+  ],
+  "expected": 15.062714989731353
+ },
+ {
+  "fn": "h_depth",
+  "args": [
+   1000
+  ],
+  "expected": 4497.1674941928295
+ },
+ {
+  "fn": "d_depth",
+  "args": [
+   1000
+  ],
+  "expected": 727.9202667105787
+ },
+ {
+  "fn": "reward_scale",
+  "args": [
+   1000
+  ],
+  "expected": 315.4012642681842
+ },
+ {
+  "fn": "h_depth",
+  "args": [
+   0
+  ],
+  "expected": 1
+ },
+ {
+  "fn": "d_depth",
+  "args": [
+   0
+  ],
+  "expected": 1
+ },
+ {
+  "fn": "reward_scale",
+  "args": [
+   0
+  ],
+  "expected": 1
+ },
+ {
+  "fn": "h_depth",
+  "args": [
+   -5
+  ],
+  "expected": 1
+ },
+ {
+  "fn": "d_depth",
+  "args": [
+   -5
+  ],
+  "expected": 1
+ },
+ {
+  "fn": "reward_scale",
+  "args": [
+   -5
+  ],
+  "expected": 1
+ },
+ {
+  "fn": "h_depth",
+  "args": [
+   1.5
+  ],
+  "expected": 1.121895541395057
+ },
+ {
+  "fn": "d_depth",
+  "args": [
+   1.5
+  ],
+  "expected": 1.0605960588272993
+ },
+ {
+  "fn": "reward_scale",
+  "args": [
+   1.5
+  ],
+  "expected": 1.0422505058659501
+ },
+ {
+  "fn": "h_depth",
+  "args": [
+   7.25
+  ],
+  "expected": 2.9114019094994164
+ },
+ {
+  "fn": "d_depth",
+  "args": [
+   7.25
+  ],
+  "expected": 1.8371173070873836
+ },
+ {
+  "fn": "reward_scale",
+  "args": [
+   7.25
+  ],
+  "expected": 1.561794098467962
+ },
+ {
+  "fn": "xp_required",
+  "args": [
+   1
+  ],
+  "expected": 100,
+  "integer": true
+ },
+ {
+  "fn": "xp_required",
+  "args": [
+   2
+  ],
+  "expected": 255,
+  "integer": true
+ },
+ {
+  "fn": "xp_required",
+  "args": [
+   5
+  ],
+  "expected": 878,
+  "integer": true
+ },
+ {
+  "fn": "xp_required",
+  "args": [
+   10
+  ],
+  "expected": 2239,
+  "integer": true
+ },
+ {
+  "fn": "xp_required",
+  "args": [
+   20
+  ],
+  "expected": 5707,
+  "integer": true
+ },
+ {
+  "fn": "xp_required",
+  "args": [
+   50
+  ],
+  "expected": 19661,
+  "integer": true
+ },
+ {
+  "fn": "xp_required",
+  "args": [
+   100
+  ],
+  "expected": 50119,
+  "integer": true
+ },
+ {
+  "fn": "xp_required",
+  "args": [
+   0
+  ],
+  "expected": 0,
+  "integer": true
+ },
+ {
+  "fn": "tech_power",
+  "args": [
+   80,
+   4
+  ],
+  "expected": 71.05809487057647
+ },
+ {
+  "fn": "tech_power",
+  "args": [
+   0,
+   1
+  ],
+  "expected": 10.5
+ },
+ {
+  "fn": "tech_power",
+  "args": [
+   200,
+   12
+  ],
+  "expected": 181.2161132739239
+ },
+ {
+  "fn": "tech_power",
+  "args": [
+   50.5,
+   8
+  ],
+  "expected": 66.3616842911482
+ },
+ {
+  "fn": "attack_interval_ms",
+  "args": [
+   1000,
+   50,
+   1.2
+  ],
+  "expected": 555.5555555555555
+ },
+ {
+  "fn": "attack_interval_ms",
+  "args": [
+   100,
+   0,
+   1
+  ],
+  "expected": 150
+ },
+ {
+  "fn": "attack_interval_ms",
+  "args": [
+   1000,
+   0,
+   0
+  ],
+  "expected": 999999999999.9999
+ },
+ {
+  "fn": "attack_interval_ms",
+  "args": [
+   500,
+   200,
+   2
+  ],
+  "expected": 150
+ },
+ {
+  "fn": "attack_interval_ms",
+  "args": [
+   1000,
+   -50,
+   1
+  ],
+  "expected": 2000
+ },
+ {
+  "fn": "cooldown_ms",
+  "args": [
+   1000,
+   25
+  ],
+  "expected": 800
+ },
+ {
+  "fn": "cooldown_ms",
+  "args": [
+   100,
+   0
+  ],
+  "expected": 250
+ },
+ {
+  "fn": "cooldown_ms",
+  "args": [
+   5000,
+   80
+  ],
+  "expected": 2777.777777777778
+ },
+ {
+  "fn": "cooldown_ms",
+  "args": [
+   200,
+   -50
+  ],
+  "expected": 400
+ },
+ {
+  "fn": "clamp_value",
+  "args": [
+   5,
+   0,
+   10
+  ],
+  "expected": 5
+ },
+ {
+  "fn": "clamp_value",
+  "args": [
+   -5,
+   0,
+   10
+  ],
+  "expected": 0
+ },
+ {
+  "fn": "clamp_value",
+  "args": [
+   15,
+   0,
+   10
+  ],
+  "expected": 10
+ },
+ {
+  "fn": "clamp_value",
+  "args": [
+   0.5,
+   0,
+   1
+  ],
+  "expected": 0.5
+ },
+ {
+  "fn": "wilson_interval",
+  "args": [
+   7,
+   10,
+   1.96
+  ],
+  "expected": [
+   0.3967732199795652,
+   0.892210712513788
+  ]
+ },
+ {
+  "fn": "wilson_interval",
+  "args": [
+   0,
+   0,
+   1.96
+  ],
+  "expected": [
+   0,
+   1
+  ]
+ },
+ {
+  "fn": "wilson_interval",
+  "args": [
+   10,
+   10,
+   1.96
+  ],
+  "expected": [
+   0.7224598312333834,
+   1
+  ]
+ },
+ {
+  "fn": "wilson_interval",
+  "args": [
+   3,
+   20,
+   2.576
+  ],
+  "expected": [
+   0.03878395856802335,
+   0.43560717612240213
+  ]
+ },
+ {
+  "fn": "median",
+  "args": [
+   [
+    9,
+    1,
+    5,
+    3
+   ]
+  ],
+  "expected": 4
+ },
+ {
+  "fn": "median",
+  "args": [
+   [
+    1
+   ]
+  ],
+  "expected": 1
+ },
+ {
+  "fn": "median",
+  "args": [
+   [
+    2,
+    4
+   ]
+  ],
+  "expected": 3
+ },
+ {
+  "fn": "median",
+  "args": [
+   []
+  ],
+  "expected": 0
+ },
+ {
+  "fn": "quantile",
+  "args": [
+   [
+    0,
+    10,
+    20
+   ],
+   0.25
+  ],
+  "expected": 5
+ },
+ {
+  "fn": "quantile",
+  "args": [
+   [
+    0,
+    10,
+    20
+   ],
+   0.5
+  ],
+  "expected": 10
+ },
+ {
+  "fn": "quantile",
+  "args": [
+   [
+    5
+   ],
+   0.9
+  ],
+  "expected": 5
+ },
+ {
+  "fn": "quantile",
+  "args": [
+   [],
+   0.5
+  ],
+  "expected": 0
+ },
+ {
+  "fn": "mean",
+  "args": [
+   [
+    2,
+    4,
+    8
+   ]
+  ],
+  "expected": 4.666666666666667
+ },
+ {
+  "fn": "mean",
+  "args": [
+   [
+    1
+   ]
+  ],
+  "expected": 1
+ },
+ {
+  "fn": "mean",
+  "args": [
+   []
+  ],
+  "expected": 0
+ }
+]

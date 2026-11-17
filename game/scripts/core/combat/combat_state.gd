@@ -1,0 +1,130 @@
+class_name CombatState
+extends RefCounted
+
+var seed: String = ""
+var depth: int = 1
+var biome: String = "B01"
+var node_type: String = "COMBAT"
+var time_ms: int = 0
+var max_duration_ms: int = 180000
+var operator: CombatActorState
+var drones: Array[CombatActorState] = []
+var enemies: Array[CombatActorState] = []
+var allies: Array[CombatActorState] = []
+var rng: Dictionary = {}
+var next_event_id: int = 1
+var log: Array[Dictionary] = []
+var log_truncated: bool = false
+var metrics: Dictionary = {}
+var outcome: String = ""
+var build: Dictionary = {}
+var tactics: Dictionary = {}
+var rules_hash: String = ""
+var wanted_delta: int = 0
+var reveal_delta: int = 0
+var record_log: bool = true
+var ambient_heat_per_sec: float = 0.0
+var cooling_penalty: float = 0.0
+var enemy_windup_mult: float = 1.0
+var elite_pen: float = 0.0
+var minimum_enemy_telegraph_ms: int = 0
+var drone_war: bool = false
+var extra_enemy_digital_bonus: float = 0.0
+var trigger_chains: Dictionary = {}
+
+func all_actors() -> Array[CombatActorState]:
+	var result: Array[CombatActorState] = [operator]
+	result.append_array(drones)
+	result.append_array(allies)
+	result.append_array(enemies)
+	return result
+
+func to_dictionary() -> Dictionary:
+	var drone_values: Array[Dictionary] = []
+	for actor: CombatActorState in drones:
+		drone_values.append(actor.to_dictionary())
+	var enemy_values: Array[Dictionary] = []
+	for actor: CombatActorState in enemies:
+		enemy_values.append(actor.to_dictionary())
+	var ally_values: Array[Dictionary] = []
+	for actor: CombatActorState in allies:
+		ally_values.append(actor.to_dictionary())
+	return {
+		"seed": seed, "depth": depth, "biome": biome, "nodeType": node_type, "timeMs": time_ms,
+		"maxDurationMs": max_duration_ms, "operator": operator.to_dictionary(), "drones": drone_values,
+		"enemies": enemy_values, "allies": ally_values, "rng": rng.duplicate(true), "nextEventId": next_event_id,
+		"log": log.duplicate(true), "logTruncated": log_truncated, "metrics": metrics.duplicate(true),
+		"outcome": outcome if not outcome.is_empty() else null, "tactics": tactics.duplicate(true), "rulesHash": rules_hash,
+		"wantedDelta": wanted_delta, "revealDelta": reveal_delta, "recordLog": record_log,
+		"ambientHeatPerSec": ambient_heat_per_sec, "coolingPenalty": cooling_penalty,
+		"enemyWindupMult": enemy_windup_mult, "elitePen": elite_pen,
+		"minimumEnemyTelegraphMs": minimum_enemy_telegraph_ms, "droneWar": drone_war,
+		"extraEnemyDigitalBonus": extra_enemy_digital_bonus, "triggerChains": trigger_chains.duplicate(true),
+	}
+
+static func from_dictionary(value: Dictionary, resolved_build: Dictionary) -> CombatState:
+	if not value.get("operator") is Dictionary or resolved_build.is_empty():
+		return null
+	var state: CombatState = CombatState.new()
+	state.seed = str(value.get("seed", ""))
+	state.depth = int(value.get("depth", 1))
+	state.biome = str(value.get("biome", "B01"))
+	state.node_type = str(value.get("nodeType", "COMBAT"))
+	state.time_ms = int(value.get("timeMs", 0))
+	state.max_duration_ms = int(value.get("maxDurationMs", 180000))
+	state.operator = CombatActorState.from_dictionary(value["operator"])
+	for actor_value: Variant in value.get("drones", []):
+		if actor_value is Dictionary: state.drones.append(CombatActorState.from_dictionary(actor_value))
+	for actor_value: Variant in value.get("enemies", []):
+		if actor_value is Dictionary: state.enemies.append(CombatActorState.from_dictionary(actor_value))
+	for actor_value: Variant in value.get("allies", []):
+		if actor_value is Dictionary: state.allies.append(CombatActorState.from_dictionary(actor_value))
+	var rng_value: Variant = value.get("rng", {})
+	if not rng_value is Dictionary:
+		return null
+	var restored_rng: DeterministicRng = DeterministicRng.new()
+	if not restored_rng.restore(rng_value):
+		return null
+	state.rng = restored_rng.serialize()
+	state.next_event_id = int(value.get("nextEventId", 1))
+	state.log.assign(value.get("log", []))
+	state.log_truncated = bool(value.get("logTruncated", false))
+	state.metrics = value.get("metrics", {}).duplicate(true)
+	state.outcome = str(value.get("outcome", "")) if value.get("outcome") != null else ""
+	state.build = resolved_build.duplicate(true)
+	state.tactics = value.get("tactics", {}).duplicate(true)
+	state.rules_hash = str(value.get("rulesHash", ""))
+	state.wanted_delta = int(value.get("wantedDelta", 0))
+	state.reveal_delta = int(value.get("revealDelta", 0))
+	state.record_log = bool(value.get("recordLog", true))
+	state.ambient_heat_per_sec = float(value.get("ambientHeatPerSec", 0.0))
+	state.cooling_penalty = float(value.get("coolingPenalty", 0.0))
+	state.enemy_windup_mult = float(value.get("enemyWindupMult", 1.0))
+	state.elite_pen = float(value.get("elitePen", 0.0))
+	state.minimum_enemy_telegraph_ms = int(value.get("minimumEnemyTelegraphMs", 0))
+	state.drone_war = bool(value.get("droneWar", false))
+	state.extra_enemy_digital_bonus = float(value.get("extraEnemyDigitalBonus", 0.0))
+	state.trigger_chains = value.get("triggerChains", {}).duplicate(true)
+	return state if state.operator != null and not state.rng.is_empty() else null
+
+func clone() -> CombatState:
+	var copy: CombatState = CombatState.new()
+	for property: Dictionary in get_property_list():
+		var property_name: String = str(property.get("name", ""))
+		if property_name in ["script", "operator", "drones", "enemies", "allies", "build", "tactics"] or property_name.is_empty():
+			continue
+		var value: Variant = get(property_name)
+		if value is Dictionary or value is Array:
+			copy.set(property_name, value.duplicate(true))
+		else:
+			copy.set(property_name, value)
+	copy.operator = operator.clone()
+	for actor: CombatActorState in drones:
+		copy.drones.append(actor.clone())
+	for actor: CombatActorState in enemies:
+		copy.enemies.append(actor.clone())
+	for actor: CombatActorState in allies:
+		copy.allies.append(actor.clone())
+	copy.build = build.duplicate(true)
+	copy.tactics = tactics.duplicate(true)
+	return copy

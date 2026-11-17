@@ -1,0 +1,3373 @@
+{
+  "config": {
+    "seed": "basic-auto-replay",
+    "depth": 1,
+    "biome": "B01",
+    "nodeType": "COMBAT",
+    "enemy": {
+      "templateId": "E01"
+    },
+    "tactics": {
+      "id": "EMPTY",
+      "name": "Empty",
+      "rules": []
+    },
+    "maxDurationMs": 3000
+  },
+  "status": {
+    "id": "BLEED",
+    "snapshot": 100
+  },
+  "appliedEvent": {
+    "eventId": 2,
+    "timestamp": 0,
+    "kind": "STATUS_APPLY",
+    "actorId": "operator",
+    "incomingTags": [],
+    "producedTags": [],
+    "chainDepth": 0,
+    "text": "Рейдер: Кровотечение ×1.",
+    "targetId": "enemy:0",
+    "statusId": "BLEED",
+    "data": {
+      "stacks": 1,
+      "snapshot": 100,
+      "durationMs": 4000
+    }
+  },
+  "frames": [
+    {
+      "timeMs": 100,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          2321738806,
+          1311020801,
+          1532441864,
+          2752640338
+        ],
+        "calls": 0
+      },
+      "nextEventId": 3,
+      "metrics": {
+        "damageDealt": 0,
+        "damageTaken": 0,
+        "damageByType": {
+          "KINETIC": 0,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {},
+        "takenBySource": {},
+        "hits": 0,
+        "misses": 0,
+        "crits": 0,
+        "dodgesTaken": 0,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 0,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": null,
+      "operator": {
+        "hp": 300,
+        "shield": 75,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 140,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 1000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 0
+        }
+      ],
+      "events": []
+    },
+    {
+      "timeMs": 200,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          2321738806,
+          1311020801,
+          1532441864,
+          2752640338
+        ],
+        "calls": 0
+      },
+      "nextEventId": 3,
+      "metrics": {
+        "damageDealt": 0,
+        "damageTaken": 0,
+        "damageByType": {
+          "KINETIC": 0,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {},
+        "takenBySource": {},
+        "hits": 0,
+        "misses": 0,
+        "crits": 0,
+        "dodgesTaken": 0,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 0,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": null,
+      "operator": {
+        "hp": 300,
+        "shield": 75,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 140,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 1000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 0
+        }
+      ],
+      "events": []
+    },
+    {
+      "timeMs": 300,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          2321738806,
+          1311020801,
+          1532441864,
+          2752640338
+        ],
+        "calls": 0
+      },
+      "nextEventId": 3,
+      "metrics": {
+        "damageDealt": 0,
+        "damageTaken": 0,
+        "damageByType": {
+          "KINETIC": 0,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {},
+        "takenBySource": {},
+        "hits": 0,
+        "misses": 0,
+        "crits": 0,
+        "dodgesTaken": 0,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 0,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": null,
+      "operator": {
+        "hp": 300,
+        "shield": 75,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 140,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 1000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 0
+        }
+      ],
+      "events": []
+    },
+    {
+      "timeMs": 400,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          2321738806,
+          1311020801,
+          1532441864,
+          2752640338
+        ],
+        "calls": 0
+      },
+      "nextEventId": 3,
+      "metrics": {
+        "damageDealt": 0,
+        "damageTaken": 0,
+        "damageByType": {
+          "KINETIC": 0,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {},
+        "takenBySource": {},
+        "hits": 0,
+        "misses": 0,
+        "crits": 0,
+        "dodgesTaken": 0,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 0,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": null,
+      "operator": {
+        "hp": 300,
+        "shield": 75,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 140,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 1000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 0
+        }
+      ],
+      "events": []
+    },
+    {
+      "timeMs": 500,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          2321738806,
+          1311020801,
+          1532441864,
+          2752640338
+        ],
+        "calls": 0
+      },
+      "nextEventId": 3,
+      "metrics": {
+        "damageDealt": 0,
+        "damageTaken": 0,
+        "damageByType": {
+          "KINETIC": 0,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {},
+        "takenBySource": {},
+        "hits": 0,
+        "misses": 0,
+        "crits": 0,
+        "dodgesTaken": 0,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 0,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": null,
+      "operator": {
+        "hp": 300,
+        "shield": 75,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 140,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 1000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 0
+        }
+      ],
+      "events": []
+    },
+    {
+      "timeMs": 600,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          2321738806,
+          1311020801,
+          1532441864,
+          2752640338
+        ],
+        "calls": 0
+      },
+      "nextEventId": 3,
+      "metrics": {
+        "damageDealt": 0,
+        "damageTaken": 0,
+        "damageByType": {
+          "KINETIC": 0,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {},
+        "takenBySource": {},
+        "hits": 0,
+        "misses": 0,
+        "crits": 0,
+        "dodgesTaken": 0,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 0,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": null,
+      "operator": {
+        "hp": 300,
+        "shield": 75,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 140,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 1000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 0
+        }
+      ],
+      "events": []
+    },
+    {
+      "timeMs": 700,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          2321738806,
+          1311020801,
+          1532441864,
+          2752640338
+        ],
+        "calls": 0
+      },
+      "nextEventId": 3,
+      "metrics": {
+        "damageDealt": 0,
+        "damageTaken": 0,
+        "damageByType": {
+          "KINETIC": 0,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {},
+        "takenBySource": {},
+        "hits": 0,
+        "misses": 0,
+        "crits": 0,
+        "dodgesTaken": 0,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 0,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": null,
+      "operator": {
+        "hp": 300,
+        "shield": 75,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 140,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 1000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 0
+        }
+      ],
+      "events": []
+    },
+    {
+      "timeMs": 800,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          906745126,
+          181141223,
+          2517240961,
+          2752640340
+        ],
+        "calls": 2
+      },
+      "nextEventId": 5,
+      "metrics": {
+        "damageDealt": 33.00970873786408,
+        "damageTaken": 0,
+        "damageByType": {
+          "KINETIC": 33.00970873786408,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {
+          "operator": 33.00970873786408
+        },
+        "takenBySource": {},
+        "hits": 1,
+        "misses": 0,
+        "crits": 0,
+        "dodgesTaken": 0,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 0,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": null,
+      "operator": {
+        "hp": 300,
+        "shield": 75,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 106.99029126213591,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 1000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 33.00970873786408
+        }
+      ],
+      "events": [
+        {
+          "eventId": 3,
+          "timestamp": 800,
+          "kind": "ATTACK",
+          "actorId": "operator",
+          "incomingTags": [],
+          "producedTags": [],
+          "chainDepth": 0,
+          "text": "Оператор атакует Рейдер.",
+          "targetId": "enemy:0",
+          "actionId": "operator:atk:1"
+        },
+        {
+          "eventId": 4,
+          "timestamp": 800,
+          "kind": "DAMAGE",
+          "actorId": "operator",
+          "incomingTags": [],
+          "producedTags": [],
+          "chainDepth": 0,
+          "text": "Оператор → Рейдер: 33.0 KINETIC, щит −0.0, HP −33.0.",
+          "targetId": "enemy:0",
+          "actionId": "operator:atk:1",
+          "damageType": "KINETIC",
+          "crit": false,
+          "originActionId": "operator:atk:1",
+          "amountBeforeDefense": 34,
+          "amountAfterDefense": 33.00970873786408,
+          "shieldConsumed": 0,
+          "hpLost": 33.00970873786408,
+          "bypassed": 0,
+          "data": {
+            "overkill": 0
+          }
+        }
+      ]
+    },
+    {
+      "timeMs": 900,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          906745126,
+          181141223,
+          2517240961,
+          2752640340
+        ],
+        "calls": 2
+      },
+      "nextEventId": 5,
+      "metrics": {
+        "damageDealt": 33.00970873786408,
+        "damageTaken": 0,
+        "damageByType": {
+          "KINETIC": 33.00970873786408,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {
+          "operator": 33.00970873786408
+        },
+        "takenBySource": {},
+        "hits": 1,
+        "misses": 0,
+        "crits": 0,
+        "dodgesTaken": 0,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 0,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": null,
+      "operator": {
+        "hp": 300,
+        "shield": 75,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 106.99029126213591,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 1000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 33.00970873786408
+        }
+      ],
+      "events": []
+    },
+    {
+      "timeMs": 1000,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          906745126,
+          181141223,
+          2517240961,
+          2752640340
+        ],
+        "calls": 2
+      },
+      "nextEventId": 6,
+      "metrics": {
+        "damageDealt": 35.92233009708738,
+        "damageTaken": 0,
+        "damageByType": {
+          "KINETIC": 35.92233009708738,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {
+          "operator": 35.92233009708738
+        },
+        "takenBySource": {},
+        "hits": 1,
+        "misses": 0,
+        "crits": 0,
+        "dodgesTaken": 0,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 1,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": null,
+      "operator": {
+        "hp": 300,
+        "shield": 75,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 104.07766990291262,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 2000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 35.92233009708738
+        }
+      ],
+      "events": [
+        {
+          "eventId": 5,
+          "timestamp": 1000,
+          "kind": "DOT_TICK",
+          "actorId": "operator",
+          "incomingTags": [],
+          "producedTags": [],
+          "chainDepth": 0,
+          "text": "Кровотечение → Рейдер: 2.9 KINETIC.",
+          "targetId": "enemy:0",
+          "actionId": "dot:BLEED:enemy:0:1000",
+          "statusId": "BLEED",
+          "damageType": "KINETIC",
+          "amountBeforeDefense": 3,
+          "amountAfterDefense": 2.912621359223301,
+          "shieldConsumed": 0,
+          "hpLost": 2.912621359223301
+        }
+      ]
+    },
+    {
+      "timeMs": 1100,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          181312280,
+          1180332169,
+          1964804770,
+          2752640341
+        ],
+        "calls": 3
+      },
+      "nextEventId": 8,
+      "metrics": {
+        "damageDealt": 35.92233009708738,
+        "damageTaken": 0,
+        "damageByType": {
+          "KINETIC": 35.92233009708738,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {
+          "operator": 35.92233009708738
+        },
+        "takenBySource": {},
+        "hits": 1,
+        "misses": 1,
+        "crits": 0,
+        "dodgesTaken": 1,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 1,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": null,
+      "operator": {
+        "hp": 300,
+        "shield": 75,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 104.07766990291262,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 2000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 35.92233009708738
+        }
+      ],
+      "events": [
+        {
+          "eventId": 6,
+          "timestamp": 1100,
+          "kind": "ATTACK",
+          "actorId": "enemy:0",
+          "incomingTags": [],
+          "producedTags": [],
+          "chainDepth": 0,
+          "text": "Рейдер атакует Оператор.",
+          "targetId": "operator",
+          "actionId": "enemy:0:atk:1"
+        },
+        {
+          "eventId": 7,
+          "timestamp": 1100,
+          "kind": "MISS",
+          "actorId": "enemy:0",
+          "incomingTags": [],
+          "producedTags": [],
+          "chainDepth": 0,
+          "text": "Рейдер: промах по Оператор.",
+          "targetId": "operator",
+          "actionId": "enemy:0:atk:1",
+          "damageType": "KINETIC",
+          "originActionId": "enemy:0:atk:1",
+          "roll": 0.8333333333333334
+        }
+      ]
+    },
+    {
+      "timeMs": 1200,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          181312280,
+          1180332169,
+          1964804770,
+          2752640341
+        ],
+        "calls": 3
+      },
+      "nextEventId": 8,
+      "metrics": {
+        "damageDealt": 35.92233009708738,
+        "damageTaken": 0,
+        "damageByType": {
+          "KINETIC": 35.92233009708738,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {
+          "operator": 35.92233009708738
+        },
+        "takenBySource": {},
+        "hits": 1,
+        "misses": 1,
+        "crits": 0,
+        "dodgesTaken": 1,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 1,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": null,
+      "operator": {
+        "hp": 300,
+        "shield": 75,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 104.07766990291262,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 2000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 35.92233009708738
+        }
+      ],
+      "events": []
+    },
+    {
+      "timeMs": 1300,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          181312280,
+          1180332169,
+          1964804770,
+          2752640341
+        ],
+        "calls": 3
+      },
+      "nextEventId": 8,
+      "metrics": {
+        "damageDealt": 35.92233009708738,
+        "damageTaken": 0,
+        "damageByType": {
+          "KINETIC": 35.92233009708738,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {
+          "operator": 35.92233009708738
+        },
+        "takenBySource": {},
+        "hits": 1,
+        "misses": 1,
+        "crits": 0,
+        "dodgesTaken": 1,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 1,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": null,
+      "operator": {
+        "hp": 300,
+        "shield": 75,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 104.07766990291262,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 2000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 35.92233009708738
+        }
+      ],
+      "events": []
+    },
+    {
+      "timeMs": 1400,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          181312280,
+          1180332169,
+          1964804770,
+          2752640341
+        ],
+        "calls": 3
+      },
+      "nextEventId": 8,
+      "metrics": {
+        "damageDealt": 35.92233009708738,
+        "damageTaken": 0,
+        "damageByType": {
+          "KINETIC": 35.92233009708738,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {
+          "operator": 35.92233009708738
+        },
+        "takenBySource": {},
+        "hits": 1,
+        "misses": 1,
+        "crits": 0,
+        "dodgesTaken": 1,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 1,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": null,
+      "operator": {
+        "hp": 300,
+        "shield": 75,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 104.07766990291262,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 2000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 35.92233009708738
+        }
+      ],
+      "events": []
+    },
+    {
+      "timeMs": 1500,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          1182358961,
+          503373746,
+          1233757319,
+          2752640342
+        ],
+        "calls": 4
+      },
+      "nextEventId": 10,
+      "metrics": {
+        "damageDealt": 35.92233009708738,
+        "damageTaken": 0,
+        "damageByType": {
+          "KINETIC": 35.92233009708738,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {
+          "operator": 35.92233009708738
+        },
+        "takenBySource": {},
+        "hits": 1,
+        "misses": 2,
+        "crits": 0,
+        "dodgesTaken": 1,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 1,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": null,
+      "operator": {
+        "hp": 300,
+        "shield": 75,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 104.07766990291262,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 2000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 35.92233009708738
+        }
+      ],
+      "events": [
+        {
+          "eventId": 8,
+          "timestamp": 1500,
+          "kind": "ATTACK",
+          "actorId": "operator",
+          "incomingTags": [],
+          "producedTags": [],
+          "chainDepth": 0,
+          "text": "Оператор атакует Рейдер.",
+          "targetId": "enemy:0",
+          "actionId": "operator:atk:2"
+        },
+        {
+          "eventId": 9,
+          "timestamp": 1500,
+          "kind": "MISS",
+          "actorId": "operator",
+          "incomingTags": [],
+          "producedTags": [],
+          "chainDepth": 0,
+          "text": "Оператор: промах по Рейдер.",
+          "targetId": "enemy:0",
+          "actionId": "operator:atk:2",
+          "damageType": "KINETIC",
+          "originActionId": "operator:atk:2",
+          "roll": 0.84
+        }
+      ]
+    },
+    {
+      "timeMs": 1600,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          1182358961,
+          503373746,
+          1233757319,
+          2752640342
+        ],
+        "calls": 4
+      },
+      "nextEventId": 10,
+      "metrics": {
+        "damageDealt": 35.92233009708738,
+        "damageTaken": 0,
+        "damageByType": {
+          "KINETIC": 35.92233009708738,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {
+          "operator": 35.92233009708738
+        },
+        "takenBySource": {},
+        "hits": 1,
+        "misses": 2,
+        "crits": 0,
+        "dodgesTaken": 1,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 1,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": null,
+      "operator": {
+        "hp": 300,
+        "shield": 75,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 104.07766990291262,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 2000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 35.92233009708738
+        }
+      ],
+      "events": []
+    },
+    {
+      "timeMs": 1700,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          1182358961,
+          503373746,
+          1233757319,
+          2752640342
+        ],
+        "calls": 4
+      },
+      "nextEventId": 10,
+      "metrics": {
+        "damageDealt": 35.92233009708738,
+        "damageTaken": 0,
+        "damageByType": {
+          "KINETIC": 35.92233009708738,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {
+          "operator": 35.92233009708738
+        },
+        "takenBySource": {},
+        "hits": 1,
+        "misses": 2,
+        "crits": 0,
+        "dodgesTaken": 1,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 1,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": null,
+      "operator": {
+        "hp": 300,
+        "shield": 75,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 104.07766990291262,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 2000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 35.92233009708738
+        }
+      ],
+      "events": []
+    },
+    {
+      "timeMs": 1800,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          1182358961,
+          503373746,
+          1233757319,
+          2752640342
+        ],
+        "calls": 4
+      },
+      "nextEventId": 10,
+      "metrics": {
+        "damageDealt": 35.92233009708738,
+        "damageTaken": 0,
+        "damageByType": {
+          "KINETIC": 35.92233009708738,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {
+          "operator": 35.92233009708738
+        },
+        "takenBySource": {},
+        "hits": 1,
+        "misses": 2,
+        "crits": 0,
+        "dodgesTaken": 1,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 1,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": null,
+      "operator": {
+        "hp": 300,
+        "shield": 75,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 104.07766990291262,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 2000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 35.92233009708738
+        }
+      ],
+      "events": []
+    },
+    {
+      "timeMs": 1900,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          1182358961,
+          503373746,
+          1233757319,
+          2752640342
+        ],
+        "calls": 4
+      },
+      "nextEventId": 10,
+      "metrics": {
+        "damageDealt": 35.92233009708738,
+        "damageTaken": 0,
+        "damageByType": {
+          "KINETIC": 35.92233009708738,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {
+          "operator": 35.92233009708738
+        },
+        "takenBySource": {},
+        "hits": 1,
+        "misses": 2,
+        "crits": 0,
+        "dodgesTaken": 1,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 1,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": null,
+      "operator": {
+        "hp": 300,
+        "shield": 75,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 104.07766990291262,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 2000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 35.92233009708738
+        }
+      ],
+      "events": []
+    },
+    {
+      "timeMs": 2000,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          1182358961,
+          503373746,
+          1233757319,
+          2752640342
+        ],
+        "calls": 4
+      },
+      "nextEventId": 11,
+      "metrics": {
+        "damageDealt": 38.834951456310684,
+        "damageTaken": 0,
+        "damageByType": {
+          "KINETIC": 38.834951456310684,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {
+          "operator": 38.834951456310684
+        },
+        "takenBySource": {},
+        "hits": 1,
+        "misses": 2,
+        "crits": 0,
+        "dodgesTaken": 1,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 2,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": null,
+      "operator": {
+        "hp": 300,
+        "shield": 75,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 101.16504854368932,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 3000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 38.834951456310684
+        }
+      ],
+      "events": [
+        {
+          "eventId": 10,
+          "timestamp": 2000,
+          "kind": "DOT_TICK",
+          "actorId": "operator",
+          "incomingTags": [],
+          "producedTags": [],
+          "chainDepth": 0,
+          "text": "Кровотечение → Рейдер: 2.9 KINETIC.",
+          "targetId": "enemy:0",
+          "actionId": "dot:BLEED:enemy:0:2000",
+          "statusId": "BLEED",
+          "damageType": "KINETIC",
+          "amountBeforeDefense": 3,
+          "amountAfterDefense": 2.912621359223301,
+          "shieldConsumed": 0,
+          "hpLost": 2.912621359223301
+        }
+      ]
+    },
+    {
+      "timeMs": 2100,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          1182358961,
+          503373746,
+          1233757319,
+          2752640342
+        ],
+        "calls": 4
+      },
+      "nextEventId": 11,
+      "metrics": {
+        "damageDealt": 38.834951456310684,
+        "damageTaken": 0,
+        "damageByType": {
+          "KINETIC": 38.834951456310684,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {
+          "operator": 38.834951456310684
+        },
+        "takenBySource": {},
+        "hits": 1,
+        "misses": 2,
+        "crits": 0,
+        "dodgesTaken": 1,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 2,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": null,
+      "operator": {
+        "hp": 300,
+        "shield": 75,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 101.16504854368932,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 3000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 38.834951456310684
+        }
+      ],
+      "events": []
+    },
+    {
+      "timeMs": 2200,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          504356829,
+          2513881279,
+          2574607341,
+          2752640343
+        ],
+        "calls": 5
+      },
+      "nextEventId": 13,
+      "metrics": {
+        "damageDealt": 38.834951456310684,
+        "damageTaken": 18.095238095238095,
+        "damageByType": {
+          "KINETIC": 38.834951456310684,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {
+          "operator": 38.834951456310684
+        },
+        "takenBySource": {
+          "enemy:0": 18.095238095238095
+        },
+        "hits": 2,
+        "misses": 2,
+        "crits": 0,
+        "dodgesTaken": 1,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 2,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": null,
+      "operator": {
+        "hp": 300,
+        "shield": 56.904761904761905,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 101.16504854368932,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 3000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 38.834951456310684
+        }
+      ],
+      "events": [
+        {
+          "eventId": 11,
+          "timestamp": 2200,
+          "kind": "ATTACK",
+          "actorId": "enemy:0",
+          "incomingTags": [],
+          "producedTags": [],
+          "chainDepth": 0,
+          "text": "Рейдер атакует Оператор.",
+          "targetId": "operator",
+          "actionId": "enemy:0:atk:2"
+        },
+        {
+          "eventId": 12,
+          "timestamp": 2200,
+          "kind": "DAMAGE",
+          "actorId": "enemy:0",
+          "incomingTags": [],
+          "producedTags": [],
+          "chainDepth": 0,
+          "text": "Рейдер → Оператор: 18.1 KINETIC, щит −18.1, HP −0.0.",
+          "targetId": "operator",
+          "actionId": "enemy:0:atk:2",
+          "damageType": "KINETIC",
+          "crit": false,
+          "originActionId": "enemy:0:atk:2",
+          "amountBeforeDefense": 19,
+          "amountAfterDefense": 18.095238095238095,
+          "shieldConsumed": 18.095238095238095,
+          "hpLost": 0,
+          "bypassed": 0,
+          "data": {
+            "overkill": 0
+          }
+        }
+      ]
+    },
+    {
+      "timeMs": 2300,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          1695683348,
+          2198483351,
+          852054529,
+          2752640345
+        ],
+        "calls": 7
+      },
+      "nextEventId": 15,
+      "metrics": {
+        "damageDealt": 71.84466019417476,
+        "damageTaken": 18.095238095238095,
+        "damageByType": {
+          "KINETIC": 71.84466019417476,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {
+          "operator": 71.84466019417476
+        },
+        "takenBySource": {
+          "enemy:0": 18.095238095238095
+        },
+        "hits": 3,
+        "misses": 2,
+        "crits": 0,
+        "dodgesTaken": 1,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 2,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": null,
+      "operator": {
+        "hp": 300,
+        "shield": 56.904761904761905,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 68.15533980582524,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 3000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 71.84466019417476
+        }
+      ],
+      "events": [
+        {
+          "eventId": 13,
+          "timestamp": 2300,
+          "kind": "ATTACK",
+          "actorId": "operator",
+          "incomingTags": [],
+          "producedTags": [],
+          "chainDepth": 0,
+          "text": "Оператор атакует Рейдер.",
+          "targetId": "enemy:0",
+          "actionId": "operator:atk:3"
+        },
+        {
+          "eventId": 14,
+          "timestamp": 2300,
+          "kind": "DAMAGE",
+          "actorId": "operator",
+          "incomingTags": [],
+          "producedTags": [],
+          "chainDepth": 0,
+          "text": "Оператор → Рейдер: 33.0 KINETIC, щит −0.0, HP −33.0.",
+          "targetId": "enemy:0",
+          "actionId": "operator:atk:3",
+          "damageType": "KINETIC",
+          "crit": false,
+          "originActionId": "operator:atk:3",
+          "amountBeforeDefense": 34,
+          "amountAfterDefense": 33.00970873786408,
+          "shieldConsumed": 0,
+          "hpLost": 33.00970873786408,
+          "bypassed": 0,
+          "data": {
+            "overkill": 0
+          }
+        }
+      ]
+    },
+    {
+      "timeMs": 2400,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          1695683348,
+          2198483351,
+          852054529,
+          2752640345
+        ],
+        "calls": 7
+      },
+      "nextEventId": 15,
+      "metrics": {
+        "damageDealt": 71.84466019417476,
+        "damageTaken": 18.095238095238095,
+        "damageByType": {
+          "KINETIC": 71.84466019417476,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {
+          "operator": 71.84466019417476
+        },
+        "takenBySource": {
+          "enemy:0": 18.095238095238095
+        },
+        "hits": 3,
+        "misses": 2,
+        "crits": 0,
+        "dodgesTaken": 1,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 2,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": null,
+      "operator": {
+        "hp": 300,
+        "shield": 56.904761904761905,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 68.15533980582524,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 3000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 71.84466019417476
+        }
+      ],
+      "events": []
+    },
+    {
+      "timeMs": 2500,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          1695683348,
+          2198483351,
+          852054529,
+          2752640345
+        ],
+        "calls": 7
+      },
+      "nextEventId": 15,
+      "metrics": {
+        "damageDealt": 71.84466019417476,
+        "damageTaken": 18.095238095238095,
+        "damageByType": {
+          "KINETIC": 71.84466019417476,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {
+          "operator": 71.84466019417476
+        },
+        "takenBySource": {
+          "enemy:0": 18.095238095238095
+        },
+        "hits": 3,
+        "misses": 2,
+        "crits": 0,
+        "dodgesTaken": 1,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 2,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": null,
+      "operator": {
+        "hp": 300,
+        "shield": 56.904761904761905,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 68.15533980582524,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 3000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 71.84466019417476
+        }
+      ],
+      "events": []
+    },
+    {
+      "timeMs": 2600,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          1695683348,
+          2198483351,
+          852054529,
+          2752640345
+        ],
+        "calls": 7
+      },
+      "nextEventId": 15,
+      "metrics": {
+        "damageDealt": 71.84466019417476,
+        "damageTaken": 18.095238095238095,
+        "damageByType": {
+          "KINETIC": 71.84466019417476,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {
+          "operator": 71.84466019417476
+        },
+        "takenBySource": {
+          "enemy:0": 18.095238095238095
+        },
+        "hits": 3,
+        "misses": 2,
+        "crits": 0,
+        "dodgesTaken": 1,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 2,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": null,
+      "operator": {
+        "hp": 300,
+        "shield": 56.904761904761905,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 68.15533980582524,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 3000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 71.84466019417476
+        }
+      ],
+      "events": []
+    },
+    {
+      "timeMs": 2700,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          1695683348,
+          2198483351,
+          852054529,
+          2752640345
+        ],
+        "calls": 7
+      },
+      "nextEventId": 15,
+      "metrics": {
+        "damageDealt": 71.84466019417476,
+        "damageTaken": 18.095238095238095,
+        "damageByType": {
+          "KINETIC": 71.84466019417476,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {
+          "operator": 71.84466019417476
+        },
+        "takenBySource": {
+          "enemy:0": 18.095238095238095
+        },
+        "hits": 3,
+        "misses": 2,
+        "crits": 0,
+        "dodgesTaken": 1,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 2,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": null,
+      "operator": {
+        "hp": 300,
+        "shield": 56.904761904761905,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 68.15533980582524,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 3000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 71.84466019417476
+        }
+      ],
+      "events": []
+    },
+    {
+      "timeMs": 2800,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          1695683348,
+          2198483351,
+          852054529,
+          2752640345
+        ],
+        "calls": 7
+      },
+      "nextEventId": 15,
+      "metrics": {
+        "damageDealt": 71.84466019417476,
+        "damageTaken": 18.095238095238095,
+        "damageByType": {
+          "KINETIC": 71.84466019417476,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {
+          "operator": 71.84466019417476
+        },
+        "takenBySource": {
+          "enemy:0": 18.095238095238095
+        },
+        "hits": 3,
+        "misses": 2,
+        "crits": 0,
+        "dodgesTaken": 1,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 2,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": null,
+      "operator": {
+        "hp": 300,
+        "shield": 56.904761904761905,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 68.15533980582524,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 3000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 71.84466019417476
+        }
+      ],
+      "events": []
+    },
+    {
+      "timeMs": 2900,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          1695683348,
+          2198483351,
+          852054529,
+          2752640345
+        ],
+        "calls": 7
+      },
+      "nextEventId": 15,
+      "metrics": {
+        "damageDealt": 71.84466019417476,
+        "damageTaken": 18.095238095238095,
+        "damageByType": {
+          "KINETIC": 71.84466019417476,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {
+          "operator": 71.84466019417476
+        },
+        "takenBySource": {
+          "enemy:0": 18.095238095238095
+        },
+        "hits": 3,
+        "misses": 2,
+        "crits": 0,
+        "dodgesTaken": 1,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 2,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": null,
+      "operator": {
+        "hp": 300,
+        "shield": 56.904761904761905,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 68.15533980582524,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 3000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 71.84466019417476
+        }
+      ],
+      "events": []
+    },
+    {
+      "timeMs": 3000,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          3380046840,
+          788081822,
+          1447761540,
+          2752640347
+        ],
+        "calls": 9
+      },
+      "nextEventId": 19,
+      "metrics": {
+        "damageDealt": 107.76699029126215,
+        "damageTaken": 18.095238095238095,
+        "damageByType": {
+          "KINETIC": 107.76699029126215,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {
+          "operator": 107.76699029126215
+        },
+        "takenBySource": {
+          "enemy:0": 18.095238095238095
+        },
+        "hits": 4,
+        "misses": 2,
+        "crits": 0,
+        "dodgesTaken": 1,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 3,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": "TIMEOUT",
+      "operator": {
+        "hp": 300,
+        "shield": 56.904761904761905,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 32.23300970873786,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 4000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 107.76699029126215
+        }
+      ],
+      "events": [
+        {
+          "eventId": 15,
+          "timestamp": 3000,
+          "kind": "DOT_TICK",
+          "actorId": "operator",
+          "incomingTags": [],
+          "producedTags": [],
+          "chainDepth": 0,
+          "text": "Кровотечение → Рейдер: 2.9 KINETIC.",
+          "targetId": "enemy:0",
+          "actionId": "dot:BLEED:enemy:0:3000",
+          "statusId": "BLEED",
+          "damageType": "KINETIC",
+          "amountBeforeDefense": 3,
+          "amountAfterDefense": 2.912621359223301,
+          "shieldConsumed": 0,
+          "hpLost": 2.912621359223301
+        },
+        {
+          "eventId": 16,
+          "timestamp": 3000,
+          "kind": "ATTACK",
+          "actorId": "operator",
+          "incomingTags": [],
+          "producedTags": [],
+          "chainDepth": 0,
+          "text": "Оператор атакует Рейдер.",
+          "targetId": "enemy:0",
+          "actionId": "operator:atk:4"
+        },
+        {
+          "eventId": 17,
+          "timestamp": 3000,
+          "kind": "DAMAGE",
+          "actorId": "operator",
+          "incomingTags": [],
+          "producedTags": [],
+          "chainDepth": 0,
+          "text": "Оператор → Рейдер: 33.0 KINETIC, щит −0.0, HP −33.0.",
+          "targetId": "enemy:0",
+          "actionId": "operator:atk:4",
+          "damageType": "KINETIC",
+          "crit": false,
+          "originActionId": "operator:atk:4",
+          "amountBeforeDefense": 34,
+          "amountAfterDefense": 33.00970873786408,
+          "shieldConsumed": 0,
+          "hpLost": 33.00970873786408,
+          "bypassed": 0,
+          "data": {
+            "overkill": 0
+          }
+        },
+        {
+          "eventId": 18,
+          "timestamp": 3000,
+          "kind": "COMBAT_END",
+          "actorId": "operator",
+          "incomingTags": [],
+          "producedTags": [],
+          "chainDepth": 0,
+          "text": "Бой завершён: TIMEOUT.",
+          "data": {
+            "outcome": "TIMEOUT"
+          }
+        }
+      ]
+    },
+    {
+      "timeMs": 3000,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          3380046840,
+          788081822,
+          1447761540,
+          2752640347
+        ],
+        "calls": 9
+      },
+      "nextEventId": 19,
+      "metrics": {
+        "damageDealt": 107.76699029126215,
+        "damageTaken": 18.095238095238095,
+        "damageByType": {
+          "KINETIC": 107.76699029126215,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {
+          "operator": 107.76699029126215
+        },
+        "takenBySource": {
+          "enemy:0": 18.095238095238095
+        },
+        "hits": 4,
+        "misses": 2,
+        "crits": 0,
+        "dodgesTaken": 1,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 3,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": "TIMEOUT",
+      "operator": {
+        "hp": 300,
+        "shield": 56.904761904761905,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 32.23300970873786,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 4000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 107.76699029126215
+        }
+      ],
+      "events": []
+    },
+    {
+      "timeMs": 3000,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          3380046840,
+          788081822,
+          1447761540,
+          2752640347
+        ],
+        "calls": 9
+      },
+      "nextEventId": 19,
+      "metrics": {
+        "damageDealt": 107.76699029126215,
+        "damageTaken": 18.095238095238095,
+        "damageByType": {
+          "KINETIC": 107.76699029126215,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {
+          "operator": 107.76699029126215
+        },
+        "takenBySource": {
+          "enemy:0": 18.095238095238095
+        },
+        "hits": 4,
+        "misses": 2,
+        "crits": 0,
+        "dodgesTaken": 1,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 3,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": "TIMEOUT",
+      "operator": {
+        "hp": 300,
+        "shield": 56.904761904761905,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 32.23300970873786,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 4000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 107.76699029126215
+        }
+      ],
+      "events": []
+    },
+    {
+      "timeMs": 3000,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          3380046840,
+          788081822,
+          1447761540,
+          2752640347
+        ],
+        "calls": 9
+      },
+      "nextEventId": 19,
+      "metrics": {
+        "damageDealt": 107.76699029126215,
+        "damageTaken": 18.095238095238095,
+        "damageByType": {
+          "KINETIC": 107.76699029126215,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {
+          "operator": 107.76699029126215
+        },
+        "takenBySource": {
+          "enemy:0": 18.095238095238095
+        },
+        "hits": 4,
+        "misses": 2,
+        "crits": 0,
+        "dodgesTaken": 1,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 3,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": "TIMEOUT",
+      "operator": {
+        "hp": 300,
+        "shield": 56.904761904761905,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 32.23300970873786,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 4000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 107.76699029126215
+        }
+      ],
+      "events": []
+    },
+    {
+      "timeMs": 3000,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          3380046840,
+          788081822,
+          1447761540,
+          2752640347
+        ],
+        "calls": 9
+      },
+      "nextEventId": 19,
+      "metrics": {
+        "damageDealt": 107.76699029126215,
+        "damageTaken": 18.095238095238095,
+        "damageByType": {
+          "KINETIC": 107.76699029126215,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {
+          "operator": 107.76699029126215
+        },
+        "takenBySource": {
+          "enemy:0": 18.095238095238095
+        },
+        "hits": 4,
+        "misses": 2,
+        "crits": 0,
+        "dodgesTaken": 1,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 3,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": "TIMEOUT",
+      "operator": {
+        "hp": 300,
+        "shield": 56.904761904761905,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 32.23300970873786,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 4000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 107.76699029126215
+        }
+      ],
+      "events": []
+    },
+    {
+      "timeMs": 3000,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          3380046840,
+          788081822,
+          1447761540,
+          2752640347
+        ],
+        "calls": 9
+      },
+      "nextEventId": 19,
+      "metrics": {
+        "damageDealt": 107.76699029126215,
+        "damageTaken": 18.095238095238095,
+        "damageByType": {
+          "KINETIC": 107.76699029126215,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {
+          "operator": 107.76699029126215
+        },
+        "takenBySource": {
+          "enemy:0": 18.095238095238095
+        },
+        "hits": 4,
+        "misses": 2,
+        "crits": 0,
+        "dodgesTaken": 1,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 3,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": "TIMEOUT",
+      "operator": {
+        "hp": 300,
+        "shield": 56.904761904761905,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 32.23300970873786,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 4000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 107.76699029126215
+        }
+      ],
+      "events": []
+    },
+    {
+      "timeMs": 3000,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          3380046840,
+          788081822,
+          1447761540,
+          2752640347
+        ],
+        "calls": 9
+      },
+      "nextEventId": 19,
+      "metrics": {
+        "damageDealt": 107.76699029126215,
+        "damageTaken": 18.095238095238095,
+        "damageByType": {
+          "KINETIC": 107.76699029126215,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {
+          "operator": 107.76699029126215
+        },
+        "takenBySource": {
+          "enemy:0": 18.095238095238095
+        },
+        "hits": 4,
+        "misses": 2,
+        "crits": 0,
+        "dodgesTaken": 1,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 3,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": "TIMEOUT",
+      "operator": {
+        "hp": 300,
+        "shield": 56.904761904761905,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 32.23300970873786,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 4000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 107.76699029126215
+        }
+      ],
+      "events": []
+    },
+    {
+      "timeMs": 3000,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          3380046840,
+          788081822,
+          1447761540,
+          2752640347
+        ],
+        "calls": 9
+      },
+      "nextEventId": 19,
+      "metrics": {
+        "damageDealt": 107.76699029126215,
+        "damageTaken": 18.095238095238095,
+        "damageByType": {
+          "KINETIC": 107.76699029126215,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {
+          "operator": 107.76699029126215
+        },
+        "takenBySource": {
+          "enemy:0": 18.095238095238095
+        },
+        "hits": 4,
+        "misses": 2,
+        "crits": 0,
+        "dodgesTaken": 1,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 3,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": "TIMEOUT",
+      "operator": {
+        "hp": 300,
+        "shield": 56.904761904761905,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 32.23300970873786,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 4000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 107.76699029126215
+        }
+      ],
+      "events": []
+    },
+    {
+      "timeMs": 3000,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          3380046840,
+          788081822,
+          1447761540,
+          2752640347
+        ],
+        "calls": 9
+      },
+      "nextEventId": 19,
+      "metrics": {
+        "damageDealt": 107.76699029126215,
+        "damageTaken": 18.095238095238095,
+        "damageByType": {
+          "KINETIC": 107.76699029126215,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {
+          "operator": 107.76699029126215
+        },
+        "takenBySource": {
+          "enemy:0": 18.095238095238095
+        },
+        "hits": 4,
+        "misses": 2,
+        "crits": 0,
+        "dodgesTaken": 1,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 3,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": "TIMEOUT",
+      "operator": {
+        "hp": 300,
+        "shield": 56.904761904761905,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 32.23300970873786,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 4000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 107.76699029126215
+        }
+      ],
+      "events": []
+    },
+    {
+      "timeMs": 3000,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          3380046840,
+          788081822,
+          1447761540,
+          2752640347
+        ],
+        "calls": 9
+      },
+      "nextEventId": 19,
+      "metrics": {
+        "damageDealt": 107.76699029126215,
+        "damageTaken": 18.095238095238095,
+        "damageByType": {
+          "KINETIC": 107.76699029126215,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {
+          "operator": 107.76699029126215
+        },
+        "takenBySource": {
+          "enemy:0": 18.095238095238095
+        },
+        "hits": 4,
+        "misses": 2,
+        "crits": 0,
+        "dodgesTaken": 1,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 3,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": "TIMEOUT",
+      "operator": {
+        "hp": 300,
+        "shield": 56.904761904761905,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 32.23300970873786,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 4000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 107.76699029126215
+        }
+      ],
+      "events": []
+    },
+    {
+      "timeMs": 3000,
+      "rng": {
+        "stream": "combat",
+        "state": [
+          3380046840,
+          788081822,
+          1447761540,
+          2752640347
+        ],
+        "calls": 9
+      },
+      "nextEventId": 19,
+      "metrics": {
+        "damageDealt": 107.76699029126215,
+        "damageTaken": 18.095238095238095,
+        "damageByType": {
+          "KINETIC": 107.76699029126215,
+          "ENERGY": 0,
+          "DIGITAL": 0
+        },
+        "damageBySource": {
+          "operator": 107.76699029126215
+        },
+        "takenBySource": {
+          "enemy:0": 18.095238095238095
+        },
+        "hits": 4,
+        "misses": 2,
+        "crits": 0,
+        "dodgesTaken": 1,
+        "kills": 0,
+        "skillUses": {},
+        "ruleFailures": [],
+        "energySpent": 0,
+        "energyStarvedMs": 0,
+        "heatLockouts": 0,
+        "heatLockoutMs": 0,
+        "shieldAbsorbed": 0,
+        "hpLost": 0,
+        "healingDone": 0,
+        "statusTicks": 3,
+        "procsTriggered": 0,
+        "interrupts": 0,
+        "chainLimitHits": 0,
+        "ttk": [],
+        "droneDeaths": 0,
+        "escaped": [],
+        "lowestHpFraction": 1,
+        "timeWithoutShieldMs": 0
+      },
+      "outcome": "TIMEOUT",
+      "operator": {
+        "hp": 300,
+        "shield": 56.904761904761905,
+        "statuses": {}
+      },
+      "enemies": [
+        {
+          "hp": 32.23300970873786,
+          "shield": 0,
+          "statuses": {
+            "BLEED": [
+              {
+                "sourceId": "operator:BLEED",
+                "sourceActorId": "operator",
+                "expiresAt": 4000,
+                "nextTickAt": 4000,
+                "snapshot": 100,
+                "stacks": 1
+              }
+            ]
+          },
+          "damageTaken": 107.76699029126215
+        }
+      ],
+      "events": []
+    }
+  ]
+}

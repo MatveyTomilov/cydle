@@ -1,0 +1,12 @@
+node_modules/
+dist/
+/game/.godot/
+/game/build/
+/game/.codex/config.toml
+/build/
+artifacts/sim-lab/*/
+!artifacts/sim-lab/.gitkeep
+*.log
+.DS_Store
+test-results/
+playwright-report/

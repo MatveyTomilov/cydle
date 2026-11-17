@@ -1,0 +1,672 @@
+{
+  "schemaVersion": 1,
+  "affixes": [
+    {
+      "id": "AF_HP",
+      "name": "Резерв HP",
+      "stat": "maxHP",
+      "tiers": [
+        20,
+        35,
+        55,
+        80
+      ],
+      "slots": [
+        "ARMOR",
+        "IMPLANT"
+      ],
+      "group": "defensive",
+      "unit": "HP",
+      "op": "FLAT",
+      "scaleD": true
+    },
+    {
+      "id": "AF_SH",
+      "name": "Ёмкость щита",
+      "stat": "maxShield",
+      "tiers": [
+        10,
+        20,
+        30,
+        45
+      ],
+      "slots": [
+        "ARMOR",
+        "OFFHAND",
+        "IMPLANT"
+      ],
+      "group": "defensive",
+      "unit": "щит",
+      "op": "FLAT",
+      "scaleD": true
+    },
+    {
+      "id": "AF_ARM",
+      "name": "Бронепластины",
+      "stat": "armor",
+      "tiers": [
+        2,
+        4,
+        6,
+        8
+      ],
+      "slots": [
+        "ARMOR",
+        "IMPLANT"
+      ],
+      "group": "defensive",
+      "unit": "броня",
+      "op": "FLAT",
+      "integer": true
+    },
+    {
+      "id": "AF_ERE",
+      "name": "Сопр. энергии",
+      "stat": "energyRes",
+      "tiers": [
+        3,
+        5,
+        7,
+        10
+      ],
+      "slots": [
+        "ARMOR",
+        "OFFHAND"
+      ],
+      "group": "defensive",
+      "unit": "п.п.",
+      "op": "FLAT"
+    },
+    {
+      "id": "AF_DRE",
+      "name": "Сопр. цифры",
+      "stat": "digitalRes",
+      "tiers": [
+        3,
+        5,
+        7,
+        10
+      ],
+      "slots": [
+        "ARMOR",
+        "OFFHAND"
+      ],
+      "group": "defensive",
+      "unit": "п.п.",
+      "op": "FLAT"
+    },
+    {
+      "id": "AF_EVA",
+      "name": "Уклонение",
+      "stat": "evasion",
+      "tiers": [
+        4,
+        7,
+        10,
+        15
+      ],
+      "slots": [
+        "ARMOR",
+        "IMPLANT"
+      ],
+      "group": "defensive",
+      "unit": "ед.",
+      "op": "FLAT",
+      "integer": true
+    },
+    {
+      "id": "AF_ACC",
+      "name": "Точность",
+      "stat": "accuracy",
+      "tiers": [
+        4,
+        8,
+        12,
+        16
+      ],
+      "slots": [
+        "MAIN",
+        "OFFHAND"
+      ],
+      "group": "offensive",
+      "unit": "ед.",
+      "op": "FLAT",
+      "integer": true
+    },
+    {
+      "id": "AF_KDM",
+      "name": "Кинетический урон",
+      "stat": "kineticDamage",
+      "tiers": [
+        5,
+        9,
+        13,
+        18
+      ],
+      "slots": [
+        "MAIN",
+        "IMPLANT"
+      ],
+      "group": "offensive",
+      "unit": "%",
+      "op": "INCREASED"
+    },
+    {
+      "id": "AF_EDM",
+      "name": "Энергетический урон",
+      "stat": "energyDamage",
+      "tiers": [
+        5,
+        9,
+        13,
+        18
+      ],
+      "slots": [
+        "MAIN",
+        "IMPLANT"
+      ],
+      "group": "offensive",
+      "unit": "%",
+      "op": "INCREASED"
+    },
+    {
+      "id": "AF_DDM",
+      "name": "Цифровой урон",
+      "stat": "digitalDamage",
+      "tiers": [
+        5,
+        9,
+        13,
+        18
+      ],
+      "slots": [
+        "MAIN",
+        "IMPLANT"
+      ],
+      "group": "offensive",
+      "unit": "%",
+      "op": "INCREASED"
+    },
+    {
+      "id": "AF_AS",
+      "name": "Скорость атаки",
+      "stat": "attackSpeed",
+      "tiers": [
+        3,
+        5,
+        8,
+        10
+      ],
+      "slots": [
+        "MAIN",
+        "IMPLANT"
+      ],
+      "group": "offensive",
+      "unit": "%",
+      "op": "INCREASED"
+    },
+    {
+      "id": "AF_CR",
+      "name": "Шанс крита",
+      "stat": "critChance",
+      "tiers": [
+        2,
+        3,
+        4,
+        5
+      ],
+      "slots": [
+        "MAIN",
+        "OFFHAND"
+      ],
+      "group": "offensive",
+      "unit": "п.п.",
+      "op": "FLAT"
+    },
+    {
+      "id": "AF_CM",
+      "name": "Крит. множитель",
+      "stat": "critMultiplier",
+      "tiers": [
+        5,
+        10,
+        15,
+        20
+      ],
+      "slots": [
+        "MAIN",
+        "OFFHAND"
+      ],
+      "group": "offensive",
+      "unit": "п.п.",
+      "op": "FLAT"
+    },
+    {
+      "id": "AF_PEN",
+      "name": "Пробитие брони",
+      "stat": "armorPen",
+      "tiers": [
+        3,
+        6,
+        9,
+        12
+      ],
+      "slots": [
+        "MAIN",
+        "OFFHAND"
+      ],
+      "group": "offensive",
+      "unit": "ед.",
+      "op": "FLAT"
+    },
+    {
+      "id": "AF_EPN",
+      "name": "Пробитие энергии",
+      "stat": "energyPen",
+      "tiers": [
+        2,
+        3,
+        5,
+        7
+      ],
+      "slots": [
+        "MAIN",
+        "OFFHAND"
+      ],
+      "group": "offensive",
+      "unit": "п.п.",
+      "op": "FLAT"
+    },
+    {
+      "id": "AF_DPN",
+      "name": "Пробитие цифры",
+      "stat": "digitalPen",
+      "tiers": [
+        2,
+        3,
+        5,
+        7
+      ],
+      "slots": [
+        "MAIN",
+        "OFFHAND"
+      ],
+      "group": "offensive",
+      "unit": "п.п.",
+      "op": "FLAT"
+    },
+    {
+      "id": "AF_ER",
+      "name": "Регенерация энергии",
+      "stat": "energyRegen",
+      "tiers": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "slots": [
+        "IMPLANT",
+        "OFFHAND"
+      ],
+      "group": "resource",
+      "unit": "/с",
+      "op": "FLAT"
+    },
+    {
+      "id": "AF_COO",
+      "name": "Охлаждение",
+      "stat": "heatCooling",
+      "tiers": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "slots": [
+        "IMPLANT",
+        "OFFHAND"
+      ],
+      "group": "resource",
+      "unit": "/с",
+      "op": "FLAT"
+    },
+    {
+      "id": "AF_NC",
+      "name": "Нейроёмкость",
+      "stat": "neuralCapacity",
+      "tiers": [
+        4,
+        8,
+        12,
+        16
+      ],
+      "slots": [
+        "IMPLANT"
+      ],
+      "group": "resource",
+      "unit": "ед.",
+      "op": "FLAT",
+      "integer": true
+    },
+    {
+      "id": "AF_DRO",
+      "name": "Урон дронов",
+      "stat": "droneDamage",
+      "tiers": [
+        5,
+        10,
+        15,
+        20
+      ],
+      "slots": [
+        "IMPLANT",
+        "OFFHAND"
+      ],
+      "group": "offensive",
+      "unit": "%",
+      "op": "INCREASED"
+    },
+    {
+      "id": "AF_DHP",
+      "name": "HP дронов",
+      "stat": "droneHP",
+      "tiers": [
+        5,
+        10,
+        15,
+        20
+      ],
+      "slots": [
+        "IMPLANT",
+        "OFFHAND"
+      ],
+      "group": "defensive",
+      "unit": "%",
+      "op": "INCREASED"
+    },
+    {
+      "id": "AF_VIR",
+      "name": "Урон VIRUS",
+      "stat": "virusDamage",
+      "tiers": [
+        5,
+        9,
+        13,
+        18
+      ],
+      "slots": [
+        "MAIN",
+        "IMPLANT"
+      ],
+      "group": "offensive",
+      "unit": "%",
+      "op": "INCREASED"
+    },
+    {
+      "id": "AF_DOT",
+      "name": "Длительность DoT",
+      "stat": "dotDuration",
+      "tiers": [
+        4,
+        7,
+        10,
+        15
+      ],
+      "slots": [
+        "IMPLANT"
+      ],
+      "group": "utility",
+      "unit": "%",
+      "op": "INCREASED"
+    },
+    {
+      "id": "AF_HEA",
+      "name": "Сила лечения",
+      "stat": "healing",
+      "tiers": [
+        5,
+        10,
+        15,
+        20
+      ],
+      "slots": [
+        "ARMOR",
+        "IMPLANT"
+      ],
+      "group": "defensive",
+      "unit": "%",
+      "op": "INCREASED"
+    },
+    {
+      "id": "AF_SR",
+      "name": "Регенерация щита",
+      "stat": "shieldRegen",
+      "tiers": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "slots": [
+        "ARMOR",
+        "OFFHAND"
+      ],
+      "group": "resource",
+      "unit": "/с",
+      "op": "FLAT"
+    },
+    {
+      "id": "AF_CDR",
+      "name": "Восстановление CD",
+      "stat": "cooldownRecovery",
+      "tiers": [
+        3,
+        5,
+        7,
+        10
+      ],
+      "slots": [
+        "IMPLANT"
+      ],
+      "group": "utility",
+      "unit": "%",
+      "op": "INCREASED"
+    },
+    {
+      "id": "AF_FUEL",
+      "name": "Запас топлива",
+      "stat": "fuelMax",
+      "tiers": [
+        2,
+        3,
+        4,
+        6
+      ],
+      "slots": [
+        "ENGINE"
+      ],
+      "group": "resource",
+      "unit": "ед.",
+      "op": "FLAT",
+      "integer": true
+    },
+    {
+      "id": "AF_CARGO",
+      "name": "Вместимость груза",
+      "stat": "cargoUnits",
+      "tiers": [
+        2,
+        4,
+        6,
+        8
+      ],
+      "slots": [
+        "CARGO"
+      ],
+      "group": "resource",
+      "unit": "ед.",
+      "op": "FLAT",
+      "integer": true
+    },
+    {
+      "id": "AF_SCAN",
+      "name": "Дальность разведки",
+      "stat": "scanRange",
+      "tiers": [
+        1,
+        1,
+        2,
+        2
+      ],
+      "slots": [
+        "SCANNER"
+      ],
+      "group": "utility",
+      "unit": "слоёв",
+      "op": "FLAT",
+      "integer": true,
+      "fixed": true
+    },
+    {
+      "id": "AF_ROAD",
+      "name": "Скорость переезда",
+      "stat": "travelDurationLess",
+      "tiers": [
+        2,
+        4,
+        6,
+        8
+      ],
+      "slots": [
+        "ENGINE"
+      ],
+      "group": "utility",
+      "unit": "%",
+      "op": "FLAT"
+    }
+  ],
+  "rarityAffixCount": {
+    "COMMON": [
+      0,
+      0
+    ],
+    "MODIFIED": [
+      1,
+      2
+    ],
+    "RARE": [
+      3,
+      4
+    ],
+    "LEGENDARY": [
+      4,
+      5
+    ],
+    "UNIQUE": [
+      0,
+      2
+    ]
+  },
+  "trRanges": {
+    "COMMON": [
+      8,
+      12
+    ],
+    "MODIFIED": [
+      12,
+      18
+    ],
+    "RARE": [
+      18,
+      28
+    ],
+    "LEGENDARY": [
+      12,
+      20
+    ],
+    "UNIQUE": [
+      0,
+      0
+    ]
+  },
+  "rarityPriceMultipliers": {
+    "COMMON": 1,
+    "MODIFIED": 1.3,
+    "RARE": 2,
+    "LEGENDARY": 4,
+    "UNIQUE": 10
+  },
+  "rarityTables": {
+    "ORDINARY": [
+      60,
+      28,
+      10,
+      1.8,
+      0.2
+    ],
+    "ELITE": [
+      30,
+      35,
+      25,
+      8.5,
+      1.5
+    ],
+    "BOSS": [
+      10,
+      20,
+      38,
+      25,
+      7
+    ]
+  },
+  "slotGroupWeights": {
+    "MAIN": {
+      "offensive": 55,
+      "resource": 30,
+      "utility": 15
+    },
+    "ARMOR": {
+      "defensive": 70,
+      "resource": 20,
+      "utility": 10
+    },
+    "IMPLANT": {
+      "offensive": 33,
+      "defensive": 33,
+      "resource": 34
+    },
+    "OFFHAND": {
+      "offensive": 40,
+      "defensive": 30,
+      "resource": 30
+    },
+    "DRONE": {
+      "offensive": 40,
+      "defensive": 30,
+      "resource": 30
+    },
+    "ENGINE": {
+      "resource": 50,
+      "utility": 50
+    },
+    "CHASSIS": {
+      "defensive": 60,
+      "resource": 40
+    },
+    "SCANNER": {
+      "utility": 100
+    },
+    "SERVICE": {
+      "resource": 50,
+      "defensive": 50
+    },
+    "CARGO": {
+      "resource": 100
+    },
+    "SUPPORT": {
+      "offensive": 40,
+      "resource": 60
+    }
+  }
+}

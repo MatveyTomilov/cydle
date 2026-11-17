@@ -1,0 +1,3314 @@
+{
+  "schemaVersion": 1,
+  "skills": [
+    {
+      "id": "SK_BURST",
+      "name": "Очередь",
+      "channel": "main",
+      "tags": [
+        "K",
+        "DIRECT",
+        "MULTI"
+      ],
+      "coefficient": 0.45,
+      "hits": 3,
+      "hitCoefficient": 0.45,
+      "energyCost": 0,
+      "heatDelta": 2,
+      "windupMs": 180,
+      "recoveryMs": 220,
+      "cooldownMs": 900,
+      "targetMode": "nearest",
+      "procWeight": 0.35,
+      "basis": "MAIN_K",
+      "requires": [
+        "MAIN_K"
+      ],
+      "interruptible": false,
+      "desc": "3 пакета по 0.45 основного K-урона, procWeight 0.35 на пакет."
+    },
+    {
+      "id": "SK_PIERCE",
+      "name": "Бронебойный",
+      "channel": "main",
+      "tags": [
+        "K",
+        "DIRECT"
+      ],
+      "coefficient": 1.6,
+      "hits": 1,
+      "energyCost": 12,
+      "heatDelta": 1,
+      "windupMs": 300,
+      "recoveryMs": 350,
+      "cooldownMs": 4000,
+      "targetMode": "nearest",
+      "procWeight": 1,
+      "basis": "MAIN_K",
+      "requires": [
+        "MAIN_K"
+      ],
+      "interruptible": false,
+      "extraEffects": [
+        {
+          "type": "stat",
+          "stat": "armorPen",
+          "op": "FLAT",
+          "value": 20,
+          "note": "только этот удар"
+        }
+      ],
+      "desc": "1.60 K и +20 плоского пробития."
+    },
+    {
+      "id": "SK_EXEC",
+      "name": "Контрольный",
+      "channel": "main",
+      "tags": [
+        "K",
+        "DIRECT"
+      ],
+      "coefficient": 1.3,
+      "hits": 1,
+      "energyCost": 15,
+      "heatDelta": 2,
+      "windupMs": 220,
+      "recoveryMs": 350,
+      "cooldownMs": 6000,
+      "targetMode": "lowestHPPercent",
+      "procWeight": 1,
+      "basis": "MAIN_K",
+      "special": "EXECUTE",
+      "requires": [
+        "MAIN_K"
+      ],
+      "interruptible": false,
+      "desc": "1.30 K, ×1.4 MORE если HP цели < 30%."
+    },
+    {
+      "id": "SK_BLADE",
+      "name": "Серия",
+      "channel": "main",
+      "tags": [
+        "K",
+        "DIRECT",
+        "MULTI"
+      ],
+      "coefficient": 0.55,
+      "hits": 3,
+      "hitCoefficient": 0.55,
+      "energyCost": 10,
+      "heatDelta": 4,
+      "windupMs": 240,
+      "recoveryMs": 360,
+      "cooldownMs": 3000,
+      "targetMode": "nearest",
+      "procWeight": 0.35,
+      "basis": "MAIN_K",
+      "requires": [
+        "MAIN_K"
+      ],
+      "interruptible": false,
+      "extraEffects": [
+        {
+          "type": "trigger",
+          "id": "SK_BLADE_bleed",
+          "event": "ON_HIT",
+          "action": {
+            "kind": "applyStatus",
+            "status": "BLEED",
+            "stacks": 1,
+            "target": "target"
+          },
+          "desc": "BLEED на последнем ударе серии."
+        }
+      ],
+      "desc": "3×0.55 K, BLEED на последнем попадании."
+    },
+    {
+      "id": "SK_PLASMA",
+      "name": "Плазменный",
+      "channel": "main",
+      "tags": [
+        "E",
+        "TECH",
+        "DIRECT"
+      ],
+      "coefficient": 1.45,
+      "hits": 1,
+      "energyCost": 16,
+      "heatDelta": 12,
+      "windupMs": 260,
+      "recoveryMs": 320,
+      "cooldownMs": 3000,
+      "targetMode": "nearest",
+      "procWeight": 1,
+      "basis": "TECH_E",
+      "interruptible": false,
+      "desc": "1.45 TechPower энергетического урона."
+    },
+    {
+      "id": "SK_ARC",
+      "name": "Электродуга",
+      "channel": "main",
+      "tags": [
+        "E",
+        "TECH",
+        "DIRECT",
+        "MULTI"
+      ],
+      "coefficient": 1,
+      "hits": 1,
+      "energyCost": 24,
+      "heatDelta": 10,
+      "windupMs": 350,
+      "recoveryMs": 450,
+      "cooldownMs": 7000,
+      "targetMode": "nearest",
+      "procWeight": 1,
+      "basis": "TECH_E",
+      "splash": {
+        "coefficient": 0.5,
+        "targets": 2,
+        "status": "SHOCK"
+      },
+      "interruptible": false,
+      "desc": "1.00 TechPower E по основной цели и 0.50 по двум вторичным, SHOCK 1 с."
+    },
+    {
+      "id": "SK_OVR",
+      "name": "Форсаж",
+      "channel": "main",
+      "tags": [
+        "DIRECT"
+      ],
+      "coefficient": 0,
+      "hits": 0,
+      "energyCost": 20,
+      "heatDelta": 15,
+      "windupMs": 250,
+      "recoveryMs": 250,
+      "cooldownMs": 15000,
+      "targetMode": "self",
+      "procWeight": 0,
+      "basis": "NONE",
+      "special": "OVERCLOCK",
+      "interruptible": false,
+      "extraEffects": [
+        {
+          "type": "stat",
+          "stat": "attackSpeed",
+          "op": "INCREASED",
+          "value": 20,
+          "note": "8 секунд"
+        }
+      ],
+      "desc": "+20% скорости атаки на 8 с и +5 нагрева за каждую main автоатаку."
+    },
+    {
+      "id": "SK_NEURO",
+      "name": "Нейроукол",
+      "channel": "main",
+      "tags": [
+        "D",
+        "TECH",
+        "DIRECT"
+      ],
+      "coefficient": 1,
+      "hits": 1,
+      "energyCost": 12,
+      "heatDelta": 2,
+      "windupMs": 180,
+      "recoveryMs": 280,
+      "cooldownMs": 3000,
+      "targetMode": "nearest",
+      "procWeight": 1,
+      "basis": "TECH_D",
+      "interruptible": false,
+      "extraEffects": [
+        {
+          "type": "trigger",
+          "id": "SK_NEURO_virus",
+          "event": "ON_HIT",
+          "action": {
+            "kind": "applyStatus",
+            "status": "VIRUS",
+            "stacks": 1,
+            "target": "target"
+          },
+          "desc": "+1 VIRUS."
+        }
+      ],
+      "desc": "1.00 TechPower D и +1 стек VIRUS."
+    },
+    {
+      "id": "SK_SEED",
+      "name": "Вирусное семя",
+      "channel": "main",
+      "tags": [
+        "D",
+        "TECH",
+        "DIRECT"
+      ],
+      "coefficient": 0.7,
+      "hits": 1,
+      "energyCost": 20,
+      "heatDelta": 1,
+      "windupMs": 320,
+      "recoveryMs": 400,
+      "cooldownMs": 6000,
+      "targetMode": "infected",
+      "procWeight": 1,
+      "basis": "TECH_D",
+      "interruptible": false,
+      "extraEffects": [
+        {
+          "type": "trigger",
+          "id": "SK_SEED_virus",
+          "event": "ON_HIT",
+          "action": {
+            "kind": "applyStatus",
+            "status": "VIRUS",
+            "stacks": 2,
+            "target": "target"
+          },
+          "desc": "+2 VIRUS."
+        }
+      ],
+      "desc": "0.70 TechPower D и +2 стека VIRUS."
+    },
+    {
+      "id": "SK_DETONATE",
+      "name": "Детонация",
+      "channel": "main",
+      "tags": [
+        "D",
+        "TECH",
+        "DIRECT"
+      ],
+      "coefficient": 0.6,
+      "hits": 1,
+      "energyCost": 18,
+      "heatDelta": 4,
+      "windupMs": 200,
+      "recoveryMs": 350,
+      "cooldownMs": 8000,
+      "targetMode": "infected",
+      "procWeight": 1,
+      "basis": "NONE",
+      "special": "DETONATE",
+      "requires": [
+        "VIRUS"
+      ],
+      "interruptible": false,
+      "desc": "0.60 остаточного потенциала VIRUS как мгновенный D-урон, потребляет до 3 стеков."
+    },
+    {
+      "id": "SK_BREAK",
+      "name": "Разлом",
+      "channel": "main",
+      "tags": [
+        "K",
+        "DIRECT"
+      ],
+      "coefficient": 0.8,
+      "hits": 1,
+      "energyCost": 12,
+      "heatDelta": 2,
+      "windupMs": 240,
+      "recoveryMs": 330,
+      "cooldownMs": 5000,
+      "targetMode": "nearest",
+      "procWeight": 1,
+      "basis": "MAIN_K",
+      "requires": [
+        "MAIN_K"
+      ],
+      "interruptible": false,
+      "extraEffects": [
+        {
+          "type": "trigger",
+          "id": "SK_BREAK_ab",
+          "event": "ON_HIT",
+          "action": {
+            "kind": "applyStatus",
+            "status": "ARMOR_BREAK",
+            "stacks": 1,
+            "target": "target"
+          },
+          "desc": "+1 ARMOR_BREAK."
+        }
+      ],
+      "desc": "0.80 K и +1 стек ARMOR_BREAK."
+    },
+    {
+      "id": "SK_SCAN",
+      "name": "Слабое место",
+      "channel": "main",
+      "tags": [
+        "DIRECT"
+      ],
+      "coefficient": 0,
+      "hits": 0,
+      "energyCost": 12,
+      "heatDelta": 0,
+      "windupMs": 220,
+      "recoveryMs": 270,
+      "cooldownMs": 8000,
+      "targetMode": "boss",
+      "procWeight": 0,
+      "basis": "NONE",
+      "special": "SCAN",
+      "interruptible": false,
+      "desc": "Метка цели: +12% MORE прямого урона по ней на 6 с."
+    },
+    {
+      "id": "SK_LEECH",
+      "name": "Паразит",
+      "channel": "main",
+      "tags": [
+        "D",
+        "TECH",
+        "DIRECT"
+      ],
+      "coefficient": 1,
+      "hits": 1,
+      "energyCost": 14,
+      "heatDelta": 5,
+      "windupMs": 280,
+      "recoveryMs": 330,
+      "cooldownMs": 6000,
+      "targetMode": "infected",
+      "procWeight": 1,
+      "basis": "TECH_D",
+      "special": "LEECH",
+      "interruptible": false,
+      "desc": "1.00 TechPower D; +8 энергии при попадании по заражённой цели."
+    },
+    {
+      "id": "SK_CHAIN",
+      "name": "Перегрузка",
+      "channel": "main",
+      "tags": [
+        "E",
+        "TECH",
+        "DIRECT"
+      ],
+      "coefficient": 1.65,
+      "hits": 1,
+      "energyCost": 18,
+      "heatDelta": 18,
+      "windupMs": 400,
+      "recoveryMs": 500,
+      "cooldownMs": 10000,
+      "targetMode": "nearest",
+      "procWeight": 1,
+      "basis": "TECH_E",
+      "special": "CHAIN_HEAT",
+      "interruptible": false,
+      "desc": "1.65 TechPower E; при heat≥80 ещё +25% MORE."
+    },
+    {
+      "id": "SK_KINETIC",
+      "name": "Ударная волна",
+      "channel": "main",
+      "tags": [
+        "K",
+        "DIRECT",
+        "MULTI"
+      ],
+      "coefficient": 0.75,
+      "hits": 1,
+      "energyCost": 20,
+      "heatDelta": 5,
+      "windupMs": 350,
+      "recoveryMs": 400,
+      "cooldownMs": 9000,
+      "targetMode": "allEnemies",
+      "procWeight": 0.35,
+      "basis": "MAIN_K",
+      "maxTargets": 4,
+      "requires": [
+        "MAIN_K"
+      ],
+      "interruptible": false,
+      "desc": "0.75 K по 4 целям, procWeight 0.35 каждая."
+    },
+    {
+      "id": "SK_SIDE_FIRE",
+      "name": "Второй ствол",
+      "channel": "main",
+      "tags": [
+        "K",
+        "DIRECT"
+      ],
+      "coefficient": 1.3,
+      "hits": 1,
+      "energyCost": 8,
+      "heatDelta": 1,
+      "windupMs": 170,
+      "recoveryMs": 240,
+      "cooldownMs": 2500,
+      "targetMode": "nearest",
+      "procWeight": 1,
+      "basis": "OFFHAND",
+      "special": "SIDE_FIRE",
+      "requires": [
+        "SIDEARM"
+      ],
+      "interruptible": false,
+      "desc": "1.30 урона запасного оружия."
+    },
+    {
+      "id": "SK_SHIELD",
+      "name": "Аварийный щит",
+      "channel": "reaction",
+      "tags": [
+        "REACTION"
+      ],
+      "coefficient": 0,
+      "hits": 0,
+      "energyCost": 30,
+      "heatDelta": 5,
+      "windupMs": 100,
+      "recoveryMs": 0,
+      "cooldownMs": 20000,
+      "targetMode": "self",
+      "procWeight": 0,
+      "basis": "NONE",
+      "special": "TEMP_SHIELD",
+      "interruptible": false,
+      "desc": "+60 временных щитов на 5 с (cap источника 90)."
+    },
+    {
+      "id": "SK_EMP",
+      "name": "Перехват",
+      "channel": "reaction",
+      "tags": [
+        "REACTION",
+        "D",
+        "TECH",
+        "INTERRUPT"
+      ],
+      "coefficient": 0.6,
+      "hits": 1,
+      "energyCost": 18,
+      "heatDelta": 4,
+      "windupMs": 150,
+      "recoveryMs": 0,
+      "cooldownMs": 9000,
+      "targetMode": "imminentCast",
+      "procWeight": 1,
+      "basis": "TECH_D",
+      "special": "EMP",
+      "interruptible": false,
+      "desc": "Прерывает прерываемый каст и наносит 0.60 TechPower D."
+    },
+    {
+      "id": "SK_GUARD",
+      "name": "Дефлектор",
+      "channel": "reaction",
+      "tags": [
+        "REACTION"
+      ],
+      "coefficient": 0,
+      "hits": 0,
+      "energyCost": 10,
+      "heatDelta": 0,
+      "windupMs": 100,
+      "recoveryMs": 0,
+      "cooldownMs": 8000,
+      "targetMode": "self",
+      "procWeight": 0,
+      "basis": "NONE",
+      "special": "GUARD",
+      "interruptible": false,
+      "desc": "20% LESS входящего кинетического урона на 2 с."
+    },
+    {
+      "id": "SK_VENT",
+      "name": "Продувка",
+      "channel": "reaction",
+      "tags": [
+        "REACTION"
+      ],
+      "coefficient": 0,
+      "hits": 0,
+      "energyCost": 0,
+      "heatDelta": -35,
+      "windupMs": 100,
+      "recoveryMs": 0,
+      "cooldownMs": 12000,
+      "targetMode": "self",
+      "procWeight": 0,
+      "basis": "NONE",
+      "special": "VENT",
+      "interruptible": false,
+      "desc": "Сбрасывает 35 нагрева; при снижении со 100 снимает lockout."
+    },
+    {
+      "id": "SK_HEAL",
+      "name": "Ремодуль",
+      "channel": "reaction",
+      "tags": [
+        "REACTION"
+      ],
+      "coefficient": 0,
+      "hits": 0,
+      "energyCost": 20,
+      "heatDelta": 3,
+      "windupMs": 150,
+      "recoveryMs": 0,
+      "cooldownMs": 12000,
+      "targetMode": "self",
+      "procWeight": 0,
+      "basis": "NONE",
+      "special": "HEAL",
+      "interruptible": false,
+      "desc": "Лечение 30 + 0.10×maxHP (бонус ограничен 12% maxHP, всего ≤22% maxHP)."
+    },
+    {
+      "id": "SK_DRONE_MARK",
+      "name": "Синхрометка",
+      "channel": "reaction",
+      "tags": [
+        "REACTION",
+        "DRONE"
+      ],
+      "coefficient": 0,
+      "hits": 0,
+      "energyCost": 12,
+      "heatDelta": 1,
+      "windupMs": 100,
+      "recoveryMs": 0,
+      "cooldownMs": 6000,
+      "targetMode": "boss",
+      "procWeight": 0,
+      "basis": "NONE",
+      "special": "DRONE_MARK",
+      "interruptible": false,
+      "desc": "+15 точности дронам по одной цели на 5 с."
+    },
+    {
+      "id": "SK_DRONE_REPAIR",
+      "name": "Техподдержка",
+      "channel": "droneA",
+      "tags": [
+        "DRONE"
+      ],
+      "coefficient": 0,
+      "hits": 0,
+      "energyCost": 0,
+      "heatDelta": 0,
+      "windupMs": 200,
+      "recoveryMs": 0,
+      "cooldownMs": 15000,
+      "targetMode": "self",
+      "procWeight": 0,
+      "basis": "NONE",
+      "special": "DRONE_REPAIR",
+      "requires": [
+        "DR_MED"
+      ],
+      "interruptible": false,
+      "desc": "«Санитар» лечит себя на 25 HP и даёт оператору +20 щита."
+    },
+    {
+      "id": "SK_DRONE_EMP",
+      "name": "Малый EMP",
+      "channel": "droneA",
+      "tags": [
+        "DRONE",
+        "D"
+      ],
+      "coefficient": 0.75,
+      "hits": 1,
+      "energyCost": 0,
+      "heatDelta": 0,
+      "windupMs": 200,
+      "recoveryMs": 0,
+      "cooldownMs": 14000,
+      "targetMode": "imminentCast",
+      "procWeight": 1,
+      "basis": "NONE",
+      "special": "DRONE_EMP",
+      "requires": [
+        "DR_EMP"
+      ],
+      "interruptible": false,
+      "desc": "«Фантом» 0.75 собственного TechDamage D и JAM цели."
+    }
+  ],
+  "passives": [
+    {
+      "id": "PP_ARMOR",
+      "name": "Броневой протокол",
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "armor",
+          "op": "INCREASED",
+          "value": 12
+        }
+      ],
+      "desc": "+12% INCREASED брони."
+    },
+    {
+      "id": "PP_ACCURACY",
+      "name": "Протокол наведения",
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "accuracy",
+          "op": "FLAT",
+          "value": 10
+        }
+      ],
+      "desc": "+10 точности."
+    },
+    {
+      "id": "PP_AMMO",
+      "name": "Боевой протокол",
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "mainDamage",
+          "op": "INCREASED",
+          "value": 8
+        }
+      ],
+      "desc": "+8% INCREASED урона основного оружия."
+    },
+    {
+      "id": "PP_HEAT",
+      "name": "Термопротокол",
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "heatCooling",
+          "op": "FLAT",
+          "value": 2
+        }
+      ],
+      "desc": "+2 охлаждения/с."
+    },
+    {
+      "id": "PP_VIRUS",
+      "name": "Вирусный протокол",
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "virusDamage",
+          "op": "INCREASED",
+          "value": 15
+        }
+      ],
+      "desc": "+15% INCREASED урона тиков VIRUS."
+    },
+    {
+      "id": "PP_SHIELD",
+      "name": "Щитовой протокол",
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "shieldRegen",
+          "op": "FLAT",
+          "value": 1.5
+        }
+      ],
+      "desc": "+1.5 щита/с после 4 с без урона."
+    },
+    {
+      "id": "PP_DRONE",
+      "name": "Дроновый протокол",
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "droneDamage",
+          "op": "INCREASED",
+          "value": 12
+        }
+      ],
+      "desc": "+12% INCREASED урона дронов."
+    },
+    {
+      "id": "PP_HUNTER",
+      "name": "Протокол охоты",
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "bountyCurrency",
+          "op": "INCREASED",
+          "value": 10
+        }
+      ],
+      "desc": "+10% валютных наград только с охотников."
+    },
+    {
+      "id": "PP_ESCAPE",
+      "name": "Протокол отхода",
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "extractionChance",
+          "op": "FLAT",
+          "value": 15
+        }
+      ],
+      "desc": "+15 п.п. к шансу аварийной эвакуации."
+    },
+    {
+      "id": "PP_ECONOMY",
+      "name": "Экономный протокол",
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "repairCostLess",
+          "op": "FLAT",
+          "value": 10
+        }
+      ],
+      "desc": "−10% стоимости ремонта металлом (округление вверх, минимум 1)."
+    }
+  ],
+  "treeNodes": [
+    {
+      "id": "K1A",
+      "branch": "K",
+      "tier": 1,
+      "pos": "A",
+      "name": "Калибровка ствола",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "kineticDamage",
+          "op": "INCREASED",
+          "value": 6
+        }
+      ],
+      "desc": "+6% кинетического урона"
+    },
+    {
+      "id": "K1B",
+      "branch": "K",
+      "tier": 1,
+      "pos": "B",
+      "name": "Твёрдый сердечник",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "armorPen",
+          "op": "FLAT",
+          "value": 3
+        }
+      ],
+      "desc": "+3 плоского пробития брони"
+    },
+    {
+      "id": "K1C",
+      "branch": "K",
+      "tier": 1,
+      "pos": "C",
+      "name": "Стабилизатор",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "accuracy",
+          "op": "FLAT",
+          "value": 4
+        }
+      ],
+      "desc": "+4 точности"
+    },
+    {
+      "id": "K1D",
+      "branch": "K",
+      "tier": 1,
+      "pos": "D",
+      "name": "Рваные кромки",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "bleedDamage",
+          "op": "INCREASED",
+          "value": 5
+        }
+      ],
+      "desc": "+5% урона BLEED"
+    },
+    {
+      "id": "K2A",
+      "branch": "K",
+      "tier": 2,
+      "pos": "A",
+      "name": "Лёгкий затвор",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "attackSpeed",
+          "op": "INCREASED",
+          "value": 5,
+          "condition": {
+            "kind": "flagTrue",
+            "key": "mainKinetic"
+          }
+        }
+      ],
+      "desc": "+5% скорости атаки с K-оружием"
+    },
+    {
+      "id": "K2B",
+      "branch": "K",
+      "tier": 2,
+      "pos": "B",
+      "name": "Вскрытый шов",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "kineticDamage",
+          "op": "INCREASED",
+          "value": 10,
+          "condition": {
+            "kind": "targetStatus",
+            "status": "ARMOR_BREAK"
+          }
+        }
+      ],
+      "desc": "+10% K-урона по цели с ARMOR_BREAK"
+    },
+    {
+      "id": "K2C",
+      "branch": "K",
+      "tier": 2,
+      "pos": "C",
+      "name": "Дробовой картечь",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "armorPen",
+          "op": "FLAT",
+          "value": 2
+        },
+        {
+          "type": "stat",
+          "stat": "kineticDamage",
+          "op": "INCREASED",
+          "value": 6,
+          "condition": {
+            "kind": "flagTrue",
+            "key": "weaponShotgun"
+          }
+        }
+      ],
+      "desc": "+2 пробития, +6% урона SHOTGUN"
+    },
+    {
+      "id": "K2D",
+      "branch": "K",
+      "tier": 2,
+      "pos": "D",
+      "name": "Глубокий разрез",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "bleedStackCap",
+          "op": "FLAT",
+          "value": 1
+        }
+      ],
+      "desc": "+1 к лимиту стеков BLEED (11)"
+    },
+    {
+      "id": "K3A",
+      "branch": "K",
+      "tier": 3,
+      "pos": "A",
+      "name": "Раскол брони",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "trigger",
+          "id": "K3A",
+          "event": "ON_HIT",
+          "chance": 0.12,
+          "icdMs": 4000,
+          "requireDirect": true,
+          "damageTypeFilter": [
+            "KINETIC"
+          ],
+          "action": {
+            "kind": "applyStatus",
+            "status": "ARMOR_BREAK",
+            "stacks": 1,
+            "target": "target"
+          },
+          "desc": "12% шанс прямого K-удара наложить ARMOR_BREAK, ICD 4 с"
+        }
+      ],
+      "desc": "12% шанс ARMOR_BREAK на прямом K-ударе, ICD 4 с"
+    },
+    {
+      "id": "K3B",
+      "branch": "K",
+      "tier": 3,
+      "pos": "B",
+      "name": "Первый контакт",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "moreKinetic",
+          "op": "MORE",
+          "value": 1.08,
+          "condition": {
+            "kind": "targetHpAbove",
+            "value": 0.8
+          }
+        }
+      ],
+      "desc": "+8% MORE K-урона по цели с HP>80%"
+    },
+    {
+      "id": "K3C",
+      "branch": "K",
+      "tier": 3,
+      "pos": "C",
+      "name": "Резонанс кромки",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "critMultiplier",
+          "op": "FLAT",
+          "value": 0.1,
+          "condition": {
+            "kind": "flagTrue",
+            "key": "mainKinetic"
+          }
+        }
+      ],
+      "desc": "+0.10 к множителю крита с K-оружием"
+    },
+    {
+      "id": "K3D",
+      "branch": "K",
+      "tier": 3,
+      "pos": "D",
+      "name": "Трофейный заряд",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "trigger",
+          "id": "K3D",
+          "event": "ON_KILL",
+          "icdMs": 2000,
+          "requireKillType": "KINETIC",
+          "action": {
+            "kind": "restoreEnergy",
+            "amount": 4
+          },
+          "desc": "+4 энергии при K-убийстве, ICD 2 с"
+        }
+      ],
+      "desc": "При K-убийстве +4 энергии, ICD 2 с"
+    },
+    {
+      "id": "K4A",
+      "branch": "K",
+      "tier": 4,
+      "pos": "A",
+      "name": "Кинетический доминант",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "moreKinetic",
+          "op": "MORE",
+          "value": 1.15
+        },
+        {
+          "type": "stat",
+          "stat": "energyDamage",
+          "op": "INCREASED",
+          "value": -8
+        }
+      ],
+      "desc": "+15% MORE K-урона, −8% энергетического урона"
+    },
+    {
+      "id": "K4B",
+      "branch": "K",
+      "tier": 4,
+      "pos": "B",
+      "name": "Отдача в щит",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "trigger",
+          "id": "K4B",
+          "event": "ON_HIT",
+          "icdMs": 3000,
+          "damageTypeFilter": [
+            "KINETIC"
+          ],
+          "requireDirect": true,
+          "condition": {
+            "kind": "targetStatus",
+            "status": "ARMOR_BREAK",
+            "minStacks": 2
+          },
+          "action": {
+            "kind": "restoreShield",
+            "amount": 12
+          },
+          "desc": "K-удар по цели с ≥2 ARMOR_BREAK восстанавливает 12 щита"
+        }
+      ],
+      "desc": "K-удар по цели с ≥2 ARMOR_BREAK: +12 щита, ICD 3 с"
+    },
+    {
+      "id": "K4C",
+      "branch": "K",
+      "tier": 4,
+      "pos": "C",
+      "name": "KEYSTONE: Тройной пробой",
+      "keystone": true,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "attackSpeed",
+          "op": "INCREASED",
+          "value": -10
+        },
+        {
+          "type": "trigger",
+          "id": "K4C",
+          "event": "ON_BEFORE_HIT",
+          "counterEvery": 3,
+          "damageTypeFilter": [
+            "KINETIC"
+          ],
+          "requireDirect": true,
+          "action": {
+            "kind": "packetMod",
+            "penMultiplier": 2
+          },
+          "desc": "Каждый 3-й прямой K-удар удваивает плоское пробитие"
+        }
+      ],
+      "desc": "Каждый 3-й прямой K-удар удваивает плоское пробитие, но −10% скорости атаки"
+    },
+    {
+      "id": "K4D",
+      "branch": "K",
+      "tier": 4,
+      "pos": "D",
+      "name": "KEYSTONE: Кровавая жатва",
+      "keystone": true,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "moreExecute",
+          "op": "MORE",
+          "value": 1.3,
+          "condition": {
+            "kind": "targetStatus",
+            "status": "BLEED",
+            "minStacks": 5
+          }
+        },
+        {
+          "type": "stat",
+          "stat": "moreKinetic",
+          "op": "LESS",
+          "value": 0.15,
+          "condition": {
+            "kind": "targetNoStatus",
+            "status": "BLEED"
+          }
+        }
+      ],
+      "desc": "BLEED≥5: +30% MORE K-добивания (HP цели<30%), но −15% K по цели без кровотечения"
+    },
+    {
+      "id": "H1A",
+      "branch": "H",
+      "tier": 1,
+      "pos": "A",
+      "name": "Разогнанный контур",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "energyDamage",
+          "op": "INCREASED",
+          "value": 6
+        }
+      ],
+      "desc": "+6% энергетического урона"
+    },
+    {
+      "id": "H1B",
+      "branch": "H",
+      "tier": 1,
+      "pos": "B",
+      "name": "Радиатор",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "heatCooling",
+          "op": "FLAT",
+          "value": 2
+        }
+      ],
+      "desc": "+2 охлаждения/с"
+    },
+    {
+      "id": "H1C",
+      "branch": "H",
+      "tier": 1,
+      "pos": "C",
+      "name": "Дополнительная ячейка",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "maxEnergy",
+          "op": "FLAT",
+          "value": 10
+        }
+      ],
+      "desc": "+10 максимума энергии"
+    },
+    {
+      "id": "H1D",
+      "branch": "H",
+      "tier": 1,
+      "pos": "D",
+      "name": "Быстрый заряд",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "energyRegen",
+          "op": "FLAT",
+          "value": 3
+        }
+      ],
+      "desc": "+3 энергии/с"
+    },
+    {
+      "id": "H2A",
+      "branch": "H",
+      "tier": 2,
+      "pos": "A",
+      "name": "Горячая фаза",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "moreEnergy",
+          "op": "MORE",
+          "value": 1.1,
+          "condition": {
+            "kind": "heatAtLeast",
+            "value": 60
+          }
+        }
+      ],
+      "desc": "При heat≥60: +10% MORE энергии"
+    },
+    {
+      "id": "H2B",
+      "branch": "H",
+      "tier": 2,
+      "pos": "B",
+      "name": "Форсированная продувка",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "trigger",
+          "id": "H2B",
+          "event": "ON_CAST",
+          "skillFilter": [
+            "SK_VENT"
+          ],
+          "action": {
+            "kind": "changeHeat",
+            "amount": -10
+          },
+          "desc": "SK_VENT снимает ещё 10 нагрева"
+        }
+      ],
+      "desc": "SK_VENT снимает +10 нагрева"
+    },
+    {
+      "id": "H2C",
+      "branch": "H",
+      "tier": 2,
+      "pos": "C",
+      "name": "Экономный разряд",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "skillEnergyCostLess",
+          "op": "FLAT",
+          "value": 8
+        }
+      ],
+      "desc": "−8% стоимости энергии программ (минимум 1)"
+    },
+    {
+      "id": "H2D",
+      "branch": "H",
+      "tier": 2,
+      "pos": "D",
+      "name": "Полный бак",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "attackSpeed",
+          "op": "INCREASED",
+          "value": 8,
+          "condition": {
+            "kind": "energyAtLeast",
+            "value": 80
+          }
+        }
+      ],
+      "desc": "При энергии≥80: +8% скорости атаки"
+    },
+    {
+      "id": "H3A",
+      "branch": "H",
+      "tier": 3,
+      "pos": "A",
+      "name": "Термощит",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "trigger",
+          "id": "H3A",
+          "event": "ON_HEAT_FULL",
+          "icdMs": 10000,
+          "action": {
+            "kind": "tempShield",
+            "amount": 20,
+            "cap": 20,
+            "durationMs": 5000
+          },
+          "desc": "Пересечение 100 нагрева даёт 20 временных щитов"
+        }
+      ],
+      "desc": "При пересечении heat 100: +20 временных щитов, ICD 10 с"
+    },
+    {
+      "id": "H3B",
+      "branch": "H",
+      "tier": 3,
+      "pos": "B",
+      "name": "Плазменный ожог",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "trigger",
+          "id": "H3B",
+          "event": "ON_CAST",
+          "skillFilter": [
+            "SK_PLASMA"
+          ],
+          "icdMs": 3000,
+          "action": {
+            "kind": "applyStatus",
+            "status": "BURN",
+            "stacks": 1,
+            "target": "target"
+          },
+          "desc": "SK_PLASMA накладывает BURN"
+        }
+      ],
+      "desc": "SK_PLASMA: +1 BURN, ICD 3 с"
+    },
+    {
+      "id": "H3C",
+      "branch": "H",
+      "tier": 3,
+      "pos": "C",
+      "name": "Теплосброс",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "trigger",
+          "id": "H3C",
+          "event": "ON_KILL",
+          "requireKillType": "ENERGY",
+          "action": {
+            "kind": "changeHeat",
+            "amount": -15
+          },
+          "desc": "После E-убийства −15 нагрева"
+        }
+      ],
+      "desc": "После энергетического убийства −15 нагрева"
+    },
+    {
+      "id": "H3D",
+      "branch": "H",
+      "tier": 3,
+      "pos": "D",
+      "name": "Аварийный заряд",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "trigger",
+          "id": "H3D",
+          "event": "ON_HEAT_LOCKOUT_END",
+          "action": {
+            "kind": "buff",
+            "mods": [
+              {
+                "type": "stat",
+                "stat": "energyRegen",
+                "op": "FLAT",
+                "value": 5
+              }
+            ],
+            "durationMs": 4000
+          },
+          "desc": "После lockout +5 энергии/с на 4 с"
+        }
+      ],
+      "desc": "После heat lockout: +5 энергии/с на 4 с"
+    },
+    {
+      "id": "H4A",
+      "branch": "H",
+      "tier": 4,
+      "pos": "A",
+      "name": "Перегретый реактор",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "moreEnergy",
+          "op": "MORE",
+          "value": 1.2,
+          "condition": {
+            "kind": "heatAtLeast",
+            "value": 70
+          }
+        },
+        {
+          "type": "stat",
+          "stat": "heatCooling",
+          "op": "FLAT",
+          "value": -3
+        }
+      ],
+      "desc": "+20% MORE энергии при heat≥70, −3 охлаждения"
+    },
+    {
+      "id": "H4B",
+      "branch": "H",
+      "tier": 4,
+      "pos": "B",
+      "name": "Холодный расчёт",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "moreSkillDigital",
+          "op": "MORE",
+          "value": 1.2,
+          "condition": {
+            "kind": "heatAtMost",
+            "value": 25
+          }
+        },
+        {
+          "type": "stat",
+          "stat": "energyDamage",
+          "op": "INCREASED",
+          "value": -10
+        }
+      ],
+      "desc": "При heat≤25: +20% MORE цифровых программ, −10% энергии"
+    },
+    {
+      "id": "H4C",
+      "branch": "H",
+      "tier": 4,
+      "pos": "C",
+      "name": "KEYSTONE: Импульс перегрева",
+      "keystone": true,
+      "effects": [
+        {
+          "type": "trigger",
+          "id": "H4C_pulse",
+          "event": "ON_HEAT_FULL",
+          "icdMs": 12000,
+          "action": {
+            "kind": "secondaryDamage",
+            "basis": "techPower",
+            "coefficient": 0.7,
+            "damageType": "ENERGY",
+            "targeting": "allEnemies",
+            "canProc": false
+          },
+          "desc": "heat=100 запускает бесплатный импульс 0.7 TechPower E"
+        }
+      ],
+      "desc": "heat=100: импульс 0.7 TechPower E по всем врагам, ICD 12 с, lockout 1 с"
+    },
+    {
+      "id": "H4D",
+      "branch": "H",
+      "tier": 4,
+      "pos": "D",
+      "name": "KEYSTONE: Щитовой форсаж",
+      "keystone": true,
+      "effects": [
+        {
+          "type": "trigger",
+          "id": "H4D",
+          "event": "ON_BEFORE_HIT",
+          "damageTypeFilter": [
+            "ENERGY"
+          ],
+          "condition": {
+            "kind": "heatAtLeast",
+            "value": 80
+          },
+          "action": {
+            "kind": "packetMod",
+            "damageMultiplier": 1.25,
+            "consumeShield": 10,
+            "requireShield": 10
+          },
+          "desc": "E-атака при heat≥80 тратит 10 щита ради +25% MORE"
+        }
+      ],
+      "desc": "E-атаки при heat≥80 тратят 10 щита и получают +25% MORE (нужно ≥10 щита)"
+    },
+    {
+      "id": "N1A",
+      "branch": "N",
+      "tier": 1,
+      "pos": "A",
+      "name": "Оптимизация кода",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "digitalDamage",
+          "op": "INCREASED",
+          "value": 6
+        }
+      ],
+      "desc": "+6% цифрового урона"
+    },
+    {
+      "id": "N1B",
+      "branch": "N",
+      "tier": 1,
+      "pos": "B",
+      "name": "Агрессивный штамм",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "virusDamage",
+          "op": "INCREASED",
+          "value": 10
+        }
+      ],
+      "desc": "+10% урона VIRUS"
+    },
+    {
+      "id": "N1C",
+      "branch": "N",
+      "tier": 1,
+      "pos": "C",
+      "name": "Тихий цикл",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "energyRegen",
+          "op": "FLAT",
+          "value": 2
+        }
+      ],
+      "desc": "+2 энергии/с"
+    },
+    {
+      "id": "N1D",
+      "branch": "N",
+      "tier": 1,
+      "pos": "D",
+      "name": "Файрвол",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "digitalRes",
+          "op": "FLAT",
+          "value": 4
+        }
+      ],
+      "desc": "+4 п.п. цифрового сопротивления"
+    },
+    {
+      "id": "N2A",
+      "branch": "N",
+      "tier": 2,
+      "pos": "A",
+      "name": "Стойкая инфекция",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "virusDuration",
+          "op": "INCREASED",
+          "value": 16.67,
+          "note": "+1 с к 6 с"
+        }
+      ],
+      "desc": "Длительность VIRUS +1 с"
+    },
+    {
+      "id": "N2B",
+      "branch": "N",
+      "tier": 2,
+      "pos": "B",
+      "name": "Точный укол",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "moreDigital",
+          "op": "MORE",
+          "value": 1.1,
+          "condition": {
+            "kind": "flagTrue",
+            "key": "skill_SK_NEURO"
+          }
+        }
+      ],
+      "desc": "SK_NEURO: +10% урона"
+    },
+    {
+      "id": "N2C",
+      "branch": "N",
+      "tier": 2,
+      "pos": "C",
+      "name": "Дешёвый перехват",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "empCostFlat",
+          "op": "FLAT",
+          "value": 4
+        }
+      ],
+      "desc": "SK_EMP: −4 энергии"
+    },
+    {
+      "id": "N2D",
+      "branch": "N",
+      "tier": 2,
+      "pos": "D",
+      "name": "Взломанный канал",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "digitalDamage",
+          "op": "INCREASED",
+          "value": 10,
+          "condition": {
+            "kind": "targetStatus",
+            "status": "JAM"
+          }
+        }
+      ],
+      "desc": "+10% прямого D по цели с JAM"
+    },
+    {
+      "id": "N3A",
+      "branch": "N",
+      "tier": 3,
+      "pos": "A",
+      "name": "Утечка через вирус",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "trigger",
+          "id": "N3A",
+          "event": "ON_HIT",
+          "icdMs": 6000,
+          "requireDirect": true,
+          "damageTypeFilter": [
+            "DIGITAL"
+          ],
+          "condition": {
+            "kind": "targetStatus",
+            "status": "VIRUS"
+          },
+          "action": {
+            "kind": "applyStatus",
+            "status": "SHIELD_LEAK",
+            "target": "target"
+          },
+          "desc": "Прямой D-удар по заражённой цели накладывает SHIELD_LEAK"
+        }
+      ],
+      "desc": "Прямой D-удар по заражённой цели: SHIELD_LEAK, ICD 6 с"
+    },
+    {
+      "id": "N3B",
+      "branch": "N",
+      "tier": 3,
+      "pos": "B",
+      "name": "Двойное семя",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "trigger",
+          "id": "N3B",
+          "event": "ON_CAST",
+          "skillFilter": [
+            "SK_SEED"
+          ],
+          "action": {
+            "kind": "applyStatus",
+            "status": "VIRUS",
+            "stacks": 1,
+            "target": "target"
+          },
+          "desc": "SK_SEED накладывает ещё 1 стек"
+        }
+      ],
+      "desc": "SK_SEED: +1 дополнительный стек VIRUS"
+    },
+    {
+      "id": "N3C",
+      "branch": "N",
+      "tier": 3,
+      "pos": "C",
+      "name": "Утилизация данных",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "trigger",
+          "id": "N3C",
+          "event": "ON_KILL",
+          "icdMs": 3000,
+          "requireKillType": "DIGITAL",
+          "action": {
+            "kind": "restoreEnergy",
+            "amount": 8
+          },
+          "desc": "D-убийство восстанавливает 8 энергии"
+        }
+      ],
+      "desc": "При D-убийстве +8 энергии, ICD 3 с"
+    },
+    {
+      "id": "N3D",
+      "branch": "N",
+      "tier": 3,
+      "pos": "D",
+      "name": "Изолированная цель",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "moreDigital",
+          "op": "MORE",
+          "value": 1.15,
+          "condition": {
+            "kind": "targetAlone"
+          }
+        }
+      ],
+      "desc": "+15% MORE D по одиночной цели"
+    },
+    {
+      "id": "N4A",
+      "branch": "N",
+      "tier": 4,
+      "pos": "A",
+      "name": "Сверхдетонация",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "detonateCoefficient",
+          "op": "FLAT",
+          "value": 0.2
+        },
+        {
+          "type": "stat",
+          "stat": "virusDamage",
+          "op": "INCREASED",
+          "value": -10
+        }
+      ],
+      "desc": "SK_DETONATE: коэффициент 0.80 вместо 0.60, −10% урона тиков VIRUS"
+    },
+    {
+      "id": "N4B",
+      "branch": "N",
+      "tier": 4,
+      "pos": "B",
+      "name": "Цифровая броня",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "digitalRes",
+          "op": "FLAT",
+          "value": 15
+        },
+        {
+          "type": "stat",
+          "stat": "kineticDamage",
+          "op": "INCREASED",
+          "value": -5
+        }
+      ],
+      "desc": "+15 п.п. цифрового сопротивления, −5% K-урона"
+    },
+    {
+      "id": "N4C",
+      "branch": "N",
+      "tier": 4,
+      "pos": "C",
+      "name": "KEYSTONE: Разносчик",
+      "keystone": true,
+      "effects": [
+        {
+          "type": "trigger",
+          "id": "N4C",
+          "event": "ON_KILL",
+          "icdMs": 2000,
+          "condition": {
+            "kind": "targetStatus",
+            "status": "VIRUS"
+          },
+          "action": {
+            "kind": "transferVirus",
+            "stacks": 2
+          },
+          "desc": "Перенос 2 остаточных стеков VIRUS при убийстве"
+        },
+        {
+          "type": "stat",
+          "stat": "moreDigital",
+          "op": "LESS",
+          "value": 0.15,
+          "condition": {
+            "kind": "targetAlone"
+          }
+        }
+      ],
+      "desc": "Убийство заражённого переносит 2 стека VIRUS, ICD 2 с; −15% D по одиночной цели"
+    },
+    {
+      "id": "N4D",
+      "branch": "N",
+      "tier": 4,
+      "pos": "D",
+      "name": "KEYSTONE: Двойной перехват",
+      "keystone": true,
+      "effects": [
+        {
+          "type": "trigger",
+          "id": "N4D",
+          "event": "ON_INTERRUPT",
+          "icdMs": 15000,
+          "action": {
+            "kind": "extraReaction",
+            "windowMs": 2000
+          },
+          "desc": "Успешный EMP даёт дополнительное reaction-действие"
+        },
+        {
+          "type": "stat",
+          "stat": "reactionCostMore",
+          "op": "FLAT",
+          "value": 20
+        }
+      ],
+      "desc": "Успешный EMP даёт ещё одно reaction-действие в течение 2 с (ICD 15 с), но +20% стоимости реакций"
+    },
+    {
+      "id": "D1A",
+      "branch": "D",
+      "tier": 1,
+      "pos": "A",
+      "name": "Боевые подпрограммы",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "droneDamage",
+          "op": "INCREASED",
+          "value": 8
+        }
+      ],
+      "desc": "+8% урона дронов"
+    },
+    {
+      "id": "D1B",
+      "branch": "D",
+      "tier": 1,
+      "pos": "B",
+      "name": "Усиленный каркас",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "droneHP",
+          "op": "INCREASED",
+          "value": 10
+        }
+      ],
+      "desc": "+10% HP дронов"
+    },
+    {
+      "id": "D1C",
+      "branch": "D",
+      "tier": 1,
+      "pos": "C",
+      "name": "Синхронное наведение",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "droneAccuracy",
+          "op": "FLAT",
+          "value": 5
+        }
+      ],
+      "desc": "+5 точности дронов"
+    },
+    {
+      "id": "D1D",
+      "branch": "D",
+      "tier": 1,
+      "pos": "D",
+      "name": "Ремонтные протоколы",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "repairPower",
+          "op": "INCREASED",
+          "value": 5
+        }
+      ],
+      "desc": "+5% силы ремонта"
+    },
+    {
+      "id": "D2A",
+      "branch": "D",
+      "tier": 2,
+      "pos": "A",
+      "name": "Помехоустойчивость",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "droneJamDurationLess",
+          "op": "FLAT",
+          "value": 20
+        }
+      ],
+      "desc": "Длительность DRONE_JAM −20%"
+    },
+    {
+      "id": "D2B",
+      "branch": "D",
+      "tier": 2,
+      "pos": "B",
+      "name": "Дроновый барьер",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "droneShield",
+          "op": "INCREASED",
+          "value": 10
+        }
+      ],
+      "desc": "+10% щита дронов"
+    },
+    {
+      "id": "D2C",
+      "branch": "D",
+      "tier": 2,
+      "pos": "C",
+      "name": "Расширенный медпакет",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "droneMedBonus",
+          "op": "FLAT",
+          "value": 8
+        }
+      ],
+      "desc": "«Санитар»: +8 щита за срабатывание"
+    },
+    {
+      "id": "D2D",
+      "branch": "D",
+      "tier": 2,
+      "pos": "D",
+      "name": "Разогнанные роторы",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "droneAttackSpeed",
+          "op": "INCREASED",
+          "value": 5
+        }
+      ],
+      "desc": "+5% скорости атаки дронов"
+    },
+    {
+      "id": "D3A",
+      "branch": "D",
+      "tier": 3,
+      "pos": "A",
+      "name": "Одиночный охотник",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "moreDrone",
+          "op": "MORE",
+          "value": 1.15,
+          "condition": {
+            "kind": "otherDroneDead"
+          }
+        }
+      ],
+      "desc": "+15% MORE урона дрона, если второй мёртв/отсутствует"
+    },
+    {
+      "id": "D3B",
+      "branch": "D",
+      "tier": 3,
+      "pos": "B",
+      "name": "Совместный залп",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "moreDrone",
+          "op": "MORE",
+          "value": 1.1,
+          "condition": {
+            "kind": "bothDronesSameTarget"
+          }
+        }
+      ],
+      "desc": "Оба дрона по одной цели: +10% MORE урона"
+    },
+    {
+      "id": "D3C",
+      "branch": "D",
+      "tier": 3,
+      "pos": "C",
+      "name": "Последний заряд",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "trigger",
+          "id": "D3C",
+          "event": "ON_DRONE_DEATH",
+          "oncePerDrone": true,
+          "action": {
+            "kind": "restoreEnergy",
+            "amount": 20
+          },
+          "desc": "Гибель дрона даёт 20 энергии"
+        }
+      ],
+      "desc": "При гибели дрона +20 энергии (раз за дрон за бой)"
+    },
+    {
+      "id": "D3D",
+      "branch": "D",
+      "tier": 3,
+      "pos": "D",
+      "name": "Стойкая метка",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "droneMarkBonusMs",
+          "op": "FLAT",
+          "value": 2000
+        }
+      ],
+      "desc": "Синхрометка держится +2 с"
+    },
+    {
+      "id": "D4A",
+      "branch": "D",
+      "tier": 4,
+      "pos": "A",
+      "name": "Роевой приоритет",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "moreDrone",
+          "op": "MORE",
+          "value": 1.2
+        },
+        {
+          "type": "stat",
+          "stat": "moreMain",
+          "op": "LESS",
+          "value": 0.1
+        }
+      ],
+      "desc": "+20% MORE урона дронов, −10% урона героя"
+    },
+    {
+      "id": "D4B",
+      "branch": "D",
+      "tier": 4,
+      "pos": "B",
+      "name": "Живучий рой",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "moreDroneHP",
+          "op": "MORE",
+          "value": 1.25
+        },
+        {
+          "type": "stat",
+          "stat": "droneDamage",
+          "op": "INCREASED",
+          "value": -5
+        }
+      ],
+      "desc": "+25% MORE HP дронов, −5% их урона"
+    },
+    {
+      "id": "D4C",
+      "branch": "D",
+      "tier": 4,
+      "pos": "C",
+      "name": "KEYSTONE: Синхрония",
+      "keystone": true,
+      "effects": [
+        {
+          "type": "trigger",
+          "id": "D4C_stack",
+          "event": "PERIODIC",
+          "periodMs": 1000,
+          "condition": {
+            "kind": "dronesAlive",
+            "value": 2
+          },
+          "action": {
+            "kind": "flag",
+            "key": "synchrony",
+            "amount": 1,
+            "max": 5
+          },
+          "desc": "Два живых дрона копят 1 синхронию/с"
+        },
+        {
+          "type": "trigger",
+          "id": "D4C_spend",
+          "event": "ON_BEFORE_HIT",
+          "requireDrone": true,
+          "action": {
+            "kind": "spendFlagForDamage",
+            "flag": "synchrony",
+            "perStack": 0.1,
+            "maxStacks": 5,
+            "onlyAtMax": true
+          },
+          "desc": "На 5 синхронии следующий удар дрона ×1.5 MORE"
+        }
+      ],
+      "desc": "Два живых дрона копят синхронию (макс 5); на максимуме следующий удар ×1.5 MORE и сброс"
+    },
+    {
+      "id": "D4D",
+      "branch": "D",
+      "tier": 4,
+      "pos": "D",
+      "name": "KEYSTONE: Прощальный EMP",
+      "keystone": true,
+      "effects": [
+        {
+          "type": "trigger",
+          "id": "D4D",
+          "event": "ON_DRONE_DEATH",
+          "icdMs": 15000,
+          "action": {
+            "kind": "secondaryDamage",
+            "basis": "droneTech",
+            "coefficient": 0.6,
+            "damageType": "DIGITAL",
+            "targeting": "allEnemies",
+            "canProc": false
+          },
+          "desc": "Гибель дрона: EMP 0.6 droneTechPower D"
+        },
+        {
+          "type": "stat",
+          "stat": "moreDroneHP",
+          "op": "LESS",
+          "value": 0.2
+        }
+      ],
+      "desc": "Гибель дрона: EMP 0.6 droneTechPower D по всем (ICD 15 с), но −20% HP дронов"
+    },
+    {
+      "id": "S1A",
+      "branch": "S",
+      "tier": 1,
+      "pos": "A",
+      "name": "Резерв тканей",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "maxHP",
+          "op": "INCREASED",
+          "value": 8
+        }
+      ],
+      "desc": "+8% максимума HP"
+    },
+    {
+      "id": "S1B",
+      "branch": "S",
+      "tier": 1,
+      "pos": "B",
+      "name": "Ёмкий барьер",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "maxShield",
+          "op": "INCREASED",
+          "value": 8
+        }
+      ],
+      "desc": "+8% максимума щита"
+    },
+    {
+      "id": "S1C",
+      "branch": "S",
+      "tier": 1,
+      "pos": "C",
+      "name": "Композит",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "armor",
+          "op": "INCREASED",
+          "value": 6
+        }
+      ],
+      "desc": "+6% брони"
+    },
+    {
+      "id": "S1D",
+      "branch": "S",
+      "tier": 1,
+      "pos": "D",
+      "name": "Диэлектрик",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "energyRes",
+          "op": "FLAT",
+          "value": 4
+        }
+      ],
+      "desc": "+4 п.п. сопротивления энергии"
+    },
+    {
+      "id": "S2A",
+      "branch": "S",
+      "tier": 2,
+      "pos": "A",
+      "name": "Восстановление барьера",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "shieldRegen",
+          "op": "FLAT",
+          "value": 2
+        }
+      ],
+      "desc": "+2 щита/с после 4 с без урона"
+    },
+    {
+      "id": "S2B",
+      "branch": "S",
+      "tier": 2,
+      "pos": "B",
+      "name": "Экранирование",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "digitalRes",
+          "op": "FLAT",
+          "value": 5
+        }
+      ],
+      "desc": "+5 п.п. цифрового сопротивления"
+    },
+    {
+      "id": "S2C",
+      "branch": "S",
+      "tier": 2,
+      "pos": "C",
+      "name": "Дополнительный резерв",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "maxHP",
+          "op": "FLAT",
+          "value": 20,
+          "note": "×D(T текущей брони)"
+        }
+      ],
+      "desc": "+20 HP ×D(T текущей экипировки)"
+    },
+    {
+      "id": "S2D",
+      "branch": "S",
+      "tier": 2,
+      "pos": "D",
+      "name": "Плотный барьер",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "incomingShield",
+          "op": "LESS",
+          "value": 0.05
+        }
+      ],
+      "desc": "−5% урона, поглощаемого щитом"
+    },
+    {
+      "id": "S3A",
+      "branch": "S",
+      "tier": 3,
+      "pos": "A",
+      "name": "Отдача барьера",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "trigger",
+          "id": "S3A",
+          "event": "ON_SHIELD_ABSORB",
+          "icdMs": 3000,
+          "minAmount": 50,
+          "action": {
+            "kind": "restoreEnergy",
+            "amount": 8
+          },
+          "desc": "Щит поглотил ≥50 за удар → +8 энергии"
+        }
+      ],
+      "desc": "Щит поглотил ≥50 за один удар: +8 энергии, ICD 3 с"
+    },
+    {
+      "id": "S3B",
+      "branch": "S",
+      "tier": 3,
+      "pos": "B",
+      "name": "Порог выживания",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "incomingAll",
+          "op": "LESS",
+          "value": 0.1,
+          "condition": {
+            "kind": "hpBelow",
+            "value": 0.35
+          }
+        }
+      ],
+      "desc": "При HP<35%: −10% LESS всего входящего урона"
+    },
+    {
+      "id": "S3C",
+      "branch": "S",
+      "tier": 3,
+      "pos": "C",
+      "name": "Регенерационный контур",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "healing",
+          "op": "INCREASED",
+          "value": 15
+        }
+      ],
+      "desc": "+15% силы лечения"
+    },
+    {
+      "id": "S3D",
+      "branch": "S",
+      "tier": 3,
+      "pos": "D",
+      "name": "Герметизация",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "shieldLeakDurationLess",
+          "op": "FLAT",
+          "value": 25
+        }
+      ],
+      "desc": "Длительность SHIELD_LEAK −25%"
+    },
+    {
+      "id": "S4A",
+      "branch": "S",
+      "tier": 4,
+      "pos": "A",
+      "name": "Тяжёлый каркас",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "moreMaxHP",
+          "op": "MORE",
+          "value": 1.15
+        },
+        {
+          "type": "stat",
+          "stat": "attackSpeed",
+          "op": "INCREASED",
+          "value": -5
+        }
+      ],
+      "desc": "+15% MORE максимума HP, −5% скорости атаки"
+    },
+    {
+      "id": "S4B",
+      "branch": "S",
+      "tier": 4,
+      "pos": "B",
+      "name": "Реактор барьера",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "moreMaxShield",
+          "op": "MORE",
+          "value": 1.2
+        },
+        {
+          "type": "stat",
+          "stat": "energyRegen",
+          "op": "INCREASED",
+          "value": -5
+        }
+      ],
+      "desc": "+20% MORE максимума щита, −5% регенерации энергии"
+    },
+    {
+      "id": "S4C",
+      "branch": "S",
+      "tier": 4,
+      "pos": "C",
+      "name": "KEYSTONE: Последний барьер",
+      "keystone": true,
+      "effects": [
+        {
+          "type": "trigger",
+          "id": "S4C",
+          "event": "ON_HP_THRESHOLD",
+          "hpThreshold": 0.2,
+          "oncePerCombat": true,
+          "action": {
+            "kind": "tempShield",
+            "amount": 80,
+            "cap": 80,
+            "durationMs": 5000,
+            "scaleWithArmorT": true
+          },
+          "desc": "HP<20%: 80 временных щитов ×D(T брони) на 5 с"
+        },
+        {
+          "type": "stat",
+          "stat": "moreDirect",
+          "op": "LESS",
+          "value": 0.1
+        }
+      ],
+      "desc": "HP<20%: 80 временных щитов ×D(T брони) на 5 с, раз за бой; −10% урона"
+    },
+    {
+      "id": "S4D",
+      "branch": "S",
+      "tier": 4,
+      "pos": "D",
+      "name": "KEYSTONE: Зеркальный барьер",
+      "keystone": true,
+      "effects": [
+        {
+          "type": "trigger",
+          "id": "S4D",
+          "event": "ON_SHIELD_ABSORB",
+          "icdMs": 3000,
+          "action": {
+            "kind": "secondaryDamage",
+            "basis": "consumedShield",
+            "coefficient": 0.15,
+            "damageType": "DIGITAL",
+            "targeting": "attacker",
+            "canProc": false
+          },
+          "desc": "15% поглощённого щитом урона отражается цифрой"
+        },
+        {
+          "type": "stat",
+          "stat": "moreMaxShield",
+          "op": "LESS",
+          "value": 0.1
+        }
+      ],
+      "desc": "Поглощение щитом отражает 15% цифровым SECONDARY (ICD 3 с), но −10% максимума щита"
+    },
+    {
+      "id": "R1A",
+      "branch": "R",
+      "tier": 1,
+      "pos": "A",
+      "name": "Точный глаз",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "accuracy",
+          "op": "FLAT",
+          "value": 5
+        }
+      ],
+      "desc": "+5 точности"
+    },
+    {
+      "id": "R1B",
+      "branch": "R",
+      "tier": 1,
+      "pos": "B",
+      "name": "Лёгкий шаг",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "evasion",
+          "op": "FLAT",
+          "value": 5
+        }
+      ],
+      "desc": "+5 уклонения"
+    },
+    {
+      "id": "R1C",
+      "branch": "R",
+      "tier": 1,
+      "pos": "C",
+      "name": "Быстрые руки",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "attackSpeed",
+          "op": "INCREASED",
+          "value": 5
+        }
+      ],
+      "desc": "+5% скорости атаки"
+    },
+    {
+      "id": "R1D",
+      "branch": "R",
+      "tier": 1,
+      "pos": "D",
+      "name": "Готовность реакций",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "reactionCooldownLess",
+          "op": "FLAT",
+          "value": 5
+        }
+      ],
+      "desc": "−5% cooldown реакций"
+    },
+    {
+      "id": "R2A",
+      "branch": "R",
+      "tier": 2,
+      "pos": "A",
+      "name": "Кинетический возврат",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "trigger",
+          "id": "R2A",
+          "event": "ON_DODGE",
+          "icdMs": 1000,
+          "action": {
+            "kind": "restoreEnergy",
+            "amount": 2
+          },
+          "desc": "Уклонение даёт 2 энергии"
+        }
+      ],
+      "desc": "Успешное уклонение: +2 энергии, ICD 1 с"
+    },
+    {
+      "id": "R2B",
+      "branch": "R",
+      "tier": 2,
+      "pos": "B",
+      "name": "Усиленный резонанс",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "critMultiplier",
+          "op": "FLAT",
+          "value": 0.08
+        }
+      ],
+      "desc": "+0.08 к множителю крита"
+    },
+    {
+      "id": "R2C",
+      "branch": "R",
+      "tier": 2,
+      "pos": "C",
+      "name": "Экономный барьер",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "shieldCostFlat",
+          "op": "FLAT",
+          "value": 5
+        }
+      ],
+      "desc": "SK_SHIELD: −5 энергии"
+    },
+    {
+      "id": "R2D",
+      "branch": "R",
+      "tier": 2,
+      "pos": "D",
+      "name": "Чтение боя",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "telegraphBonusMs",
+          "op": "FLAT",
+          "value": 200
+        }
+      ],
+      "desc": "Телеграфы боссов начинаются на 200 мс раньше"
+    },
+    {
+      "id": "R3A",
+      "branch": "R",
+      "tier": 3,
+      "pos": "A",
+      "name": "Контрудар",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "trigger",
+          "id": "R3A",
+          "event": "ON_DODGE",
+          "icdMs": 3000,
+          "action": {
+            "kind": "buff",
+            "mods": [
+              {
+                "type": "stat",
+                "stat": "moreDirect",
+                "op": "MORE",
+                "value": 1.12
+              }
+            ],
+            "durationMs": 5000,
+            "consumeOnHit": true
+          },
+          "desc": "Уклонение усиливает следующую атаку"
+        }
+      ],
+      "desc": "Уклонение: следующая атака +12% MORE, ICD 3 с"
+    },
+    {
+      "id": "R3B",
+      "branch": "R",
+      "tier": 3,
+      "pos": "B",
+      "name": "Перехват энергии",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "trigger",
+          "id": "R3B",
+          "event": "ON_INTERRUPT",
+          "action": {
+            "kind": "restoreShield",
+            "amount": 10
+          },
+          "desc": "Успешное прерывание даёт 10 щита"
+        }
+      ],
+      "desc": "Успешное прерывание: +10 щита"
+    },
+    {
+      "id": "R3C",
+      "branch": "R",
+      "tier": 3,
+      "pos": "C",
+      "name": "Долгая метка",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "scanMarkBonusMs",
+          "op": "FLAT",
+          "value": 2000
+        }
+      ],
+      "desc": "Метка SK_SCAN держится +2 с"
+    },
+    {
+      "id": "R3D",
+      "branch": "R",
+      "tier": 3,
+      "pos": "D",
+      "name": "Пристрелка",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "trigger",
+          "id": "R3D",
+          "event": "ON_ATTACK_COUNTER",
+          "counterEvery": 4,
+          "action": {
+            "kind": "buff",
+            "mods": [
+              {
+                "type": "stat",
+                "stat": "accuracy",
+                "op": "FLAT",
+                "value": 8
+              }
+            ],
+            "durationMs": 4000
+          },
+          "desc": "4 удара по одной цели дают +8 точности"
+        }
+      ],
+      "desc": "4 атаки по одной цели: +8 точности на 4 с"
+    },
+    {
+      "id": "R4A",
+      "branch": "R",
+      "tier": 4,
+      "pos": "A",
+      "name": "Смертельный резонанс",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "moreCritDamage",
+          "op": "MORE",
+          "value": 1.15
+        },
+        {
+          "type": "stat",
+          "stat": "critChance",
+          "op": "FLAT",
+          "value": -8
+        }
+      ],
+      "desc": "+15% MORE крит. урона, −8 п.п. шанса крита"
+    },
+    {
+      "id": "R4B",
+      "branch": "R",
+      "tier": 4,
+      "pos": "B",
+      "name": "Вход в бой",
+      "keystone": false,
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "incomingAll",
+          "op": "LESS",
+          "value": 0.08,
+          "condition": {
+            "kind": "firstSeconds",
+            "value": 3
+          }
+        }
+      ],
+      "desc": "−8% LESS урона в первые 3 с боя"
+    },
+    {
+      "id": "R4C",
+      "branch": "R",
+      "tier": 4,
+      "pos": "C",
+      "name": "KEYSTONE: Аварийный протокол",
+      "keystone": true,
+      "effects": [
+        {
+          "type": "trigger",
+          "id": "R4C",
+          "event": "ON_COMBAT_START",
+          "oncePerCombat": true,
+          "action": {
+            "kind": "flag",
+            "key": "emergencyReaction",
+            "amount": 1,
+            "max": 1
+          },
+          "desc": "Одна реакция за бой без энергии"
+        }
+      ],
+      "desc": "Раз за бой реакция игнорирует стоимость энергии, но даёт +20 нагрева и +3 с к её cooldown"
+    },
+    {
+      "id": "R4D",
+      "branch": "R",
+      "tier": 4,
+      "pos": "D",
+      "name": "KEYSTONE: Фазовый сдвиг",
+      "keystone": true,
+      "effects": [
+        {
+          "type": "trigger",
+          "id": "R4D",
+          "event": "ON_DODGE",
+          "counterEvery": 3,
+          "icdMs": 12000,
+          "action": {
+            "kind": "reduceCooldown",
+            "amountMs": 2000
+          },
+          "desc": "Каждое 3-е уклонение освежает ближайшее готовое main-умение"
+        },
+        {
+          "type": "stat",
+          "stat": "moreMaxHP",
+          "op": "LESS",
+          "value": 0.1
+        }
+      ],
+      "desc": "Каждое 3-е уклонение сокращает CD ближайшего main-умения на 2 с (ICD 12 с), но −10% максимума HP"
+    },
+    {
+      "id": "X1",
+      "branch": "X",
+      "tier": 4,
+      "pos": "X",
+      "name": "Термоброня",
+      "keystone": false,
+      "requires": [
+        {
+          "branch": "H",
+          "points": 6
+        },
+        {
+          "branch": "S",
+          "points": 6
+        }
+      ],
+      "effects": [
+        {
+          "type": "trigger",
+          "id": "X1",
+          "event": "ON_EFFECT_SHIELD_SPENT",
+          "icdMs": 1000,
+          "action": {
+            "kind": "tempShield",
+            "amount": 0,
+            "cap": 25,
+            "durationMs": 5000,
+            "fromFlag": "effectShieldSpent",
+            "ratio": 0.5
+          },
+          "desc": "Половина щитов, потраченных U01/H4D, возвращается временным щитом"
+        }
+      ],
+      "desc": "Каждый щит, потраченный на U01 или H4D, даёт 0.5 временного щита на 5 с (макс 25), ICD 1 с"
+    },
+    {
+      "id": "X2",
+      "branch": "X",
+      "tier": 4,
+      "pos": "X",
+      "name": "Киберрой",
+      "keystone": false,
+      "requires": [
+        {
+          "branch": "N",
+          "points": 6
+        },
+        {
+          "branch": "D",
+          "points": 6
+        }
+      ],
+      "effects": [
+        {
+          "type": "trigger",
+          "id": "X2",
+          "event": "ON_HIT",
+          "icdMs": 2000,
+          "requireDrone": true,
+          "requireDirect": true,
+          "damageTypeFilter": [
+            "DIGITAL"
+          ],
+          "condition": {
+            "kind": "targetStatus",
+            "status": "VIRUS"
+          },
+          "action": {
+            "kind": "extendStatus",
+            "status": "VIRUS",
+            "ms": 1000,
+            "stacks": 1
+          },
+          "desc": "Цифровой удар дрона продлевает стек VIRUS"
+        }
+      ],
+      "desc": "Каждый прямой цифровой удар дрона по заражённой цели продлевает один стек на 1 с, ICD 2 с"
+    },
+    {
+      "id": "X3",
+      "branch": "X",
+      "tier": 4,
+      "pos": "X",
+      "name": "Предвидение",
+      "keystone": false,
+      "requires": [
+        {
+          "branch": "R",
+          "points": 6
+        },
+        {
+          "branch": "S",
+          "points": 6
+        }
+      ],
+      "effects": [
+        {
+          "type": "trigger",
+          "id": "X3",
+          "event": "ON_ENEMY_TELEGRAPH",
+          "action": {
+            "kind": "buff",
+            "mods": [
+              {
+                "type": "stat",
+                "stat": "evasion",
+                "op": "MORE",
+                "value": 1.2
+              }
+            ],
+            "durationMs": 1000,
+            "maxStacks": 1
+          },
+          "desc": "Телеграф опасного каста даёт +20% уклонения"
+        }
+      ],
+      "desc": "При телеграфе опасного каста: +20% MORE уклонения на 1 с, без стеков"
+    },
+    {
+      "id": "X4",
+      "branch": "X",
+      "tier": 4,
+      "pos": "X",
+      "name": "Взломный выстрел",
+      "keystone": false,
+      "requires": [
+        {
+          "branch": "K",
+          "points": 6
+        },
+        {
+          "branch": "N",
+          "points": 6
+        }
+      ],
+      "effects": [
+        {
+          "type": "trigger",
+          "id": "X4",
+          "event": "ON_HIT",
+          "icdMs": 3000,
+          "requireDirect": true,
+          "damageTypeFilter": [
+            "KINETIC"
+          ],
+          "condition": {
+            "kind": "targetStatus",
+            "status": "JAM"
+          },
+          "action": {
+            "kind": "secondaryDamage",
+            "basis": "techPower",
+            "coefficient": 0.3,
+            "damageType": "DIGITAL",
+            "targeting": "target",
+            "canProc": false
+          },
+          "desc": "K-удар по цели с JAM добавляет цифровой вторичный пакет"
+        }
+      ],
+      "desc": "Первый прямой K-удар по цели с JAM добавляет 0.30 TechPower D вторичным пакетом, ICD 3 с"
+    }
+  ],
+  "mutations": [
+    {
+      "id": "MUT_CHAIN",
+      "name": "Цепной разряд",
+      "benefit": "Прямая E-атака даёт вторичный пакет 0.3 TechPower E по соседней цели (ICD 2 с)",
+      "cost": "−10% прямого E-урона",
+      "tags": [
+        "energy"
+      ],
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "moreEnergy",
+          "op": "LESS",
+          "value": 0.1
+        },
+        {
+          "type": "trigger",
+          "id": "MUT_CHAIN",
+          "event": "ON_HIT",
+          "icdMs": 2000,
+          "requireDirect": true,
+          "damageTypeFilter": [
+            "ENERGY"
+          ],
+          "action": {
+            "kind": "secondaryDamage",
+            "basis": "techPower",
+            "coefficient": 0.3,
+            "damageType": "ENERGY",
+            "targeting": "otherEnemy",
+            "canProc": false
+          },
+          "desc": "Цепь по соседней цели"
+        }
+      ]
+    },
+    {
+      "id": "MUT_VIRUS",
+      "name": "Разносчик",
+      "benefit": "Убийство заражённого переносит 1 стек VIRUS (ICD 2 с)",
+      "cost": "−15% D по одиночной цели",
+      "tags": [
+        "digital",
+        "virus"
+      ],
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "moreDigital",
+          "op": "LESS",
+          "value": 0.15,
+          "condition": {
+            "kind": "targetAlone"
+          }
+        },
+        {
+          "type": "trigger",
+          "id": "MUT_VIRUS",
+          "event": "ON_KILL",
+          "icdMs": 2000,
+          "condition": {
+            "kind": "targetStatus",
+            "status": "VIRUS"
+          },
+          "action": {
+            "kind": "transferVirus",
+            "stacks": 1
+          },
+          "desc": "Перенос одного стека"
+        }
+      ]
+    },
+    {
+      "id": "MUT_SWARM",
+      "name": "Роевой приказ",
+      "benefit": "Два дрона по одной отмеченной цели: +25% MORE урона дронов",
+      "cost": "+20% cooldown дронов",
+      "tags": [
+        "drone"
+      ],
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "moreDrone",
+          "op": "MORE",
+          "value": 1.25,
+          "condition": {
+            "kind": "bothDronesSameTarget"
+          }
+        },
+        {
+          "type": "stat",
+          "stat": "droneCooldownMore",
+          "op": "FLAT",
+          "value": 20
+        }
+      ]
+    },
+    {
+      "id": "MUT_HEAT",
+      "name": "Форсаж нагрева",
+      "benefit": "+15% MORE E при heat≥70",
+      "cost": "Нагрев растёт на 30% быстрее, охлаждение −2/с",
+      "tags": [
+        "heat",
+        "energy"
+      ],
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "moreEnergy",
+          "op": "MORE",
+          "value": 1.15,
+          "condition": {
+            "kind": "heatAtLeast",
+            "value": 70
+          }
+        },
+        {
+          "type": "stat",
+          "stat": "heatCooling",
+          "op": "FLAT",
+          "value": -2
+        }
+      ]
+    },
+    {
+      "id": "MUT_SAFE",
+      "name": "Броневой резерв",
+      "benefit": "+25% MORE максимума HP",
+      "cost": "−15% урона основного оружия",
+      "tags": [
+        "defense"
+      ],
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "moreMaxHP",
+          "op": "MORE",
+          "value": 1.25
+        },
+        {
+          "type": "stat",
+          "stat": "moreMain",
+          "op": "LESS",
+          "value": 0.15
+        }
+      ]
+    },
+    {
+      "id": "MUT_RISK",
+      "name": "Ставка на риск",
+      "benefit": "+25% количества предметов на элитных узлах",
+      "cost": "−20% максимума щита",
+      "tags": [
+        "loot"
+      ],
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "moreMaxShield",
+          "op": "LESS",
+          "value": 0.2
+        }
+      ]
+    },
+    {
+      "id": "MUT_FUEL",
+      "name": "Топливный резерв",
+      "benefit": "+3 топлива на каждом checkpoint",
+      "cost": "+5 розыска после босса",
+      "tags": [
+        "road"
+      ],
+      "effects": []
+    },
+    {
+      "id": "MUT_GHOST",
+      "name": "Призрачный шаг",
+      "benefit": "+15 уклонения",
+      "cost": "−10% K-урона",
+      "tags": [
+        "evasion"
+      ],
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "evasion",
+          "op": "FLAT",
+          "value": 15
+        },
+        {
+          "type": "stat",
+          "stat": "kineticDamage",
+          "op": "INCREASED",
+          "value": -10
+        }
+      ]
+    },
+    {
+      "id": "MUT_REGEN",
+      "name": "Машинное эхо",
+      "benefit": "+3 энергии/с",
+      "cost": "+2 нагрева за каждое умение",
+      "tags": [
+        "energy"
+      ],
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "energyRegen",
+          "op": "FLAT",
+          "value": 3
+        }
+      ]
+    },
+    {
+      "id": "MUT_BLEED",
+      "name": "Кровавый контур",
+      "benefit": "+2 к лимиту стеков BLEED",
+      "cost": "−12% урона прочих DoT",
+      "tags": [
+        "bleed",
+        "kinetic"
+      ],
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "bleedStackCap",
+          "op": "FLAT",
+          "value": 2
+        },
+        {
+          "type": "stat",
+          "stat": "statusDamage",
+          "op": "INCREASED",
+          "value": -12
+        },
+        {
+          "type": "stat",
+          "stat": "bleedDamage",
+          "op": "INCREASED",
+          "value": 12
+        }
+      ]
+    },
+    {
+      "id": "MUT_WARD",
+      "name": "Цифровой оберег",
+      "benefit": "−20% MORE входящего D-урона",
+      "cost": "+10% MORE входящего K-урона",
+      "tags": [
+        "defense",
+        "digital"
+      ],
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "incomingDigital",
+          "op": "LESS",
+          "value": 0.2
+        },
+        {
+          "type": "stat",
+          "stat": "incomingKinetic",
+          "op": "MORE",
+          "value": 1.1
+        }
+      ]
+    },
+    {
+      "id": "MUT_CRIT",
+      "name": "Критический резонанс",
+      "benefit": "×1.30 MORE крит. урона",
+      "cost": "−5 п.п. шанса крита",
+      "tags": [
+        "crit"
+      ],
+      "effects": [
+        {
+          "type": "stat",
+          "stat": "moreCritDamage",
+          "op": "MORE",
+          "value": 1.3
+        },
+        {
+          "type": "stat",
+          "stat": "critChance",
+          "op": "FLAT",
+          "value": -5
+        }
+      ]
+    }
+  ]
+}
