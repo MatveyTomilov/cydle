@@ -1279,7 +1279,11 @@ func route_intel() -> Dictionary:
 	if state.run.biome == "B06": effective_intel -= 1
 	if state.run.escalation_ids.has("SCAN_DARK"): effective_intel -= 1
 	effective_intel = maxi(0, effective_intel)
-	var scan_distance: int = 1 + (1 if effective_intel >= 3 else 0)
+	var scan_bonus: int = 0
+	var scan_build: Dictionary = run_build_preview()
+	if bool(scan_build.get("valid", false)):
+		scan_bonus = maxi(0, int(scan_build.get("stats", {}).get("scanRange", 0)))
+	var scan_distance: int = (1 if effective_intel >= 1 else 0) + (1 if effective_intel >= 3 else 0) + scan_bonus
 	var result: Dictionary = {"level": intel_level, "effectiveLevel": effective_intel, "nodes": {}}
 	var preview_available: bool = state.run.biome == "B06" and _anomaly_preview_available()
 	var preview_used_flag: String = "ANOMALY_PREVIEW_USED:%d" % state.run.depth
@@ -1292,7 +1296,7 @@ func route_intel() -> Dictionary:
 			var is_preview: bool = preview_available and not state.meta.campaign_flags.has(preview_used_flag) and str(node.get("type", "")) == "ANOMALY"
 			var active_contract: Dictionary = state.run.contract
 			var is_contract_target: bool = str(active_contract.get("status", "")) == "ACTIVE" and str(active_contract.get("targetNodeId", "")) == node_id
-			var revealed: bool = visited or scouted or is_preview or is_contract_target or (distance > 0 and distance <= scan_distance and effective_intel >= 1)
+			var revealed: bool = visited or scouted or is_preview or is_contract_target or (distance > 0 and distance <= scan_distance and (effective_intel >= 1 or scan_bonus > 0))
 			var info: Dictionary = {"revealed": revealed, "visited": visited, "scouted": scouted, "contractTarget": is_contract_target}
 			if revealed:
 				info["type"] = str(node.get("type", "UNKNOWN"))
@@ -2701,6 +2705,11 @@ func continue_campaign(escalation_ids: Array[String] = []) -> bool:
 		resources["hp"] = minf(float(resources.get("hp", 0.0)), float(resources["maxHP"]))
 		resources["shield"] = minf(float(resources.get("shield", 0.0)), float(resources["maxShield"]))
 		resources["energy"] = minf(float(resources.get("energy", 0.0)), float(resources["maxEnergy"]))
+		var missing_hull: float = maxf(0.0, float(resources.get("maxHull", 100.0)) - float(resources.get("hull", 0.0)))
+		resources["maxFuel"] = maxf(0.0, float(stats.get("fuelMax", resources.get("maxFuel", 24.0))))
+		resources["maxHull"] = maxf(1.0, float(stats.get("hullMax", resources.get("maxHull", 100.0))))
+		resources["fuel"] = clampf(float(resources.get("fuel", 0.0)), 0.0, float(resources["maxFuel"]))
+		resources["hull"] = clampf(float(resources["maxHull"]) - missing_hull, 0.0, float(resources["maxHull"]))
 	run_payload["resources"]["gameTimeMs"] = float(run_payload["resources"].get("gameTimeMs", 0.0)) + 8000.0
 	return _commit_payload(payload)
 
